@@ -22,9 +22,6 @@
 
 #include <string>
 
-/**
- */
-
 void wdtServer(int port, int num_sockets, std::string destDirectory);
 
 void wdtClient(std::string destHost, int port, int num_sockets,
