@@ -19,6 +19,8 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
+#include "SourceQueue.h"
+
 DEFINE_string(directory, ".",
               "Source/Destination directory");
 DEFINE_string(destination, "",
