@@ -18,6 +18,7 @@
 
 #include "ClientSocket.h"
 #include "DirectorySourceQueue.h"
+#include "FileCreator.h"
 #include "ServerSocket.h"
 #include "Protocol.h"
 
@@ -40,6 +41,7 @@ using std::string;
 
 DEFINE_int32(backlog, 1, "Accept backlog");
 
+std::unique_ptr<FileCreator> fileCreator;
 
 /// len is initial/already read len
 size_t readAtLeast(int fd, char *buf, size_t max, size_t atLeast,
@@ -111,14 +113,10 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
       bool success = Protocol::decode(buf, off, l,
                                       id, size);
       LOG(INFO) << "Read id:" << id << " size:" << size << " off now " << off;
-      // TODO: create directories...
-      // TODO: check for weird id / properly concatenate destDir and id
-      string path = folly::to<string>(destDirectory, id);
-      int dest = open(path.c_str(), O_CREAT|O_WRONLY|O_TRUNC, 0644);
+      int dest = fileCreator->createFile(id.c_str());
       if (dest == -1) {
-        PLOG(ERROR) << "Unable to open " << id << " in " << destDirectory;
+        LOG(ERROR) << "Unable to open " << id << " in " << destDirectory;
       }
-      LOG(INFO) << "Opened " << path << " on " << dest;
       size_t toWrite = l - off;
       bool tinyFile = false;
       if (toWrite > size) {
@@ -168,6 +166,7 @@ void wdtServer(int port, int num_sockets, string destDirectory) {
     destDirectory.push_back('/');
     LOG(VERBOSE) << "Added missing trailing / to " << destDirectory;
   }
+  fileCreator.reset(new FileCreator(destDirectory.c_str()));
   std::thread vt[num_sockets];
   for (int i=0; i < num_sockets; i++) {
     vt[i] = std::thread(wdtServerOne, port + i, FLAGS_backlog, destDirectory);
