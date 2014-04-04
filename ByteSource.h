@@ -1,14 +1,24 @@
 #pragma once
 
+#include <string>
+
 namespace facebook { namespace wdt {
 
 class ByteSource {
 public:
-  /// @return true iff no more data to read
-  bool finished() const;
+  virtual ~ByteSource() {}
+
+  /// @return identifier for the source
+  virtual const std::string& getIdentifier() const = 0;
+
+  /// @return number of bytes in source
+  virtual uint64_t getSize() const = 0;
+
+  /// @return true iff all data read successfully
+  virtual bool finished() const = 0;
 
   /// @return true iff there was an error reading
-  bool hasError() const;
+  virtual bool hasError() const = 0;
 
   /**
    * Read chunk of data from the source and return a pointer to data and its
@@ -24,7 +34,7 @@ public:
    *                  use finished() and hasError() members to distinguish
    *                  the two cases
    */
-  char* read(size_t& size);
+  virtual char* read(size_t& size) = 0;
 };
 
 }}

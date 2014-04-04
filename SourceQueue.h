@@ -17,17 +17,20 @@ namespace facebook { namespace wdt {
  */
 class SourceQueue {
 public:
+  virtual ~SourceQueue() {}
+
   /// @return true iff no more sources to read from
-  bool finished() const;
+  virtual bool finished() const = 0;
 
   /**
    * Get the next source to consume. Ownership transfers to the caller.
+   * The method will block until it's able to get the next available source
+   * or be sure consumption of all sources has finished.
    *
-   * @return          New ByteSource to consume or nullptr if there is
-   *                  no source available (for now equivalent to finished()
-   *                  but later sources could be discovered over time).
+   * @return          New ByteSource to consume or nullptr if there are
+   *                  no more sources to read from (equivalent to finished()).
    */
-  std::unique_ptr<ByteSource> getNextSource();
+  virtual std::unique_ptr<ByteSource> getNextSource() = 0;
 };
 
 }}

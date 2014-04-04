@@ -19,8 +19,6 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "SourceQueue.h"
-
 DEFINE_string(directory, ".",
               "Source/Destination directory");
 DEFINE_string(destination, "",
@@ -36,7 +34,7 @@ int main(int argc, char *argv[]) {
             << " and destination=" << FLAGS_destination
             << " num sockets=" << FLAGS_num_sockets
             << " from port=" << FLAGS_port;
-    ;
+
   if (FLAGS_destination.empty()) {
     wdtServer(FLAGS_port, FLAGS_num_sockets, FLAGS_directory);
   } else {

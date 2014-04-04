@@ -17,6 +17,7 @@
 #include "wdtlib.h"
 
 #include "ClientSocket.h"
+#include "DirectorySourceQueue.h"
 #include "ServerSocket.h"
 #include "Protocol.h"
 
@@ -146,7 +147,7 @@ void wdtServer(int port, int num_sockets, string destDirectory) {
   LOG(INFO) << "Starting (receiving) server on " << port
             << " with " << num_sockets << " target dir " << destDirectory;
 
-  if (destDirectory[destDirectory.size()-1] != '/') {
+  if (destDirectory.back() != '/') {
     destDirectory.push_back('/');
     LOG(VERBOSE) << "Added missing trailing / to " << destDirectory;
   }
@@ -160,17 +161,58 @@ void wdtServer(int port, int num_sockets, string destDirectory) {
   }
 }
 
-void wdtClient(string destHost, int port, int num_sockets,
-               string srcDirectory) {
-  LOG(INFO) << "Client (sending) to " << destHost << " port " << port
-            << " with " << num_sockets << " source dir " << srcDirectory;
+void wdtClientOne(
+  const string& destHost,
+  int port,
+  DirectorySourceQueue* queue
+) {
   ClientSocket s(destHost, folly::to<string>(port));
   s.connect();
   int fd = s.getFd();
   char buf[1024];
   size_t off = 0;
-  bool success = Protocol::encode(buf, off, sizeof(buf), "file1.test", 10);
-  CHECK(success);
-  memcpy(buf+off, "1234567890", 10);
-  write(fd, buf, off+10);
+  std::unique_ptr<ByteSource> source;
+  while (source = queue->getNextSource()) {
+    bool success = Protocol::encode(
+      buf, off, sizeof(buf), source->getIdentifier(), source->getSize()
+    );
+    CHECK(success);
+    ssize_t written = write(fd, buf, off);
+    if (written != off) {
+      PLOG(FATAL) << "Write error/mismatch " << written << " " << off;
+    }
+    while (!source->finished()) {
+      size_t size;
+      char* buffer = source->read(size);
+      if (source->hasError()) {
+        LOG(ERROR) << "failed reading file";
+        break;
+      }
+      CHECK(buffer && size > 0);
+      written = write(fd, buffer, size);
+      LOG(INFO) << "wrote " << written << " on " << fd;
+      if (written != size) {
+        PLOG(FATAL) << "Write error/mismatch " << written << " " << size;
+      }
+    }
+  }
+}
+
+void wdtClient(string destHost, int port, int num_sockets,
+               string srcDirectory) {
+  if (srcDirectory.back() != '/') {
+    srcDirectory.push_back('/');
+    LOG(VERBOSE) << "Added missing trailing / to " << srcDirectory;
+  }
+  LOG(INFO) << "Client (sending) to " << destHost << " port " << port
+            << " with " << num_sockets << " source dir " << srcDirectory;
+  DirectorySourceQueue queue(srcDirectory);
+  std::thread vt[num_sockets];
+  for (int i=0; i < num_sockets; i++) {
+    vt[i] = std::thread(wdtClientOne, destHost, port + i, &queue);
+  }
+  queue.init();
+  for (int i=0; i < num_sockets; i++) {
+    vt[i].join();
+  }
 }
