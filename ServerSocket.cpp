@@ -52,8 +52,9 @@ bool ServerSocket::listen() {
                  << " : " << gai_strerror(res);
     }
     for (struct addrinfo *info=infoList; info!=nullptr; info=info->ai_next) {
-       LOG(INFO) << "will listen on "
+      LOG(INFO) << "will listen on "
                 << getNameInfo(info->ai_addr, info->ai_addrlen);
+      // TODO: set sock options
       listeningFd_ = socket(info->ai_family, info->ai_socktype,
                             info->ai_protocol);
       if (listeningFd_ == -1) {
@@ -97,6 +98,7 @@ int ServerSocket::getNextFd() {
   }
   LOG(INFO) << "new connection " << fd_ << " from "
             << getNameInfo(&addr, addrLen);
+  // TODO: set sock options
   return fd_;
 
 }

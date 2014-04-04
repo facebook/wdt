@@ -22,6 +22,7 @@
 #include "Protocol.h"
 
 #include "folly/Conv.h"
+#include "folly/String.h"
 
 #include <thread>
 
@@ -40,8 +41,13 @@ using std::string;
 DEFINE_int32(backlog, 1, "Accept backlog");
 
 
-size_t readAtLeast(int fd, char *buf, size_t max, size_t atLeast) {
-  ssize_t len = 0;
+/// len is initial/already read len
+size_t readAtLeast(int fd, char *buf, size_t max, size_t atLeast,
+                   ssize_t len=0) {
+  LOG(INFO) << "readAtLeast len " << len
+            << " max " << max
+            << " atLeast " << atLeast
+            << " from " << fd;
   int count = 0;
   while (len < atLeast) {
     ssize_t n = read(fd, buf+len, max-len);
@@ -66,6 +72,7 @@ size_t readAtLeast(int fd, char *buf, size_t max, size_t atLeast) {
 
 size_t readAtMost(int fd, char *buf, size_t max, size_t atMost) {
   const int64_t target = atMost < max ? atMost : max;
+  LOG(INFO) << "readAtMost target " << target;
   ssize_t n = read(fd, buf, target);
   if (n < 0) {
     PLOG(ERROR) << "Read error on " << fd << " with target " << target;
@@ -75,7 +82,7 @@ size_t readAtMost(int fd, char *buf, size_t max, size_t atMost) {
     LOG(ERROR) << "Eof on " << fd;
     return n;
   }
-  LOG(INFO) << "readAtMost " << n << " from " << fd;
+  LOG(INFO) << "readAtMost " << n << " / " << atMost << " from " << fd;
   return n;
 }
 
@@ -91,19 +98,19 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
     int fd = s.getNextFd();
     // test with sending bytes 1 by 1 and id len > 1024 (!)
     char buf[128*1024];
-    ssize_t l;
+    ssize_t l = 0;
     LOG(INFO) << "Reading from " << fd;
     while (true) {
-      l = readAtLeast(fd, buf, sizeof(buf), 256);
+      l = readAtLeast(fd, buf, sizeof(buf), 256, l);
       if (l <= 0) {
         break;
       }
       size_t off = 0;
       string id;
       int64_t size;
-      bool success = Protocol::decode(buf, off, sizeof(buf),
+      bool success = Protocol::decode(buf, off, l,
                                       id, size);
-      LOG(INFO) << "Read id:" << id << " size:" << size;
+      LOG(INFO) << "Read id:" << id << " size:" << size << " off now " << off;
       // TODO: create directories...
       // TODO: check for weird id / properly concatenate destDir and id
       string path = folly::to<string>(destDirectory, id);
@@ -111,21 +118,22 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
       if (dest == -1) {
         PLOG(ERROR) << "Unable to open " << id << " in " << destDirectory;
       }
-      LOG(INFO) << "Opened " << path;
-      // TODO: Doesn't work if more than 1 file fits in first read
+      LOG(INFO) << "Opened " << path << " on " << dest;
       size_t toWrite = l - off;
+      bool tinyFile = false;
       if (toWrite > size) {
-        LOG(FATAL) << "Doesn't deal with tiny files yet " << toWrite
-                   << " read vs " << size;
         toWrite = size;
+        tinyFile = true;
       }
       // write rest of stuff
-      int64_t wres = write(dest, buf + off, l - off);
-      if (wres != l-off) {
+      int64_t wres = write(dest, buf + off, toWrite);
+      if (wres != toWrite) {
         PLOG(ERROR) << "Write error/mismatch " << wres << " " << off << " " <<l;
+      } else {
+        LOG(INFO) << "Wrote intial " << wres << " / " << size << " on " << dest;
       }
       while (wres < size) {
-        int64_t nres = readAtMost(fd, buf, sizeof(buf), wres-size);
+        int64_t nres = readAtMost(fd, buf, sizeof(buf), size-wres);
         if (nres <= 0) {
           break;
         }
@@ -137,6 +145,15 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
       }
       LOG(INFO) << "completed " << id << " " << dest;
       close(dest);
+      if (tinyFile) {
+        // rare so inneficient is ok
+        LOG(INFO) << "copying extra " << l-(size+off)
+                  << " leftover bytes @ " << off+size;
+        memmove(/* dst */ buf, /* from */ buf+size+off,/*how much */l-off-size);
+        l -= (off+size);
+      } else {
+        l = 0;
+      }
     }
     LOG(INFO) << "Done with " << fd;
     close(fd);
@@ -170,17 +187,21 @@ void wdtClientOne(
   s.connect();
   int fd = s.getFd();
   char buf[1024];
-  size_t off = 0;
   std::unique_ptr<ByteSource> source;
   while (source = queue->getNextSource()) {
+    size_t off = 0;
+    const size_t expectedSize = source->getSize();
+    size_t actualSize = 0;
     bool success = Protocol::encode(
-      buf, off, sizeof(buf), source->getIdentifier(), source->getSize()
+      buf, off, sizeof(buf), source->getIdentifier(), expectedSize
     );
     CHECK(success);
     ssize_t written = write(fd, buf, off);
     if (written != off) {
       PLOG(FATAL) << "Write error/mismatch " << written << " " << off;
     }
+    LOG(INFO) << "Sent " << written << " on " << fd
+              << " : " << folly::humanify(string(buf, off));
     while (!source->finished()) {
       size_t size;
       char* buffer = source->read(size);
@@ -190,10 +211,15 @@ void wdtClientOne(
       }
       CHECK(buffer && size > 0);
       written = write(fd, buffer, size);
+      actualSize += written;
       LOG(INFO) << "wrote " << written << " on " << fd;
       if (written != size) {
         PLOG(FATAL) << "Write error/mismatch " << written << " " << size;
       }
+    }
+    if (actualSize != expectedSize) {
+      LOG(FATAL) << "UGH " << source->getIdentifier()
+                 << " " << expectedSize << " " << actualSize;
     }
   }
 }

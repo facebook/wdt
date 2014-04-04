@@ -58,6 +58,7 @@ bool ClientSocket::connect() {
       LOG(ERROR) << "Unable to connect";
       return false;
     }
+    // TODO: set sock options
     return true;
 }
 
