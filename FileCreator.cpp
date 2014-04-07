@@ -53,7 +53,7 @@ int FileCreator::createFile(const char* relPath) {
       return -1;
     }
   }
-  LOG(INFO) << "successfully created file " << path;
+  LOG(VERBOSE) << "successfully created file " << path;
   return res;
 }
 

@@ -46,10 +46,10 @@ std::unique_ptr<FileCreator> fileCreator;
 /// len is initial/already read len
 size_t readAtLeast(int fd, char *buf, size_t max, size_t atLeast,
                    ssize_t len=0) {
-  LOG(INFO) << "readAtLeast len " << len
-            << " max " << max
-            << " atLeast " << atLeast
-            << " from " << fd;
+  LOG(VERBOSE) << "readAtLeast len " << len
+               << " max " << max
+               << " atLeast " << atLeast
+               << " from " << fd;
   int count = 0;
   while (len < atLeast) {
     ssize_t n = read(fd, buf+len, max-len);
@@ -62,29 +62,29 @@ size_t readAtLeast(int fd, char *buf, size_t max, size_t atLeast,
       }
     }
     if (n == 0) {
-      LOG(WARNING) << "Eof on " << fd << " after " << count << " read " << len;
+      LOG(VERBOSE) << "Eof on " << fd << " after " << count << " read " << len;
       return len;
     }
     len += n;
     count++;
   }
-  LOG(INFO) << "took " << count << " read to get " << len << " from " << fd;
+  LOG(VERBOSE) << "took " << count << " read to get " << len << " from " << fd;
   return len;
 }
 
 size_t readAtMost(int fd, char *buf, size_t max, size_t atMost) {
   const int64_t target = atMost < max ? atMost : max;
-  LOG(INFO) << "readAtMost target " << target;
+  LOG(VERBOSE) << "readAtMost target " << target;
   ssize_t n = read(fd, buf, target);
   if (n < 0) {
     PLOG(ERROR) << "Read error on " << fd << " with target " << target;
     return n;
   }
   if (n == 0) {
-    LOG(ERROR) << "Eof on " << fd;
+    LOG(WARNING) << "Eof on " << fd;
     return n;
   }
-  LOG(INFO) << "readAtMost " << n << " / " << atMost << " from " << fd;
+  LOG(VERBOSE) << "readAtMost " << n << " / " << atMost << " from " << fd;
   return n;
 }
 
@@ -101,7 +101,7 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
     // test with sending bytes 1 by 1 and id len > 1024 (!)
     char buf[128*1024];
     ssize_t l = 0;
-    LOG(INFO) << "Reading from " << fd;
+    LOG(VERBOSE) << "Reading from " << fd;
     while (true) {
       l = readAtLeast(fd, buf, sizeof(buf), 256, l);
       if (l <= 0) {
@@ -128,7 +128,8 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
       if (wres != toWrite) {
         PLOG(ERROR) << "Write error/mismatch " << wres << " " << off << " " <<l;
       } else {
-        LOG(INFO) << "Wrote intial " << wres << " / " << size << " on " << dest;
+        LOG(VERBOSE) << "Wrote intial " << wres << " / " << size
+                     << " on " << dest;
       }
       while (wres < size) {
         int64_t nres = readAtMost(fd, buf, sizeof(buf), size-wres);
@@ -145,7 +146,7 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
       close(dest);
       if (tinyFile) {
         // rare so inneficient is ok
-        LOG(INFO) << "copying extra " << l-(size+off)
+        LOG(VERBOSE) << "copying extra " << l-(size+off)
                   << " leftover bytes @ " << off+size;
         memmove(/* dst */ buf, /* from */ buf+size+off,/*how much */l-off-size);
         l -= (off+size);
@@ -160,7 +161,7 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
 
 void wdtServer(int port, int num_sockets, string destDirectory) {
   LOG(INFO) << "Starting (receiving) server on " << port
-            << " with " << num_sockets << " target dir " << destDirectory;
+            << " : " << num_sockets << " sockets, target dir " << destDirectory;
 
   if (destDirectory.back() != '/') {
     destDirectory.push_back('/');
@@ -199,8 +200,8 @@ void wdtClientOne(
     if (written != off) {
       PLOG(FATAL) << "Write error/mismatch " << written << " " << off;
     }
-    LOG(INFO) << "Sent " << written << " on " << fd
-              << " : " << folly::humanify(string(buf, off));
+    LOG(VERBOSE) << "Sent " << written << " on " << fd
+                 << " : " << folly::humanify(string(buf, off));
     while (!source->finished()) {
       size_t size;
       char* buffer = source->read(size);
@@ -211,7 +212,7 @@ void wdtClientOne(
       CHECK(buffer && size > 0);
       written = write(fd, buffer, size);
       actualSize += written;
-      LOG(INFO) << "wrote " << written << " on " << fd;
+      LOG(VERBOSE) << "wrote " << written << " on " << fd;
       if (written != size) {
         PLOG(FATAL) << "Write error/mismatch " << written << " " << size;
       }
@@ -230,7 +231,7 @@ void wdtClient(string destHost, int port, int num_sockets,
     LOG(VERBOSE) << "Added missing trailing / to " << srcDirectory;
   }
   LOG(INFO) << "Client (sending) to " << destHost << " port " << port
-            << " with " << num_sockets << " source dir " << srcDirectory;
+            << " : " << num_sockets << " sockets, source dir " << srcDirectory;
   DirectorySourceQueue queue(srcDirectory);
   std::thread vt[num_sockets];
   for (int i=0; i < num_sockets; i++) {
