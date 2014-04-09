@@ -21,6 +21,9 @@ bool DirectorySourceQueue::init() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     initFinished_ = true;
+    if (sizeToPath_.empty()) {
+      conditionNotEmpty_.notify_all();
+    }
   }
   LOG(INFO) << "finished initialization of DirectorySourceQueue";
   return res;
@@ -97,6 +100,9 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource() {
     }
     auto pair = sizeToPath_.top();
     sizeToPath_.pop();
+    if (sizeToPath_.empty() && initFinished_) {
+      conditionNotEmpty_.notify_all();
+    }
     filesize = pair.first;
     filename = pair.second;
   }
