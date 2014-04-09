@@ -17,11 +17,9 @@ namespace facebook { namespace wdt {
 class FileCreator {
 public:
   /// rootDir is assumed to exist
-  explicit FileCreator(const char* rootDir) : rootDir_(rootDir) {
+  explicit FileCreator(const std::string &rootDir) : rootDir_(rootDir) {
     CHECK(!rootDir_.empty());
-    if (rootDir_.back() != '/') {
-      rootDir_.push_back('/');
-    }
+    addTrailingSlash(rootDir_);
   }
 
   /**
@@ -35,13 +33,17 @@ public:
    *
    * @return        file descriptor or -1 on error
    */
-  int createFile(const char* relPath);
+  int createFile(const std::string &relPath);
 
   /// reset internal directory cache
   void reset() {
     std::lock_guard<std::mutex> lock(mutex_);
     createdDirs_.clear();
   }
+
+  // TODO: do that automatically ? why do I have to call this...
+  /// appends a trailing / if not already there to path
+  static void addTrailingSlash(std::string &path);
 
 private:
   /**

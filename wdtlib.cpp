@@ -33,23 +33,42 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include <limits.h>
 
 using namespace facebook::wdt;
 
 using std::string;
 
-DEFINE_int32(backlog, 1, "Accept backlog");
+/// Max size of filename + 2 max varints
+size_t kMaxHeader = PATH_MAX + 10 + 10;
 
-std::unique_ptr<FileCreator> fileCreator;
+
+DEFINE_int32(backlog, 1, "Accept backlog");
+DEFINE_int32(buffer_size, 64*1024, "Buffer size (per thread/socket)");
+DEFINE_int32(max_retries, 20, "how many attempts to connect/listen");
+DEFINE_int32(sleep_ms, 50, "how many ms to wait between attempts");
+
+
+size_t kBufferSize;
+
+std::unique_ptr<FileCreator> gFileCreator;
+
+/// Both version, magic number and command byte
+enum CMD_MAGIC {
+  FILE_CMD = 0x44,
+  DONE_CMD = 0x4C
+};
+
 
 /// len is initial/already read len
-size_t readAtLeast(int fd, char *buf, size_t max, size_t atLeast,
+size_t readAtLeast(int fd, char *buf, size_t max, ssize_t atLeast,
                    ssize_t len=0) {
   LOG(VERBOSE) << "readAtLeast len " << len
                << " max " << max
                << " atLeast " << atLeast
                << " from " << fd;
+  CHECK(len >= 0)     << "negative len " << len;
+  CHECK(atLeast >= 0) << "negative atLeast " << atLeast;
   int count = 0;
   while (len < atLeast) {
     ssize_t n = read(fd, buf+len, max-len);
@@ -89,50 +108,80 @@ size_t readAtMost(int fd, char *buf, size_t max, size_t atMost) {
 }
 
 
-
-
 void wdtServerOne(int port, int backlog, string destDirectory) {
   LOG(INFO) << "Server Thread for port " << port << " with backlog " << backlog
             << " on " << destDirectory;
+
   ServerSocket s(folly::to<string>(port), backlog);
-  s.listen();
+  for (int i = 1; i < FLAGS_max_retries; ++i) {
+    if (s.listen()) {
+      break;
+    }
+    LOG(INFO) << "Sleeping after failed attempt " << i;
+    usleep(FLAGS_sleep_ms * 1000);
+  }
+  // one more/last try (stays true if it worked above)
+  CHECK(s.listen()) << "Unable to listen/bind despite retries";
+  char *buf = (char *)malloc(kBufferSize);
+  CHECK(buf) << "error allocating " << kBufferSize;
   while (true) {
     int fd = s.getNextFd();
-    // test with sending bytes 1 by 1 and id len > 1024 (!)
-    char buf[128*1024];
-    ssize_t l = 0;
+    // TODO test with sending bytes 1 by 1 and id len at max
+    ssize_t numRead = 0;
+    size_t off = 0;
     LOG(VERBOSE) << "Reading from " << fd;
     while (true) {
-      l = readAtLeast(fd, buf, sizeof(buf), 256, l);
-      if (l <= 0) {
+      numRead = readAtLeast(fd, buf + off, kBufferSize - off,
+                            kMaxHeader, numRead);
+      if (numRead <= 0) {
         break;
       }
-      size_t off = 0;
       string id;
       int64_t size;
-      bool success = Protocol::decode(buf, off, l,
+      const ssize_t oldOffset = off;
+      enum CMD_MAGIC cmd = (enum CMD_MAGIC)buf[off++];
+      if (cmd == DONE_CMD) {
+        LOG(INFO) << "Got done command for " << fd;
+        CHECK(numRead == 1) << "Unexpected state for done command"
+                            << " off: " << off
+                            << " numRead: " << numRead;
+        write(fd, buf+off-1, 1);
+        break;
+      }
+      CHECK(cmd == FILE_CMD) << "Unexpected magic/cmd byte " << cmd;
+      bool success = Protocol::decode(buf, off, numRead + oldOffset,
                                       id, size);
-      LOG(INFO) << "Read id:" << id << " size:" << size << " off now " << off;
-      int dest = fileCreator->createFile(id.c_str());
+      CHECK(success) << "Error decoding at"
+                     << " ooff:" << oldOffset << " off: " << off
+                     << " numRead: " << numRead;
+      LOG(INFO) << "Read id:" << id << " size:" << size
+                << " ooff:" << oldOffset << " off: " << off
+                << " numRead: " << numRead;
+      int dest = gFileCreator->createFile(id);
       if (dest == -1) {
         LOG(ERROR) << "Unable to open " << id << " in " << destDirectory;
       }
-      size_t toWrite = l - off;
-      bool tinyFile = false;
-      if (toWrite > size) {
+      ssize_t remainingData = numRead + oldOffset - off;
+      ssize_t toWrite = remainingData;
+      if (remainingData >= size) {
         toWrite = size;
-        tinyFile = true;
       }
       // write rest of stuff
       int64_t wres = write(dest, buf + off, toWrite);
       if (wres != toWrite) {
-        PLOG(ERROR) << "Write error/mismatch " << wres << " " << off << " " <<l;
+        PLOG(ERROR) << "Write error/mismatch " << wres
+                    << " " << off << " " << toWrite;
       } else {
         LOG(VERBOSE) << "Wrote intial " << wres << " / " << size
+                     << " off: " << off
+                     << " numRead: " << numRead
                      << " on " << dest;
       }
+      off += wres;
+      remainingData -= wres;
+      // also means no leftOver so it's ok we use buf from start
       while (wres < size) {
-        int64_t nres = readAtMost(fd, buf, sizeof(buf), size-wres);
+        int64_t nres = readAtMost(fd, buf, kBufferSize, size-wres);
         if (nres <= 0) {
           break;
         }
@@ -142,32 +191,51 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
         }
         wres += nwres;
       }
-      LOG(INFO) << "completed " << id << " " << dest;
+      LOG(INFO) << "completed " << id
+                     << " off: " << off
+                     << " numRead: " << numRead
+                     << " on " << dest;
       close(dest);
-      if (tinyFile) {
-        // rare so inneficient is ok
-        LOG(VERBOSE) << "copying extra " << l-(size+off)
-                  << " leftover bytes @ " << off+size;
-        memmove(/* dst */ buf, /* from */ buf+size+off,/*how much */l-off-size);
-        l -= (off+size);
+      CHECK(remainingData >= 0) "Negative remainingData " << remainingData;
+      if (remainingData > 0) {
+        // if we need to read more anyway, let's move the data
+        numRead = remainingData;
+        if (remainingData < kMaxHeader) {
+          // rare so inneficient is ok
+          LOG(VERBOSE) << "copying extra " << remainingData
+                       << " leftover bytes @ " << off;
+          memmove(/* dst      */ buf,
+                  /* from     */ buf+off,
+                  /* how much */ remainingData);
+          off = 0;
+        } else {
+          // otherwise just change the offset
+          LOG(VERBOSE) << "will use remaining extra " << remainingData
+                       << " leftover bytes @ " << off;
+        }
       } else {
-        l = 0;
+        numRead = off = 0;
       }
     }
     LOG(INFO) << "Done with " << fd;
     close(fd);
   }
+  free(buf);
 }
 
 void wdtServer(int port, int num_sockets, string destDirectory) {
+  // TODO: do that automatically ? why do I have to call this...
+  FileCreator::addTrailingSlash(destDirectory);
   LOG(INFO) << "Starting (receiving) server on " << port
             << " : " << num_sockets << " sockets, target dir " << destDirectory;
-
-  if (destDirectory.back() != '/') {
-    destDirectory.push_back('/');
-    LOG(VERBOSE) << "Added missing trailing / to " << destDirectory;
+  kBufferSize = FLAGS_buffer_size;
+  if (kBufferSize < kMaxHeader) {
+    kBufferSize = 2*1024*((kMaxHeader-1)/(2*1024) + 1); // round up to even k
+    LOG(INFO) << "Specified -buffer_size " << FLAGS_buffer_size
+              << " smaller than " << kMaxHeader
+              << " using " << kBufferSize << " instead";
   }
-  fileCreator.reset(new FileCreator(destDirectory.c_str()));
+  gFileCreator.reset(new FileCreator(destDirectory));
   std::thread vt[num_sockets];
   for (int i=0; i < num_sockets; i++) {
     vt[i] = std::thread(wdtServerOne, port + i, FLAGS_backlog, destDirectory);
@@ -184,24 +252,33 @@ void wdtClientOne(
   DirectorySourceQueue* queue
 ) {
   ClientSocket s(destHost, folly::to<string>(port));
-  s.connect();
+  for (int i = 1; i < FLAGS_max_retries; ++i) {
+    if (s.connect()) {
+      break;
+    }
+    LOG(INFO) << "Sleeping after failed attempt " << i;
+    usleep(FLAGS_sleep_ms * 1000);
+  }
+  // one more/last try (stays true if it worked above)
+  CHECK(s.connect()) << "Unable to connect despite retries";
   int fd = s.getFd();
-  char buf[1024];
+  char headerBuf[kMaxHeader];
   std::unique_ptr<ByteSource> source;
   while (source = queue->getNextSource()) {
     size_t off = 0;
+    headerBuf[off++] = FILE_CMD;
     const size_t expectedSize = source->getSize();
     size_t actualSize = 0;
     bool success = Protocol::encode(
-      buf, off, sizeof(buf), source->getIdentifier(), expectedSize
+      headerBuf, off, kMaxHeader, source->getIdentifier(), expectedSize
     );
     CHECK(success);
-    ssize_t written = write(fd, buf, off);
+    ssize_t written = write(fd, headerBuf, off);
     if (written != off) {
       PLOG(FATAL) << "Write error/mismatch " << written << " " << off;
     }
     LOG(VERBOSE) << "Sent " << written << " on " << fd
-                 << " : " << folly::humanify(string(buf, off));
+                 << " : " << folly::humanify(string(headerBuf, off));
     while (!source->finished()) {
       size_t size;
       char* buffer = source->read(size);
@@ -222,17 +299,27 @@ void wdtClientOne(
                  << " " << expectedSize << " " << actualSize;
     }
   }
+  headerBuf[0] = DONE_CMD;
+  write(fd, headerBuf, 1); //< TODO check for status/succes
+  shutdown(fd, SHUT_WR);   //< TODO check for status/succes
+  LOG(INFO) << "Wrote done cmd on " << fd << " waiting for reply...";
+  ssize_t numRead = read(fd, headerBuf, 1);
+  CHECK(numRead == 1) << "READ unexpected " << numRead << ":"
+                      << folly::humanify(string(headerBuf, numRead));
+  CHECK(headerBuf[0] == DONE_CMD) << "Unexpected reply " << headerBuf[0];
+  numRead = read(fd, headerBuf, kMaxHeader);
+  CHECK(numRead == 0) << "EOF not found when expected " << numRead << ":"
+                      << folly::humanify(string(headerBuf, numRead));
+  LOG(INFO) << "Got reply - all done for " << fd;
 }
 
 void wdtClient(string destHost, int port, int num_sockets,
                string srcDirectory) {
-  if (srcDirectory.back() != '/') {
-    srcDirectory.push_back('/');
-    LOG(VERBOSE) << "Added missing trailing / to " << srcDirectory;
-  }
+  kBufferSize = FLAGS_buffer_size;
+  FileCreator::addTrailingSlash(srcDirectory);
   LOG(INFO) << "Client (sending) to " << destHost << " port " << port
             << " : " << num_sockets << " sockets, source dir " << srcDirectory;
-  DirectorySourceQueue queue(srcDirectory);
+  DirectorySourceQueue queue(srcDirectory, kBufferSize);
   std::thread vt[num_sockets];
   for (int i=0; i < num_sockets; i++) {
     vt[i] = std::thread(wdtClientOne, destHost, port + i, &queue);

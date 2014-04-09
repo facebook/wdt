@@ -8,8 +8,6 @@
 
 namespace facebook { namespace wdt {
 
-const size_t DirectorySourceQueue::kDefaultFileSourceBufferSize = (1 << 12);
-
 bool DirectorySourceQueue::init() {
   {
     std::lock_guard<std::mutex> lock(mutex_);

@@ -9,6 +9,7 @@ namespace facebook { namespace wdt {
 class ServerSocket {
  public:
   ServerSocket(std::string port, int backlog);
+  ~ServerSocket();
   /// Sets up listening socket (first wildcard type (ipv4 or ipv6 depending
   /// on flag)).
   bool listen();

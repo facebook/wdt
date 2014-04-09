@@ -19,8 +19,6 @@ namespace facebook { namespace wdt {
  */
 class DirectorySourceQueue : public SourceQueue {
 public:
-  static const size_t kDefaultFileSourceBufferSize;
-
   /**
    * Create a DirectorySourceQueue. Call init() separately to actually recurse
    * over the root directory and initialize data about files.
@@ -32,7 +30,7 @@ public:
    */
   explicit DirectorySourceQueue(
     const std::string& rootDir,
-    size_t fileSourceBufferSize = kDefaultFileSourceBufferSize
+    size_t fileSourceBufferSize
   ) : rootDir_(rootDir),
       fileSourceBufferSize_(fileSourceBufferSize),
       initCalled_(false),

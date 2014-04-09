@@ -25,6 +25,20 @@ ServerSocket::ServerSocket(string port, int backlog) :
   sa_.ai_flags = AI_PASSIVE;
 }
 
+ServerSocket::~ServerSocket()
+{
+  LOG(INFO) << "~ServerSocket: potentially closing server socket "
+            << listeningFd_ << " and most recent connection " << fd_;
+  if (listeningFd_ >= 0) {
+    close(listeningFd_);
+    listeningFd_ = -1;
+  }
+  if (fd_ >= 0) {
+    close(fd_); // this probably fails because it's already closed by client
+    fd_ = -1;
+  }
+}
+
 /* static */
 string ServerSocket::getNameInfo(const struct sockaddr *sa, socklen_t salen) {
   char host[NI_MAXHOST], service[NI_MAXSERV];
@@ -54,7 +68,7 @@ bool ServerSocket::listen() {
     for (struct addrinfo *info=infoList; info!=nullptr; info=info->ai_next) {
       LOG(INFO) << "will listen on "
                 << getNameInfo(info->ai_addr, info->ai_addrlen);
-      // TODO: set sock options
+      // TODO: set sock options : SO_REUSEADDR,...
       listeningFd_ = socket(info->ai_family, info->ai_socktype,
                             info->ai_protocol);
       if (listeningFd_ == -1) {

@@ -7,24 +7,23 @@
 
 namespace facebook { namespace wdt {
 
-int FileCreator::createFile(const char* relPath) {
-  int p1 = 0;
-  while (relPath[p1] == '/') {
-    ++p1;
-  }
-  int p2 = strlen(relPath);
-  while (p2 > 0 && relPath[p2 - 1] == '/') {
-    --p2;
-  }
-  CHECK(p1 < p2);
+using std::string;
+
+int FileCreator::createFile(const string& relPathStr) {
+  CHECK(!relPathStr.empty());
+  CHECK(relPathStr[0] != '/');
+  CHECK(relPathStr.back() != '/');
+
   std::string path(rootDir_);
-  path.append(relPath + p1, p2 - p1);
-  while (p2 > p1 && relPath[p2 - 1] != '/') {
-    --p2;
+  path.append(relPathStr);
+
+  int p = relPathStr.size();
+  while (p && relPathStr[p - 1] != '/') {
+    --p;
   }
   std::string dir;
-  if (p1 < p2) {
-    dir.assign(relPath + p1, p2 - p1);
+  if (p) {
+    dir.assign(relPathStr.data(), p);
     if (!createDirRecursively(dir)) {
       // retry with force
       LOG(ERROR) << "failed to create dir " << dir << " recursively, "
@@ -84,5 +83,15 @@ bool FileCreator::createDirRecursively(const std::string& dir, bool force) {
   }
   return true;
 }
+
+/* static */
+void FileCreator::addTrailingSlash(string& path) {
+  if (path.back() != '/') {
+    path.push_back('/');
+    LOG(VERBOSE) << "Added missing trailing / to " << path;
+  }
+}
+
+
 
 }}
