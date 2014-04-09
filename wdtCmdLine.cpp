@@ -23,7 +23,7 @@ DEFINE_string(directory, ".",
               "Source/Destination directory");
 DEFINE_string(destination, "",
          "empty is server (destination) mode, non empty is destination host");
-DEFINE_int32(num_sockets, 4, "Number of sockets");
+DEFINE_int32(num_sockets, 8, "Number of sockets");
 DEFINE_int32(port, 22356, "Starting port number"); // W (D) T = 0x5754
 
 int main(int argc, char *argv[]) {

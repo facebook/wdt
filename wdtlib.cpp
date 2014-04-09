@@ -44,7 +44,8 @@ size_t kMaxHeader = PATH_MAX + 10 + 10;
 
 
 DEFINE_int32(backlog, 1, "Accept backlog");
-DEFINE_int32(buffer_size, 64*1024, "Buffer size (per thread/socket)");
+// 256k is fastest for test on localhost and shm : > 5 Gbytes/sec
+DEFINE_int32(buffer_size, 256*1024, "Buffer size (per thread/socket)");
 DEFINE_int32(max_retries, 20, "how many attempts to connect/listen");
 DEFINE_int32(sleep_ms, 50, "how many ms to wait between attempts");
 
@@ -200,7 +201,7 @@ void wdtServerOne(int port, int backlog, string destDirectory) {
       if (remainingData > 0) {
         // if we need to read more anyway, let's move the data
         numRead = remainingData;
-        if (remainingData < kMaxHeader) {
+        if ((remainingData < kMaxHeader) && (off > (kBufferSize/2))) {
           // rare so inneficient is ok
           LOG(VERBOSE) << "copying extra " << remainingData
                        << " leftover bytes @ " << off;
