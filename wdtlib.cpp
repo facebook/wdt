@@ -25,6 +25,7 @@
 #include "folly/Conv.h"
 #include "folly/String.h"
 
+#include <iostream>
 #include <thread>
 
 #include <gflags/gflags.h>
@@ -34,6 +35,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <chrono>
 
 using namespace facebook::wdt;
 
@@ -247,11 +249,26 @@ void wdtServer(int port, int num_sockets, string destDirectory) {
   }
 }
 
+typedef std::chrono::high_resolution_clock Clock;
+using std::chrono::nanoseconds;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+
+template<typename T>
+double durationSeconds(T d) {
+  return duration_cast<duration<double>>(d).count();
+}
+
 void wdtClientOne(
+  Clock::time_point startTime,
   const string& destHost,
   int port,
-  DirectorySourceQueue* queue
+  DirectorySourceQueue* queue,
+  size_t *pHeaderBytes,
+  size_t *pDataBytes
 ) {
+  size_t headerBytes = 0, dataBytes = 0;
+  size_t numFiles = 0;
   ClientSocket s(destHost, folly::to<string>(port));
   for (int i = 1; i < FLAGS_max_retries; ++i) {
     if (s.connect()) {
@@ -265,7 +282,12 @@ void wdtClientOne(
   int fd = s.getFd();
   char headerBuf[kMaxHeader];
   std::unique_ptr<ByteSource> source;
+
+  double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
+  LOG(INFO) << "Connect took " << elapsedSecsConn;
+
   while (source = queue->getNextSource()) {
+    ++numFiles;
     size_t off = 0;
     headerBuf[off++] = FILE_CMD;
     const size_t expectedSize = source->getSize();
@@ -275,6 +297,7 @@ void wdtClientOne(
     );
     CHECK(success);
     ssize_t written = write(fd, headerBuf, off);
+    headerBytes += written;
     if (written != off) {
       PLOG(FATAL) << "Write error/mismatch " << written << " " << off;
     }
@@ -295,6 +318,7 @@ void wdtClientOne(
         PLOG(FATAL) << "Write error/mismatch " << written << " " << size;
       }
     }
+    dataBytes += actualSize;
     if (actualSize != expectedSize) {
       LOG(FATAL) << "UGH " << source->getIdentifier()
                  << " " << expectedSize << " " << actualSize;
@@ -302,6 +326,7 @@ void wdtClientOne(
   }
   headerBuf[0] = DONE_CMD;
   write(fd, headerBuf, 1); //< TODO check for status/succes
+  ++headerBytes;
   shutdown(fd, SHUT_WR);   //< TODO check for status/succes
   LOG(INFO) << "Wrote done cmd on " << fd << " waiting for reply...";
   ssize_t numRead = read(fd, headerBuf, 1);
@@ -311,22 +336,55 @@ void wdtClientOne(
   numRead = read(fd, headerBuf, kMaxHeader);
   CHECK(numRead == 0) << "EOF not found when expected " << numRead << ":"
                       << folly::humanify(string(headerBuf, numRead));
-  LOG(INFO) << "Got reply - all done for " << fd;
+  double totalTime = durationSeconds(Clock::now() - startTime);
+  size_t totalBytes = headerBytes + dataBytes;
+  LOG(WARNING) << "Got reply - all done for fd:" << fd
+               << ". Number of files = " << numFiles
+               << ". Total time = " << totalTime
+               << " (" << elapsedSecsConn << " in connection)"
+               << ". Avg file size = " << 1.*dataBytes/numFiles
+               << ". Data bytes = " << dataBytes
+               << ". Header bytes = " << headerBytes
+               << " ( " << 100.*headerBytes/totalBytes << " % overhead)"
+               << ". Total bytes = " << totalBytes
+               << ". Total throughput = " << totalBytes/totalTime/1024./1024.
+               << " Mbytes/sec";
+  *pHeaderBytes = headerBytes;
+  *pDataBytes = dataBytes;
 }
 
 void wdtClient(string destHost, int port, int num_sockets,
                string srcDirectory) {
+  auto startTime = Clock::now();
   kBufferSize = FLAGS_buffer_size;
   FileCreator::addTrailingSlash(srcDirectory);
   LOG(INFO) << "Client (sending) to " << destHost << " port " << port
             << " : " << num_sockets << " sockets, source dir " << srcDirectory;
   DirectorySourceQueue queue(srcDirectory, kBufferSize);
   std::thread vt[num_sockets];
+  size_t headerBytes[num_sockets];
+  size_t dataBytes[num_sockets];
   for (int i=0; i < num_sockets; i++) {
-    vt[i] = std::thread(wdtClientOne, destHost, port + i, &queue);
+    dataBytes[i] = 0;
+    headerBytes[i] = 0;
+    vt[i] = std::thread(wdtClientOne, startTime, destHost, port + i, &queue,
+                        &headerBytes[i], &dataBytes[i]);
   }
   queue.init();
+  size_t totalDataBytes = 0;
+  size_t totalHeaderBytes = 0;
   for (int i=0; i < num_sockets; i++) {
     vt[i].join();
+    totalHeaderBytes += headerBytes[i];
+    totalDataBytes += dataBytes[i];
   }
+  size_t totalBytes = totalDataBytes + totalHeaderBytes;
+  double totalTime = durationSeconds(Clock::now() - startTime);
+  LOG(WARNING) << "All data transfered in " << totalTime
+               << " seconds. Data Mbytes = " << totalDataBytes/1024./1024.
+               << ". Header kbytes = " << totalHeaderBytes/1024.
+               << " ( " << 100.*totalHeaderBytes/totalBytes << " % overhead)"
+               << ". Total bytes = " << totalBytes
+               << ". Total throughput = " << totalBytes/totalTime/1024./1024.
+               << " Mbytes/sec";
 }
