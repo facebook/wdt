@@ -90,7 +90,7 @@ bool ServerSocket::listen() {
       LOG(ERROR) << "Unable to bind";
       return false;
     }
-    if (::listen(listeningFd_, 0)) {
+    if (::listen(listeningFd_, backlog_)) {
       PLOG(ERROR) << "listen error";
       close(listeningFd_);
       listeningFd_ = -1;

@@ -239,9 +239,12 @@ void wdtServer(int port, int num_sockets, string destDirectory) {
               << " using " << kBufferSize << " instead";
   }
   gFileCreator.reset(new FileCreator(destDirectory));
-  std::thread vt[num_sockets];
+  std::vector<std::thread> vt;
   for (int i=0; i < num_sockets; i++) {
-    vt[i] = std::thread(wdtServerOne, port + i, FLAGS_backlog, destDirectory);
+    vt.emplace_back(wdtServerOne,
+                    port + i,
+                    FLAGS_backlog,
+                    destDirectory);
   }
   // will never exit
   for (int i=0; i < num_sockets; i++) {
@@ -286,7 +289,7 @@ void wdtClientOne(
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
   LOG(INFO) << "Connect took " << elapsedSecsConn;
 
-  while (source = queue->getNextSource()) {
+  while ((source = queue->getNextSource())) {
     ++numFiles;
     size_t off = 0;
     headerBuf[off++] = FILE_CMD;
@@ -361,14 +364,19 @@ void wdtClient(string destHost, int port, int num_sockets,
   LOG(INFO) << "Client (sending) to " << destHost << " port " << port
             << " : " << num_sockets << " sockets, source dir " << srcDirectory;
   DirectorySourceQueue queue(srcDirectory, kBufferSize);
-  std::thread vt[num_sockets];
+  std::vector<std::thread> vt;
   size_t headerBytes[num_sockets];
   size_t dataBytes[num_sockets];
   for (int i=0; i < num_sockets; i++) {
     dataBytes[i] = 0;
     headerBytes[i] = 0;
-    vt[i] = std::thread(wdtClientOne, startTime, destHost, port + i, &queue,
-                        &headerBytes[i], &dataBytes[i]);
+    vt.emplace_back(wdtClientOne,
+                    startTime,
+                    destHost,
+                    port + i,
+                    &queue,
+                    &headerBytes[i],
+                    &dataBytes[i]);
   }
   queue.init();
   size_t totalDataBytes = 0;
