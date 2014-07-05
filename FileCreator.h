@@ -10,9 +10,12 @@ namespace facebook { namespace wdt {
 /**
  * Utitliy class for creating/opening files for writing while
  * creating subdirs automatically and only once in case multiple
- * files are created in the same directory.
+ * files are created relative to the rootDir directory.
  *
- * This class is thread-safe.
+ * Path to rootDir doesn't need to have a trailing slash
+ * (it's added for you if missing)
+ *
+ * This class is thread-safe. (yeah!)
  */
 class FileCreator {
 public:
@@ -41,11 +44,10 @@ public:
     createdDirs_.clear();
   }
 
-  // TODO: do that automatically ? why do I have to call this...
+private:
   /// appends a trailing / if not already there to path
   static void addTrailingSlash(std::string &path);
 
-private:
   /**
    * Create directory recursively, populating cache. Cache is only
    * used if force is false (but it's still populated in any case).
