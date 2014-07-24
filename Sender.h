@@ -16,32 +16,39 @@
 
 #pragma once
 
-#include "FileCreator.h"
-
-#include <memory>
+#include <chrono>
 #include <string>
 
 namespace facebook { namespace wdt {
 
-class Receiver {
- public:
-  Receiver(int port, int numSockets, std::string destDir);
+class DirectorySourceQueue;
 
-  virtual ~Receiver() {}
+typedef std::chrono::high_resolution_clock Clock;
+
+class Sender {
+ public:
+  Sender(const std::string& destHost,
+         int port,
+         int numSockets,
+         const std::string& srcDir);
+
+  virtual ~Sender() {}
 
   void start();
 
  private:
-  void receiveOne(int port,
-                  int backlog,
-                  const std::string& destDir,
-                  size_t bufferSize);
+  void sendOne(Clock::time_point startTime,
+               const std::string& destHost,
+               int port,
+               DirectorySourceQueue* queue,
+               size_t* pHeaderBytes,
+               size_t* pDataBytes);
 
  private:
+  std::string destHost_;
   int port_;
   int numSockets_;
-  std::string destDir_;
-  std::unique_ptr<FileCreator> fileCreator_;
+  std::string srcDir_;
 };
 
 }} // namespace facebook::wdt
