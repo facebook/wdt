@@ -5,7 +5,8 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 using std::string;
 
@@ -91,7 +92,5 @@ void FileCreator::addTrailingSlash(string& path) {
     LOG(VERBOSE) << "Added missing trailing / to " << path;
   }
 }
-
-
-
-}}
+}
+}

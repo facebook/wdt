@@ -19,7 +19,8 @@
 #include <chrono>
 #include <string>
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 class DirectorySourceQueue;
 
@@ -32,7 +33,8 @@ class Sender {
          int numSockets,
          const std::string& srcDir);
 
-  virtual ~Sender() {}
+  virtual ~Sender() {
+  }
 
   void start();
 
@@ -50,5 +52,5 @@ class Sender {
   int numSockets_;
   std::string srcDir_;
 };
-
-}} // namespace facebook::wdt
+}
+} // namespace facebook::wdt

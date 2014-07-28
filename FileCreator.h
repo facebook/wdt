@@ -5,7 +5,8 @@
 #include <string>
 #include <unordered_set>
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 /**
  * Utitliy class for creating/opening files for writing while
@@ -18,9 +19,9 @@ namespace facebook { namespace wdt {
  * This class is thread-safe. (yeah!)
  */
 class FileCreator {
-public:
+ public:
   /// rootDir is assumed to exist
-  explicit FileCreator(const std::string &rootDir) : rootDir_(rootDir) {
+  explicit FileCreator(const std::string& rootDir) : rootDir_(rootDir) {
     CHECK(!rootDir_.empty());
     addTrailingSlash(rootDir_);
   }
@@ -36,7 +37,7 @@ public:
    *
    * @return        file descriptor or -1 on error
    */
-  int createFile(const std::string &relPath);
+  int createFile(const std::string& relPath);
 
   /// reset internal directory cache
   void reset() {
@@ -44,9 +45,9 @@ public:
     createdDirs_.clear();
   }
 
-private:
+ private:
   /// appends a trailing / if not already there to path
-  static void addTrailingSlash(std::string &path);
+  static void addTrailingSlash(std::string& path);
 
   /**
    * Create directory recursively, populating cache. Cache is only
@@ -76,5 +77,5 @@ private:
   /// protects createdDirs_
   std::mutex mutex_;
 };
-
-}}
+}
+}

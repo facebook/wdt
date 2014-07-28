@@ -6,7 +6,8 @@
 
 #include "FileByteSource.h"
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 bool DirectorySourceQueue::init() {
   {
@@ -17,7 +18,7 @@ bool DirectorySourceQueue::init() {
     initCalled_ = true;
   }
   LOG(INFO) << "starting initialization of DirectorySourceQueue";
-  bool res = recurseOnPath();  // by default start on root/empty relative path
+  bool res = recurseOnPath(); // by default start on root/empty relative path
   {
     std::lock_guard<std::mutex> lock(mutex_);
     initFinished_ = true;
@@ -52,8 +53,8 @@ bool DirectorySourceQueue::recurseOnPath(const std::string& relativePath) {
     if (dirEntry.d_name[0] == '.') {
       continue;
     }
-    const std::string newRelativePath =
-      relativePath + std::string(dirEntry.d_name);
+    const std::string newRelativePath = relativePath
+                                        + std::string(dirEntry.d_name);
     const std::string newFullPath = rootDir_ + newRelativePath;
     if (dirEntry.d_type == DT_REG) {
       // regular file, put size/path info in sizeToPath_ member
@@ -62,13 +63,12 @@ bool DirectorySourceQueue::recurseOnPath(const std::string& relativePath) {
         PLOG(ERROR) << "stat failed on path " << newFullPath;
         return false;
       }
-      LOG(INFO) << "found file " << newFullPath
-                << " of size " << fileStat.st_size;
+      LOG(INFO) << "found file " << newFullPath << " of size "
+                << fileStat.st_size;
       {
         std::lock_guard<std::mutex> lock(mutex_);
-        sizeToPath_.push(std::make_pair(
-          (uint64_t) fileStat.st_size, newRelativePath
-        ));
+        sizeToPath_.push(
+          std::make_pair((uint64_t)fileStat.st_size, newRelativePath));
       }
       conditionNotEmpty_.notify_one();
     } else if (dirEntry.d_type == DT_DIR) {
@@ -106,11 +106,10 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource() {
     filesize = pair.first;
     filename = pair.second;
   }
-  LOG(INFO) << "got next source " << rootDir_ + filename
-            << " size " << filesize;
+  LOG(INFO) << "got next source " << rootDir_ + filename << " size "
+            << filesize;
   return std::unique_ptr<FileByteSource>(
-    new FileByteSource(rootDir_, filename, filesize, fileSourceBufferSize_)
-  );
+    new FileByteSource(rootDir_, filename, filesize, fileSourceBufferSize_));
 }
-
-}}
+}
+}

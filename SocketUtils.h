@@ -1,11 +1,11 @@
 #pragma once
 
-
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 class SocketUtils {
-  public:
-    static int getReceiveBufferSize(int fd);
+ public:
+  static int getReceiveBufferSize(int fd);
 };
-
-}} // namespace facebook::wdt
+}
+} // namespace facebook::wdt

@@ -4,7 +4,8 @@
 
 #include "ByteSource.h"
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 /**
  * Interface for consuming data from multiple ByteSource's.
@@ -16,8 +17,9 @@ namespace facebook { namespace wdt {
  * is guaranteed to be consumed exactly once.
  */
 class SourceQueue {
-public:
-  virtual ~SourceQueue() {}
+ public:
+  virtual ~SourceQueue() {
+  }
 
   /// @return true iff no more sources to read from
   virtual bool finished() const = 0;
@@ -32,5 +34,5 @@ public:
    */
   virtual std::unique_ptr<ByteSource> getNextSource() = 0;
 };
-
-}}
+}
+}

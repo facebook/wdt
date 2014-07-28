@@ -21,13 +21,15 @@
 #include <memory>
 #include <string>
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 class Receiver {
  public:
   Receiver(int port, int numSockets, std::string destDir);
 
-  virtual ~Receiver() {}
+  virtual ~Receiver() {
+  }
 
   void start();
 
@@ -43,5 +45,5 @@ class Receiver {
   std::string destDir_;
   std::unique_ptr<FileCreator> fileCreator_;
 };
-
-}} // namespace facebook::wdt
+}
+} // namespace facebook::wdt

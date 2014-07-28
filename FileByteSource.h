@@ -5,7 +5,8 @@
 #include "ByteSource.h"
 #include "folly/ThreadLocal.h"
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 /**
  * ByteSource that reads data from a file. The buffer used is thread-local
@@ -14,7 +15,7 @@ namespace facebook { namespace wdt {
  * multiple threads.
  */
 class FileByteSource : public ByteSource {
-public:
+ public:
   /**
    * Create a new FileByteSource for a given path.
    *
@@ -24,12 +25,10 @@ public:
    *                          truncate, if it's smaller we'll fail
    * @param bufferSize        size of buffer for temporarily storing read bytes
    */
-  FileByteSource(
-    const std::string& rootPath,
-    const std::string& relPath,
-    uint64_t size,
-    size_t bufferSize
-  );
+  FileByteSource(const std::string& rootPath,
+                 const std::string& relPath,
+                 uint64_t size,
+                 size_t bufferSize);
 
   /// close file descriptor if still open
   virtual ~FileByteSource() {
@@ -61,8 +60,7 @@ public:
   /// @see ByteSource.h
   virtual char* read(size_t& size);
 
-private:
-
+ private:
   struct Buffer {
     explicit Buffer(size_t size) : size_(size) {
       data_ = new char[size + 1];
@@ -72,7 +70,7 @@ private:
       delete[] data_;
     }
 
-    char *data_;
+    char* data_;
     size_t size_;
   };
 
@@ -98,5 +96,5 @@ private:
   /// number of bytes read so far from file
   uint64_t bytesRead_;
 };
-
-}}
+}
+}

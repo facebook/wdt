@@ -2,11 +2,13 @@
 
 #include <string>
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 class ByteSource {
-public:
-  virtual ~ByteSource() {}
+ public:
+  virtual ~ByteSource() {
+  }
 
   /// @return identifier for the source
   virtual const std::string& getIdentifier() const = 0;
@@ -36,5 +38,5 @@ public:
    */
   virtual char* read(size_t& size) = 0;
 };
-
-}}
+}
+}

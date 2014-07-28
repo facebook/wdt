@@ -15,23 +15,22 @@ DECLARE_int32(sleep_ms);
 
 namespace {
 
-template<typename T>
+template <typename T>
 double durationSeconds(T d) {
   return std::chrono::duration_cast<std::chrono::duration<double>>(d).count();
 }
 
 } // anonymous namespace
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 Sender::Sender(const std::string& destHost,
                int port,
                int numSockets,
                const std::string& srcDir)
-    : destHost_(destHost),
-      port_(port),
-      numSockets_(numSockets),
-      srcDir_(srcDir) {}
+  : destHost_(destHost), port_(port), numSockets_(numSockets), srcDir_(srcDir) {
+}
 
 void Sender::start() {
   auto startTime = Clock::now();
@@ -153,17 +152,17 @@ void Sender::sendOne(Clock::time_point startTime,
   double totalTime = durationSeconds(Clock::now() - startTime);
   size_t totalBytes = headerBytes + dataBytes;
   LOG(WARNING)
-      << "Got reply - all done for fd:" << fd
-      << ". Number of files = " << numFiles << ". Total time = " << totalTime
-      << " (" << elapsedSecsConn << " in connection)"
-      << ". Avg file size = " << 1. * dataBytes / numFiles
-      << ". Data bytes = " << dataBytes << ". Header bytes = " << headerBytes
-      << " ( " << 100. * headerBytes / totalBytes << " % overhead)"
-      << ". Total bytes = " << totalBytes
-      << ". Total throughput = " << totalBytes / totalTime / 1024. / 1024.
-      << " Mbytes/sec";
+    << "Got reply - all done for fd:" << fd
+    << ". Number of files = " << numFiles << ". Total time = " << totalTime
+    << " (" << elapsedSecsConn << " in connection)"
+    << ". Avg file size = " << 1. * dataBytes / numFiles
+    << ". Data bytes = " << dataBytes << ". Header bytes = " << headerBytes
+    << " ( " << 100. * headerBytes / totalBytes << " % overhead)"
+    << ". Total bytes = " << totalBytes
+    << ". Total throughput = " << totalBytes / totalTime / 1024. / 1024.
+    << " Mbytes/sec";
   *pHeaderBytes = headerBytes;
   *pDataBytes = dataBytes;
 }
-
-}} // namespace facebook::wdt
+}
+} // namespace facebook::wdt

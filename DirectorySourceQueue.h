@@ -10,7 +10,8 @@
 
 #include "SourceQueue.h"
 
-namespace facebook { namespace wdt {
+namespace facebook {
+namespace wdt {
 
 /**
  * SourceQueue that returns all the regular files under a given directory
@@ -18,7 +19,7 @@ namespace facebook { namespace wdt {
  * file size.
  */
 class DirectorySourceQueue : public SourceQueue {
-public:
+ public:
   /**
    * Create a DirectorySourceQueue. Call init() separately to actually recurse
    * over the root directory and initialize data about files.
@@ -28,10 +29,9 @@ public:
    *                              FileByteSource objects (returned by
    *                              getNextSource)
    */
-  explicit DirectorySourceQueue(
-    const std::string& rootDir,
-    size_t fileSourceBufferSize
-  ) : rootDir_(rootDir),
+  explicit DirectorySourceQueue(const std::string& rootDir,
+                                size_t fileSourceBufferSize)
+    : rootDir_(rootDir),
       fileSourceBufferSize_(fileSourceBufferSize),
       initCalled_(false),
       initFinished_(false) {
@@ -62,8 +62,7 @@ public:
   /// @return next FileByteSource to consume or nullptr when finished
   virtual std::unique_ptr<ByteSource> getNextSource();
 
-private:
-
+ private:
   /**
    * Recurse on a relative path (to rootDir_) to gather data about files.
    *
@@ -97,5 +96,5 @@ private:
   /// Orders size/relative path pairs for files under root by decreasing size
   std::priority_queue<std::pair<uint64_t, std::string>> sizeToPath_;
 };
-
-}}
+}
+}
