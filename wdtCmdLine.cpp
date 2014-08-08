@@ -17,10 +17,16 @@
 #include "Sender.h"
 #include "Receiver.h"
 
+#include <folly/String.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <iostream>
 
 DEFINE_string(directory, ".", "Source/Destination directory");
+DEFINE_bool(files,
+            false,
+            "If true, read a list of files and optional "
+            "filesizes from stdin relative to the directory and transfer then");
 DEFINE_string(
   destination,
   "",
@@ -47,8 +53,27 @@ int main(int argc, char* argv[]) {
       FLAGS_port, FLAGS_num_sockets, FLAGS_directory);
     receiver.start();
   } else {
-    facebook::wdt::Sender sender(
-      FLAGS_destination, FLAGS_port, FLAGS_num_sockets, FLAGS_directory);
+    std::vector<facebook::wdt::FileInfo> fileInfo;
+    if (FLAGS_files) {
+      // Each line should have the filename and optionally
+      // the filesize separated by a single space
+      std::string line;
+      while (std::getline(std::cin, line)) {
+        std::vector<std::string> fields;
+        folly::split('\t', line, fields, true);
+        if (fields.empty() || fields.size() > 2) {
+          LOG(FATAL) << "Invalid input in stdin: " << line;
+        }
+        int64_t filesize = fields.size() > 1 ? folly::to<int64_t>(fields[1])
+                                             : -1;
+        fileInfo.emplace_back(fields[0], filesize);
+      }
+    }
+    facebook::wdt::Sender sender(FLAGS_destination,
+                                 FLAGS_port,
+                                 FLAGS_num_sockets,
+                                 FLAGS_directory,
+                                 fileInfo);
     sender.start();
   }
   return 0;

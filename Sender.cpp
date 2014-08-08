@@ -1,7 +1,6 @@
 #include "Sender.h"
 
 #include "ClientSocket.h"
-#include "DirectorySourceQueue.h"
 #include "Protocol.h"
 
 #include <folly/Conv.h>
@@ -28,8 +27,13 @@ namespace wdt {
 Sender::Sender(const std::string& destHost,
                int port,
                int numSockets,
-               const std::string& srcDir)
-  : destHost_(destHost), port_(port), numSockets_(numSockets), srcDir_(srcDir) {
+               const std::string& srcDir,
+               const std::vector<FileInfo>& srcFileInfo)
+  : destHost_(destHost),
+    port_(port),
+    numSockets_(numSockets),
+    srcDir_(srcDir),
+    srcFileInfo_(srcFileInfo) {
 }
 
 void Sender::start() {
@@ -37,7 +41,8 @@ void Sender::start() {
   size_t bufferSize = FLAGS_buffer_size;
   LOG(INFO) << "Client (sending) to " << destHost_ << " port " << port_ << " : "
             << numSockets_ << " sockets, source dir " << srcDir_;
-  DirectorySourceQueue queue(srcDir_, bufferSize);
+
+  DirectorySourceQueue queue(srcDir_, bufferSize, srcFileInfo_);
   std::vector<std::thread> vt;
   size_t headerBytes[numSockets_];
   size_t dataBytes[numSockets_];

@@ -16,8 +16,10 @@
 
 #pragma once
 
+#include "DirectorySourceQueue.h"
+
 #include <chrono>
-#include <string>
+#include <memory>
 
 namespace facebook {
 namespace wdt {
@@ -31,7 +33,8 @@ class Sender {
   Sender(const std::string& destHost,
          int port,
          int numSockets,
-         const std::string& srcDir);
+         const std::string& srcDir,
+         const std::vector<FileInfo>& srcFileInfo = {});
 
   virtual ~Sender() {
   }
@@ -50,7 +53,8 @@ class Sender {
   std::string destHost_;
   int port_;
   int numSockets_;
-  std::string srcDir_;
+  std::string srcDir_{""};
+  std::vector<FileInfo> srcFileInfo_;
 };
 }
 } // namespace facebook::wdt

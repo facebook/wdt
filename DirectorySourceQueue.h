@@ -7,11 +7,15 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <utility>
 
 #include "SourceQueue.h"
 
 namespace facebook {
 namespace wdt {
+
+/// filename-filesize pair. Negative filesize denotes the entire file.
+typedef std::pair<std::string, int64_t> FileInfo;
 
 /**
  * SourceQueue that returns all the regular files under a given directory
@@ -28,19 +32,12 @@ class DirectorySourceQueue : public SourceQueue {
    * @param fileSourceBufferSize  buffer size to use when creating individual
    *                              FileByteSource objects (returned by
    *                              getNextSource)
+   * @param fileInfo              (optional) if non-empty, only operate on the
+   *                              specified paths relative to rootDir
    */
-  explicit DirectorySourceQueue(const std::string& rootDir,
-                                size_t fileSourceBufferSize)
-    : rootDir_(rootDir),
-      fileSourceBufferSize_(fileSourceBufferSize),
-      initCalled_(false),
-      initFinished_(false) {
-    CHECK(!rootDir_.empty());
-    CHECK(fileSourceBufferSize_ > 0);
-    if (rootDir_.back() != '/') {
-      rootDir_.push_back('/');
-    }
-  };
+  DirectorySourceQueue(const std::string& rootDir,
+                       size_t fileSourceBufferSize,
+                       const std::vector<FileInfo>& fileInfo = {});
 
   /**
    * Recurse over given root directory, gather data about regular files and
@@ -68,18 +65,28 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param relativePath    relative path to rootDir_
    *
-   * @return                whether an error was encountered
+   * @return                true on success, false on error
    */
   bool recurseOnPath(const std::string& relativePath = "");
 
-  /// root directory to recurse on
-  std::string rootDir_;
+  /**
+   * Stat the input files and populate sizeToPath_
+   *
+   * @return                true on success, false on error
+   */
+  bool enqueueFiles();
+
+  /// root directory to recurse on if fileInfo_ is empty
+  std::string rootDir_{""};
 
   /**
    * buffer size to use when creating individual FileByteSource objects
    * (returned by getNextSource).
    */
   const size_t fileSourceBufferSize_;
+
+  /// List of files to enqueue instead of recursing over rootDir_.
+  std::vector<FileInfo> fileInfo_;
 
   /// protects initCalled_/initFinished_/sizeToPath_
   mutable std::mutex mutex_;
@@ -88,10 +95,10 @@ class DirectorySourceQueue : public SourceQueue {
   mutable std::condition_variable conditionNotEmpty_;
 
   /// Indicates whether init() has been called to prevent multiple calls
-  bool initCalled_;
+  bool initCalled_{false};
 
   /// Indicates whether call to init() has finished
-  bool initFinished_;
+  bool initFinished_{false};
 
   /// Orders size/relative path pairs for files under root by decreasing size
   std::priority_queue<std::pair<uint64_t, std::string>> sizeToPath_;

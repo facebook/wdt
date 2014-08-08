@@ -9,6 +9,20 @@
 namespace facebook {
 namespace wdt {
 
+DirectorySourceQueue::DirectorySourceQueue(
+  const std::string& rootDir,
+  size_t fileSourceBufferSize,
+  const std::vector<FileInfo>& fileInfo)
+  : rootDir_(rootDir),
+    fileSourceBufferSize_(fileSourceBufferSize),
+    fileInfo_(fileInfo) {
+  CHECK(!rootDir_.empty() || !fileInfo_.empty());
+  CHECK(fileSourceBufferSize_ > 0);
+  if (rootDir_.back() != '/') {
+    rootDir_.push_back('/');
+  }
+};
+
 bool DirectorySourceQueue::init() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -18,7 +32,12 @@ bool DirectorySourceQueue::init() {
     initCalled_ = true;
   }
   LOG(INFO) << "starting initialization of DirectorySourceQueue";
-  bool res = recurseOnPath(); // by default start on root/empty relative path
+  bool res = false;
+  if (!fileInfo_.empty()) {
+    res = enqueueFiles();
+  } else {
+    res = recurseOnPath(); // by default start on root/empty relative path
+  }
   {
     std::lock_guard<std::mutex> lock(mutex_);
     initFinished_ = true;
@@ -79,6 +98,29 @@ bool DirectorySourceQueue::recurseOnPath(const std::string& relativePath) {
     }
   }
   closedir(dirPtr);
+  return true;
+}
+
+bool DirectorySourceQueue::enqueueFiles() {
+  for (const auto& info : fileInfo_) {
+    const auto& fullPath = rootDir_ + info.first;
+    uint64_t filesize;
+    if (info.second < 0) {
+      struct stat fileStat;
+      if (stat(fullPath.c_str(), &fileStat) != 0) {
+        PLOG(ERROR) << "stat failed on path " << fullPath;
+        return false;
+      }
+      filesize = fileStat.st_size;
+    } else {
+      filesize = info.second;
+    }
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      sizeToPath_.push(std::make_pair(filesize, info.first));
+    }
+    conditionNotEmpty_.notify_one();
+  }
   return true;
 }
 
