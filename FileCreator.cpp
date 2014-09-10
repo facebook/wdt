@@ -10,7 +10,7 @@ namespace wdt {
 
 using std::string;
 
-int FileCreator::createFile(const string& relPathStr) {
+int FileCreator::createFile(const string &relPathStr) {
   CHECK(!relPathStr.empty());
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
@@ -57,7 +57,7 @@ int FileCreator::createFile(const string& relPathStr) {
   return res;
 }
 
-bool FileCreator::createDirRecursively(const std::string& dir, bool force) {
+bool FileCreator::createDirRecursively(const std::string &dir, bool force) {
   int pos = 0;
   std::string subdir;
   while (pos < dir.size()) {
@@ -86,7 +86,7 @@ bool FileCreator::createDirRecursively(const std::string& dir, bool force) {
 }
 
 /* static */
-void FileCreator::addTrailingSlash(string& path) {
+void FileCreator::addTrailingSlash(string &path) {
   if (path.back() != '/') {
     path.push_back('/');
     LOG(VERBOSE) << "Added missing trailing / to " << path;

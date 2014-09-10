@@ -11,7 +11,7 @@ class ByteSource {
   }
 
   /// @return identifier for the source
-  virtual const std::string& getIdentifier() const = 0;
+  virtual const std::string &getIdentifier() const = 0;
 
   /// @return number of bytes in source
   virtual uint64_t getSize() const = 0;
@@ -36,7 +36,7 @@ class ByteSource {
    *                  use finished() and hasError() members to distinguish
    *                  the two cases
    */
-  virtual char* read(size_t& size) = 0;
+  virtual char *read(size_t &size) = 0;
 };
 }
 }

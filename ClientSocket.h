@@ -20,4 +20,4 @@ class ClientSocket {
   struct addrinfo sa_;
 };
 }
-} // namespace facebook::wdt
+}  // namespace facebook::wdt

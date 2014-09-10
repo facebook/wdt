@@ -16,7 +16,7 @@ class ServerSocket {
   bool listen();
   /// will accept next (/only) incoming connection
   int getNextFd();
-  static std::string getNameInfo(const struct sockaddr* sa, socklen_t salen);
+  static std::string getNameInfo(const struct sockaddr *sa, socklen_t salen);
 
  private:
   const std::string port_;
@@ -26,4 +26,4 @@ class ServerSocket {
   struct addrinfo sa_;
 };
 }
-} // namespace facebook::wdt
+}  // namespace facebook::wdt

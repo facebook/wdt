@@ -33,6 +33,7 @@ the current largest file)
 
 * Sender.{h|cpp}
 
+Formerly wdtlib.cpp - main code sending files
 
 
 === Consuming / Receiving ===
@@ -42,6 +43,8 @@ the current largest file)
 Creates file and directories necessary for said file (mkdir -p like)
 
 * Receiver.{h|cpp}
+
+Formerly wdtlib.cpp - main code receiving files
 
 
 === Low level building blocks ===
@@ -62,11 +65,3 @@ Decodes/Encodes an id (file path) and size (byte length of the data)
 * SocketUtils.{h|cpp}
 
 Common socket related utilities (both client/server, sender/receiver side use)
-
-
-=== Old ===
-
-* wdtlib.{h|cpp}
-
-Initial all in one hackathon version being refactored/cleaned up into above
-components instead

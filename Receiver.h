@@ -34,9 +34,7 @@ class Receiver {
   void start();
 
  private:
-  void receiveOne(int port,
-                  int backlog,
-                  const std::string& destDir,
+  void receiveOne(int port, int backlog, const std::string &destDir,
                   size_t bufferSize);
 
  private:
@@ -46,4 +44,4 @@ class Receiver {
   std::unique_ptr<FileCreator> fileCreator_;
 };
 }
-} // namespace facebook::wdt
+}  // namespace facebook::wdt

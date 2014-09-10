@@ -10,12 +10,11 @@ namespace facebook {
 namespace wdt {
 
 DirectorySourceQueue::DirectorySourceQueue(
-  const std::string& rootDir,
-  size_t fileSourceBufferSize,
-  const std::vector<FileInfo>& fileInfo)
-  : rootDir_(rootDir),
-    fileSourceBufferSize_(fileSourceBufferSize),
-    fileInfo_(fileInfo) {
+    const std::string &rootDir, size_t fileSourceBufferSize,
+    const std::vector<FileInfo> &fileInfo)
+    : rootDir_(rootDir),
+      fileSourceBufferSize_(fileSourceBufferSize),
+      fileInfo_(fileInfo) {
   CHECK(!rootDir_.empty() || !fileInfo_.empty());
   CHECK(fileSourceBufferSize_ > 0);
   if (rootDir_.back() != '/') {
@@ -36,7 +35,8 @@ bool DirectorySourceQueue::init() {
   if (!fileInfo_.empty()) {
     res = enqueueFiles();
   } else {
-    res = recurseOnPath(); // by default start on root/empty relative path
+    // by default start on root/empty relative path
+    res = recurseOnPath();
   }
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -49,49 +49,78 @@ bool DirectorySourceQueue::init() {
   return res;
 }
 
-bool DirectorySourceQueue::recurseOnPath(const std::string& relativePath) {
+// TODO consider reusing the dirent buffer and the path strings
+bool DirectorySourceQueue::recurseOnPath(std::string relativePath) {
   const std::string fullPath = rootDir_ + relativePath;
-  LOG(INFO) << "recursing on directory " << fullPath;
-  DIR* dirPtr = opendir(fullPath.c_str());
+  LOG(INFO) << "Recursing on directory " << fullPath;
+  DIR *dirPtr = opendir(fullPath.c_str());
   if (!dirPtr) {
     PLOG(ERROR) << "error opening dir " << fullPath;
     return false;
   }
-  dirent dirEntry;
-  dirent* dirEntryPtr = nullptr;
+  // From readdir_r(2) [seems size can change in theory
+  // depending how deep we are]
+  const size_t entryLen = offsetof(struct dirent, d_name) +
+                          pathconf(fullPath.c_str(), _PC_NAME_MAX) + 1;
+  std::unique_ptr<char[]> buf(new char[entryLen]);
+  dirent *dirEntryPtr = (dirent *)buf.get();
+  dirent *dirEntryRes = nullptr;
+
   while (true) {
-    if (readdir_r(dirPtr, &dirEntry, &dirEntryPtr) != 0) {
+    if (readdir_r(dirPtr, dirEntryPtr, &dirEntryRes) != 0) {
       PLOG(ERROR) << "error reading dir " << fullPath;
       closedir(dirPtr);
       return false;
     }
-    if (!dirEntryPtr) {
+    if (!dirEntryRes) {
+      VLOG(1) << "Done with " << fullPath;
       // finished reading dir
       break;
     }
-    if (dirEntry.d_name[0] == '.') {
+    const auto dType = dirEntryRes->d_type;
+    VLOG(1) << "Found entry " << dirEntryRes->d_name << " type " << (int)dType;
+    if (dirEntryRes->d_name[0] == '.') {
+      VLOG(1) << "Skipping entry starting with . : " << dirEntryRes->d_name;
       continue;
     }
-    const std::string newRelativePath = relativePath
-                                        + std::string(dirEntry.d_name);
-    const std::string newFullPath = rootDir_ + newRelativePath;
-    if (dirEntry.d_type == DT_REG) {
-      // regular file, put size/path info in sizeToPath_ member
+    // Following code is a bit ugly trying to save stat() call for directories
+    // yet still work for xfs which returns DT_UNKNOWN for everything
+    // would be simpler to always stat()
+
+    // if we reach DT_DIR and DT_REG directly:
+    bool isDir = (dType == DT_DIR);
+    if (!isDir && dType != DT_REG && dType != DT_UNKNOWN) {
+      VLOG(1) << "Ignoring entry type " << (int)(dType);
+      continue;
+    }
+    std::string newRelativePath =
+        relativePath + std::string(dirEntryRes->d_name);
+    if (!isDir) {
+      // DT_REG or DT_UNKNOWN cases
+      const std::string newFullPath = rootDir_ + newRelativePath;
       struct stat fileStat;
       if (stat(newFullPath.c_str(), &fileStat) != 0) {
         PLOG(ERROR) << "stat failed on path " << newFullPath;
         return false;
       }
-      LOG(INFO) << "found file " << newFullPath << " of size "
-                << fileStat.st_size;
-      {
-        std::lock_guard<std::mutex> lock(mutex_);
-        sizeToPath_.push(
-          std::make_pair((uint64_t)fileStat.st_size, newRelativePath));
+      // could dcheck that if DT_REG we better be !isDir
+      isDir = S_ISDIR(fileStat.st_mode);
+      // if we were DT_UNKNOWN this could still be a block device etc... (xfs)
+      if (S_ISREG(fileStat.st_mode)) {
+        LOG(INFO) << "Found reg file " << newFullPath << " of size "
+                  << fileStat.st_size;
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+          sizeToPath_.push(
+              std::make_pair((uint64_t)fileStat.st_size, newRelativePath));
+        }
+        conditionNotEmpty_.notify_one();
+        continue;
       }
-      conditionNotEmpty_.notify_one();
-    } else if (dirEntry.d_type == DT_DIR) {
-      if (!recurseOnPath(newRelativePath + "/")) {
+    }
+    if (isDir) {
+      newRelativePath.push_back('/');
+      if (!recurseOnPath(std::move(newRelativePath))) {
         closedir(dirPtr);
         return false;
       }
@@ -102,8 +131,8 @@ bool DirectorySourceQueue::recurseOnPath(const std::string& relativePath) {
 }
 
 bool DirectorySourceQueue::enqueueFiles() {
-  for (const auto& info : fileInfo_) {
-    const auto& fullPath = rootDir_ + info.first;
+  for (const auto &info : fileInfo_) {
+    const auto &fullPath = rootDir_ + info.first;
     uint64_t filesize;
     if (info.second < 0) {
       struct stat fileStat;
@@ -151,7 +180,7 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource() {
   LOG(INFO) << "got next source " << rootDir_ + filename << " size "
             << filesize;
   return std::unique_ptr<FileByteSource>(
-    new FileByteSource(rootDir_, filename, filesize, fileSourceBufferSize_));
+      new FileByteSource(rootDir_, filename, filesize, fileSourceBufferSize_));
 }
 }
 }

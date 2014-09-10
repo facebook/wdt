@@ -21,7 +21,7 @@ namespace wdt {
 class FileCreator {
  public:
   /// rootDir is assumed to exist
-  explicit FileCreator(const std::string& rootDir) : rootDir_(rootDir) {
+  explicit FileCreator(const std::string &rootDir) : rootDir_(rootDir) {
     CHECK(!rootDir_.empty());
     addTrailingSlash(rootDir_);
   }
@@ -37,7 +37,7 @@ class FileCreator {
    *
    * @return        file descriptor or -1 on error
    */
-  int createFile(const std::string& relPath);
+  int createFile(const std::string &relPath);
 
   /// reset internal directory cache
   void reset() {
@@ -47,7 +47,7 @@ class FileCreator {
 
  private:
   /// appends a trailing / if not already there to path
-  static void addTrailingSlash(std::string& path);
+  static void addTrailingSlash(std::string &path);
 
   /**
    * Create directory recursively, populating cache. Cache is only
@@ -60,10 +60,10 @@ class FileCreator {
    *
    * @return            true iff successful
    */
-  bool createDirRecursively(const std::string& dir, bool force = false);
+  bool createDirRecursively(const std::string &dir, bool force = false);
 
   /// Check whether directory has been created/is in cache
-  bool dirCreated(const std::string& dir) {
+  bool dirCreated(const std::string &dir) {
     std::lock_guard<std::mutex> lock(mutex_);
     return createdDirs_.find(dir) != createdDirs_.end();
   }

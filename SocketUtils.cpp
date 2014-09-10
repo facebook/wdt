@@ -9,6 +9,6 @@ using namespace facebook::wdt;
 int SocketUtils::getReceiveBufferSize(int fd) {
   int size;
   socklen_t sizeSize = sizeof(size);
-  getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void*)&size, &sizeSize);
+  getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void *)&size, &sizeSize);
   return size;
 }

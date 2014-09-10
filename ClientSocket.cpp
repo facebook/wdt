@@ -1,5 +1,5 @@
 #include "ClientSocket.h"
-#include "ServerSocket.h" // for getnameinfo
+#include "ServerSocket.h"  // for getnameinfo
 
 #include <glog/logging.h>
 #include <sys/socket.h>
@@ -12,7 +12,7 @@ namespace wdt {
 using std::string;
 
 ClientSocket::ClientSocket(string dest, string port)
-  : dest_(dest), port_(port), fd_(-1) {
+    : dest_(dest), port_(port), fd_(-1) {
   memset(&sa_, 0, sizeof(sa_));
   if (FLAGS_ipv6) {
     sa_.ai_family = AF_INET6;
@@ -25,14 +25,14 @@ bool ClientSocket::connect() {
     return true;
   }
   // Lookup
-  struct addrinfo* infoList;
+  struct addrinfo *infoList;
   int res = getaddrinfo(dest_.c_str(), port_.c_str(), &sa_, &infoList);
   if (res) {
     // not errno, can't use PLOG (perror)
     LOG(FATAL) << "Failed getaddrinfo " << dest_ << " , " << port_ << " : "
                << res << " : " << gai_strerror(res);
   }
-  for (struct addrinfo* info = infoList; info != nullptr;
+  for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
     LOG(INFO) << "will connect to "
               << ServerSocket::getNameInfo(info->ai_addr, info->ai_addrlen);
@@ -65,4 +65,4 @@ int ClientSocket::getFd() const {
   return fd_;
 }
 }
-} // end namespace facebook::wtd
+}  // end namespace facebook::wtd

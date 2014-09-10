@@ -35,9 +35,8 @@ class DirectorySourceQueue : public SourceQueue {
    * @param fileInfo              (optional) if non-empty, only operate on the
    *                              specified paths relative to rootDir
    */
-  DirectorySourceQueue(const std::string& rootDir,
-                       size_t fileSourceBufferSize,
-                       const std::vector<FileInfo>& fileInfo = {});
+  DirectorySourceQueue(const std::string &rootDir, size_t fileSourceBufferSize,
+                       const std::vector<FileInfo> &fileInfo = {});
 
   /**
    * Recurse over given root directory, gather data about regular files and
@@ -63,11 +62,11 @@ class DirectorySourceQueue : public SourceQueue {
   /**
    * Recurse on a relative path (to rootDir_) to gather data about files.
    *
-   * @param relativePath    relative path to rootDir_
+   * @param relativePath    relative path to rootDir_, default is rootDir_
    *
    * @return                true on success, false on error
    */
-  bool recurseOnPath(const std::string& relativePath = "");
+  bool recurseOnPath(const std::string relativePath = "");
 
   /**
    * Stat the input files and populate sizeToPath_

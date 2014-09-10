@@ -11,6 +11,7 @@
 DECLARE_int32(buffer_size);
 DECLARE_int32(max_retries);
 DECLARE_int32(sleep_ms);
+DEFINE_bool(ignore_open_errors, false, "will continue despite open errors");
 
 namespace {
 
@@ -19,21 +20,19 @@ double durationSeconds(T d) {
   return std::chrono::duration_cast<std::chrono::duration<double>>(d).count();
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 namespace facebook {
 namespace wdt {
 
-Sender::Sender(const std::string& destHost,
-               int port,
-               int numSockets,
-               const std::string& srcDir,
-               const std::vector<FileInfo>& srcFileInfo)
-  : destHost_(destHost),
-    port_(port),
-    numSockets_(numSockets),
-    srcDir_(srcDir),
-    srcFileInfo_(srcFileInfo) {
+Sender::Sender(const std::string &destHost, int port, int numSockets,
+               const std::string &srcDir,
+               const std::vector<FileInfo> &srcFileInfo)
+    : destHost_(destHost),
+      port_(port),
+      numSockets_(numSockets),
+      srcDir_(srcDir),
+      srcFileInfo_(srcFileInfo) {
 }
 
 void Sender::start() {
@@ -49,14 +48,8 @@ void Sender::start() {
   for (int i = 0; i < numSockets_; i++) {
     dataBytes[i] = 0;
     headerBytes[i] = 0;
-    vt.emplace_back(&Sender::sendOne,
-                    this,
-                    startTime,
-                    destHost_,
-                    port_ + i,
-                    &queue,
-                    &headerBytes[i],
-                    &dataBytes[i]);
+    vt.emplace_back(&Sender::sendOne, this, startTime, destHost_, port_ + i,
+                    &queue, &headerBytes[i], &dataBytes[i]);
   }
   queue.init();
   size_t totalDataBytes = 0;
@@ -76,12 +69,9 @@ void Sender::start() {
                << totalBytes / totalTime / 1024. / 1024. << " Mbytes/sec";
 }
 
-void Sender::sendOne(Clock::time_point startTime,
-                     const std::string& destHost,
-                     int port,
-                     DirectorySourceQueue* queue,
-                     size_t* pHeaderBytes,
-                     size_t* pDataBytes) {
+void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
+                     int port, DirectorySourceQueue *queue,
+                     size_t *pHeaderBytes, size_t *pDataBytes) {
   size_t headerBytes = 0, dataBytes = 0;
   size_t numFiles = 0;
   ClientSocket s(destHost, folly::to<std::string>(port));
@@ -102,16 +92,16 @@ void Sender::sendOne(Clock::time_point startTime,
   LOG(INFO) << "Connect took " << elapsedSecsConn;
 
   while ((source = queue->getNextSource())) {
+    if (FLAGS_ignore_open_errors && source->hasError()) {
+      continue;
+    }
     ++numFiles;
     size_t off = 0;
     headerBuf[off++] = Protocol::FILE_CMD;
     const size_t expectedSize = source->getSize();
     size_t actualSize = 0;
-    bool success = Protocol::encode(headerBuf,
-                                    off,
-                                    Protocol::kMaxHeader,
-                                    source->getIdentifier(),
-                                    expectedSize);
+    bool success = Protocol::encode(headerBuf, off, Protocol::kMaxHeader,
+                                    source->getIdentifier(), expectedSize);
     CHECK(success);
     ssize_t written = write(fd, headerBuf, off);
     headerBytes += written;
@@ -122,7 +112,7 @@ void Sender::sendOne(Clock::time_point startTime,
             << folly::humanify(std::string(headerBuf, off));
     while (!source->finished()) {
       size_t size;
-      char* buffer = source->read(size);
+      char *buffer = source->read(size);
       if (source->hasError()) {
         LOG(ERROR) << "failed reading file";
         break;
@@ -142,11 +132,11 @@ void Sender::sendOne(Clock::time_point startTime,
     }
   }
   headerBuf[0] = Protocol::DONE_CMD;
-  write(fd, headerBuf, 1); //< TODO check for status/succes
+  write(fd, headerBuf, 1);  //< TODO check for status/succes
   ++headerBytes;
-  shutdown(fd, SHUT_WR); //< TODO check for status/succes
+  shutdown(fd, SHUT_WR);  //< TODO check for status/succes
   LOG(INFO) << "Wrote done cmd on " << fd << " waiting for reply...";
-  ssize_t numRead = read(fd, headerBuf, 1);
+  ssize_t numRead = read(fd, headerBuf, 1);  // TODO: returns 0 on disk full
   CHECK(numRead == 1) << "READ unexpected " << numRead << ":"
                       << folly::humanify(std::string(headerBuf, numRead));
   CHECK(headerBuf[0] == Protocol::DONE_CMD) << "Unexpected reply "
@@ -156,18 +146,18 @@ void Sender::sendOne(Clock::time_point startTime,
                       << folly::humanify(std::string(headerBuf, numRead));
   double totalTime = durationSeconds(Clock::now() - startTime);
   size_t totalBytes = headerBytes + dataBytes;
-  LOG(WARNING)
-    << "Got reply - all done for fd:" << fd
-    << ". Number of files = " << numFiles << ". Total time = " << totalTime
-    << " (" << elapsedSecsConn << " in connection)"
-    << ". Avg file size = " << 1. * dataBytes / numFiles
-    << ". Data bytes = " << dataBytes << ". Header bytes = " << headerBytes
-    << " ( " << 100. * headerBytes / totalBytes << " % overhead)"
-    << ". Total bytes = " << totalBytes
-    << ". Total throughput = " << totalBytes / totalTime / 1024. / 1024.
-    << " Mbytes/sec";
+  LOG(WARNING) << "Got reply - all done for fd:" << fd
+               << ". Number of files = " << numFiles
+               << ". Total time = " << totalTime << " (" << elapsedSecsConn
+               << " in connection)"
+               << ". Avg file size = " << 1. * dataBytes / numFiles
+               << ". Data bytes = " << dataBytes
+               << ". Header bytes = " << headerBytes << " ( "
+               << 100. * headerBytes / totalBytes << " % overhead)"
+               << ". Total bytes = " << totalBytes << ". Total throughput = "
+               << totalBytes / totalTime / 1024. / 1024. << " Mbytes/sec";
   *pHeaderBytes = headerBytes;
   *pDataBytes = dataBytes;
 }
 }
-} // namespace facebook::wdt
+}  // namespace facebook::wdt

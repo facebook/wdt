@@ -30,11 +30,9 @@ typedef std::chrono::high_resolution_clock Clock;
 
 class Sender {
  public:
-  Sender(const std::string& destHost,
-         int port,
-         int numSockets,
-         const std::string& srcDir,
-         const std::vector<FileInfo>& srcFileInfo = {});
+  Sender(const std::string &destHost, int port, int numSockets,
+         const std::string &srcDir,
+         const std::vector<FileInfo> &srcFileInfo = {});
 
   virtual ~Sender() {
   }
@@ -42,12 +40,9 @@ class Sender {
   void start();
 
  private:
-  void sendOne(Clock::time_point startTime,
-               const std::string& destHost,
-               int port,
-               DirectorySourceQueue* queue,
-               size_t* pHeaderBytes,
-               size_t* pDataBytes);
+  void sendOne(Clock::time_point startTime, const std::string &destHost,
+               int port, DirectorySourceQueue *queue, size_t *pHeaderBytes,
+               size_t *pDataBytes);
 
  private:
   std::string destHost_;
@@ -57,4 +52,4 @@ class Sender {
   std::vector<FileInfo> srcFileInfo_;
 };
 }
-} // namespace facebook::wdt
+}  // namespace facebook::wdt

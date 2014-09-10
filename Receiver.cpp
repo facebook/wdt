@@ -22,8 +22,8 @@ DECLARE_int32(backlog);
 namespace {
 
 /// len is initial/already read len
-size_t readAtLeast(
-  int fd, char* buf, size_t max, ssize_t atLeast, ssize_t len = 0) {
+size_t readAtLeast(int fd, char *buf, size_t max, ssize_t atLeast,
+                   ssize_t len = 0) {
   VLOG(1) << "readAtLeast len " << len << " max " << max << " atLeast "
           << atLeast << " from " << fd;
   CHECK(len >= 0) << "negative len " << len;
@@ -50,7 +50,7 @@ size_t readAtLeast(
   return len;
 }
 
-size_t readAtMost(int fd, char* buf, size_t max, size_t atMost) {
+size_t readAtMost(int fd, char *buf, size_t max, size_t atMost) {
   const int64_t target = atMost < max ? atMost : max;
   VLOG(1) << "readAtMost target " << target;
   ssize_t n = read(fd, buf, target);
@@ -66,13 +66,13 @@ size_t readAtMost(int fd, char* buf, size_t max, size_t atMost) {
   return n;
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 namespace facebook {
 namespace wdt {
 
 Receiver::Receiver(int port, int numSockets, std::string destDir)
-  : port_(port), numSockets_(numSockets), destDir_(destDir) {
+    : port_(port), numSockets_(numSockets), destDir_(destDir) {
 }
 
 void Receiver::start() {
@@ -89,12 +89,8 @@ void Receiver::start() {
   fileCreator_.reset(new FileCreator(destDir_));
   std::vector<std::thread> vt;
   for (int i = 0; i < numSockets_; i++) {
-    vt.emplace_back(&Receiver::receiveOne,
-                    this,
-                    port_ + i,
-                    FLAGS_backlog,
-                    destDir_,
-                    bufferSize);
+    vt.emplace_back(&Receiver::receiveOne, this, port_ + i, FLAGS_backlog,
+                    destDir_, bufferSize);
   }
   // will never exit
   for (int i = 0; i < numSockets_; i++) {
@@ -102,9 +98,7 @@ void Receiver::start() {
   }
 }
 
-void Receiver::receiveOne(int port,
-                          int backlog,
-                          const std::string& destDir,
+void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
                           size_t bufferSize) {
   LOG(INFO) << "Server Thread for port " << port << " with backlog " << backlog
             << " on " << destDir;
@@ -119,7 +113,7 @@ void Receiver::receiveOne(int port,
   }
   // one more/last try (stays true if it worked above)
   CHECK(s.listen()) << "Unable to listen/bind despite retries";
-  char* buf = (char*)malloc(bufferSize);
+  char *buf = (char *)malloc(bufferSize);
   CHECK(buf) << "error allocating " << bufferSize;
   while (true) {
     int fd = s.getNextFd();
@@ -129,8 +123,8 @@ void Receiver::receiveOne(int port,
     LOG(INFO) << "New socket on " << fd << " socket buffer is "
               << SocketUtils::getReceiveBufferSize(fd);
     while (true) {
-      numRead = readAtLeast(
-        fd, buf + off, bufferSize - off, Protocol::kMaxHeader, numRead);
+      numRead = readAtLeast(fd, buf + off, bufferSize - off,
+                            Protocol::kMaxHeader, numRead);
       if (numRead <= 0) {
         break;
       }
@@ -191,8 +185,8 @@ void Receiver::receiveOne(int port,
       if (remainingData > 0) {
         // if we need to read more anyway, let's move the data
         numRead = remainingData;
-        if ((remainingData < Protocol::kMaxHeader)
-            && (off > (bufferSize / 2))) {
+        if ((remainingData < Protocol::kMaxHeader) &&
+            (off > (bufferSize / 2))) {
           // rare so inneficient is ok
           VLOG(1) << "copying extra " << remainingData << " leftover bytes @ "
                   << off;
@@ -215,4 +209,4 @@ void Receiver::receiveOne(int port,
   free(buf);
 }
 }
-} // namespace facebook::wdt
+}  // namespace facebook::wdt

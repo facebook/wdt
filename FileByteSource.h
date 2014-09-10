@@ -23,12 +23,11 @@ class FileByteSource : public ByteSource {
    * @param relPath           relative filepath to root
    * @param size              size of file; if actual size is larger we'll
    *                          truncate, if it's smaller we'll fail
-   * @param bufferSize        size of buffer for temporarily storing read bytes
+   * @param bufferSize        size of buffer for temporarily storing read
+   *bytes
    */
-  FileByteSource(const std::string& rootPath,
-                 const std::string& relPath,
-                 uint64_t size,
-                 size_t bufferSize);
+  FileByteSource(const std::string &rootPath, const std::string &relPath,
+                 uint64_t size, size_t bufferSize);
 
   /// close file descriptor if still open
   virtual ~FileByteSource() {
@@ -38,7 +37,7 @@ class FileByteSource : public ByteSource {
   }
 
   /// @return filepath
-  virtual const std::string& getIdentifier() const {
+  virtual const std::string &getIdentifier() const {
     return relPath_;
   }
 
@@ -58,7 +57,7 @@ class FileByteSource : public ByteSource {
   }
 
   /// @see ByteSource.h
-  virtual char* read(size_t& size);
+  virtual char *read(size_t &size);
 
  private:
   struct Buffer {
@@ -70,7 +69,7 @@ class FileByteSource : public ByteSource {
       delete[] data_;
     }
 
-    char* data_;
+    char *data_;
     size_t size_;
   };
 

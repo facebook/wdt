@@ -21,7 +21,7 @@ void testProtocol() {
   size_t off = 0;
   bool success = Protocol::encode(buf, off, sizeof(buf), id, size);
   EXPECT_TRUE(success);
-  EXPECT_EQ(off, id.size() + 1 + 1); // 1 byte varint for id len and size
+  EXPECT_EQ(off, id.size() + 1 + 1);  // 1 byte varint for id len and size
   string nid;
   int64_t nsize;
   size_t noff = 0;
@@ -42,12 +42,12 @@ void testProtocol() {
   EXPECT_FALSE(success);
 
   // Long size:
-  size = (int64_t)100 * 1024 * 1024 * 1024; // 100Gb
+  size = (int64_t)100 * 1024 * 1024 * 1024;  // 100Gb
   id.assign("different");
   off = 0;
   success = Protocol::encode(buf, off, sizeof(buf), id, size);
   EXPECT_TRUE(success);
-  EXPECT_EQ(off, id.size() + 1 + 6); // 1 byte varint for id len and size
+  EXPECT_EQ(off, id.size() + 1 + 6);  // 1 byte varint for id len and size
   noff = 0;
   success = Protocol::decode(buf, noff, sizeof(buf), nid, nsize);
   EXPECT_TRUE(success);
@@ -65,9 +65,9 @@ TEST(Protocol, Simple) {
   testProtocol();
 }
 }
-} // namespaces
+}  // namespaces
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);

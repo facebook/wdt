@@ -8,4 +8,4 @@ class SocketUtils {
   static int getReceiveBufferSize(int fd);
 };
 }
-} // namespace facebook::wdt
+}  // namespace facebook::wdt
