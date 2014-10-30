@@ -12,6 +12,7 @@ DECLARE_int32(buffer_size);
 DECLARE_int32(max_retries);
 DECLARE_int32(sleep_ms);
 DEFINE_bool(ignore_open_errors, false, "will continue despite open errors");
+DEFINE_bool(two_phases, false, "do directory discovery first/separately");
 
 namespace {
 
@@ -36,12 +37,18 @@ Sender::Sender(const std::string &destHost, int port, int numSockets,
 }
 
 void Sender::start() {
-  auto startTime = Clock::now();
-  size_t bufferSize = FLAGS_buffer_size;
+  const bool twoPhases = FLAGS_two_phases;
+  const size_t bufferSize = FLAGS_buffer_size;
   LOG(INFO) << "Client (sending) to " << destHost_ << " port " << port_ << " : "
             << numSockets_ << " sockets, source dir " << srcDir_;
-
+  auto startTime = Clock::now();
   DirectorySourceQueue queue(srcDir_, bufferSize, srcFileInfo_);
+  std::thread dirThread = queue.buildQueueAsynchronously();
+  double directoryTime;
+  if (twoPhases) {
+    dirThread.join();
+    directoryTime = durationSeconds(Clock::now() - startTime);
+  }
   std::vector<std::thread> vt;
   size_t headerBytes[numSockets_];
   size_t dataBytes[numSockets_];
@@ -51,7 +58,10 @@ void Sender::start() {
     vt.emplace_back(&Sender::sendOne, this, startTime, destHost_, port_ + i,
                     &queue, &headerBytes[i], &dataBytes[i]);
   }
-  queue.init();
+  if (!twoPhases) {
+    dirThread.join();
+    directoryTime = durationSeconds(Clock::now() - startTime);
+  }
   size_t totalDataBytes = 0;
   size_t totalHeaderBytes = 0;
   for (int i = 0; i < numSockets_; i++) {
@@ -61,12 +71,15 @@ void Sender::start() {
   }
   size_t totalBytes = totalDataBytes + totalHeaderBytes;
   double totalTime = durationSeconds(Clock::now() - startTime);
-  LOG(WARNING) << "All data transfered in " << totalTime
-               << " seconds. Data Mbytes = " << totalDataBytes / 1024. / 1024.
+  LOG(WARNING) << "All data (" << queue.count() << " files) transfered in "
+               << totalTime << " seconds (" << directoryTime
+               << " dirtime). Data Mbytes = " << totalDataBytes / 1024. / 1024.
                << ". Header kbytes = " << totalHeaderBytes / 1024. << " ( "
                << 100. * totalHeaderBytes / totalBytes << " % overhead)"
                << ". Total bytes = " << totalBytes << ". Total throughput = "
-               << totalBytes / totalTime / 1024. / 1024. << " Mbytes/sec";
+               << totalBytes / totalTime / 1024. / 1024. << " Mbytes/sec ("
+               << totalBytes / (totalTime - directoryTime) / 1024. / 1024.
+               << " Mbytes/sec pure transf rate)";
 }
 
 void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
@@ -79,7 +92,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     if (s.connect()) {
       break;
     }
-    LOG(INFO) << "Sleeping after failed attempt " << i;
+    VLOG(1) << "Sleeping after failed attempt " << i;
     usleep(FLAGS_sleep_ms * 1000);
   }
   // one more/last try (stays true if it worked above)
@@ -89,7 +102,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   std::unique_ptr<ByteSource> source;
 
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
-  LOG(INFO) << "Connect took " << elapsedSecsConn;
+  VLOG(1) << "Connect took " << elapsedSecsConn;
 
   while ((source = queue->getNextSource())) {
     if (FLAGS_ignore_open_errors && source->hasError()) {
@@ -108,22 +121,36 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     if (written != off) {
       PLOG(FATAL) << "Write error/mismatch " << written << " " << off;
     }
-    VLOG(1) << "Sent " << written << " on " << fd << " : "
+    VLOG(3) << "Sent " << written << " on " << fd << " : "
             << folly::humanify(std::string(headerBuf, off));
     while (!source->finished()) {
       size_t size;
       char *buffer = source->read(size);
       if (source->hasError()) {
-        LOG(ERROR) << "failed reading file";
+        LOG(ERROR) << "Failed reading file " << source->getIdentifier()
+                   << " for fd " << fd;
         break;
       }
       CHECK(buffer && size > 0);
-      written = write(fd, buffer, size);
-      actualSize += written;
-      VLOG(1) << "wrote " << written << " on " << fd;
-      if (written != size) {
-        PLOG(FATAL) << "Write error/mismatch " << written << " " << size;
+      written = 0;
+      do {
+        ssize_t w = write(fd, buffer + written, size - written);
+        if (w < 0) {
+          // TODO: retries, close connection etc...
+          PLOG(FATAL) << "Write error " << written << " (" << size << ")";
+        }
+        written += w;
+        if (w != size) {
+          VLOG(1) << "Short write " << w << " sub total now " << written
+                  << " on " << fd << " out of " << size;
+        } else {
+          VLOG(3) << "Wrote all of " << size << " on " << fd;
+        }
+      } while (written < size);
+      if (written > size) {
+        PLOG(FATAL) << "Write error " << written << " > " << size;
       }
+      actualSize += written;
     }
     dataBytes += actualSize;
     if (actualSize != expectedSize) {
@@ -135,7 +162,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   write(fd, headerBuf, 1);  //< TODO check for status/succes
   ++headerBytes;
   shutdown(fd, SHUT_WR);  //< TODO check for status/succes
-  LOG(INFO) << "Wrote done cmd on " << fd << " waiting for reply...";
+  VLOG(1) << "Wrote done cmd on " << fd << " waiting for reply...";
   ssize_t numRead = read(fd, headerBuf, 1);  // TODO: returns 0 on disk full
   CHECK(numRead == 1) << "READ unexpected " << numRead << ":"
                       << folly::humanify(std::string(headerBuf, numRead));
@@ -146,16 +173,17 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
                       << folly::humanify(std::string(headerBuf, numRead));
   double totalTime = durationSeconds(Clock::now() - startTime);
   size_t totalBytes = headerBytes + dataBytes;
-  LOG(WARNING) << "Got reply - all done for fd:" << fd
-               << ". Number of files = " << numFiles
-               << ". Total time = " << totalTime << " (" << elapsedSecsConn
-               << " in connection)"
-               << ". Avg file size = " << 1. * dataBytes / numFiles
-               << ". Data bytes = " << dataBytes
-               << ". Header bytes = " << headerBytes << " ( "
-               << 100. * headerBytes / totalBytes << " % overhead)"
-               << ". Total bytes = " << totalBytes << ". Total throughput = "
-               << totalBytes / totalTime / 1024. / 1024. << " Mbytes/sec";
+  LOG(INFO) << "Got reply - all done for fd:" << fd
+            << ". Number of files = " << numFiles
+            << ". Total time = " << totalTime << " (" << elapsedSecsConn
+            << " in connection)"
+            << ". Avg file size = " << 1. * dataBytes / numFiles
+            << ". Data bytes = " << dataBytes
+            << ". Header bytes = " << headerBytes << " ( "
+            << 100. * headerBytes / totalBytes << " % overhead)"
+            << ". Total bytes = " << totalBytes
+            << ". Total throughput = " << totalBytes / totalTime / 1024. / 1024.
+            << " Mbytes/sec";
   *pHeaderBytes = headerBytes;
   *pDataBytes = dataBytes;
 }

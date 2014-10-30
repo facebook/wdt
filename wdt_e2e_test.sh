@@ -64,6 +64,7 @@ mkdir $DIR/dst
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
 #cp -R wdt folly /usr/share $DIR/src
+cp -R wdt folly $DIR/src
 
 #for size in 1k 64K 512K 1M 16M 256M 512M 1G
 #for size in 512K 1M 16M 256M 512M 1G

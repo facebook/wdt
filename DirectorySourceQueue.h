@@ -7,6 +7,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include "SourceQueue.h"
@@ -21,12 +22,17 @@ typedef std::pair<std::string, int64_t> FileInfo;
  * SourceQueue that returns all the regular files under a given directory
  * (recursively) as individual FileByteSource objects, sorted by decreasing
  * file size.
+ *
+ * TODO: The actual building of the queue is specific to this implementation
+ * which may or may not make it easy to plug a different implementation
+ * (as shown by the current implementation of Sender.cpp)
  */
 class DirectorySourceQueue : public SourceQueue {
  public:
   /**
-   * Create a DirectorySourceQueue. Call init() separately to actually recurse
-   * over the root directory and initialize data about files.
+   * Create a DirectorySourceQueue.
+   * Call buildQueueSynchronously() or buildQueueAsynchronously() separately
+   * to actually recurse over the root directory gather files and sizes.
    *
    * @param rootDir               root directory to recurse on
    * @param fileSourceBufferSize  buffer size to use when creating individual
@@ -47,29 +53,42 @@ class DirectorySourceQueue : public SourceQueue {
    * return false. In case it is called from multiple threads, one of them
    * will do initialization while the other calls will fail.
    *
+   * This is synchronous in the succeeding thread - it will block until
+   * the directory is completely discovered. Use buildQueueAsynchronously()
+   * for async fetch from parallel thread.
+   *
    * @return          true iff initialization was successful and hasn't
    *                  been done before
    */
-  bool init();
+  bool buildQueueSynchronously();
+
+  /**
+   * Starts a new thread to build the queue @see buildQueueSynchronously()
+   * @return the created thread (to be joined if needed)
+   */
+  std::thread buildQueueAsynchronously();
 
   /// @return true iff all regular files under root dir have been consumed
-  virtual bool finished() const;
+  bool finished() const override;
 
   /// @return next FileByteSource to consume or nullptr when finished
-  virtual std::unique_ptr<ByteSource> getNextSource();
+  std::unique_ptr<ByteSource> getNextSource() override;
+
+  size_t count() const override {
+    return numEntries_;
+  }
 
  private:
   /**
-   * Recurse on a relative path (to rootDir_) to gather data about files.
-   *
-   * @param relativePath    relative path to rootDir_, default is rootDir_
+   * Traverse rootDir_ to gather files and sizes to enqueue
    *
    * @return                true on success, false on error
    */
-  bool recurseOnPath(const std::string relativePath = "");
+  bool explore();
 
   /**
-   * Stat the input files and populate sizeToPath_
+   * Stat the input files and populate sizeToPath_ (alternative to
+   * explore used when fileInfo was specified)
    *
    * @return                true on success, false on error
    */
@@ -101,6 +120,9 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// Orders size/relative path pairs for files under root by decreasing size
   std::priority_queue<std::pair<uint64_t, std::string>> sizeToPath_;
+
+  /// Total number of entries/files that have passed through the queue
+  size_t numEntries_{0};
 };
 }
 }

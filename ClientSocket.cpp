@@ -34,8 +34,8 @@ bool ClientSocket::connect() {
   }
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
-    LOG(INFO) << "will connect to "
-              << ServerSocket::getNameInfo(info->ai_addr, info->ai_addrlen);
+    VLOG(2) << "will connect to "
+            << ServerSocket::getNameInfo(info->ai_addr, info->ai_addrlen);
     fd_ = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd_ == -1) {
       PLOG(WARNING) << "Error making socket";
@@ -47,7 +47,7 @@ bool ClientSocket::connect() {
       fd_ = -1;
       continue;
     }
-    LOG(INFO) << "Successful connect on " << fd_;
+    VLOG(1) << "Successful connect on " << fd_;
     sa_ = *info;
     break;
   }
@@ -61,7 +61,7 @@ bool ClientSocket::connect() {
 }
 
 int ClientSocket::getFd() const {
-  LOG(INFO) << "fd is " << fd_;
+  VLOG(1) << "fd is " << fd_;
   return fd_;
 }
 }

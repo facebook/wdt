@@ -19,12 +19,15 @@ DECLARE_int32(max_retries);
 DECLARE_int32(sleep_ms);
 DECLARE_int32(backlog);
 
+DEFINE_bool(skip_writes, false,
+            "If true no files will be created/written (benchmark/dummy mode)");
+
 namespace {
 
 /// len is initial/already read len
 size_t readAtLeast(int fd, char *buf, size_t max, ssize_t atLeast,
                    ssize_t len = 0) {
-  VLOG(1) << "readAtLeast len " << len << " max " << max << " atLeast "
+  VLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
           << atLeast << " from " << fd;
   CHECK(len >= 0) << "negative len " << len;
   CHECK(atLeast >= 0) << "negative atLeast " << atLeast;
@@ -40,19 +43,19 @@ size_t readAtLeast(int fd, char *buf, size_t max, ssize_t atLeast,
       }
     }
     if (n == 0) {
-      VLOG(1) << "Eof on " << fd << " after " << count << " read " << len;
+      VLOG(2) << "Eof on " << fd << " after " << count << " read " << len;
       return len;
     }
     len += n;
     count++;
   }
-  VLOG(1) << "took " << count << " read to get " << len << " from " << fd;
+  VLOG(3) << "took " << count << " read to get " << len << " from " << fd;
   return len;
 }
 
 size_t readAtMost(int fd, char *buf, size_t max, size_t atMost) {
   const int64_t target = atMost < max ? atMost : max;
-  VLOG(1) << "readAtMost target " << target;
+  VLOG(3) << "readAtMost target " << target;
   ssize_t n = read(fd, buf, target);
   if (n < 0) {
     PLOG(ERROR) << "Read error on " << fd << " with target " << target;
@@ -62,7 +65,7 @@ size_t readAtMost(int fd, char *buf, size_t max, size_t atMost) {
     LOG(WARNING) << "Eof on " << fd;
     return n;
   }
-  VLOG(1) << "readAtMost " << n << " / " << atMost << " from " << fd;
+  VLOG(3) << "readAtMost " << n << " / " << atMost << " from " << fd;
   return n;
 }
 
@@ -100,8 +103,10 @@ void Receiver::start() {
 
 void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
                           size_t bufferSize) {
-  LOG(INFO) << "Server Thread for port " << port << " with backlog " << backlog
-            << " on " << destDir;
+  const bool doActualWrites = !FLAGS_skip_writes;
+
+  VLOG(1) << "Server Thread for port " << port << " with backlog " << backlog
+          << " on " << destDir << " writes= " << doActualWrites;
 
   ServerSocket s(folly::to<std::string>(port), backlog);
   for (int i = 1; i < FLAGS_max_retries; ++i) {
@@ -132,8 +137,12 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
       int64_t size;
       const ssize_t oldOffset = off;
       Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[off++];
+      if (cmd == Protocol::EXIT_CMD) {
+        LOG(CRITICAL) << "Got exit command - exiting";
+        exit(0);
+      }
       if (cmd == Protocol::DONE_CMD) {
-        LOG(INFO) << "Got done command for " << fd;
+        VLOG(1) << "Got done command for " << fd;
         CHECK(numRead == 1) << "Unexpected state for done command"
                             << " off: " << off << " numRead: " << numRead;
         write(fd, buf + off - 1, 1);
@@ -144,11 +153,15 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
       CHECK(success) << "Error decoding at"
                      << " ooff:" << oldOffset << " off: " << off
                      << " numRead: " << numRead;
-      LOG(INFO) << "Read id:" << id << " size:" << size << " ooff:" << oldOffset
-                << " off: " << off << " numRead: " << numRead;
-      int dest = fileCreator_->createFile(id);
-      if (dest == -1) {
-        LOG(ERROR) << "Unable to open " << id << " in " << destDir;
+      VLOG(1) << "Read id:" << id << " size:" << size << " ooff:" << oldOffset
+              << " off: " << off << " numRead: " << numRead;
+
+      int dest = -1;
+      if (doActualWrites) {
+        dest = fileCreator_->createFile(id);
+        if (dest == -1) {
+          LOG(ERROR) << "Unable to open " << id << " in " << destDir;
+        }
       }
       ssize_t remainingData = numRead + oldOffset - off;
       ssize_t toWrite = remainingData;
@@ -156,12 +169,15 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         toWrite = size;
       }
       // write rest of stuff
-      int64_t wres = write(dest, buf + off, toWrite);
+      int64_t wres = toWrite;
+      if (doActualWrites) {
+        wres = write(dest, buf + off, toWrite);
+      }
       if (wres != toWrite) {
         PLOG(ERROR) << "Write error/mismatch " << wres << " " << off << " "
                     << toWrite;
       } else {
-        VLOG(1) << "Wrote intial " << wres << " / " << size << " off: " << off
+        VLOG(3) << "Wrote intial " << wres << " / " << size << " off: " << off
                 << " numRead: " << numRead << " on " << dest;
       }
       off += wres;
@@ -172,15 +188,20 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         if (nres <= 0) {
           break;
         }
-        int64_t nwres = write(dest, buf, nres);
+        int64_t nwres = nres;
+        if (doActualWrites) {
+          nwres = write(dest, buf, nres);
+        }
         if (nwres != nres) {
           PLOG(ERROR) << "Write error/mismatch " << nwres << " " << nres;
         }
         wres += nwres;
       }
-      LOG(INFO) << "completed " << id << " off: " << off
-                << " numRead: " << numRead << " on " << dest;
-      close(dest);
+      VLOG(1) << "completed " << id << " off: " << off
+              << " numRead: " << numRead << " on " << dest;
+      if (doActualWrites) {
+        close(dest);
+      }
       CHECK(remainingData >= 0) "Negative remainingData " << remainingData;
       if (remainingData > 0) {
         // if we need to read more anyway, let's move the data
@@ -188,7 +209,7 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         if ((remainingData < Protocol::kMaxHeader) &&
             (off > (bufferSize / 2))) {
           // rare so inneficient is ok
-          VLOG(1) << "copying extra " << remainingData << " leftover bytes @ "
+          VLOG(3) << "copying extra " << remainingData << " leftover bytes @ "
                   << off;
           memmove(/* dst      */ buf,
                   /* from     */ buf + off,
@@ -196,14 +217,14 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
           off = 0;
         } else {
           // otherwise just change the offset
-          VLOG(1) << "will use remaining extra " << remainingData
+          VLOG(3) << "will use remaining extra " << remainingData
                   << " leftover bytes @ " << off;
         }
       } else {
         numRead = off = 0;
       }
     }
-    LOG(INFO) << "Done with " << fd;
+    VLOG(1) << "Done with " << fd;
     close(fd);
   }
   free(buf);

@@ -23,8 +23,8 @@ ServerSocket::ServerSocket(string port, int backlog)
 }
 
 ServerSocket::~ServerSocket() {
-  LOG(INFO) << "~ServerSocket: potentially closing server socket "
-            << listeningFd_ << " and most recent connection " << fd_;
+  VLOG(1) << "~ServerSocket: potentially closing server socket " << listeningFd_
+          << " and most recent connection " << fd_;
   if (listeningFd_ >= 0) {
     close(listeningFd_);
     listeningFd_ = -1;
@@ -60,8 +60,8 @@ bool ServerSocket::listen() {
   }
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
-    LOG(INFO) << "will listen on "
-              << getNameInfo(info->ai_addr, info->ai_addrlen);
+    VLOG(1) << "will listen on "
+            << getNameInfo(info->ai_addr, info->ai_addrlen);
     // TODO: set sock options : SO_REUSEADDR,...
     listeningFd_ =
         socket(info->ai_family, info->ai_socktype, info->ai_protocol);
@@ -75,7 +75,7 @@ bool ServerSocket::listen() {
       listeningFd_ = -1;
       continue;
     }
-    LOG(INFO) << "Successful bind on " << listeningFd_;
+    VLOG(1) << "Successful bind on " << listeningFd_;
     sa_ = *info;
     break;
   }
@@ -99,13 +99,13 @@ int ServerSocket::getNextFd() {
   }
   struct sockaddr addr;
   socklen_t addrLen = sizeof(addr);
-  LOG(INFO) << "Waiting for new connection...";
+  VLOG(1) << "Waiting for new connection...";
   fd_ = accept(listeningFd_, &addr, &addrLen);
   if (fd_ < 0) {
     PLOG(ERROR) << "accept error";
   }
-  LOG(INFO) << "new connection " << fd_ << " from "
-            << getNameInfo(&addr, addrLen);
+  VLOG(1) << "new connection " << fd_ << " from "
+          << getNameInfo(&addr, addrLen);
   // TODO: set sock options
   return fd_;
 }

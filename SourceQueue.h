@@ -33,6 +33,9 @@ class SourceQueue {
    *                  no more sources to read from (equivalent to finished()).
    */
   virtual std::unique_ptr<ByteSource> getNextSource() = 0;
+
+  /// @return total number of entries enqueued/processed through the queue
+  virtual size_t count() const = 0;
 };
 }
 }
