@@ -103,6 +103,7 @@ bool DirectorySourceQueue::explore() {
 
       // if we reach DT_DIR and DT_REG directly:
       bool isDir = (dType == DT_DIR);
+      // This ignores symlinks on fs that support dType
       if (!isDir && dType != DT_REG && dType != DT_UNKNOWN) {
         VLOG(3) << "Ignoring entry type " << (int)(dType);
         continue;
@@ -113,14 +114,16 @@ bool DirectorySourceQueue::explore() {
         // DT_REG or DT_UNKNOWN cases
         const std::string newFullPath = rootDir_ + newRelativePath;
         struct stat fileStat;
-        if (stat(newFullPath.c_str(), &fileStat) != 0) {
+        // until we decide to follow symlinks in both cases: lstat
+        if (lstat(newFullPath.c_str(), &fileStat) != 0) {
           PLOG(ERROR) << "stat() failed on path " << newFullPath;
           hasError = true;
           continue;
         }
         // could dcheck that if DT_REG we better be !isDir
         isDir = S_ISDIR(fileStat.st_mode);
-        // if we were DT_UNKNOWN this could still be a block device etc... (xfs)
+        // if we were DT_UNKNOWN this could still be a symlink, block device
+        // etc... (xfs) (TODO: option to follow symlinks)
         if (S_ISREG(fileStat.st_mode)) {
           VLOG(1) << "Found reg file " << newFullPath << " of size "
                   << fileStat.st_size;

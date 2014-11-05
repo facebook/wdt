@@ -74,8 +74,8 @@ void Sender::start() {
   LOG(WARNING) << "All data (" << queue.count() << " files) transfered in "
                << totalTime << " seconds (" << directoryTime
                << " dirtime). Data Mbytes = " << totalDataBytes / 1024. / 1024.
-               << ". Header kbytes = " << totalHeaderBytes / 1024. << " ( "
-               << 100. * totalHeaderBytes / totalBytes << " % overhead)"
+               << ". Header kbytes = " << totalHeaderBytes / 1024. << " ("
+               << 100. * totalHeaderBytes / totalBytes << "% overhead)"
                << ". Total bytes = " << totalBytes << ". Total throughput = "
                << totalBytes / totalTime / 1024. / 1024. << " Mbytes/sec ("
                << totalBytes / (totalTime - directoryTime) / 1024. / 1024.

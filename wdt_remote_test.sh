@@ -1,77 +1,103 @@
 #! /bin/sh
 
-REMOTE=$1
-if [ -z $REMOTE ] ; then
-    echo "Usage: $0 desthost"
+#set -e
+# modified from wdt_e2e_test.sh and fbonly/wdt_prof.sh
+
+SRCHOST=$1
+DSTHOST=$2
+if [ -z $DSTHOST ] ; then
+    echo "Usage: $0 srchost desthost"
     exit 1
 fi
 
-echo "Remote Test - assumes wdt binary is in path - target is $REMOTE"
+SKIP_WRITES="true"
 
-# Verbose:
-#WDTBIN="wdt -minloglevel 0"
-# Fastest:
-BS=`expr 256 \* 1024`
-WDTBIN_OPTS="-buffer_size=$BS -num_sockets=16 -minloglevel 2"
-WDTBIN="wdt $WDTBIN_OPTS"
+echo "Run from ~fbcode (wdt's parent dir). Skip writes is $SKIP_WRITES"
+
+#WDTBIN_OPTS="-minloglevel 2 -sleep_ms 10 -max_retries 5 -num_sockets 15"
+WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 16 -ipv4=true"
 
 BASEDIR=/dev/shm/tmpWDT
+
+
+# Version with profiler:
+#WDTNAME="wdt_prof"
+#WDTDIR="_bin/wdt/fbonly"
+# Non profiler version
+WDTNAME="wdt"
+WDTORIGDIR="_bin/wdt"
+WDTDIR="$BASEDIR/_bin/wdt"
+WDTBIN="$WDTDIR/$WDTNAME"
+WDTCMD="$WDTBIN $WDTBIN_OPTS"
+
+REMOTEUSER="root"
+RSHDST="ssh -l $REMOTEUSER $DSTHOST"
+RSHSRC="ssh -l $REMOTEUSER $SRCHOST"
+SCP="scp"
+NC="nc -4" # ipv4 only
+
+#BASEDIR=/data/wdt/tmpWDT
 mkdir -p $BASEDIR
 DIR=`mktemp -d --tmpdir=$BASEDIR`
 echo "Testing in $DIR"
 
-pkill -x wdt
+CMD="pkill -x $WDTNAME; mkdir -p $DIR/src ; mkdir -p $WDTDIR"
+$RSHSRC $CMD
+$RSHDST $CMD
+$SCP $WDTORIGDIR/$WDTNAME $REMOTEUSER@$DSTHOST:$WDTBIN
+$SCP $WDTORIGDIR/$WDTNAME $REMOTEUSER@$SRCHOST:$WDTBIN
 
-mkdir $DIR/src
-ssh $REMOTE "pkill -x wdt; mkdir -p $DIR/dst"
+#cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
+#cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
+# TODO get a better test/load generation - remote execute the for below for ex
+#$RSHSRC "cp -R /usr/bin /usr/share $DIR/src"
 
+#$RSHSRC "cp -R /usr/bin /usr/lib /usr/lib64 $DIR/src"
 
-cp -R /usr/bin /usr/lib /usr/share $DIR/src
+$RSHSRC "dd if=/dev/zero of=$DIR/src/big.1 bs=256M count=1; for i in {2..64} ; do ln $DIR/src/big.1 $DIR/src/big.\$i; done; ls -lh $DIR/src"
 
-# Various smaller tests if the bigger one fails and logs are too hard to read:
-#cp wdt/wdtlib.cpp wdt/wdtlib.h $DIR/src
-#cp wdt/*.cpp $DIR/src
-#cp /usr/bin/* $DIR/src
-#cp wdt/wdtlib.cpp $DIR/src/a
-#cp wdt/wdtlib.h  $DIR/src/b
-#head -30 wdt/wdtlib.cpp >  $DIR/src/c
-echo "staging copy done, starting wdt on $REMOTE"
+echo 'done with setup'
+
+echo "staging copy done on $SRCHOST, starting wdt on $DSTHOST"
 # Can't have both client and server send to stdout in parallel or log lines
 # get mangled/are missing - so we redirect the server one
-ssh $REMOTE "date;$WDTBIN -directory $DIR/dst > $DIR/server.log 2>&1 &"
+$RSHDST "date; $WDTCMD -directory $DIR/dst -skip_writes=$SKIP_WRITES > $DIR/server.log 2>&1 &"
 
 # wait for server to be up
-while [ `/bin/true | nc $REMOTE 22356; echo $?` -eq 1 ]
+while [ `$RSHSRC "/bin/true | $NC $DSTHOST 22356; echo $?"` -eq 1 ]
 do
  echo "Server not up yet...`date`..."
  sleep 0.5
 done
-echo "Server is up on $REMOTE 22356 - `date`"
+echo "Server is up on $DSTHOST 22356 - `date`"
+
 
 # Only 1 socket (single threaded send/receive)
-#$WDTBIN -num_sockets=1 -directory $DIR/src -destination ::1
+#$WDTCMD -num_sockets=1 -directory $DIR/src -destination ::1
 # Normal
-time $WDTBIN -directory $DIR/src -destination $REMOTE |& tee $DIR/client.log
-# No need to wait for transfer to finish, client now exits when last byte is saved
-echo "Checking for difference `date`"
 
-(cd $DIR/src ; ( find . -type f | /bin/fgrep -v "/." | xargs md5sum | sort ) > ../src.md5s )
-ssh $REMOTE "cd $DIR/dst ; find . -type f | xargs md5sum | sort" > $DIR/dst.md5s
+#time trickle -d 1000 -u 1000 $WDTCMD -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log
+$RSHSRC "time $WDTCMD -directory $DIR/src -destination $DSTHOST |& tee $DIR/client.log"
 
-echo "Should be no diff"
-(cd $DIR; diff -u src.md5s dst.md5s)
-STATUS=$?
-#(cd $DIR; ls -lR src/ dst/ )
+echo "2nd run of client"
+$RSHSRC "time $WDTCMD -directory $DIR/src -destination $DSTHOST |& tee $DIR/client2.log"
 
-pkill -x wdt
+echo "3nd run of client with 2 phases"
+$RSHSRC "time  $WDTCMD -directory $DIR/src -destination $DSTHOST -two_phases |& tee $DIR/client3.log"
 
-if [ $STATUS -eq 0 ] ; then
-  echo "Good run, deleting logs in $DIR"
-  find $DIR -type d | xargs chmod 755 # cp -r makes lib/locale not writeable somehow
-  rm -rf $DIR
-  ssh $REMOTE "pkill -x wdt; rm -rf $DIR"
-else
-  echo "Bad run ($STATUS) - keeping full logs and partial transfer in $DIR (and on $REMOTE)"
-fi
+echo "Skipping independant verification"
+STATUS=0
+
+echo "Making the server end gracefully"
+$RSHSRC "echo -n e | $NC $DSTHOST 22356"
+
+echo "Server logs:"
+$RSHDST "cat $DIR/server.log"
+
+echo "Deleting logs in $DIR"
+$RSHSRC "find $DIR -type d | xargs chmod 755; rm -rf $DIR"
+$RSHDST "pkill -x wdt; rm -rf $DIR"
+
+echo "All done with testing from $SRCHOST to $DSTHOST"
 
 exit $STATUS

@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 
 DEFINE_bool(ipv6, true, "use ipv6 only");
+DEFINE_bool(ipv4, false, "use ipv4 only, takes precedence over -ipv6");
 
 namespace facebook {
 namespace wdt {
@@ -16,6 +17,9 @@ ClientSocket::ClientSocket(string dest, string port)
   memset(&sa_, 0, sizeof(sa_));
   if (FLAGS_ipv6) {
     sa_.ai_family = AF_INET6;
+  }
+  if (FLAGS_ipv4) {
+    sa_.ai_family = AF_INET;
   }
   sa_.ai_socktype = SOCK_STREAM;
 }

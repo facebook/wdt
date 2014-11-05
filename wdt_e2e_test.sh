@@ -51,6 +51,7 @@ WDTBIN_OPTS="-minloglevel 2 -sleep_ms 1 -max_retries 999"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/tmpWDT
+#BASEDIR=/data/wdt/tmpWDT
 mkdir -p $BASEDIR
 DIR=`mktemp -d --tmpdir=$BASEDIR`
 echo "Testing in $DIR"
@@ -65,6 +66,7 @@ mkdir $DIR/dst
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
 #cp -R wdt folly /usr/share $DIR/src
 cp -R wdt folly $DIR/src
+#cp -R wdt $DIR/src
 
 #for size in 1k 64K 512K 1M 16M 256M 512M 1G
 #for size in 512K 1M 16M 256M 512M 1G
@@ -81,6 +83,8 @@ do
 done
 echo "done with setup"
 
+# test symlink issues
+(cd $DIR/src ; touch a; ln -s doesntexist badlink; touch c; ln -s wdt wdt_2)
 
 
 # Various smaller tests if the bigger one fails and logs are too hard to read:
