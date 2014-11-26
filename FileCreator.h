@@ -24,6 +24,8 @@ class FileCreator {
   explicit FileCreator(const std::string &rootDir) : rootDir_(rootDir) {
     CHECK(!rootDir_.empty());
     addTrailingSlash(rootDir_);
+    createDirRecursively(rootDir_, false);
+    reset();
   }
 
   /**
@@ -60,7 +62,7 @@ class FileCreator {
    *
    * @return            true iff successful
    */
-  bool createDirRecursively(const std::string &dir, bool force = false);
+  bool createDirRecursively(const std::string dir, bool force = false);
 
   /// Check whether directory has been created/is in cache
   bool dirCreated(const std::string &dir) {

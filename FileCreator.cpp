@@ -57,31 +57,37 @@ int FileCreator::createFile(const string &relPathStr) {
   return res;
 }
 
-bool FileCreator::createDirRecursively(const std::string &dir, bool force) {
-  int pos = 0;
-  std::string subdir;
-  while (pos < dir.size()) {
-    while (pos < dir.size() && dir[pos] != '/') {
-      subdir.push_back(dir[pos]);
-      ++pos;
-    }
-    CHECK(pos < dir.size());
-    subdir.push_back('/');
-    ++pos;
-    if (force || !dirCreated(subdir)) {
-      std::string fullDir(rootDir_ + subdir);
-      int code = mkdir(fullDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-      if (code != 0 && errno != EEXIST) {
-        PLOG(ERROR) << "failed to make directory " << fullDir;
-        return false;
-      }
-      LOG(INFO) << "made dir " << fullDir;
-      {
-        std::lock_guard<std::mutex> lock(mutex_);
-        createdDirs_.insert(subdir);
-      }
+bool FileCreator::createDirRecursively(const std::string dir, bool force) {
+  if (!force && dirCreated(dir)) {
+    return true;
+  }
+
+  CHECK(dir.back() == '/');
+
+  size_t lastIndex = dir.size() - 1;
+  while(lastIndex > 0 && dir[lastIndex - 1] != '/') {
+    lastIndex--;
+  }
+
+  if (lastIndex > 0) {
+    if (!createDirRecursively(dir.substr(0, lastIndex), force)) {
+      return false;
     }
   }
+
+  std::string fullDirPath = rootDir_ + dir;
+  int code =
+    mkdir(fullDirPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+  if (code != 0 && errno != EEXIST) {
+    PLOG(ERROR) << "failed to make directory " << dir;
+    return false;
+  }
+  LOG(INFO) << "made dir " << dir;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    createdDirs_.insert(dir);
+  }
+
   return true;
 }
 

@@ -59,7 +59,6 @@ echo "Testing in $DIR"
 pkill -x wdt
 
 mkdir $DIR/src
-mkdir $DIR/dst
 
 
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
