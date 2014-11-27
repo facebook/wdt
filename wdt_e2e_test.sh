@@ -34,6 +34,14 @@
 # >= 9500 < 10000 , 9750 , 100, 3
 # # target 25.0%,8075.0
 # # target 50.0%,8487.5
+usage="
+The possible options to this script are
+-t #threads
+-s specify 1 to save client logs to local dir
+-a Average transfer rate to achieve
+-p Peak Rate for Token Bucket
+-d Delay (seconds) to introduce at receiver
+"
 
 echo "Run from ~/fbcode - or fbmake runtests"
 
@@ -46,8 +54,37 @@ DO_VERIFY=1
 #WDTBIN="_bin/wdt/wdt -minloglevel 0"
 # Fastest:
 BS=`expr 256 \* 1024`
+threads=8
+avg_rate=-1
+max_rate=-1
+keeplog=0
+delay=0
+if [ "$1" == "-h" ]; then
+  echo "$usage"
+  exit 0
+fi
+while getopts ":t:a:p:s:d:h:" opt; do
+  case $opt in
+    t) threads="$OPTARG"
+    ;;
+    s) keeplog="$OPTARG"
+    ;;
+    a) avg_rate="$OPTARG"
+    ;;
+    p) max_rate="$OPTARG"
+    ;;
+    d) delay="$OPTARG"
+    ;;
+    h) echo "$usage"
+       exit
+    ;;
+    \?) echo "Invalid option -$OPTARG" >&2
+    ;;
+  esac
+done
+printf "(Sockets,Average rate, Max_rate, Save local?, Delay)=%s,%s,%s,%s,%s\n" "$threads" "$avg_rate" "$max_rate" "$keeplog" "$delay"
 #WDTBIN_OPTS="-buffer_size=$BS -num_sockets=8 -minloglevel 2 -sleep_ms 1 -max_retries 999"
-WDTBIN_OPTS="-minloglevel 2 -sleep_ms 1 -max_retries 999"
+WDTBIN_OPTS="-minloglevel=0 -v=1 -sleep_ms 1 -max_retries 999 -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/tmpWDT
@@ -93,18 +130,20 @@ echo "done with setup"
 #cp wdt/wdtlib.cpp $DIR/src/a
 #cp wdt/wdtlib.h  $DIR/src/b
 #head -30 wdt/wdtlib.cpp >  $DIR/src/c
-
 # Can't have both client and server send to stdout in parallel or log lines
 # get mangled/are missing - so we redirect the server one
 $WDTBIN -directory $DIR/dst > $DIR/server.log 2>&1 &
-
 # client now retries connects so no need wait for server to be up
-
+pidofreceiver=$!
 # Only 1 socket (single threaded send/receive)
 #$WDTBIN -num_sockets=1 -directory $DIR/src -destination ::1
 # Normal
 
 #time trickle -d 1000 -u 1000 $WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log
+if [ $delay -gt 0 ] ; then
+  (sleep 3; kill -STOP $pidofreceiver; sleep $delay; kill -CONT $pidofreceiver ) &
+fi
+echo "$WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log"
 time $WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log
 
 # rsync test:
@@ -135,7 +174,9 @@ pkill -x wdt
 
 echo "Server logs:"
 cat $DIR/server.log
-
+if [ $keeplog -ne 0 ]; then 
+  cp $DIR/client.log client.log
+fi
 if [ $STATUS -eq 0 ] ; then
   echo "Good run, deleting logs in $DIR"
   find $DIR -type d | xargs chmod 755 # cp -r makes lib/locale not writeable somehow

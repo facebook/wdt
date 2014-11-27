@@ -42,7 +42,8 @@ class Sender {
  private:
   void sendOne(Clock::time_point startTime, const std::string &destHost,
                int port, DirectorySourceQueue *queue, size_t *pHeaderBytes,
-               size_t *pDataBytes);
+               size_t *pDataBytes, double avgRateBytes, double maxRateBytes,
+               double bucketLimitBytes);
 
  private:
   std::string destHost_;
