@@ -104,7 +104,7 @@ void Sender::start() {
     perThreadPeakRateBytesPerSec =
         kPeakMultiplier * perThreadAvgRateBytesPerSec;
   }
-  if (perThreadBucketLimit <= 0 && perThreadPeakRateBytesPerSec >= 0) {
+  if (perThreadBucketLimit <= 0 && perThreadPeakRateBytesPerSec > 0) {
     perThreadBucketLimit =
         kTimeMultiplier * kBucketMultiplier * perThreadPeakRateBytesPerSec;
     LOG(INFO) << "Burst limit not specified but peak "

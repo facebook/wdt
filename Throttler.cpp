@@ -23,15 +23,19 @@ Throttler::Throttler(Clock::time_point start, double avgRateBytesPerSec,
   if (bucketLimitBytes > 0) {
     bytesTokenBucketLimit_ = bucketLimitBytes;
   }
-  LOG(INFO) << "Average rate " << avgRateBytesPerSec_ / kMbToB;
+  if (avgRateBytesPerSec > 0) {
+    LOG(INFO) << "Average rate " << avgRateBytesPerSec_ / kMbToB;
+  } else {
+    LOG(INFO) << "No average rate specified";
+  }
   if (bucketRateBytesPerSec_ > 0) {
     LOG(INFO) << "Peak rate " << bucketRateBytesPerSec_ / kMbToB
               << " mbytes / seconds.  Bucket limit "
-              << bytesTokenBucketLimit_ / kMbToB << " mbytes."
+              << bytesTokenBucketLimit_ / kMbToB << " mbytes.";
   } else {
     LOG(INFO) << "No peak rate specified";
   }
-  instanceProgress_ = 0;
+  instantProgress_ = 0;
   lastFillTime_ = start;
   isTokenBucketEnabled = (bucketRateBytesPerSec_ > 0);
 }
