@@ -21,11 +21,18 @@ namespace wdt {
 class FileCreator {
  public:
   /// rootDir is assumed to exist
-  explicit FileCreator(const std::string &rootDir) : rootDir_(rootDir) {
-    CHECK(!rootDir_.empty());
-    addTrailingSlash(rootDir_);
-    createDirRecursively(rootDir_, false);
+  explicit FileCreator(const std::string &rootDir) {
+    CHECK(!rootDir.empty());
+
+    // For creating root directory, we are using createDirRecursively.
+    // Since, this function adds rootDir to the path provided to it,
+    // we are setting the value of rootDir after the function call.
+    // So, createDirRecursively uses empty rootDir for this call.
+    std::string rootDirPath = rootDir;
+    addTrailingSlash(rootDirPath);
+    createDirRecursively(rootDirPath, false);
     reset();
+    rootDir_ = rootDirPath;
   }
 
   /**

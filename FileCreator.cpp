@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <folly/Conv.h>
 
 namespace facebook {
 namespace wdt {
@@ -65,7 +66,7 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
   CHECK(dir.back() == '/');
 
   size_t lastIndex = dir.size() - 1;
-  while(lastIndex > 0 && dir[lastIndex - 1] != '/') {
+  while (lastIndex > 0 && dir[lastIndex - 1] != '/') {
     lastIndex--;
   }
 
@@ -75,14 +76,17 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
     }
   }
 
-  std::string fullDirPath = rootDir_ + dir;
-  int code =
-    mkdir(fullDirPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+  std::string fullDirPath;
+  folly::toAppend(rootDir_, dir, &fullDirPath);
+  int code = mkdir(fullDirPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   if (code != 0 && errno != EEXIST) {
-    PLOG(ERROR) << "failed to make directory " << dir;
+    PLOG(ERROR) << "failed to make directory " << fullDirPath;
     return false;
+  } else if (code != 0) {
+    LOG(INFO) << "dir already exists " << fullDirPath;
+  } else {
+    LOG(INFO) << "made dir " << fullDirPath;
   }
-  LOG(INFO) << "made dir " << dir;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     createdDirs_.insert(dir);
