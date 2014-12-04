@@ -54,7 +54,7 @@ int FileCreator::createFile(const string &relPathStr) {
       return -1;
     }
   }
-  LOG(VERBOSE) << "successfully created file " << path;
+  VLOG(1) << "successfully created file " << path;
   return res;
 }
 
@@ -99,7 +99,7 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
 void FileCreator::addTrailingSlash(string &path) {
   if (path.back() != '/') {
     path.push_back('/');
-    LOG(VERBOSE) << "Added missing trailing / to " << path;
+    VLOG(1) << "Added missing trailing / to " << path;
   }
 }
 }

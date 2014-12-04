@@ -1,11 +1,15 @@
 #include "Sender.h"
+
 #include "ClientSocket.h"
 #include "Protocol.h"
 #include "Throttler.h"
 
 #include <folly/Conv.h>
+#include <folly/Memory.h>
 #include <folly/String.h>
+
 #include <thread>
+
 DECLARE_int32(buffer_size);
 DECLARE_int32(max_retries);
 DECLARE_int32(sleep_ms);
@@ -165,10 +169,13 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
                      size_t *pHeaderBytes, size_t *pDataBytes,
                      double avgRateBytes, double maxRateBytes,
                      double bucketLimitBytes) {
-  Throttler throttler(startTime, avgRateBytes, maxRateBytes, bucketLimitBytes);
+  std::unique_ptr<Throttler> throttler;
   const bool doThrottling = (avgRateBytes > 0 || maxRateBytes > 0);
-  if (!doThrottling) {
-    LOG(INFO) << "No throttling in effect";
+  if (doThrottling) {
+    throttler = folly::make_unique<Throttler>(startTime, avgRateBytes,
+                                              maxRateBytes, bucketLimitBytes);
+  } else {
+    VLOG(1) << "No throttling in effect";
   }
   size_t headerBytes = 0, dataBytes = 0, totalBytes = 0;
   size_t numFiles = 0;
@@ -229,7 +236,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
          * was being written and it is okay to start throttling with the
          * next expected write.
          */
-        throttler.limit(totalBytes);
+        throttler->limit(totalBytes);
       }
       do {
         ssize_t w = write(fd, buffer + written, size - written);

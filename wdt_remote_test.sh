@@ -10,12 +10,14 @@ if [ -z $DSTHOST ] ; then
     exit 1
 fi
 
+#SKIP_WRITES="false"
 SKIP_WRITES="true"
 
 echo "Run from ~fbcode (wdt's parent dir). Skip writes is $SKIP_WRITES"
 
 #WDTBIN_OPTS="-minloglevel 2 -sleep_ms 10 -max_retries 5 -num_sockets 15"
-WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 16 -ipv4=true"
+WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 16"
+#WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 16 -ipv4=true"
 
 BASEDIR=/dev/shm/tmpWDT
 
@@ -30,6 +32,7 @@ WDTDIR="$BASEDIR/_bin/wdt"
 WDTBIN="$WDTDIR/$WDTNAME"
 WDTCMD="$WDTBIN $WDTBIN_OPTS"
 
+# For prod
 REMOTEUSER="root"
 RSHDST="ssh -l $REMOTEUSER $DSTHOST"
 RSHSRC="ssh -l $REMOTEUSER $SRCHOST"
@@ -47,26 +50,28 @@ $RSHDST $CMD
 $SCP $WDTORIGDIR/$WDTNAME $REMOTEUSER@$DSTHOST:$WDTBIN
 $SCP $WDTORIGDIR/$WDTNAME $REMOTEUSER@$SRCHOST:$WDTBIN
 
+# Start server/recipient first (so it's likely ready by the time we are done
+# staging the src)
+echo "Starting server on destination side $DSTHOST"
+$RSHDST "date; $WDTCMD -directory $DIR/dst -skip_writes=$SKIP_WRITES > $DIR/server.log 2>&1 &"
+
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
 # TODO get a better test/load generation - remote execute the for below for ex
 #$RSHSRC "cp -R /usr/bin /usr/share $DIR/src"
 
 #$RSHSRC "cp -R /usr/bin /usr/lib /usr/lib64 $DIR/src"
-
-$RSHSRC "dd if=/dev/zero of=$DIR/src/big.1 bs=256M count=1; for i in {2..64} ; do ln $DIR/src/big.1 $DIR/src/big.\$i; done; ls -lh $DIR/src"
+echo "Staging on source side"
+$RSHSRC "dd if=/dev/zero of=$DIR/src/big.1 bs=16M count=1; for i in {2..64} ; do ln $DIR/src/big.1 $DIR/src/big.\$i; done; ls -lh $DIR/src"
 
 echo 'done with setup'
 
-echo "staging copy done on $SRCHOST, starting wdt on $DSTHOST"
-# Can't have both client and server send to stdout in parallel or log lines
-# get mangled/are missing - so we redirect the server one
-$RSHDST "date; $WDTCMD -directory $DIR/dst -skip_writes=$SKIP_WRITES > $DIR/server.log 2>&1 &"
+echo "Staging copy done on $SRCHOST, checking $DSTHOST"
 
 # wait for server to be up
 while [ `$RSHSRC "/bin/true | $NC $DSTHOST 22356; echo $?"` -eq 1 ]
 do
- echo "Server not up yet...`date`..."
+ echo "Destination server not up yet...`date`..."
  sleep 0.5
 done
 echo "Server is up on $DSTHOST 22356 - `date`"

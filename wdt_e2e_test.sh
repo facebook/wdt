@@ -84,7 +84,7 @@ while getopts ":t:a:p:s:d:h:" opt; do
 done
 printf "(Sockets,Average rate, Max_rate, Save local?, Delay)=%s,%s,%s,%s,%s\n" "$threads" "$avg_rate" "$max_rate" "$keeplog" "$delay"
 #WDTBIN_OPTS="-buffer_size=$BS -num_sockets=8 -minloglevel 2 -sleep_ms 1 -max_retries 999"
-WDTBIN_OPTS="-minloglevel=0 -v=1 -sleep_ms 1 -max_retries 999 -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200"
+WDTBIN_OPTS="-minloglevel=0 -sleep_ms 1 -max_retries 999 -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/tmpWDT
@@ -174,7 +174,7 @@ pkill -x wdt
 
 echo "Server logs:"
 cat $DIR/server.log
-if [ $keeplog -ne 0 ]; then 
+if [ $keeplog -ne 0 ]; then
   cp $DIR/client.log client.log
 fi
 if [ $STATUS -eq 0 ] ; then
