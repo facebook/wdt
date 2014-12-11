@@ -26,6 +26,8 @@ DEFINE_string(directory, ".", "Source/Destination directory");
 DEFINE_bool(files, false,
             "If true, read a list of files and optional "
             "filesizes from stdin relative to the directory and transfer then");
+DEFINE_bool(follow_symlinks, false,
+            "If true, follow symlinks and copy them as well");
 DEFINE_string(
     destination, "",
     "empty is server (destination) mode, non empty is destination host");
@@ -68,7 +70,8 @@ int main(int argc, char *argv[]) {
       }
     }
     facebook::wdt::Sender sender(FLAGS_destination, FLAGS_port,
-                                 FLAGS_num_sockets, FLAGS_directory, fileInfo);
+                                 FLAGS_num_sockets, FLAGS_directory, fileInfo,
+                                 FLAGS_follow_symlinks);
     sender.start();
   }
   return 0;

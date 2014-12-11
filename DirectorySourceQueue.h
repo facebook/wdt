@@ -40,9 +40,11 @@ class DirectorySourceQueue : public SourceQueue {
    *                              getNextSource)
    * @param fileInfo              (optional) if non-empty, only operate on the
    *                              specified paths relative to rootDir
+   * @param followSymlinks        (optional) if true, follow sym links
    */
   DirectorySourceQueue(const std::string &rootDir, size_t fileSourceBufferSize,
-                       const std::vector<FileInfo> &fileInfo = {});
+                       const std::vector<FileInfo> &fileInfo = {},
+                       const bool followSymlinks = false);
 
   /**
    * Recurse over given root directory, gather data about regular files and
@@ -123,6 +125,9 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// Total number of entries/files that have passed through the queue
   size_t numEntries_{0};
+
+  /// Whether to follow symlinks or not
+  bool followSymlinks_{false};
 };
 }
 }

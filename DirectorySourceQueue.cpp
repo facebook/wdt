@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <set>
 
 #include "FileByteSource.h"
 
@@ -11,10 +12,11 @@ namespace wdt {
 
 DirectorySourceQueue::DirectorySourceQueue(
     const std::string &rootDir, size_t fileSourceBufferSize,
-    const std::vector<FileInfo> &fileInfo)
+    const std::vector<FileInfo> &fileInfo, const bool followSymlinks)
     : rootDir_(rootDir),
       fileSourceBufferSize_(fileSourceBufferSize),
-      fileInfo_(fileInfo) {
+      fileInfo_(fileInfo),
+      followSymlinks_(followSymlinks) {
   CHECK(!rootDir_.empty() || !fileInfo_.empty());
   CHECK(fileSourceBufferSize_ > 0);
   if (rootDir_.back() != '/') {
@@ -58,6 +60,7 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
 
 bool DirectorySourceQueue::explore() {
   bool hasError = false;
+  std::set<std::string> visited;
   std::deque<std::string> todoList;
   todoList.push_back("");
   while (!todoList.empty()) {
@@ -103,29 +106,69 @@ bool DirectorySourceQueue::explore() {
 
       // if we reach DT_DIR and DT_REG directly:
       bool isDir = (dType == DT_DIR);
-      // This ignores symlinks on fs that support dType
-      if (!isDir && dType != DT_REG && dType != DT_UNKNOWN) {
+      bool isLink = (dType == DT_LNK);
+      bool keepEntry = (isDir || dType == DT_REG || dType == DT_UNKNOWN);
+      if (followSymlinks_) {
+        keepEntry |= isLink;
+      }
+      if (!keepEntry) {
         VLOG(3) << "Ignoring entry type " << (int)(dType);
         continue;
       }
       std::string newRelativePath =
           relativePath + std::string(dirEntryRes->d_name);
+      std::string newFullPath = rootDir_ + newRelativePath;
       if (!isDir) {
-        // DT_REG or DT_UNKNOWN cases
-        const std::string newFullPath = rootDir_ + newRelativePath;
+        // DT_REG, DT_LNK or DT_UNKNOWN cases
         struct stat fileStat;
-        // until we decide to follow symlinks in both cases: lstat
-        if (lstat(newFullPath.c_str(), &fileStat) != 0) {
+        // Use stat since we can also have symlinks
+        if (stat(newFullPath.c_str(), &fileStat) != 0) {
           PLOG(ERROR) << "stat() failed on path " << newFullPath;
           hasError = true;
           continue;
         }
+
+        if (followSymlinks_) {
+          std::string pathToResolve = newFullPath;
+          if (dType == DT_UNKNOWN) {
+            // Use lstat because we are checking the file itself
+            // and not what it points to (if it is a link)
+            struct stat linkStat;
+            if (lstat(pathToResolve.c_str(), &linkStat) != 0) {
+              PLOG(ERROR) << "lstat() failed on path " << pathToResolve;
+              hasError = true;
+              continue;
+            }
+            if (S_ISLNK(linkStat.st_mode)) {
+              // Let's resolve it below
+              isLink = true;
+            }
+          }
+          if (isLink) {
+            // Use realpath() as it resolves to a nice canonicalized
+            // full path we can used for the stat() call later,
+            // readlink could still give us a relative path
+            // and making sure the output buffer is sized appropriately
+            // can be ugly
+            char *resolvedPath = realpath(pathToResolve.c_str(), nullptr);
+            if (!resolvedPath) {
+              hasError = true;
+              PLOG(ERROR) << "Couldn't resolve " << pathToResolve.c_str();
+              continue;
+            }
+            newFullPath.assign(resolvedPath);
+            free(resolvedPath);
+            VLOG(2) << "Resolved symlink " << dirEntryRes->d_name << " to "
+                    << newFullPath;
+          }
+        }
+
         // could dcheck that if DT_REG we better be !isDir
         isDir = S_ISDIR(fileStat.st_mode);
         // if we were DT_UNKNOWN this could still be a symlink, block device
-        // etc... (xfs) (TODO: option to follow symlinks)
+        // etc... (xfs)
         if (S_ISREG(fileStat.st_mode)) {
-          VLOG(1) << "Found reg file " << newFullPath << " of size "
+          VLOG(1) << "Found file " << newFullPath << " of size "
                   << fileStat.st_size;
           {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -138,8 +181,17 @@ bool DirectorySourceQueue::explore() {
         }
       }
       if (isDir) {
+        if (followSymlinks_) {
+          if (visited.find(newFullPath) != visited.end()) {
+            LOG(ERROR) << "Attempted to visit directory twice: " << newFullPath;
+            hasError = true;
+            continue;
+          }
+          //TODO: consider custom hashing ignoring common prefix
+          visited.insert(newFullPath);
+        }
         newRelativePath.push_back('/');
-        VLOG(3) << "Adding " << newRelativePath;
+        VLOG(1) << "Adding " << newRelativePath;
         todoList.push_back(std::move(newRelativePath));
       }
     }

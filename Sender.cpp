@@ -66,12 +66,14 @@ namespace wdt {
 
 Sender::Sender(const std::string &destHost, int port, int numSockets,
                const std::string &srcDir,
-               const std::vector<FileInfo> &srcFileInfo)
+               const std::vector<FileInfo> &srcFileInfo,
+               const bool followSymlinks)
     : destHost_(destHost),
       port_(port),
       numSockets_(numSockets),
       srcDir_(srcDir),
-      srcFileInfo_(srcFileInfo) {
+      srcFileInfo_(srcFileInfo),
+      followSymlinks_(followSymlinks) {
 }
 
 void Sender::start() {
@@ -80,7 +82,8 @@ void Sender::start() {
   LOG(INFO) << "Client (sending) to " << destHost_ << " port " << port_ << " : "
             << numSockets_ << " sockets, source dir " << srcDir_;
   auto startTime = Clock::now();
-  DirectorySourceQueue queue(srcDir_, bufferSize, srcFileInfo_);
+  DirectorySourceQueue queue(srcDir_, bufferSize, srcFileInfo_,
+                             followSymlinks_);
   std::thread dirThread = queue.buildQueueAsynchronously();
   double directoryTime;
   if (twoPhases) {

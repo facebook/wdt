@@ -32,7 +32,8 @@ class Sender {
  public:
   Sender(const std::string &destHost, int port, int numSockets,
          const std::string &srcDir,
-         const std::vector<FileInfo> &srcFileInfo = {});
+         const std::vector<FileInfo> &srcFileInfo = {},
+         const bool followSymlinks = false);
 
   virtual ~Sender() {
   }
@@ -51,6 +52,7 @@ class Sender {
   int numSockets_;
   std::string srcDir_{""};
   std::vector<FileInfo> srcFileInfo_;
+  bool followSymlinks_;
 };
 }
 }  // namespace facebook::wdt

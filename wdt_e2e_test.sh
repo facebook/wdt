@@ -84,7 +84,7 @@ while getopts ":t:a:p:s:d:h:" opt; do
 done
 printf "(Sockets,Average rate, Max_rate, Save local?, Delay)=%s,%s,%s,%s,%s\n" "$threads" "$avg_rate" "$max_rate" "$keeplog" "$delay"
 #WDTBIN_OPTS="-buffer_size=$BS -num_sockets=8 -minloglevel 2 -sleep_ms 1 -max_retries 999"
-WDTBIN_OPTS="-minloglevel=0 -sleep_ms 1 -max_retries 999 -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200"
+WDTBIN_OPTS="-minloglevel=0 -sleep_ms 1 -max_retries 999 -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200 -follow_symlinks"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/tmpWDT
@@ -96,7 +96,7 @@ echo "Testing in $DIR"
 pkill -x wdt
 
 mkdir $DIR/src
-
+mkdir $DIR/extsrc
 
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
@@ -120,8 +120,8 @@ done
 echo "done with setup"
 
 # test symlink issues
-(cd $DIR/src ; touch a; ln -s doesntexist badlink; touch c; ln -s wdt wdt_2)
-
+(cd $DIR/src ; touch a; ln -s doesntexist badlink; dd if=/dev/zero of=c bs=1024 count=1; mkdir d; ln -s ../d d/e; ln -s ../c d/a)
+(cd $DIR/extsrc; mkdir TestDir; mkdir TestDir/test; cd TestDir; echo "Text1" >> file1; cd test; echo "Text2" >> file1; ln -s $DIR/extsrc/TestDir; cp -R $DIR/extsrc/TestDir $DIR/src)
 
 # Various smaller tests if the bigger one fails and logs are too hard to read:
 #cp wdt/wdtlib.cpp wdt/wdtlib.h $DIR/src
@@ -158,7 +158,7 @@ if [ $DO_VERIFY -eq 1 ] ; then
     NUM_FILES=`(cd $DIR/dst ; ( find . -type f | wc -l))`
     echo "Transfered `du -ks $DIR/dst` kbytes across $NUM_FILES files"
 
-    (cd $DIR/src ; ( find . -type f | /bin/fgrep -v "/." | xargs md5sum | sort ) > ../src.md5s )
+    (cd $DIR/src ; ( find -L . -type f | /bin/fgrep -v "/." | xargs md5sum | sort ) > ../src.md5s )
     (cd $DIR/dst ; ( find . -type f | xargs md5sum | sort ) > ../dst.md5s )
 
     echo "Should be no diff"
