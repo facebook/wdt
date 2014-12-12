@@ -31,6 +31,17 @@ DEFINE_bool(follow_symlinks, false,
 DEFINE_string(
     destination, "",
     "empty is server (destination) mode, non empty is destination host");
+DEFINE_string(include_regex, "",
+              "Regular expression representing files to include for transfer, "
+              "empty/default is to include all files in directory. If "
+              "exclude_regex is also specified, then files matching "
+              "exclude_regex are excluded.");
+DEFINE_string(exclude_regex, "",
+              "Regular expression representing files to exclude for transfer, "
+              "empty/default is to not exclude any file.");
+DEFINE_string(prune_dir_regex, "",
+              "Regular expression representing directories to exclude for "
+              "transfer, default/empty is to recurse in all directories");
 DEFINE_int32(num_sockets, 8, "Number of sockets");
 DEFINE_int32(port, 22356, "Starting port number");  // W (D) T = 0x5754
 DEFINE_int32(backlog, 1, "Accept backlog");
@@ -69,9 +80,11 @@ int main(int argc, char *argv[]) {
         fileInfo.emplace_back(fields[0], filesize);
       }
     }
-    facebook::wdt::Sender sender(FLAGS_destination, FLAGS_port,
-                                 FLAGS_num_sockets, FLAGS_directory, fileInfo,
-                                 FLAGS_follow_symlinks);
+    facebook::wdt::Sender sender(FLAGS_destination, FLAGS_directory);
+    sender.setIncludeRegex(FLAGS_include_regex);
+    sender.setExcludeRegex(FLAGS_exclude_regex);
+    sender.setPruneDirRegex(FLAGS_prune_dir_regex);
+    sender.setSrcFileInfo(fileInfo);
     sender.start();
   }
   return 0;

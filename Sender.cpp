@@ -10,7 +10,6 @@
 
 #include <thread>
 
-DECLARE_int32(buffer_size);
 DECLARE_int32(max_retries);
 DECLARE_int32(sleep_ms);
 DEFINE_double(avg_mbytes_per_sec, -1,
@@ -64,26 +63,49 @@ double durationSeconds(T d) {
 namespace facebook {
 namespace wdt {
 
-Sender::Sender(const std::string &destHost, int port, int numSockets,
-               const std::string &srcDir,
-               const std::vector<FileInfo> &srcFileInfo,
-               const bool followSymlinks)
-    : destHost_(destHost),
-      port_(port),
-      numSockets_(numSockets),
-      srcDir_(srcDir),
-      srcFileInfo_(srcFileInfo),
-      followSymlinks_(followSymlinks) {
+Sender::Sender(const std::string &destHost, const std::string &srcDir)
+    : destHost_(destHost), srcDir_(srcDir) {
+}
+
+void Sender::setIncludeRegex(const std::string &includeRegex) {
+  includeRegex_ = includeRegex;
+}
+
+void Sender::setExcludeRegex(const std::string &excludeRegex) {
+  excludeRegex_ = excludeRegex;
+}
+
+void Sender::setPruneDirRegex(const std::string &pruneDirRegex) {
+  pruneDirRegex_ = pruneDirRegex;
+}
+
+void Sender::setPort(const int port) {
+  port_ = port;
+}
+
+void Sender::setNumSockets(const int numSockets) {
+  numSockets_ = numSockets;
+}
+
+void Sender::setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo) {
+  srcFileInfo_ = srcFileInfo;
+}
+
+void Sender::setFollowSymlinks(const bool followSymlinks) {
+  followSymlinks_ = followSymlinks;
 }
 
 void Sender::start() {
   const bool twoPhases = FLAGS_two_phases;
-  const size_t bufferSize = FLAGS_buffer_size;
   LOG(INFO) << "Client (sending) to " << destHost_ << " port " << port_ << " : "
             << numSockets_ << " sockets, source dir " << srcDir_;
   auto startTime = Clock::now();
-  DirectorySourceQueue queue(srcDir_, bufferSize, srcFileInfo_,
-                             followSymlinks_);
+  DirectorySourceQueue queue(srcDir_);
+  queue.setIncludePattern(includeRegex_);
+  queue.setExcludePattern(excludeRegex_);
+  queue.setPruneDirPattern(pruneDirRegex_);
+  queue.setFileInfo(srcFileInfo_);
+  queue.setFollowSymlinks(followSymlinks_);
   std::thread dirThread = queue.buildQueueAsynchronously();
   double directoryTime;
   if (twoPhases) {

@@ -6,23 +6,47 @@
 #include <set>
 
 #include "FileByteSource.h"
+#include <regex>
 
 namespace facebook {
 namespace wdt {
 
-DirectorySourceQueue::DirectorySourceQueue(
-    const std::string &rootDir, size_t fileSourceBufferSize,
-    const std::vector<FileInfo> &fileInfo, const bool followSymlinks)
-    : rootDir_(rootDir),
-      fileSourceBufferSize_(fileSourceBufferSize),
-      fileInfo_(fileInfo),
-      followSymlinks_(followSymlinks) {
-  CHECK(!rootDir_.empty() || !fileInfo_.empty());
-  CHECK(fileSourceBufferSize_ > 0);
+DirectorySourceQueue::DirectorySourceQueue(const std::string &rootDir)
+    : rootDir_(rootDir) {
+  CHECK(!rootDir_.empty());
   if (rootDir_.back() != '/') {
     rootDir_.push_back('/');
   }
 };
+
+void DirectorySourceQueue::setIncludePattern(
+    const std::string &includePattern) {
+  includePattern_ = includePattern;
+}
+
+void DirectorySourceQueue::setExcludePattern(
+    const std::string &excludePattern) {
+  excludePattern_ = excludePattern;
+}
+
+void DirectorySourceQueue::setPruneDirPattern(
+    const std::string &pruneDirPattern) {
+  pruneDirPattern_ = pruneDirPattern;
+}
+
+void DirectorySourceQueue::setFileSourceBufferSize(
+    const size_t fileSourceBufferSize) {
+  fileSourceBufferSize_ = fileSourceBufferSize;
+  CHECK(fileSourceBufferSize_ > 0);
+}
+
+void DirectorySourceQueue::setFileInfo(const std::vector<FileInfo> &fileInfo) {
+  fileInfo_ = fileInfo;
+}
+
+void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
+  followSymlinks_ = followSymlinks;
+}
 
 std::thread DirectorySourceQueue::buildQueueAsynchronously() {
   // relying on RVO (and thread not copyable to avoid multiple ones)
@@ -61,6 +85,9 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
 bool DirectorySourceQueue::explore() {
   bool hasError = false;
   std::set<std::string> visited;
+  std::regex includeRegex(includePattern_);
+  std::regex excludeRegex(excludePattern_);
+  std::regex pruneDirRegex(pruneDirPattern_);
   std::deque<std::string> todoList;
   todoList.push_back("");
   while (!todoList.empty()) {
@@ -97,8 +124,10 @@ bool DirectorySourceQueue::explore() {
       VLOG(2) << "Found entry " << dirEntryRes->d_name << " type "
               << (int)dType;
       if (dirEntryRes->d_name[0] == '.') {
-        VLOG(3) << "Skipping entry starting with . : " << dirEntryRes->d_name;
-        continue;
+        if (dirEntryRes->d_name[1] == '\0' ||
+            (dirEntryRes->d_name[1] == '.' && dirEntryRes->d_name[2] == '\0'))
+          VLOG(3) << "Skipping entry : " << dirEntryRes->d_name;
+          continue;
       }
       // Following code is a bit ugly trying to save stat() call for directories
       // yet still work for xfs which returns DT_UNKNOWN for everything
@@ -170,6 +199,14 @@ bool DirectorySourceQueue::explore() {
         if (S_ISREG(fileStat.st_mode)) {
           VLOG(1) << "Found file " << newFullPath << " of size "
                   << fileStat.st_size;
+          if (!excludePattern_.empty() &&
+              std::regex_match(newRelativePath, excludeRegex)) {
+            continue;
+          }
+          if (!includePattern_.empty() &&
+              !std::regex_match(newRelativePath, includeRegex)) {
+            continue;
+          }
           {
             std::lock_guard<std::mutex> lock(mutex_);
             sizeToPath_.push(
@@ -187,12 +224,15 @@ bool DirectorySourceQueue::explore() {
             hasError = true;
             continue;
           }
-          //TODO: consider custom hashing ignoring common prefix
+          // TODO: consider custom hashing ignoring common prefix
           visited.insert(newFullPath);
         }
         newRelativePath.push_back('/');
-        VLOG(1) << "Adding " << newRelativePath;
-        todoList.push_back(std::move(newRelativePath));
+        if (pruneDirPattern_.empty() ||
+            !std::regex_match(newRelativePath, pruneDirRegex)) {
+          VLOG(1) << "Adding " << newRelativePath;
+          todoList.push_back(std::move(newRelativePath));
+        }
       }
     }
     closedir(dirPtr);

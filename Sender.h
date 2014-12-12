@@ -21,6 +21,10 @@
 #include <chrono>
 #include <memory>
 
+DECLARE_int32(port);
+DECLARE_int32(num_sockets);
+DECLARE_bool(follow_symlinks);
+
 namespace facebook {
 namespace wdt {
 
@@ -30,15 +34,26 @@ typedef std::chrono::high_resolution_clock Clock;
 
 class Sender {
  public:
-  Sender(const std::string &destHost, int port, int numSockets,
-         const std::string &srcDir,
-         const std::vector<FileInfo> &srcFileInfo = {},
-         const bool followSymlinks = false);
+  Sender(const std::string &destHost, const std::string &srcDir);
 
   virtual ~Sender() {
   }
 
   void start();
+
+  void setIncludeRegex(const std::string &includeRegex);
+
+  void setExcludeRegex(const std::string &excludeRegex);
+
+  void setPruneDirRegex(const std::string &pruneDirRegex);
+
+  void setPort(const int port);
+
+  void setNumSockets(const int numSockets);
+
+  void setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo);
+
+  void setFollowSymlinks(const bool followSymlinks);
 
  private:
   void sendOne(Clock::time_point startTime, const std::string &destHost,
@@ -48,11 +63,14 @@ class Sender {
 
  private:
   std::string destHost_;
-  int port_;
-  int numSockets_;
-  std::string srcDir_{""};
+  int port_ = FLAGS_port;
+  int numSockets_ = FLAGS_num_sockets;
+  std::string srcDir_;
+  std::string pruneDirRegex_;
+  std::string includeRegex_;
+  std::string excludeRegex_;
   std::vector<FileInfo> srcFileInfo_;
-  bool followSymlinks_;
+  bool followSymlinks_ = FLAGS_follow_symlinks;
 };
 }
 }  // namespace facebook::wdt

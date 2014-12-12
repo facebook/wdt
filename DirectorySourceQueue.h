@@ -12,6 +12,8 @@
 
 #include "SourceQueue.h"
 
+DECLARE_int32(buffer_size);
+
 namespace facebook {
 namespace wdt {
 
@@ -35,16 +37,8 @@ class DirectorySourceQueue : public SourceQueue {
    * to actually recurse over the root directory gather files and sizes.
    *
    * @param rootDir               root directory to recurse on
-   * @param fileSourceBufferSize  buffer size to use when creating individual
-   *                              FileByteSource objects (returned by
-   *                              getNextSource)
-   * @param fileInfo              (optional) if non-empty, only operate on the
-   *                              specified paths relative to rootDir
-   * @param followSymlinks        (optional) if true, follow sym links
    */
-  DirectorySourceQueue(const std::string &rootDir, size_t fileSourceBufferSize,
-                       const std::vector<FileInfo> &fileInfo = {},
-                       const bool followSymlinks = false);
+  explicit DirectorySourceQueue(const std::string &rootDir);
 
   /**
    * Recurse over given root directory, gather data about regular files and
@@ -80,6 +74,48 @@ class DirectorySourceQueue : public SourceQueue {
     return numEntries_;
   }
 
+  /**
+   * Sets regex represnting files to include for transfer
+   *
+   * @param includePattern          file inclusion regex
+   */
+  void setIncludePattern(const std::string &includePattern);
+
+  /**
+   * Sets regex represnting files to exclude for transfer
+   *
+   * @param excludePattern          file exclusion regex
+   */
+  void setExcludePattern(const std::string &excludePattern);
+
+  /**
+   * Sets regex represnting directories to exclude for transfer
+   *
+   * @param pruneDirPattern         directory exclusion regex
+   */
+  void setPruneDirPattern(const std::string &pruneDirPattern);
+
+  /**
+   * Sets buffer size to use during creating individual FileByteSource object
+   *
+   * @param fileSourceBufferSize  buffers size
+   */
+  void setFileSourceBufferSize(const size_t fileSourceBufferSize);
+
+  /**
+   * Sets specific files to be transferred
+   *
+   * @param fileInfo              files to transferred
+   */
+  void setFileInfo(const std::vector<FileInfo> &fileInfo);
+
+  /**
+   * Sets whether to follow symlink or not
+   *
+   * @param followSymlinks        whether to follow symlink or not
+   */
+  void setFollowSymlinks(const bool followSymlinks);
+
  private:
   /**
    * Traverse rootDir_ to gather files and sizes to enqueue
@@ -97,13 +133,22 @@ class DirectorySourceQueue : public SourceQueue {
   bool enqueueFiles();
 
   /// root directory to recurse on if fileInfo_ is empty
-  std::string rootDir_{""};
+  std::string rootDir_;
+
+  /// regex represnting directories to prune
+  std::string pruneDirPattern_;
+
+  /// regex representing files to include
+  std::string includePattern_;
+
+  /// regex representing files to exclude
+  std::string excludePattern_;
 
   /**
    * buffer size to use when creating individual FileByteSource objects
    * (returned by getNextSource).
    */
-  const size_t fileSourceBufferSize_;
+  size_t fileSourceBufferSize_ = FLAGS_buffer_size;
 
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<FileInfo> fileInfo_;
