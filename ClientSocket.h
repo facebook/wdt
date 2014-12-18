@@ -4,14 +4,20 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include "ErrorCodes.h"
 
 namespace facebook {
 namespace wdt {
 class ClientSocket {
  public:
   ClientSocket(std::string dest, std::string port);
-  bool connect();
+  virtual ErrorCode connect();
+  virtual int read(char *buf, int nbyte) const;
+  virtual int write(char *buf, int nbyte) const;
   int getFd() const;
+  void shutdown() const;
+  virtual ~ClientSocket() {
+  }
 
  private:
   const std::string dest_;

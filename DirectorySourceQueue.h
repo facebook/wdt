@@ -68,7 +68,7 @@ class DirectorySourceQueue : public SourceQueue {
   bool finished() const override;
 
   /// @return next FileByteSource to consume or nullptr when finished
-  std::unique_ptr<ByteSource> getNextSource() override;
+  virtual std::unique_ptr<ByteSource> getNextSource() override;
 
   size_t count() const override {
     return numEntries_;
@@ -115,6 +115,9 @@ class DirectorySourceQueue : public SourceQueue {
    * @param followSymlinks        whether to follow symlink or not
    */
   void setFollowSymlinks(const bool followSymlinks);
+
+  virtual ~DirectorySourceQueue() {
+  }
 
  private:
   /**

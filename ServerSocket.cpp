@@ -46,17 +46,18 @@ string ServerSocket::getNameInfo(const struct sockaddr *sa, socklen_t salen) {
   return folly::to<string>(host, " ", service);
 }
 
-bool ServerSocket::listen() {
+ErrorCode ServerSocket::listen() {
   if (listeningFd_ > 0) {
-    return true;
+    return OK;
   }
   // Lookup
   struct addrinfo *infoList;
   int res = getaddrinfo(nullptr, port_.c_str(), &sa_, &infoList);
   if (res) {
     // not errno, can't use PLOG (perror)
-    LOG(FATAL) << "Failed getaddrinfo ai_passive on " << port_ << " : " << res
+    LOG(ERROR) << "Failed getaddrinfo ai_passive on " << port_ << " : " << res
                << " : " << gai_strerror(res);
+    return CONN_ERROR;
   }
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
@@ -82,31 +83,47 @@ bool ServerSocket::listen() {
   freeaddrinfo(infoList);
   if (listeningFd_ <= 0) {
     LOG(ERROR) << "Unable to bind";
-    return false;
+    return CONN_ERROR_RETRYABLE;
   }
   if (::listen(listeningFd_, backlog_)) {
     PLOG(ERROR) << "listen error";
     close(listeningFd_);
     listeningFd_ = -1;
-    return false;
+    return CONN_ERROR_RETRYABLE;
   }
-  return true;
+  return OK;
 }
 
-int ServerSocket::getNextFd() {
-  if (!listen()) {
-    return -1;
-  }
+ErrorCode ServerSocket::acceptNextConnection() {
+  WDT_CHECK(listen() == OK);
   struct sockaddr addr;
   socklen_t addrLen = sizeof(addr);
   VLOG(1) << "Waiting for new connection...";
   fd_ = accept(listeningFd_, &addr, &addrLen);
   if (fd_ < 0) {
     PLOG(ERROR) << "accept error";
+    return CONN_ERROR;
   }
   VLOG(1) << "new connection " << fd_ << " from "
           << getNameInfo(&addr, addrLen);
   // TODO: set sock options
+  return OK;
+}
+
+int ServerSocket::read(char *buf, int nbyte) const {
+  return ::read(fd_, buf, nbyte);
+}
+
+int ServerSocket::write(char *buf, int nbyte) const {
+  return ::write(fd_, buf, nbyte);
+}
+
+int ServerSocket::closeCurrentConnection() {
+  return close(fd_);
+}
+
+int ServerSocket::getFd() const {
+  VLOG(1) << "fd is " << fd_;
   return fd_;
 }
 }

@@ -41,7 +41,10 @@ class Throttler {
    * This method also calls the averageThrottler inside
    * @param bytesTotalProgress         Total Progress till now in bytes
    */
-  void limit(double bytesTotalProgress);
+  virtual void limit(double bytesTotalProgress);
+
+  virtual ~Throttler() {
+  }
 
  private:
   /**

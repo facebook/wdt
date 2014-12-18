@@ -1,5 +1,7 @@
 #include "Protocol.h"
 
+#include "ErrorCodes.h"
+
 #include "folly/Range.h"
 #include "folly/String.h"  // exceptionStr
 #include "folly/Varint.h"
@@ -15,10 +17,7 @@ bool Protocol::encode(char *dest, size_t &off, size_t max, std::string id,
   memcpy(dest + off, id.data(), idLen);
   off += idLen;
   off += folly::encodeVarint(size, (uint8_t *)dest + off);
-  if (off > max) {
-    LOG(FATAL) << "Memory corruption:" << off << " " << max;
-    return false;
-  }
+  WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
   return true;
 }
 
@@ -46,4 +45,4 @@ bool Protocol::decode(char *src, size_t &off, size_t max, std::string &id,
     return false;
   }
   return true;
-};
+}

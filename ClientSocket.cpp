@@ -24,17 +24,18 @@ ClientSocket::ClientSocket(string dest, string port)
   sa_.ai_socktype = SOCK_STREAM;
 }
 
-bool ClientSocket::connect() {
+ErrorCode ClientSocket::connect() {
   if (fd_ > 0) {
-    return true;
+    return OK;
   }
   // Lookup
   struct addrinfo *infoList;
   int res = getaddrinfo(dest_.c_str(), port_.c_str(), &sa_, &infoList);
   if (res) {
     // not errno, can't use PLOG (perror)
-    LOG(FATAL) << "Failed getaddrinfo " << dest_ << " , " << port_ << " : "
+    LOG(ERROR) << "Failed getaddrinfo " << dest_ << " , " << port_ << " : "
                << res << " : " << gai_strerror(res);
+    return CONN_ERROR;
   }
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
@@ -58,15 +59,29 @@ bool ClientSocket::connect() {
   freeaddrinfo(infoList);
   if (fd_ <= 0) {
     LOG(ERROR) << "Unable to connect";
-    return false;
+    return CONN_ERROR_RETRYABLE;
   }
   // TODO: set sock options
-  return true;
+  return OK;
 }
 
 int ClientSocket::getFd() const {
   VLOG(1) << "fd is " << fd_;
   return fd_;
+}
+
+int ClientSocket::read(char *buf, int nbyte) const {
+  return ::read(fd_, buf, nbyte);
+}
+
+int ClientSocket::write(char *buf, int nbyte) const {
+  return ::write(fd_, buf, nbyte);
+}
+
+void ClientSocket::shutdown() const {
+  if (::shutdown(fd_, SHUT_WR) < 0) {
+    VLOG(1) << "Socket shutdown failed for fd " << fd_;
+  }
 }
 }
 }  // end namespace facebook::wtd

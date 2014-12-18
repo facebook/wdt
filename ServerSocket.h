@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ErrorCodes.h"
+
 #include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -10,12 +12,16 @@ namespace wdt {
 class ServerSocket {
  public:
   ServerSocket(std::string port, int backlog);
-  ~ServerSocket();
+  virtual ~ServerSocket();
   /// Sets up listening socket (first wildcard type (ipv4 or ipv6 depending
   /// on flag)).
-  bool listen();
+  ErrorCode listen();
   /// will accept next (/only) incoming connection
-  int getNextFd();
+  ErrorCode acceptNextConnection();
+  int read(char *buf, int nbyte) const;
+  int write(char *buf, int nbyte) const;
+  int getFd() const;
+  int closeCurrentConnection();
   static std::string getNameInfo(const struct sockaddr *sa, socklen_t salen);
 
  private:

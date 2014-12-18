@@ -17,6 +17,7 @@
 #pragma once
 
 #include "FileCreator.h"
+#include "ErrorCodes.h"
 
 #include <memory>
 #include <string>
@@ -31,11 +32,11 @@ class Receiver {
   virtual ~Receiver() {
   }
 
-  void start();
+  std::vector<ErrorCode> start();
 
  private:
   void receiveOne(int port, int backlog, const std::string &destDir,
-                  size_t bufferSize);
+                  size_t bufferSize, ErrorCode &errCode);
 
  private:
   int port_;

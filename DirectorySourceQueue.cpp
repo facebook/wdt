@@ -127,7 +127,7 @@ bool DirectorySourceQueue::explore() {
         if (dirEntryRes->d_name[1] == '\0' ||
             (dirEntryRes->d_name[1] == '.' && dirEntryRes->d_name[2] == '\0'))
           VLOG(3) << "Skipping entry : " << dirEntryRes->d_name;
-          continue;
+        continue;
       }
       // Following code is a bit ugly trying to save stat() call for directories
       // yet still work for xfs which returns DT_UNKNOWN for everything

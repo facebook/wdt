@@ -17,6 +17,9 @@
 #pragma once
 
 #include "DirectorySourceQueue.h"
+#include "ErrorCodes.h"
+#include "Throttler.h"
+#include "ClientSocket.h"
 
 #include <chrono>
 #include <memory>
@@ -39,7 +42,7 @@ class Sender {
   virtual ~Sender() {
   }
 
-  void start();
+  std::vector<ErrorCode> start();
 
   void setIncludeRegex(const std::string &includeRegex);
 
@@ -55,11 +58,27 @@ class Sender {
 
   void setFollowSymlinks(const bool followSymlinks);
 
- private:
+  struct SendStats {
+    size_t totalBytes = 0;
+    size_t headerBytes = 0;
+    size_t dataBytes = 0;
+    ErrorCode errCode;
+  };
+
+  // Making the following 2 functions public for unit testing. Need to find way
+  // to unit test private functions
+  virtual SendStats sendOneByteSource(
+      const std::unique_ptr<ClientSocket> &socket,
+      const std::unique_ptr<Throttler> &throttler,
+      const std::unique_ptr<ByteSource> &source, const bool doThrottling,
+      const size_t totalBytes);
+
   void sendOne(Clock::time_point startTime, const std::string &destHost,
-               int port, DirectorySourceQueue *queue, size_t *pHeaderBytes,
-               size_t *pDataBytes, double avgRateBytes, double maxRateBytes,
-               double bucketLimitBytes);
+               int port, DirectorySourceQueue &queue, double avgRateBytes,
+               double maxRateBytes, double bucketLimitBytes, SendStats &stat);
+
+  virtual std::unique_ptr<ClientSocket> makeSocket(const std::string &destHost,
+                                                   int port);
 
  private:
   std::string destHost_;

@@ -122,6 +122,10 @@ Common socket related utilities (both client/server, sender/receiver side use)
 
 Throttling code
 
+* ErrorCodes.h
+
+Header file for error codes
+
 ## Submitting diffs/making changes
 
 (facebook only:)
