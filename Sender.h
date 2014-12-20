@@ -20,13 +20,9 @@
 #include "ErrorCodes.h"
 #include "Throttler.h"
 #include "ClientSocket.h"
-
+#include "WdtOptions.h"
 #include <chrono>
 #include <memory>
-
-DECLARE_int32(port);
-DECLARE_int32(num_sockets);
-DECLARE_bool(follow_symlinks);
 
 namespace facebook {
 namespace wdt {
@@ -38,7 +34,8 @@ typedef std::chrono::high_resolution_clock Clock;
 class Sender {
  public:
   Sender(const std::string &destHost, const std::string &srcDir);
-
+  Sender(int port, int numSockets, const std::string &destHost,
+         const std::string &srcDir);
   virtual ~Sender() {
   }
 
@@ -82,14 +79,14 @@ class Sender {
 
  private:
   std::string destHost_;
-  int port_ = FLAGS_port;
-  int numSockets_ = FLAGS_num_sockets;
+  int port_;
+  int numSockets_;
   std::string srcDir_;
   std::string pruneDirRegex_;
   std::string includeRegex_;
   std::string excludeRegex_;
   std::vector<FileInfo> srcFileInfo_;
-  bool followSymlinks_ = FLAGS_follow_symlinks;
+  bool followSymlinks_;
 };
 }
 }  // namespace facebook::wdt

@@ -1,11 +1,8 @@
 #include "ServerSocket.h"
-
+#include "WdtOptions.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
-
 #include "folly/Conv.h"
-
-DECLARE_bool(ipv6);
 
 namespace facebook {
 namespace wdt {
@@ -15,7 +12,8 @@ using std::string;
 ServerSocket::ServerSocket(string port, int backlog)
     : port_(port), backlog_(backlog), listeningFd_(-1), fd_(-1) {
   memset(&sa_, 0, sizeof(sa_));
-  if (FLAGS_ipv6) {
+  const auto &options = WdtOptions::get();
+  if (options.ipv6_) {
     sa_.ai_family = AF_INET6;
   }
   sa_.ai_socktype = SOCK_STREAM;

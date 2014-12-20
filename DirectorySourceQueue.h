@@ -151,7 +151,7 @@ class DirectorySourceQueue : public SourceQueue {
    * buffer size to use when creating individual FileByteSource objects
    * (returned by getNextSource).
    */
-  size_t fileSourceBufferSize_ = FLAGS_buffer_size;
+  size_t fileSourceBufferSize_;
 
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<FileInfo> fileInfo_;

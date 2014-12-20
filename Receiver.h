@@ -18,7 +18,7 @@
 
 #include "FileCreator.h"
 #include "ErrorCodes.h"
-
+#include "WdtOptions.h"
 #include <memory>
 #include <string>
 

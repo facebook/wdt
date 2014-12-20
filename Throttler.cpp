@@ -1,14 +1,12 @@
 #include "Throttler.h"
+#include "WdtOptions.h"
 const int64_t kMillisecsPerSec = 1000;
 const double kMbToB = 1024 * 1024;
-DEFINE_int64(peak_log_time_ms, 0,
-             "Peak throttler prints out logs for instantaneous "
-             "rate of transfer. Specify the time interval (ms) for "
-             "the measure of instance");
 namespace facebook {
 namespace wdt {
 Throttler::Throttler(Clock::time_point start, double avgRateBytesPerSec,
-                     double peakRateBytesPerSec, double bucketLimitBytes)
+                     double peakRateBytesPerSec, double bucketLimitBytes,
+                     double throttlerLogTimeMillis)
     : startTime_(start),
       bytesProgress_(0),
       avgRateBytesPerSec_(avgRateBytesPerSec) {
@@ -38,6 +36,7 @@ Throttler::Throttler(Clock::time_point start, double avgRateBytesPerSec,
   instantProgress_ = 0;
   lastFillTime_ = start;
   isTokenBucketEnabled = (bucketRateBytesPerSec_ > 0);
+  throttlerLogTimeMillis_ = throttlerLogTimeMillis;
 }
 void Throttler::limit(double bytesTotalProgress) {
   double deltaProgress = bytesTotalProgress - bytesProgress_;
@@ -68,7 +67,7 @@ void Throttler::limit(double bytesTotalProgress) {
     }
   }
   sleepTimeSeconds += avgThrottlerSleep;
-  if (FLAGS_peak_log_time_ms > 0) {
+  if (throttlerLogTimeMillis_ > 0) {
     printPeriodicLogs(deltaProgress, now, sleepTimeSeconds);
   }
 }
@@ -83,7 +82,7 @@ void Throttler::printPeriodicLogs(double deltaProgress,
   */
   std::chrono::duration<double> elapsedLogDuration = now - lastLogTime_;
   double elapsedLogSeconds = elapsedLogDuration.count() + sleepTimeSeconds;
-  if (elapsedLogSeconds * kMillisecsPerSec >= FLAGS_peak_log_time_ms) {
+  if (elapsedLogSeconds * kMillisecsPerSec >= throttlerLogTimeMillis_) {
     std::chrono::duration<double> elapsedAvgDuration = now - startTime_;
     double elapsedAvgSeconds = elapsedAvgDuration.count() + sleepTimeSeconds;
     double instantBytesPerSec = instantProgress_ / (double)elapsedLogSeconds;

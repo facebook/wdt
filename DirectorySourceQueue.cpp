@@ -1,5 +1,5 @@
 #include "DirectorySourceQueue.h"
-
+#include "WdtOptions.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -17,6 +17,7 @@ DirectorySourceQueue::DirectorySourceQueue(const std::string &rootDir)
   if (rootDir_.back() != '/') {
     rootDir_.push_back('/');
   }
+  fileSourceBufferSize_ = WdtOptions::get().bufferSize_;
 };
 
 void DirectorySourceQueue::setIncludePattern(

@@ -10,25 +10,6 @@
 
 #include <thread>
 
-DECLARE_int32(max_retries);
-DECLARE_int32(sleep_ms);
-DEFINE_double(avg_mbytes_per_sec, -1,
-              "Target transfer rate in mbytes/sec that should be maintained, "
-              "specify negative for unlimited");
-DEFINE_double(max_mbytes_per_sec, 0,
-              "Peak transfer rate in mbytes/sec that should be maintained, "
-              "specify negative for unlimited and 0 for auto configure. "
-              "In auto configure mode peak rate will be 1.2 "
-              "times average rate");
-DEFINE_double(bucket_limit, 0,
-              "Limit of burst in mbytes to control how "
-              "much data you can send at unlimited speed. Unless "
-              "you specify a peak rate of -1, wdt will either use "
-              "your burst limit (if not 0) or max burst possible at a time "
-              "will be 2 times the data allowed in "
-              "1/4th seconds at peak rate");
-DEFINE_bool(ignore_open_errors, false, "will continue despite open errors");
-DEFINE_bool(two_phases, false, "do directory discovery first/separately");
 // Constants for different calculations
 /*
  * If you change any of the multipliers be
@@ -38,19 +19,6 @@ const double kMbToB = 1024 * 1024;
 const double kPeakMultiplier = 1.2;
 const int kBucketMultiplier = 2;
 const double kTimeMultiplier = 0.25;
-/**
- * avg_mbytes_per_sec Rate at which we would like data to be transferred,
- *                    specifying this as < 0 makes it unlimited
- * max_mbytes_per_sec Rate at which tokens will be generated in TB algorithm
- *                    When we lag behind, this will allow us to go faster,
- *                    specify as < 0 to make it unlimited. Specify as 0
- *                    for auto configuring.
- *                    auto conf as (kPeakMultiplier * avg_mbytes_per_sec)
- * bucket_limit       Maximum bucket size of TB algorithm in mbytes
- *                    This together with max_bytes_per_sec will
- *                    make for maximum burst rate. If specified as 0 it is
- *                    kBucketMultiplier * kTimeMultiplier * max_mbytes_per_sec
- */
 namespace {
 
 template <typename T>
@@ -63,8 +31,22 @@ double durationSeconds(T d) {
 namespace facebook {
 namespace wdt {
 
-Sender::Sender(const std::string &destHost, const std::string &srcDir)
-    : destHost_(destHost), srcDir_(srcDir) {
+Sender::Sender(int port, int numSockets, const std::string &destHost,
+               const std::string &srcDir)
+    : Sender(destHost, srcDir) {
+  this->port_ = port;
+  this->numSockets_ = numSockets;
+}
+Sender::Sender(const std::string &destHost, const std::string &srcDir) {
+  this->destHost_ = destHost;
+  this->srcDir_ = srcDir;
+  const auto &options = WdtOptions::get();
+  this->port_ = options.port_;
+  this->numSockets_ = options.numSockets_;
+  this->followSymlinks_ = options.followSymlinks_;
+  this->includeRegex_ = options.includeRegex_;
+  this->excludeRegex_ = options.excludeRegex_;
+  this->pruneDirRegex_ = options.pruneDirRegex_;
 }
 
 void Sender::setIncludeRegex(const std::string &includeRegex) {
@@ -96,7 +78,8 @@ void Sender::setFollowSymlinks(const bool followSymlinks) {
 }
 
 std::vector<ErrorCode> Sender::start() {
-  const bool twoPhases = FLAGS_two_phases;
+  const auto &options = WdtOptions::get();
+  const bool twoPhases = options.twoPhases_;
   LOG(INFO) << "Client (sending) to " << destHost_ << " port " << port_ << " : "
             << numSockets_ << " sockets, source dir " << srcDir_;
   auto startTime = Clock::now();
@@ -114,9 +97,9 @@ std::vector<ErrorCode> Sender::start() {
   }
   std::vector<std::thread> vt;
   std::vector<SendStats> stats(numSockets_);
-  double avgRateBytesPerSec = FLAGS_avg_mbytes_per_sec * kMbToB;
-  double peakRateBytesPerSec = FLAGS_max_mbytes_per_sec * kMbToB;
-  double bucketLimitBytes = FLAGS_bucket_limit * kMbToB;
+  double avgRateBytesPerSec = options.avgMbytesPerSec_ * kMbToB;
+  double peakRateBytesPerSec = options.maxMbytesPerSec_ * kMbToB;
+  double bucketLimitBytes = options.throttlerBucketLimit_ * kMbToB;
   double perThreadAvgRateBytesPerSec = avgRateBytesPerSec / numSockets_;
   double perThreadPeakRateBytesPerSec = peakRateBytesPerSec / numSockets_;
   double perThreadBucketLimit = bucketLimitBytes / numSockets_;
@@ -200,10 +183,12 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
                      double maxRateBytes, double bucketLimitBytes,
                      SendStats &stat) {
   std::unique_ptr<Throttler> throttler;
+  const auto &options = WdtOptions::get();
   const bool doThrottling = (avgRateBytes > 0 || maxRateBytes > 0);
   if (doThrottling) {
     throttler = folly::make_unique<Throttler>(startTime, avgRateBytes,
-                                              maxRateBytes, bucketLimitBytes);
+                                              maxRateBytes, bucketLimitBytes,
+                                              options.throttlerLogTimeMillis_);
   } else {
     VLOG(1) << "No throttling in effect";
   }
@@ -211,7 +196,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   size_t headerBytes = 0, dataBytes = 0, totalBytes = 0;
   size_t numFiles = 0;
   ErrorCode code;
-  for (int i = 1; i < FLAGS_max_retries; ++i) {
+  for (int i = 1; i < options.maxRetries_; ++i) {
     code = socket->connect();
     if (code == OK) {
       break;
@@ -220,7 +205,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
       return;
     }
     VLOG(1) << "Sleeping after failed attempt " << i;
-    usleep(FLAGS_sleep_ms * 1000);
+    usleep(options.sleepMillis_ * 1000);
   }
   // one more/last try (stays true if it worked above)
   if (code != OK && socket->connect() != OK) {
@@ -235,7 +220,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
   VLOG(1) << "Connect took " << elapsedSecsConn;
   while ((source = queue.getNextSource())) {
-    if (FLAGS_ignore_open_errors && source->hasError()) {
+    if (options.ignoreOpenErrors_ && source->hasError()) {
       continue;
     }
     ++numFiles;

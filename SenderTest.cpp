@@ -1,4 +1,5 @@
 #include "Sender.h"
+#include "WdtOptions.h"
 #include "FileByteSource.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -323,11 +324,20 @@ TEST(SendOneByteSource, MultiChunkSuccess) {
 }
 }
 }
-
+void initOptions() {
+  auto &options = facebook::wdt::WdtOptions::getMutable();
+  options.numSockets_ = FLAGS_num_sockets;
+  options.port_ = FLAGS_port;
+  options.followSymlinks_ = FLAGS_follow_symlinks;
+  options.maxRetries_ = FLAGS_max_retries;
+  options.sleepMillis_ = FLAGS_sleep_ms;
+  options.bufferSize_ = FLAGS_buffer_size;
+}
 int main(int argc, char *argv[]) {
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  initOptions();
   int ret = RUN_ALL_TESTS();
   return ret;
 }

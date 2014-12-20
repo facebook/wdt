@@ -32,7 +32,8 @@ class Throttler {
    *                                  at the peak rate
    */
   Throttler(Clock::time_point start, double avgRateBytesPerSec,
-            double peakRateBytesPerSec, double bucketLimitBytes);
+            double peakRateBytesPerSec, double bucketLimitBytes,
+            double throttlerLogTimeMillis = 0);
 
   /**
    * This method is implementation of token bucket algorithm.
@@ -89,6 +90,8 @@ class Throttler {
   int64_t bytesTokenBucketLimit_;
   /// Rate at which bucket is filled
   double bucketRateBytesPerSec_;
+  /// Interval between every print of throttler logs
+  double throttlerLogTimeMillis_;
   bool isTokenBucketEnabled;
 };
 }

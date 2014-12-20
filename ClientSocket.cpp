@@ -1,12 +1,8 @@
 #include "ClientSocket.h"
 #include "ServerSocket.h"  // for getnameinfo
-
+#include "WdtOptions.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
-
-DEFINE_bool(ipv6, true, "use ipv6 only");
-DEFINE_bool(ipv4, false, "use ipv4 only, takes precedence over -ipv6");
-
 namespace facebook {
 namespace wdt {
 
@@ -15,10 +11,11 @@ using std::string;
 ClientSocket::ClientSocket(string dest, string port)
     : dest_(dest), port_(port), fd_(-1) {
   memset(&sa_, 0, sizeof(sa_));
-  if (FLAGS_ipv6) {
+  const auto &options = WdtOptions::get();
+  if (options.ipv6_) {
     sa_.ai_family = AF_INET6;
   }
-  if (FLAGS_ipv4) {
+  if (options.ipv4_) {
     sa_.ai_family = AF_INET;
   }
   sa_.ai_socktype = SOCK_STREAM;

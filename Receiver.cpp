@@ -14,14 +14,6 @@
 #include <sys/types.h>
 #include <thread>
 
-DECLARE_int32(buffer_size);
-DECLARE_int32(max_retries);
-DECLARE_int32(sleep_ms);
-DECLARE_int32(backlog);
-
-DEFINE_bool(skip_writes, false,
-            "If true no files will be created/written (benchmark/dummy mode)");
-
 namespace facebook {
 namespace wdt {
 
@@ -79,11 +71,12 @@ Receiver::Receiver(int port, int numSockets, std::string destDir)
 std::vector<ErrorCode> Receiver::start() {
   LOG(INFO) << "Starting (receiving) server on " << port_ << " : "
             << numSockets_ << " sockets, target dir " << destDir_;
-  size_t bufferSize = FLAGS_buffer_size;
+  const auto &options = WdtOptions::get();
+  size_t bufferSize = options.bufferSize_;
   if (bufferSize < Protocol::kMaxHeader) {
     // round up to even k
     bufferSize = 2 * 1024 * ((Protocol::kMaxHeader - 1) / (2 * 1024) + 1);
-    LOG(INFO) << "Specified -buffer_size " << FLAGS_buffer_size
+    LOG(INFO) << "Specified -buffer_size " << options.bufferSize_
               << " smaller than " << Protocol::kMaxHeader << " using "
               << bufferSize << " instead";
   }
@@ -91,7 +84,7 @@ std::vector<ErrorCode> Receiver::start() {
   std::vector<std::thread> vt;
   ErrorCode errCodes[numSockets_];
   for (int i = 0; i < numSockets_; i++) {
-    vt.emplace_back(&Receiver::receiveOne, this, port_ + i, FLAGS_backlog,
+    vt.emplace_back(&Receiver::receiveOne, this, port_ + i, options.backlog_,
                     std::ref(destDir_), bufferSize, std::ref(errCodes[i]));
   }
   // will never exit
@@ -103,13 +96,14 @@ std::vector<ErrorCode> Receiver::start() {
 
 void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
                           size_t bufferSize, ErrorCode &errCode) {
-  const bool doActualWrites = !FLAGS_skip_writes;
+  const auto &options = WdtOptions::get();
+  const bool doActualWrites = !options.skipWrites_;
 
   VLOG(1) << "Server Thread for port " << port << " with backlog " << backlog
           << " on " << destDir << " writes= " << doActualWrites;
 
   ServerSocket s(folly::to<std::string>(port), backlog);
-  for (int i = 1; i < FLAGS_max_retries; ++i) {
+  for (int i = 1; i < options.maxRetries_; ++i) {
     ErrorCode code = s.listen();
     if (code == OK) {
       break;
@@ -118,7 +112,7 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
       return;
     }
     LOG(INFO) << "Sleeping after failed attempt " << i;
-    usleep(FLAGS_sleep_ms * 1000);
+    usleep(options.sleepMillis_ * 1000);
   }
   // one more/last try (stays true if it worked above)
   if (s.listen() != OK) {

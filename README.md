@@ -57,6 +57,11 @@ a 1 second delay before we send the first payload byte
 Main program which allows to have a server or client process to exercise
 the library (for end 2 end test as well as a standalone utility)
 
+* WdtOptions.{h|cpp}
+To specify the behavior of wdt. If wdt is used as a library, then the
+caller get the mutable object of options and set different options accordingly.
+When wdt is run in a standalone mode, behavior is changed through gflags in
+wdtCmdLine.cpp
 
 ### Producing/Sending
 
