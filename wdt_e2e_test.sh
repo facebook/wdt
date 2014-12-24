@@ -49,6 +49,7 @@ echo "Run from ~/fbcode - or fbmake runtests"
 # to 1 : slow/expensive but checks correctness
 # to 0 : fast for repeated benchmarking not for correctness
 DO_VERIFY=1
+NC="nc -4" # ipv4 only
 
 # Verbose:
 #WDTBIN="_bin/wdt/wdt -minloglevel 0"
@@ -84,7 +85,7 @@ while getopts ":t:a:p:s:d:h:" opt; do
 done
 printf "(Sockets,Average rate, Max_rate, Save local?, Delay)=%s,%s,%s,%s,%s\n" "$threads" "$avg_rate" "$max_rate" "$keeplog" "$delay"
 #WDTBIN_OPTS="-buffer_size=$BS -num_sockets=8 -minloglevel 2 -sleep_ms 1 -max_retries 999"
-WDTBIN_OPTS="-minloglevel=0 -sleep_ms 1 -max_retries 999 -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200 -follow_symlinks"
+WDTBIN_OPTS="-minloglevel=0 -sleep_ms 1 -max_retries 999 -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/tmpWDT
@@ -101,7 +102,17 @@ mkdir $DIR/extsrc
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
 #cp -R wdt folly /usr/share $DIR/src
-cp -R wdt folly $DIR/src
+cp -R wdt folly /usr/share $DIR/src
+# Removing symlinks which point to the same source tree
+for link in `find -L $DIR/src -xtype l`
+do
+  real_path=`realpath $link`;
+  if [[ $real_path =~ ^$DIR/src/* ]]
+  then
+    echo "Removing symlink $link"
+    rm $link
+  fi
+done
 #cp -R wdt $DIR/src
 
 #for size in 1k 64K 512K 1M 16M 256M 512M 1G
@@ -146,6 +157,14 @@ fi
 echo "$WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log"
 time $WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log
 
+echo -n e | $NC localhost 22356
+
+$WDTBIN -directory $DIR/dst_symlinks >> $DIR/server.log 2>&1 &
+echo "$WDTBIN -follow_symlinks -directory $DIR/src -destination $HOSTNAME |& tee -a $DIR/client.log"
+time $WDTBIN -follow_symlinks -directory $DIR/src -destination $HOSTNAME |& tee -a $DIR/client.log
+
+echo -n e | $NC localhost 22356
+
 # rsync test:
 #time rsync --stats -v -W -r $DIR/src/ $DIR/dst/
 
@@ -153,24 +172,43 @@ time $WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log
 
 
 if [ $DO_VERIFY -eq 1 ] ; then
+    echo "Verifying for run without follow_symlinks"
     echo "Checking for difference `date`"
 
     NUM_FILES=`(cd $DIR/dst ; ( find . -type f | wc -l))`
     echo "Transfered `du -ks $DIR/dst` kbytes across $NUM_FILES files"
 
-    (cd $DIR/src ; ( find -L . -type f | /bin/fgrep -v "/." | xargs md5sum | sort ) > ../src.md5s )
+    (cd $DIR/src ; ( find . -type f | /bin/fgrep -v "/." | xargs md5sum | sort ) > ../src.md5s )
     (cd $DIR/dst ; ( find . -type f | xargs md5sum | sort ) > ../dst.md5s )
 
     echo "Should be no diff"
     (cd $DIR; diff -u src.md5s dst.md5s)
     STATUS=$?
+
+
+    echo "Verifying for run with follow_symlinks"
+    echo "Checking for difference `date`"
+
+    NUM_FILES=`(cd $DIR/dst_symlinks; ( find . -type f | wc -l))`
+    echo "Transfered `du -ks $DIR/dst_symlinks` kbytes across $NUM_FILES files"
+
+    (cd $DIR/src ; ( find -L . -type f | /bin/fgrep -v "/." | xargs md5sum |  \
+    sort ) > ../src_symlinks.md5s )
+    (cd $DIR/dst_symlinks ; ( find . -type f | xargs md5sum | sort ) >  \
+    ../dst_symlinks.md5s )
+
+    echo "Should be no diff"
+    (cd $DIR; diff -u src_symlinks.md5s dst_symlinks.md5s)
+    SYMLINK_STATUS=$?
+    if [ $STATUS -eq 0 ] ; then
+      STATUS=$SYMLINK_STATUS
+    fi
 #(cd $DIR; ls -lR src/ dst/ )
 else
     echo "Skipping independant verification"
     STATUS=0
 fi
 
-pkill -x wdt
 
 echo "Server logs:"
 cat $DIR/server.log
