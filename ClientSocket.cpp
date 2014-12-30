@@ -34,8 +34,10 @@ ErrorCode ClientSocket::connect() {
                << res << " : " << gai_strerror(res);
     return CONN_ERROR;
   }
+  int count = 0;
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
+    ++count;
     VLOG(2) << "will connect to "
             << ServerSocket::getNameInfo(info->ai_addr, info->ai_addrlen);
     fd_ = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
@@ -44,7 +46,8 @@ ErrorCode ClientSocket::connect() {
       continue;
     }
     if (::connect(fd_, info->ai_addr, info->ai_addrlen)) {
-      PLOG(WARNING) << "Error connecting";
+      PLOG(INFO) << "Error connecting on "
+                 << ServerSocket::getNameInfo(info->ai_addr, info->ai_addrlen);
       close(fd_);
       fd_ = -1;
       continue;
@@ -55,7 +58,10 @@ ErrorCode ClientSocket::connect() {
   }
   freeaddrinfo(infoList);
   if (fd_ <= 0) {
-    LOG(ERROR) << "Unable to connect";
+    if (count > 1 ) {
+      // Only log this if not redundant with log above (ie --ipv6=false)
+      LOG(INFO) << "Unable to connect to either of the " << count << " addrs";
+    }
     return CONN_ERROR_RETRYABLE;
   }
   // TODO: set sock options

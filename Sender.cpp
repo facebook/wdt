@@ -196,7 +196,9 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   size_t headerBytes = 0, dataBytes = 0, totalBytes = 0;
   size_t numFiles = 0;
   ErrorCode code;
+  int connectAttempts = 0;
   for (int i = 1; i < options.maxRetries_; ++i) {
+    ++connectAttempts;
     code = socket->connect();
     if (code == OK) {
       break;
@@ -208,17 +210,21 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     usleep(options.sleepMillis_ * 1000);
   }
   // one more/last try (stays true if it worked above)
-  if (code != OK && socket->connect() != OK) {
-    LOG(ERROR) << "Unable to connect despite retries";
-    stat.errCode = CONN_ERROR;
-    return;
+  if (code != OK) {
+    ++connectAttempts;
+    if (socket->connect() != OK) {
+      LOG(ERROR) << "Unable to connect despite retries";
+      stat.errCode = CONN_ERROR;
+      return;
+    }
   }
-
   char headerBuf[Protocol::kMaxHeader];
   std::unique_ptr<ByteSource> source;
 
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
-  VLOG(1) << "Connect took " << elapsedSecsConn;
+  ((connectAttempts>1) ? LOG(WARNING) : LOG(INFO))
+    << "Connection took " << connectAttempts << " attempt(s) and "
+    << elapsedSecsConn << " seconds.";
   while ((source = queue.getNextSource())) {
     if (options.ignoreOpenErrors_ && source->hasError()) {
       continue;
