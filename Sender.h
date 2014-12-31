@@ -21,6 +21,8 @@
 #include "Throttler.h"
 #include "ClientSocket.h"
 #include "WdtOptions.h"
+#include "Reporting.h"
+
 #include <chrono>
 #include <memory>
 
@@ -39,7 +41,7 @@ class Sender {
   virtual ~Sender() {
   }
 
-  std::vector<ErrorCode> start();
+  TransferReport start();
 
   void setIncludeRegex(const std::string &includeRegex);
 
@@ -55,16 +57,9 @@ class Sender {
 
   void setFollowSymlinks(const bool followSymlinks);
 
-  struct SendStats {
-    size_t totalBytes = 0;
-    size_t headerBytes = 0;
-    size_t dataBytes = 0;
-    ErrorCode errCode;
-  };
-
   // Making the following 2 functions public for unit testing. Need to find way
   // to unit test private functions
-  virtual SendStats sendOneByteSource(
+  virtual TransferStats sendOneByteSource(
       const std::unique_ptr<ClientSocket> &socket,
       const std::unique_ptr<Throttler> &throttler,
       const std::unique_ptr<ByteSource> &source, const bool doThrottling,
@@ -72,12 +67,23 @@ class Sender {
 
   void sendOne(Clock::time_point startTime, const std::string &destHost,
                int port, DirectorySourceQueue &queue, double avgRateBytes,
-               double maxRateBytes, double bucketLimitBytes, SendStats &stat);
+               double maxRateBytes, double bucketLimitBytes,
+               TransferStats &threadStats,
+               std::vector<TransferStats> &transferredFileStats);
 
   virtual std::unique_ptr<ClientSocket> makeSocket(const std::string &destHost,
                                                    int port);
 
  private:
+  std::unique_ptr<ClientSocket> connectToReceiver(const std::string &destHost,
+                                                  const int port,
+                                                  ErrorCode &errCode,
+                                                  Clock::time_point startTime);
+  void validateTransferStats(
+      const std::vector<TransferStats> &transferredSourceStats,
+      const std::vector<TransferStats> &failedSourceStats,
+      const std::vector<TransferStats> &threadStats);
+
   std::string destHost_;
   int port_;
   int numSockets_;

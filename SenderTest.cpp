@@ -19,6 +19,8 @@ namespace wdt {
 
 using std::string;
 using std::unique_ptr;
+using std::pair;
+using std::vector;
 
 class MockThrottler : public Throttler {
  public:
@@ -54,9 +56,9 @@ class SimpleSender : public Sender {
   SimpleSender() : Sender("localhost", "22000") {
   }
 
-  SendStats sendOneByteSource_(ClientSocket *s, Throttler *throttler,
-                               ByteSource *source, const bool doThrottling,
-                               const size_t totalBytes) {
+  TransferStats sendOneByteSource_(ClientSocket *s, Throttler *throttler,
+                                   ByteSource *source, const bool doThrottling,
+                                   const size_t totalBytes) {
     const unique_ptr<Throttler> throttlerPtr(throttler);
     const unique_ptr<ByteSource> sourcePtr(source);
     const unique_ptr<ClientSocket> socketPtr(s);
@@ -75,6 +77,8 @@ class MockDirectorySourceQueue : public DirectorySourceQueue {
   unique_ptr<ByteSource> getNextSource() {
     return unique_ptr<ByteSource>(getNextSource_());
   }
+
+  MOCK_METHOD1(returnToQueue, void(unique_ptr<ByteSource> &));
 };
 
 class MockSender : public Sender {
@@ -89,12 +93,14 @@ class MockSender : public Sender {
     return unique_ptr<ClientSocket>(makeSocket_());
   }
 
-  MOCK_METHOD5(sendOneByteSource, SendStats(const unique_ptr<ClientSocket> &,
-                                            const unique_ptr<Throttler> &,
-                                            const unique_ptr<ByteSource> &,
-                                            const bool, const size_t));
-  void sendOneSimple(DirectorySourceQueue &queue, SendStats &stat) {
-    sendOne(Clock::now(), "localhost", 220000, queue, 0, 0, 0, stat);
+  MOCK_METHOD5(sendOneByteSource,
+               TransferStats(const unique_ptr<ClientSocket> &,
+                             const unique_ptr<Throttler> &,
+                             const unique_ptr<ByteSource> &, const bool,
+                             const size_t));
+  void sendOneSimple(DirectorySourceQueue &queue, TransferStats &stat) {
+    vector<TransferStats> v;
+    sendOne(Clock::now(), "localhost", 220000, queue, 0, 0, 0, stat, v);
   }
 };
 
@@ -109,9 +115,9 @@ TEST(SendOne, ConnectionError) {
     EXPECT_CALL(*socket, connect()).WillOnce(Return(CONN_ERROR));
   }
 
-  Sender::SendStats stats;
+  TransferStats stats;
   sender.sendOneSimple(queue, stats);
-  EXPECT_EQ(stats.errCode, CONN_ERROR);
+  EXPECT_EQ(stats.getErrorCode(), CONN_ERROR);
 
   socket = new MockClientSocket;
   {
@@ -121,10 +127,10 @@ TEST(SendOne, ConnectionError) {
         Return(CONN_ERROR_RETRYABLE));
   }
   sender.sendOneSimple(queue, stats);
-  EXPECT_EQ(stats.errCode, CONN_ERROR);
+  EXPECT_EQ(stats.getErrorCode(), CONN_ERROR);
 }
 
-TEST(SendOne, ByteSourceSendError) {
+TEST(SendOne, ByteSourceSendError1) {
   MockClientSocket *socket = new MockClientSocket;
   MockDirectorySourceQueue queue;
   MockByteSource *source = new MockByteSource;
@@ -133,17 +139,32 @@ TEST(SendOne, ByteSourceSendError) {
   {
     InSequence s;
     EXPECT_CALL(sender, makeSocket_()).WillOnce(Return(socket));
-    EXPECT_CALL(*socket, connect()).Times(1).WillRepeatedly(Return(OK));
+    EXPECT_CALL(*socket, connect()).WillOnce(Return(OK));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(source));
-    Sender::SendStats stats;
-    stats.errCode = SOCKET_WRITE_ERROR;
+    TransferStats stats;
+    stats.addHeaderBytes(2);
+    stats.addDataBytes(3);
+    stats.setErrorCode(BYTE_SOURCE_READ_ERROR);
     EXPECT_CALL(sender, sendOneByteSource(_, _, _, _, _))
         .WillOnce(Return(stats));
+    EXPECT_CALL(queue, returnToQueue(_));
+    EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(nullptr));
+    EXPECT_CALL(*socket, write(_, 1)).WillOnce(Return(1));
+    EXPECT_CALL(*socket, read(_, 1))
+        .WillOnce(DoAll(SetArgPointee<0>(Protocol::DONE_CMD), Return(1)));
+    EXPECT_CALL(*socket, read(_, _)).WillOnce(Return(0));
   }
 
-  Sender::SendStats stats;
+  TransferStats stats;
   sender.sendOneSimple(queue, stats);
-  EXPECT_EQ(stats.errCode, SOCKET_WRITE_ERROR);
+  EXPECT_EQ(stats.getErrorCode(), OK);
+  EXPECT_EQ(stats.getTotalBytes(), 6);
+  EXPECT_EQ(stats.getHeaderBytes(), 3);
+  EXPECT_EQ(stats.getDataBytes(), 3);
+  EXPECT_EQ(stats.getEffectiveTotalBytes(), 1);
+  EXPECT_EQ(stats.getEffectiveHeaderBytes(), 1);
+  EXPECT_EQ(stats.getEffectiveDataBytes(), 0);
+  EXPECT_EQ(stats.getNumFiles(), 0);
 }
 
 TEST(SendOne, Success) {
@@ -157,11 +178,13 @@ TEST(SendOne, Success) {
     EXPECT_CALL(sender, makeSocket_()).WillOnce(Return(socket));
     EXPECT_CALL(*socket, connect()).Times(1).WillRepeatedly(Return(OK));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(source));
-    Sender::SendStats stats;
-    stats.errCode = OK;
-    stats.totalBytes = 10;
-    stats.headerBytes = 3;
-    stats.dataBytes = 7;
+    TransferStats stats;
+    stats.addHeaderBytes(3);
+    stats.addDataBytes(7);
+    stats.addEffectiveBytes(3, 7);
+    stats.setErrorCode(OK);
+    stats.incrNumFiles();
+
     EXPECT_CALL(sender, sendOneByteSource(_, _, _, _, _))
         .WillOnce(Return(stats));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(nullptr));
@@ -171,11 +194,16 @@ TEST(SendOne, Success) {
     EXPECT_CALL(*socket, read(_, _)).WillOnce(Return(0));
   }
 
-  Sender::SendStats stats;
+  TransferStats stats;
   sender.sendOneSimple(queue, stats);
-  EXPECT_EQ(stats.errCode, OK);
-  EXPECT_EQ(stats.headerBytes, 4);
-  EXPECT_EQ(stats.dataBytes, 7);
+  EXPECT_EQ(stats.getErrorCode(), OK);
+  EXPECT_EQ(stats.getTotalBytes(), 11);
+  EXPECT_EQ(stats.getHeaderBytes(), 4);
+  EXPECT_EQ(stats.getDataBytes(), 7);
+  EXPECT_EQ(stats.getEffectiveTotalBytes(), 11);
+  EXPECT_EQ(stats.getEffectiveHeaderBytes(), 4);
+  EXPECT_EQ(stats.getEffectiveDataBytes(), 7);
+  EXPECT_EQ(stats.getNumFiles(), 1);
 }
 
 TEST(SendOneByteSource, HeaderWriteFailure) {
@@ -187,7 +215,7 @@ TEST(SendOneByteSource, HeaderWriteFailure) {
   EXPECT_CALL(*source, getSize()).WillOnce(Return(10));
   EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(0));
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
-  EXPECT_EQ(stats.errCode, SOCKET_WRITE_ERROR);
+  EXPECT_EQ(stats.getErrorCode(), SOCKET_WRITE_ERROR);
 }
 
 TEST(SendOneByteSource, ByteSourceReadError) {
@@ -204,7 +232,10 @@ TEST(SendOneByteSource, ByteSourceReadError) {
   EXPECT_CALL(*source, read(_)).WillOnce(DoAll(SetArgReferee<0>(3), Return(p)));
   EXPECT_CALL(*source, hasError()).WillOnce(Return(true));
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
-  EXPECT_EQ(stats.errCode, BYTE_SOURCE_READ_ERROR);
+  EXPECT_EQ(stats.getErrorCode(), BYTE_SOURCE_READ_ERROR);
+  EXPECT_EQ(stats.getTotalBytes(), 3);
+  EXPECT_EQ(stats.getHeaderBytes(), 3);
+  EXPECT_EQ(stats.getDataBytes(), 0);
 }
 
 TEST(SendOneByteSource, SocketWriteError) {
@@ -224,7 +255,10 @@ TEST(SendOneByteSource, SocketWriteError) {
   EXPECT_CALL(*socket, write(p, 3)).WillOnce(Return(-1));
 
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
-  EXPECT_EQ(stats.errCode, SOCKET_WRITE_ERROR);
+  EXPECT_EQ(stats.getErrorCode(), SOCKET_WRITE_ERROR);
+  EXPECT_EQ(stats.getTotalBytes(), 3);
+  EXPECT_EQ(stats.getHeaderBytes(), 3);
+  EXPECT_EQ(stats.getDataBytes(), 0);
 
   // TEST 2
   source = new MockByteSource;
@@ -239,7 +273,10 @@ TEST(SendOneByteSource, SocketWriteError) {
   EXPECT_CALL(*socket, write(p, 3)).WillOnce(Return(4));
 
   stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
-  EXPECT_EQ(stats.errCode, SOCKET_WRITE_ERROR);
+  EXPECT_EQ(stats.getErrorCode(), SOCKET_WRITE_ERROR);
+  EXPECT_EQ(stats.getTotalBytes(), 7);
+  EXPECT_EQ(stats.getHeaderBytes(), 3);
+  EXPECT_EQ(stats.getDataBytes(), 4);
 }
 
 TEST(SendOneByteSource, SingleChunkSuccess) {
@@ -264,8 +301,10 @@ TEST(SendOneByteSource, SingleChunkSuccess) {
   }
 
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
-  EXPECT_EQ(stats.errCode, OK);
-  EXPECT_EQ(stats.dataBytes, 3);
+  EXPECT_EQ(stats.getErrorCode(), OK);
+  EXPECT_EQ(stats.getTotalBytes(), 6);
+  EXPECT_EQ(stats.getHeaderBytes(), 3);
+  EXPECT_EQ(stats.getDataBytes(), 3);
 
   // TEST short write
   source = new MockByteSource;
@@ -287,8 +326,10 @@ TEST(SendOneByteSource, SingleChunkSuccess) {
   }
 
   stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
-  EXPECT_EQ(stats.errCode, OK);
-  EXPECT_EQ(stats.dataBytes, 3);
+  EXPECT_EQ(stats.getErrorCode(), OK);
+  EXPECT_EQ(stats.getTotalBytes(), 6);
+  EXPECT_EQ(stats.getHeaderBytes(), 3);
+  EXPECT_EQ(stats.getDataBytes(), 3);
 }
 
 TEST(SendOneByteSource, MultiChunkSuccess) {
@@ -319,8 +360,10 @@ TEST(SendOneByteSource, MultiChunkSuccess) {
   }
 
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
-  EXPECT_EQ(stats.errCode, OK);
-  EXPECT_EQ(stats.dataBytes, 5);
+  EXPECT_EQ(stats.getErrorCode(), OK);
+  EXPECT_EQ(stats.getTotalBytes(), 8);
+  EXPECT_EQ(stats.getHeaderBytes(), 3);
+  EXPECT_EQ(stats.getDataBytes(), 5);
 }
 }
 }

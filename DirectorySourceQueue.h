@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "SourceQueue.h"
+#include "WdtOptions.h"
 
 DECLARE_int32(buffer_size);
 
@@ -116,6 +117,23 @@ class DirectorySourceQueue : public SourceQueue {
    */
   void setFollowSymlinks(const bool followSymlinks);
 
+  /**
+   * returns a source to the queue, checks for fail/retries, doesn't increment
+   * numentries
+   *
+   * @param source               source to be returned to the queue
+   */
+  virtual void returnToQueue(std::unique_ptr<ByteSource> &source);
+
+  /**
+   * Returns list of files which were not transfereed. It empties the queue and
+   * adds queue entries to the failed file list. This function should be called
+   * after all the sending threads have finished execurtion
+   *
+   * @return                      stats for failed sources
+   */
+  const std::vector<TransferStats> &getFailedSourceStats();
+
   virtual ~DirectorySourceQueue() {
   }
 
@@ -134,6 +152,16 @@ class DirectorySourceQueue : public SourceQueue {
    * @return                true on success, false on error
    */
   bool enqueueFiles();
+
+  /**
+   * initial creation from either explore or enqueue files - always increment
+   * numentries inside the lock, doesn't check for fail retries
+   *
+   * @param relativePath         relative path of the file to be added
+   * @param fileSize             size of the file
+   */
+  virtual void createIntoQueue(const std::string &relativePath,
+                               const size_t fileSize);
 
   /// root directory to recurse on if fileInfo_ is empty
   std::string rootDir_;
@@ -168,14 +196,39 @@ class DirectorySourceQueue : public SourceQueue {
   /// Indicates whether call to init() has finished
   bool initFinished_{false};
 
-  /// Orders size/relative path pairs for files under root by decreasing size
-  std::priority_queue<std::pair<uint64_t, std::string>> sizeToPath_;
+  struct SourceComparator {
+    bool operator()(const std::unique_ptr<ByteSource> &source1,
+                    const std::unique_ptr<ByteSource> &source2) {
+      auto retryCount1 = source1->getTransferStats().getFailedAttempts();
+      auto retryCount2 = source2->getTransferStats().getFailedAttempts();
+      if (retryCount1 != retryCount2) {
+        return retryCount1 > retryCount2;
+      }
+      if (source1->getSize() != source2->getSize()) {
+        return source1->getSize() < source2->getSize();
+      }
+      return source1->getIdentifier() < source2->getIdentifier();
+    }
+  };
+
+  /**
+   * priority queue of sources. Sources are first ordered by increasing
+   * failedAttempts, then by decreasing size.
+   */
+  std::priority_queue<std::unique_ptr<ByteSource>,
+                      std::vector<std::unique_ptr<ByteSource>>,
+                      SourceComparator> sourceQueue_;
+
+  /// Transfer stats for sources which are not transferred
+  std::vector<TransferStats> failedSourceStats_;
 
   /// Total number of entries/files that have passed through the queue
   size_t numEntries_{0};
 
   /// Whether to follow symlinks or not
   bool followSymlinks_{false};
+
+  const WdtOptions &options_;
 };
 }
 }

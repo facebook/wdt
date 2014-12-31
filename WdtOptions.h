@@ -119,6 +119,16 @@ class WdtOptions {
    * Regex for the directories that shouldn't be explored
    */
   std::string pruneDirRegex_;
+
+  /**
+   * Maximu number of retries for transferring a file
+   */
+  int maxTransferRetries_;
+
+  /**
+   * True if full reporting is enabled. False otherwise
+   */
+  bool fullReporting_;
   /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted
@@ -142,6 +152,8 @@ class WdtOptions {
     maxRetries_ = 20;
     sleepMillis_ = 50;
     backlog_ = 1;
+    maxTransferRetries_ = 3;
+    fullReporting_ = false;
 
     throttlerLogTimeMillis_ = 0;
     avgMbytesPerSec_ = -1;

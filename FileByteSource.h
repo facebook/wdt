@@ -59,6 +59,19 @@ class FileByteSource : public ByteSource {
   /// @see ByteSource.h
   virtual char *read(size_t &size);
 
+  /// open the source for reading
+  virtual void open();
+
+  /// @return transfer stats for the source
+  virtual const TransferStats &getTransferStats() const {
+    return transferStats_;
+  }
+
+  /// @param stats    Stats to be added
+  virtual void addTransferStats(const TransferStats &stats) {
+    transferStats_ += stats;
+  }
+
  private:
   struct Buffer {
     explicit Buffer(size_t size) : size_(size) {
@@ -90,10 +103,16 @@ class FileByteSource : public ByteSource {
   const uint64_t size_;
 
   /// open file descriptor for file (set to < 0 on error)
-  int fd_;
+  int fd_{-1};
 
   /// number of bytes read so far from file
   uint64_t bytesRead_;
+
+  /// buffer size
+  size_t bufferSize_;
+
+  /// transfer stats
+  TransferStats transferStats_;
 };
 }
 }

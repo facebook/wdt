@@ -194,6 +194,7 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
       if (wres != toWrite) {
         PLOG(ERROR) << "Write error/mismatch " << wres << " " << off << " "
                     << toWrite;
+        break;
       } else {
         VLOG(3) << "Wrote intial " << wres << " / " << size << " off: " << off
                 << " numRead: " << numRead << " on " << dest;
@@ -212,6 +213,7 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         }
         if (nwres != nres) {
           PLOG(ERROR) << "Write error/mismatch " << nwres << " " << nres;
+          break;
         }
         wres += nwres;
       }

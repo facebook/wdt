@@ -131,6 +131,10 @@ Throttling code
 
 Header file for error codes
 
+* Reporting.{h|cpp}
+
+Class represnting transfer stats and reports
+
 ## Submitting diffs/making changes
 
 (facebook only:)

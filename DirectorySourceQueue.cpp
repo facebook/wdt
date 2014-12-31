@@ -1,10 +1,11 @@
 #include "DirectorySourceQueue.h"
-#include "WdtOptions.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <set>
+#include <utility>
 
+#include <folly/Memory.h>
 #include "FileByteSource.h"
 #include <regex>
 
@@ -12,12 +13,12 @@ namespace facebook {
 namespace wdt {
 
 DirectorySourceQueue::DirectorySourceQueue(const std::string &rootDir)
-    : rootDir_(rootDir) {
+    : rootDir_(rootDir), options_(WdtOptions::get()) {
   CHECK(!rootDir_.empty());
   if (rootDir_.back() != '/') {
     rootDir_.push_back('/');
   }
-  fileSourceBufferSize_ = WdtOptions::get().bufferSize_;
+  fileSourceBufferSize_ = options_.bufferSize_;
 };
 
 void DirectorySourceQueue::setIncludePattern(
@@ -75,7 +76,7 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
     std::lock_guard<std::mutex> lock(mutex_);
     initFinished_ = true;
     // TODO: comment why
-    if (sizeToPath_.empty()) {
+    if (sourceQueue_.empty()) {
       conditionNotEmpty_.notify_all();
     }
   }
@@ -208,12 +209,7 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          {
-            std::lock_guard<std::mutex> lock(mutex_);
-            sizeToPath_.push(
-                std::make_pair((uint64_t)fileStat.st_size, newRelativePath));
-            ++numEntries_;
-          }
+          createIntoQueue(newRelativePath, fileStat.st_size);
           conditionNotEmpty_.notify_one();
           continue;
         }
@@ -242,6 +238,35 @@ bool DirectorySourceQueue::explore() {
   return !hasError;
 }
 
+void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  size_t retries = source->getTransferStats().getFailedAttempts();
+  if (retries >= options_.maxTransferRetries_) {
+    LOG(ERROR) << source->getIdentifier() << " failed after " << retries
+               << " number of tries.";
+    failedSourceStats_.emplace_back(source->getTransferStats());
+  } else {
+    sourceQueue_.push(std::move(source));
+  }
+}
+
+void DirectorySourceQueue::createIntoQueue(const std::string &relativePath,
+                                           const size_t fileSize) {
+  std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
+      rootDir_, relativePath, fileSize, fileSourceBufferSize_);
+  std::lock_guard<std::mutex> lock(mutex_);
+  sourceQueue_.push(std::move(source));
+  numEntries_++;
+}
+
+const std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
+  while (!sourceQueue_.empty()) {
+    failedSourceStats_.emplace_back(sourceQueue_.top()->getTransferStats());
+    sourceQueue_.pop();
+  }
+  return failedSourceStats_;
+}
+
 bool DirectorySourceQueue::enqueueFiles() {
   for (const auto &info : fileInfo_) {
     const auto &fullPath = rootDir_ + info.first;
@@ -256,11 +281,7 @@ bool DirectorySourceQueue::enqueueFiles() {
     } else {
       filesize = info.second;
     }
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      sizeToPath_.push(std::make_pair(filesize, info.first));
-      ++numEntries_;
-    }
+    createIntoQueue(info.first, filesize);
     conditionNotEmpty_.notify_one();
   }
   return true;
@@ -268,31 +289,27 @@ bool DirectorySourceQueue::enqueueFiles() {
 
 bool DirectorySourceQueue::finished() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return initFinished_ && sizeToPath_.empty();
+  return initFinished_ && sourceQueue_.empty();
 }
 
 std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource() {
-  uint64_t filesize;
-  std::string filename;
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    while (sizeToPath_.empty() && !initFinished_) {
-      conditionNotEmpty_.wait(lock);
-    }
-    if (sizeToPath_.empty()) {
-      return nullptr;
-    }
-    auto pair = sizeToPath_.top();
-    sizeToPath_.pop();
-    if (sizeToPath_.empty() && initFinished_) {
-      conditionNotEmpty_.notify_all();
-    }
-    filesize = pair.first;
-    filename = pair.second;
+  std::unique_lock<std::mutex> lock(mutex_);
+  while (sourceQueue_.empty() && !initFinished_) {
+    conditionNotEmpty_.wait(lock);
   }
-  VLOG(1) << "got next source " << rootDir_ + filename << " size " << filesize;
-  return std::unique_ptr<FileByteSource>(
-      new FileByteSource(rootDir_, filename, filesize, fileSourceBufferSize_));
+  if (sourceQueue_.empty()) {
+    return nullptr;
+  }
+  // using const_cast since priority_queue returns a const reference
+  std::unique_ptr<ByteSource> source =
+      std::move(const_cast<std::unique_ptr<ByteSource> &>(sourceQueue_.top()));
+  sourceQueue_.pop();
+  if (sourceQueue_.empty() && initFinished_) {
+    conditionNotEmpty_.notify_all();
+  }
+  VLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
+          << " size " << source->getSize();
+  return source;
 }
 }
 }

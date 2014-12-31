@@ -73,7 +73,7 @@ echo -n "e" | nc $REMOTE 22356
 echo "Server logs:"
 cat $DIR/server.log
 
-MAXRATE=`awk 'match($0, /All data.*Total throughput = ([0-9.]+)/, res) {rate=res[1]; if (rate>max) max=rate} END {print max}' $DIR/client?.log`
+MAXRATE=`awk 'match($0, /.*Total sender throughput = ([0-9.]+)/, res) {rate=res[1]; if (rate>max) max=rate} END {print max}' $DIR/client?.log`
 
 echo "Deleting logs and staging in $DIR"
 rm -rf $DIR

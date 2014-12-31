@@ -77,7 +77,7 @@ void Sender::setFollowSymlinks(const bool followSymlinks) {
   followSymlinks_ = followSymlinks;
 }
 
-std::vector<ErrorCode> Sender::start() {
+TransferReport Sender::start() {
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.twoPhases_;
   LOG(INFO) << "Client (sending) to " << destHost_ << " port " << port_ << " : "
@@ -96,7 +96,8 @@ std::vector<ErrorCode> Sender::start() {
     directoryTime = durationSeconds(Clock::now() - startTime);
   }
   std::vector<std::thread> vt;
-  std::vector<SendStats> stats(numSockets_);
+  std::vector<TransferStats> threadStats(numSockets_);
+  std::vector<std::vector<TransferStats>> sourceStats(numSockets_);
   double avgRateBytesPerSec = options.avgMbytesPerSec_ * kMbToB;
   double peakRateBytesPerSec = options.maxMbytesPerSec_ * kMbToB;
   double bucketLimitBytes = options.throttlerBucketLimit_ * kMbToB;
@@ -126,39 +127,80 @@ std::vector<ErrorCode> Sender::start() {
           << "(" << perThreadAvgRateBytesPerSec << ", "
           << perThreadPeakRateBytesPerSec << ")";
   for (int i = 0; i < numSockets_; i++) {
+    threadStats[i].setId(folly::to<std::string>(i));
     vt.emplace_back(&Sender::sendOne, this, startTime, std::ref(destHost_),
                     port_ + i, std::ref(queue), perThreadAvgRateBytesPerSec,
                     perThreadPeakRateBytesPerSec, perThreadBucketLimit,
-                    std::ref(stats[i]));
+                    std::ref(threadStats[i]), std::ref(sourceStats[i]));
   }
   if (!twoPhases) {
     dirThread.join();
     directoryTime = durationSeconds(Clock::now() - startTime);
   }
-  size_t totalDataBytes = 0;
-  size_t totalHeaderBytes = 0;
   for (int i = 0; i < numSockets_; i++) {
     vt[i].join();
-    totalHeaderBytes += stats[i].headerBytes;
-    totalDataBytes += stats[i].dataBytes;
   }
-  size_t totalBytes = totalDataBytes + totalHeaderBytes;
+
+  std::vector<TransferStats> transferredSourceStats;
+  if (WdtOptions::get().fullReporting_) {
+    for (auto stats : sourceStats) {
+      transferredSourceStats.insert(transferredSourceStats.end(), stats.begin(),
+                                    stats.end());
+    }
+    validateTransferStats(transferredSourceStats, queue.getFailedSourceStats(),
+                          threadStats);
+  }
+  TransferReport report(transferredSourceStats, queue.getFailedSourceStats(),
+                        threadStats);
   double totalTime = durationSeconds(Clock::now() - startTime);
-  LOG(WARNING) << "All data (" << queue.count() << " files) transfered in "
-               << totalTime << " seconds (" << directoryTime
-               << " dirtime). Data Mbytes = " << totalDataBytes / kMbToB
-               << ". Header kbytes = " << totalHeaderBytes / 1024. << " ("
-               << 100. * totalHeaderBytes / totalBytes << "% overhead)"
-               << ". Total bytes = " << totalBytes
-               << ". Total throughput = " << totalBytes / totalTime / kMbToB
-               << " Mbytes/sec ("
-               << totalBytes / (totalTime - directoryTime) / kMbToB
-               << " Mbytes/sec pure transf rate)";
-  std::vector<ErrorCode> errCodes;
-  for (auto stat : stats) {
-    errCodes.emplace_back(stat.errCode);
+  LOG(INFO) << "Total time = " << totalTime << "seconds (" << directoryTime
+            << " dirTime)"
+            << ". Transfer summary : " << report
+            << "\nTotal sender throughput = "
+            << report.getSummary().getEffectiveTotalBytes() / totalTime / kMbToB
+            << " Mbytes/sec (" << report.getSummary().getEffectiveTotalBytes() /
+                                      (totalTime - directoryTime) / kMbToB
+            << " Mbytes/sec pure transf rate)";
+  return report;
+}
+
+void Sender::validateTransferStats(
+    const std::vector<TransferStats> &transferredSourceStats,
+    const std::vector<TransferStats> &failedSourceStats,
+    const std::vector<TransferStats> &threadStats) {
+  size_t sourceFailedAttempts = 0;
+  size_t sourceNumFiles = transferredSourceStats.size();
+  size_t sourceDataBytes = 0;
+  size_t sourceEffectiveDataBytes = 0;
+
+  size_t threadFailedAttempts = 0;
+  size_t threadNumFiles = 0;
+  size_t threadDataBytes = 0;
+  size_t threadEffectiveDataBytes = 0;
+
+  for (auto stat : transferredSourceStats) {
+    sourceFailedAttempts += stat.getFailedAttempts();
+    WDT_CHECK(stat.getNumFiles() == 1);
+    sourceDataBytes += stat.getDataBytes();
+    sourceEffectiveDataBytes += stat.getEffectiveDataBytes();
   }
-  return errCodes;
+  for (auto stat : failedSourceStats) {
+    sourceFailedAttempts += stat.getFailedAttempts();
+    WDT_CHECK(stat.getNumFiles() == 0);
+    sourceDataBytes += stat.getDataBytes();
+    sourceEffectiveDataBytes += stat.getEffectiveDataBytes();
+  }
+  for (auto stat : threadStats) {
+    threadFailedAttempts += stat.getFailedAttempts();
+    threadNumFiles += stat.getNumFiles();
+    threadDataBytes += stat.getDataBytes();
+    threadEffectiveDataBytes += stat.getEffectiveDataBytes();
+  }
+
+  WDT_CHECK(sourceFailedAttempts == threadFailedAttempts);
+  WDT_CHECK(sourceNumFiles == threadNumFiles);
+  WDT_CHECK(sourceDataBytes == threadDataBytes);
+  WDT_CHECK(sourceEffectiveDataBytes == threadEffectiveDataBytes);
 }
 
 std::unique_ptr<ClientSocket> Sender::makeSocket(const std::string &destHost,
@@ -167,21 +209,59 @@ std::unique_ptr<ClientSocket> Sender::makeSocket(const std::string &destHost,
                                           folly::to<std::string>(port));
 }
 
+std::unique_ptr<ClientSocket> Sender::connectToReceiver(
+    const std::string &destHost, const int port, ErrorCode &errCode,
+    Clock::time_point startTime) {
+  const auto &options = WdtOptions::get();
+  int connectAttempts = 0;
+  std::unique_ptr<ClientSocket> socket = makeSocket(destHost, port);
+  for (int i = 1; i < options.maxRetries_; ++i) {
+    ++connectAttempts;
+    errCode = socket->connect();
+    if (errCode == OK) {
+      break;
+    } else if (errCode == CONN_ERROR) {
+      return nullptr;
+    }
+    VLOG(1) << "Sleeping after failed attempt " << i;
+    usleep(options.sleepMillis_ * 1000);
+  }
+  // one more/last try (stays true if it worked above)
+  if (errCode != OK) {
+    ++connectAttempts;
+    if (socket->connect() != OK) {
+      LOG(ERROR) << "Unable to connect despite retries";
+      errCode = CONN_ERROR;
+      return nullptr;
+    }
+  }
+  errCode = OK;
+  double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
+  ((connectAttempts > 1) ? LOG(WARNING) : LOG(INFO))
+      << "Connection took " << connectAttempts << " attempt(s) and "
+      << elapsedSecsConn << " seconds.";
+  return socket;
+}
+
 /**
- * @param startTime         Time when this thread was spawned
- * @param destHost          Address to the destination, see ClientSocket
- * @param port              Port to establish connect
- * @param queue             DirectorySourceQueue object for reading files
- * @param avgRateBytes      Average rate of throttler in bytes/sec
- * @param maxRateBytes      Peak rate for Token Bucket algorithm in bytes/sec
-                            Checkout Throttler.h for Token Bucket
- * @param bucketLimitBytes  Bucket Limit for Token Bucket algorithm in bytes
- * @param stat              Pointer to return send statistics
+ * @param startTime              Time when this thread was spawned
+ * @param destHost               Address to the destination, see ClientSocket
+ * @param port                   Port to establish connect
+ * @param queue                  DirectorySourceQueue object for reading files
+ * @param avgRateBytes           Average rate of throttler in bytes/sec
+ * @param maxRateBytes           Peak rate for Token Bucket algorithm in
+ bytes/sec
+                                 Checkout Throttler.h for Token Bucket
+ * @param bucketLimitBytes       Bucket Limit for Token Bucket algorithm in
+ bytes
+ * @param threadStats            Per thread statistics
+ * @param transferredFileStats   Stats for successfully transferred files
  */
 void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
                      int port, DirectorySourceQueue &queue, double avgRateBytes,
                      double maxRateBytes, double bucketLimitBytes,
-                     SendStats &stat) {
+                     TransferStats &threadStats,
+                     std::vector<TransferStats> &transferredFileStats) {
   std::unique_ptr<Throttler> throttler;
   const auto &options = WdtOptions::get();
   const bool doThrottling = (avgRateBytes > 0 || maxRateBytes > 0);
@@ -192,104 +272,88 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   } else {
     VLOG(1) << "No throttling in effect";
   }
-  std::unique_ptr<ClientSocket> socket = makeSocket(destHost, port);
-  size_t headerBytes = 0, dataBytes = 0, totalBytes = 0;
-  size_t numFiles = 0;
+
   ErrorCode code;
-  int connectAttempts = 0;
-  for (int i = 1; i < options.maxRetries_; ++i) {
-    ++connectAttempts;
-    code = socket->connect();
-    if (code == OK) {
-      break;
-    } else if (code == CONN_ERROR) {
-      stat.errCode = code;
-      return;
-    }
-    VLOG(1) << "Sleeping after failed attempt " << i;
-    usleep(options.sleepMillis_ * 1000);
-  }
-  // one more/last try (stays true if it worked above)
+  std::unique_ptr<ClientSocket> socket =
+      connectToReceiver(destHost, port, code, startTime);
   if (code != OK) {
-    ++connectAttempts;
-    if (socket->connect() != OK) {
-      LOG(ERROR) << "Unable to connect despite retries";
-      stat.errCode = CONN_ERROR;
-      return;
-    }
+    threadStats.setErrorCode(code);
+    return;
   }
   char headerBuf[Protocol::kMaxHeader];
-  std::unique_ptr<ByteSource> source;
 
-  double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
-  ((connectAttempts>1) ? LOG(WARNING) : LOG(INFO))
-    << "Connection took " << connectAttempts << " attempt(s) and "
-    << elapsedSecsConn << " seconds.";
-  while ((source = queue.getNextSource())) {
+  while (true) {
+    auto source = queue.getNextSource();
+    if (!source) {
+      break;
+    }
+    source->open();
     if (options.ignoreOpenErrors_ && source->hasError()) {
       continue;
     }
-    ++numFiles;
-    auto sendStats =
-        sendOneByteSource(socket, throttler, source, doThrottling, totalBytes);
-    if (sendStats.errCode != OK) {
-      stat.errCode = sendStats.errCode;
-      return;
+    auto transferStats = sendOneByteSource(
+        socket, throttler, source, doThrottling, threadStats.getTotalBytes());
+    threadStats += transferStats;
+    source->addTransferStats(transferStats);
+    if (transferStats.getErrorCode() == OK) {
+      if (options.fullReporting_) {
+        transferredFileStats.emplace_back(source->getTransferStats());
+      }
+    } else {
+      queue.returnToQueue(source);
+      if (transferStats.getErrorCode() == SOCKET_WRITE_ERROR) {
+        socket = connectToReceiver(destHost, port, code, Clock::now());
+        if (code != OK) {
+          threadStats.setErrorCode(code);
+          return;
+        }
+      }
     }
-    totalBytes = sendStats.totalBytes;
-    headerBytes += sendStats.headerBytes;
-    dataBytes += sendStats.dataBytes;
   }
-  WDT_CHECK(totalBytes == headerBytes + dataBytes);
   headerBuf[0] = Protocol::DONE_CMD;
-  socket->write(headerBuf, 1);  //< TODO check for status/succes
-  ++headerBytes;
+  ssize_t written = socket->write(headerBuf, 1);
+  if (written != 1) {
+    LOG(ERROR) << "Socket write failure " << written;
+    threadStats.setErrorCode(SOCKET_WRITE_ERROR);
+    return;
+  }
+  threadStats.addHeaderBytes(1);
+  threadStats.addEffectiveBytes(1, 0);
   socket->shutdown();
   VLOG(1) << "Wrote done cmd on " << socket->getFd() << " waiting for reply...";
   ssize_t numRead = socket->read(headerBuf, 1);  // TODO: returns 0 on disk full
   if (numRead != 1) {
-    LOG(ERROR) << "READ unexpected " << numRead << ":"
-               << folly::humanify(std::string(headerBuf, numRead));
-    stat.errCode = SOCKET_READ_ERROR;
+    LOG(ERROR) << "READ unexpected " << numRead;
+    threadStats.setErrorCode(SOCKET_READ_ERROR);
     return;
   }
   if (headerBuf[0] != Protocol::DONE_CMD) {
     LOG(ERROR) << "Unexpected reply " << headerBuf[0];
-    stat.errCode = PROTOCOL_ERROR;
+    threadStats.setErrorCode(PROTOCOL_ERROR);
     return;
   }
   numRead = socket->read(headerBuf, Protocol::kMaxHeader);
   if (numRead != 0) {
     LOG(ERROR) << "EOF not found when expected " << numRead << ":"
                << folly::humanify(std::string(headerBuf, numRead));
-    stat.errCode = SOCKET_READ_ERROR;
+    threadStats.setErrorCode(SOCKET_READ_ERROR);
     return;
   }
+  threadStats.setErrorCode(OK);
   double totalTime = durationSeconds(Clock::now() - startTime);
-  LOG(INFO) << "Got reply - all done for fd:" << socket->getFd()
-            << ". Number of files = " << numFiles
-            << ". Total time = " << totalTime << " (" << elapsedSecsConn
-            << " in connection)"
-            << ". Avg file size = " << 1. * dataBytes / numFiles
-            << ". Data bytes = " << dataBytes
-            << ". Header bytes = " << headerBytes << " ( "
-            << 100. * headerBytes / totalBytes << " % overhead)"
-            << ". Total bytes = " << totalBytes
-            << ". Total throughput = " << totalBytes / totalTime / kMbToB
+  LOG(INFO) << "Got reply - all done for fd:" << socket->getFd() << ". "
+            << "Transfer stat : " << threadStats << " Total throughput = "
+            << threadStats.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
-  stat.headerBytes = headerBytes;
-  stat.dataBytes = dataBytes;
-  stat.errCode = OK;
   return;
 }
 
-Sender::SendStats Sender::sendOneByteSource(
+TransferStats Sender::sendOneByteSource(
     const std::unique_ptr<ClientSocket> &socket,
     const std::unique_ptr<Throttler> &throttler,
     const std::unique_ptr<ByteSource> &source, const bool doThrottling,
     const size_t totalBytes) {
-  SendStats stats;
-  stats.totalBytes = totalBytes;
+  TransferStats stats;
   char headerBuf[Protocol::kMaxHeader];
   size_t off = 0;
   headerBuf[off++] = Protocol::FILE_CMD;
@@ -298,13 +362,13 @@ Sender::SendStats Sender::sendOneByteSource(
   Protocol::encode(headerBuf, off, Protocol::kMaxHeader,
                    source->getIdentifier(), expectedSize);
   ssize_t written = socket->write(headerBuf, off);
-  stats.headerBytes += written;
-  stats.totalBytes += written;
   if (written != off) {
     LOG(ERROR) << "Write error/mismatch " << written << " " << off;
-    stats.errCode = SOCKET_WRITE_ERROR;
+    stats.setErrorCode(SOCKET_WRITE_ERROR);
+    stats.incrFailedAttempts();
     return stats;
   }
+  stats.addHeaderBytes(written);
   VLOG(3) << "Sent " << written << " on " << socket->getFd() << " : "
           << folly::humanify(std::string(headerBuf, off));
   while (!source->finished()) {
@@ -317,7 +381,6 @@ Sender::SendStats Sender::sendOneByteSource(
     }
     WDT_CHECK(buffer && size > 0);
     written = 0;
-    stats.totalBytes += size;
     if (doThrottling) {
       /**
        * If throttling is enabled we call limit(totalBytes) which
@@ -328,16 +391,18 @@ Sender::SendStats Sender::sendOneByteSource(
        * was being written and it is okay to start throttling with the
        * next expected write.
        */
-      throttler->limit(stats.totalBytes);
+      throttler->limit(totalBytes + stats.getTotalBytes() + size);
     }
     do {
       ssize_t w = socket->write(buffer + written, size - written);
       if (w < 0) {
         // TODO: retries, close connection etc...
         LOG(ERROR) << "Write error " << written << " (" << size << ")";
-        stats.errCode = SOCKET_WRITE_ERROR;
+        stats.setErrorCode(SOCKET_WRITE_ERROR);
+        stats.incrFailedAttempts();
         return stats;
       }
+      stats.addDataBytes(w);
       written += w;
       if (w != size) {
         VLOG(1) << "Short write " << w << " sub total now " << written << " on "
@@ -348,21 +413,24 @@ Sender::SendStats Sender::sendOneByteSource(
     } while (written < size);
     if (written > size) {
       LOG(ERROR) << "Write error " << written << " > " << size;
-      stats.errCode = SOCKET_WRITE_ERROR;
+      stats.setErrorCode(SOCKET_WRITE_ERROR);
+      stats.incrFailedAttempts();
       return stats;
     }
     actualSize += written;
   }
-  stats.dataBytes += actualSize;
   if (actualSize != expectedSize) {
     LOG(ERROR) << "UGH " << source->getIdentifier() << " " << expectedSize
                << " " << actualSize;
     // Can only happen if sender thread can not read complete source byte
     // stream
-    stats.errCode = BYTE_SOURCE_READ_ERROR;
+    stats.setErrorCode(BYTE_SOURCE_READ_ERROR);
+    stats.incrFailedAttempts();
     return stats;
   }
-  stats.errCode = OK;
+  stats.setErrorCode(OK);
+  stats.incrNumFiles();
+  stats.addEffectiveBytes(stats.getHeaderBytes(), stats.getDataBytes());
   return stats;
 }
 }

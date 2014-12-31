@@ -58,7 +58,7 @@ ErrorCode ClientSocket::connect() {
   }
   freeaddrinfo(infoList);
   if (fd_ <= 0) {
-    if (count > 1 ) {
+    if (count > 1) {
       // Only log this if not redundant with log above (ie --ipv6=false)
       LOG(INFO) << "Unable to connect to either of the " << count << " addrs";
     }

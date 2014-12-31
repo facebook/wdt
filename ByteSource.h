@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Reporting.h"
+
 #include <string>
 
 namespace facebook {
@@ -37,6 +39,15 @@ class ByteSource {
    *                  the two cases
    */
   virtual char *read(size_t &size) = 0;
+
+  /// open the source for reading
+  virtual void open() = 0;
+
+  /// @return transfer stats for the source
+  virtual const TransferStats &getTransferStats() const = 0;
+
+  /// @param stats    Stats to be added
+  virtual void addTransferStats(const TransferStats &stats) = 0;
 };
 }
 }
