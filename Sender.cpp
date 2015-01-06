@@ -153,8 +153,8 @@ TransferReport Sender::start() {
   TransferReport report(transferredSourceStats, queue.getFailedSourceStats(),
                         threadStats);
   double totalTime = durationSeconds(Clock::now() - startTime);
-  LOG(INFO) << "Total time = " << totalTime << "seconds (" << directoryTime
-            << " dirTime)"
+  LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
+            << directoryTime << " dirTime)"
             << ". Transfer summary : " << report
             << "\nTotal sender throughput = "
             << report.getSummary().getEffectiveTotalBytes() / totalTime / kMbToB

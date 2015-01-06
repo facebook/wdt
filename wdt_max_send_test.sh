@@ -13,12 +13,25 @@ else
   WDTBIN="$1"
 fi
 
+# TEST_COUNT is an environment variable. It is set up by the python benchmarking
+# script.
+if [ -z $TEST_COUNT ]; then
+  TEST_COUNT=2
+fi
+
 REMOTE=::1
 SKIP_WRITES="true"
 
-WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 13"
+#WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 13"
 # Still gets almost same max (21G) with throttling set high enough
 WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 13 --avg_mbytes_per_sec=26000 --max_mbytes_per_sec=26001"
+CLIENT_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
+%Mmax)k\n%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps\nCLIENT_PROFILE %U \
+%S %e"
+SERVER_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
+%Mmax)k\n%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps\nSERVER_PROFILE %U \
+%S %e"
+
 WDTNAME=`basename $WDTBIN`
 WDTCMD="$WDTBIN $WDTBIN_OPTS"
 
@@ -45,30 +58,37 @@ do
         cp $DIR/src/$base.1 $DIR/src/$base.$i
     done
 done
-echo "Done with staging src test files, starting server"
+echo "Done with staging src test files"
 
-time $WDTCMD -directory $DIR/dst -skip_writes=$SKIP_WRITES > $DIR/server.log 2>&1 &
+/usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst -skip_writes=$SKIP_WRITES > \
+$DIR/server.log 2>&1 &
 
 # wait for server to be up
 while [ `/bin/true | nc $REMOTE 22356; echo $?` -eq 1 ]
 do
- echo "Server not up yet...`date`..."
- sleep 0.5
+  echo "Server not up yet...`date`..."
+  sleep 0.5
 done
-echo "Server is up on $REMOTE 22356 - `date` - starting first client run"
+echo "Server is up on $REMOTE 22356 - `date` - starting client run"
 
-time $WDTCMD -directory $DIR/src -destination $REMOTE |& tee $DIR/client1.log
+for ((i = 1; i <= TEST_COUNT; i++))
+do
+  echo "starting ${i}th run"
+  TWO_PHASE_ARG=""
+  # every other run will be two_phases
+  [ $(($i % 2)) -eq 0 ] && TWO_PHASE_ARG="-two_phases"
 
-echo "2nd run of client - stdout/err direct"
-time $WDTCMD -directory $DIR/src -destination $REMOTE |& tee $DIR/client2.log
+  /usr/bin/time -f "$CLIENT_PROFILE_FORMAT" $WDTCMD -directory $DIR/src \
+  -destination $REMOTE $TWO_PHASE_ARG |& tee $DIR/client$i.log
+  THROUGHPUT=`awk 'match($0, /.*Total sender throughput = ([0-9.]+)/, res) \
+  {print res[1]} END {}' $DIR/client$i.log`
+  echo "THROUGHPUT $THROUGHPUT"
+  TRANSFER_TIME=`awk 'match($0, /.*Total sender time = ([0-9.]+)/, res) \
+  {print res[1]} END {}' $DIR/client$i.log`
+  echo "TRANSFER_TIME $TRANSFER_TIME"
+done
 
-echo "3nd run of client with 2 phases"
-time  $WDTCMD -directory $DIR/src -destination $REMOTE -two_phases |& tee $DIR/client3.log
-echo "4th run of client with 2 phases"
-time  $WDTCMD -directory $DIR/src -destination $REMOTE -two_phases |& tee $DIR/client4.log
-
-echo "Making the server end gracefully"
-echo -n "e" | nc $REMOTE 22356
+echo -n e | nc $REMOTE 22356
 
 echo "Server logs:"
 cat $DIR/server.log
