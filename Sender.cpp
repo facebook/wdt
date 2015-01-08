@@ -215,7 +215,7 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
   const auto &options = WdtOptions::get();
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket = makeSocket(destHost, port);
-  for (int i = 1; i < options.maxRetries_; ++i) {
+  for (int i = 1; i <= options.maxRetries_; ++i) {
     ++connectAttempts;
     errCode = socket->connect();
     if (errCode == OK) {
@@ -223,20 +223,19 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
     } else if (errCode == CONN_ERROR) {
       return nullptr;
     }
-    VLOG(1) << "Sleeping after failed attempt " << i;
-    usleep(options.sleepMillis_ * 1000);
-  }
-  // one more/last try (stays true if it worked above)
-  if (errCode != OK) {
-    ++connectAttempts;
-    if (socket->connect() != OK) {
-      LOG(ERROR) << "Unable to connect despite retries";
-      errCode = CONN_ERROR;
-      return nullptr;
+    if (i != options.maxRetries_) {
+      // sleep between attempts but not after the last
+      VLOG(1) << "Sleeping after failed attempt " << i;
+      usleep(options.sleepMillis_ * 1000);
     }
   }
-  errCode = OK;
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
+  if (errCode != OK) {
+    LOG(ERROR) << "Unable to connect despite " << connectAttempts
+               << " retries in " << elapsedSecsConn << " seconds.";
+    errCode = CONN_ERROR;
+    return nullptr;
+  }
   ((connectAttempts > 1) ? LOG(WARNING) : LOG(INFO))
       << "Connection took " << connectAttempts << " attempt(s) and "
       << elapsedSecsConn << " seconds.";

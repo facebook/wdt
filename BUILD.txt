@@ -1,0 +1,48 @@
+WDT opensource build uses CMake 3.1.x or later
+
+This should build in a variety of environments (if it doesn't please open
+and issue or even better, contribute a patch)
+
+See also README.md Dependencies section
+(Inside facebook see https://our.intern.facebook.com/intern/wiki/WDT/OpenSource)
+
+Notes:
+ On Ubuntu 14.04 - to get g++ 4.9
+ sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+ sudo apt-get upgrade
+If using a vmware image/starting fresh
+ sudo vmware-config-tools.pl  # to setup shared folders
+
+# Get folly
+mkdir deps/; cd deps
+git clone https://github.com/facebook/folly.git
+
+# Getting pre built (this also installs gflags, libunwind and glog-dev)
+sudo apt-get install libgoogle-glog-dev libboost-system-dev \
+     libdouble-conversion-dev # and optionally: libjemalloc-dev
+
+# OR
+
+# If double-conversion isn't available:
+
+git clone https://github.com/floitsch/double-conversion.git
+cd double-conversion; cmake . ; make && sudo make install
+
+
+# Get and install gflags (with correct namespace for glog):
+# TODO: yet we use gflags/gflags.h ...
+git clone https://github.com/schuhschuh/gflags.git
+mkdir gflags/build
+cd gflags/build
+#cmake -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on ..
+cmake -D BUILD_SHARED_LIBS=on ..
+make && sudo make install
+
+# Get and install glog
+svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
+cd glog
+./configure && make && sudo make install
+
+# Macos
+
+# TODO/(see wiki https://our.intern.facebook.com/intern/wiki/Folly/BuildingOnMac )

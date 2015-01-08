@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 # Multiple benchmarks - set DO_VERIFY=0 and
 #
@@ -103,7 +103,10 @@ mkdir $DIR/extsrc
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
 #cp -R wdt folly /usr/share $DIR/src
-cp -R wdt folly /usr/share $DIR/src
+#cp -R wdt folly /usr/share $DIR/src
+# TODO(@uddipta): this doesn't work / fails the _symlinks check !
+#cp -R wdt folly /usr/share/doc $DIR/src
+cp -R wdt folly /usr/lib /usr/lib64 $DIR/src
 # Removing symlinks which point to the same source tree
 for link in `find -L $DIR/src -xtype l`
 do
@@ -144,7 +147,7 @@ echo "done with setup"
 #head -30 wdt/wdtlib.cpp >  $DIR/src/c
 # Can't have both client and server send to stdout in parallel or log lines
 # get mangled/are missing - so we redirect the server one
-$WDTBIN -directory $DIR/dst > $DIR/server.log 2>&1 &
+$WDTBIN -minloglevel=1 -directory $DIR/dst > $DIR/server.log 2>&1 &
 # client now retries connects so no need wait for server to be up
 pidofreceiver=$!
 # Only 1 socket (single threaded send/receive)

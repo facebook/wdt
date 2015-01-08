@@ -106,7 +106,13 @@ void initOptions() {
   options.maxRetries_ = FLAGS_max_retries;
   options.sleepMillis_ = FLAGS_sleep_ms;
 }
+
+DECLARE_bool(logtostderr); // default of standard glog is off - let's set it on
+
+using namespace facebook::wdt;
+
 int main(int argc, char *argv[]) {
+  FLAGS_logtostderr = true;
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   initOptions();
@@ -114,13 +120,18 @@ int main(int argc, char *argv[]) {
             << " and destination=" << FLAGS_destination
             << " num sockets=" << FLAGS_num_sockets
             << " from port=" << FLAGS_port;
-
+  ErrorCode retCode = OK;
   if (FLAGS_destination.empty()) {
-    facebook::wdt::Receiver receiver(FLAGS_port, FLAGS_num_sockets,
-                                     FLAGS_directory);
-    receiver.start();
+    Receiver receiver(FLAGS_port, FLAGS_num_sockets, FLAGS_directory);
+    // TODO fix this
+    auto const &errCodes = receiver.start();
+    for (const auto &errCode : errCodes) {
+      if (errCode != OK) {
+        retCode = errCode;
+      }
+    }
   } else {
-    std::vector<facebook::wdt::FileInfo> fileInfo;
+    std::vector<FileInfo> fileInfo;
     if (FLAGS_files) {
       // Each line should have the filename and optionally
       // the filesize separated by a single space
@@ -136,12 +147,13 @@ int main(int argc, char *argv[]) {
         fileInfo.emplace_back(fields[0], filesize);
       }
     }
-    facebook::wdt::Sender sender(FLAGS_destination, FLAGS_directory);
+    Sender sender(FLAGS_destination, FLAGS_directory);
     sender.setIncludeRegex(FLAGS_include_regex);
     sender.setExcludeRegex(FLAGS_exclude_regex);
     sender.setPruneDirRegex(FLAGS_prune_dir_regex);
     sender.setSrcFileInfo(fileInfo);
-    sender.start();
+    // TODO fix that
+    retCode = sender.start().getSummary().getErrorCode();
   }
-  return 0;
+  return retCode;
 }

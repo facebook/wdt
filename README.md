@@ -49,15 +49,48 @@ but that requires synchronization
 We want things to work with even up to 1 second latency without incurring
 a 1 second delay before we send the first payload byte
 
+## Dependencies
+
+gflags (google flags library) but only for the command line,  the library
+doesn't depend on that
+
+gtest (google testing) but only for tests
+
+glog (google logging library)
+
+Parts of facebook Folly open source library (as set in the CMakefile)
+Mostly conv and threadlocal
+
+You can build and embed wdt as a library with as little as a C++11 compiler and
+glog - and you could macro way glog or replace by printing to stderr if needed
 
 ## Code layout
+
+### Directories
+
+* cmake/
+CMake files additionally to CMakeLists.txt
+
+* deps/
+Dependencies (open source version)
+
+* fbonly/
+Stuff specific to facebook/not open source yet
+
+### Main files
 
 * wdtCmdline.cpp
 
 Main program which allows to have a server or client process to exercise
 the library (for end 2 end test as well as a standalone utility)
 
+* wcp.sh
+
+A script to use wdt like scp for single big files - pending splitting support
+inside wdt proper the script does the splitting for you. install as "wcp".
+
 * WdtOptions.{h|cpp}
+
 To specify the behavior of wdt. If wdt is used as a library, then the
 caller get the mutable object of options and set different options accordingly.
 When wdt is run in a standalone mode, behavior is changed through gflags in

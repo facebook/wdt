@@ -8,6 +8,8 @@
 namespace facebook {
 namespace wdt {
 
+// TODO: make those non copyable (or at least not copied by accident)
+
 /// class representing statistics related to file transfer
 class TransferStats {
  private:
@@ -148,7 +150,7 @@ class TransferReport {
       : transferredSourceStats_(transferredSourceStats),
         failedSourceStats_(failedSourceStats),
         threadStats_(threadStats) {
-    for (auto stats : threadStats) {
+    for (const auto &stats : threadStats) {
       summary_ += stats;
     }
     auto errCode = failedSourceStats_.empty() ? OK : ERROR;

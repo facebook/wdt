@@ -148,7 +148,7 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
       const ssize_t oldOffset = off;
       Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[off++];
       if (cmd == Protocol::EXIT_CMD) {
-        LOG(CRITICAL) << "Got exit command - exiting";
+        LOG(ERROR) << "Got exit command - exiting";
         exit(0);
       }
       if (cmd == Protocol::DONE_CMD) {
