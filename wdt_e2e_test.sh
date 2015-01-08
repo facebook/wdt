@@ -50,6 +50,7 @@ echo "Run from ~/fbcode - or fbmake runtests"
 # to 0 : fast for repeated benchmarking not for correctness
 DO_VERIFY=1
 NC="nc -4" # ipv4 only
+REALPATH=/mnt/vol/engshare/svnroot/tfb/trunk/www/scripts/bin/realpath
 
 # Verbose:
 #WDTBIN="_bin/wdt/wdt -minloglevel 0"
@@ -106,7 +107,7 @@ cp -R wdt folly /usr/share $DIR/src
 # Removing symlinks which point to the same source tree
 for link in `find -L $DIR/src -xtype l`
 do
-  real_path=`realpath $link`;
+  real_path=`$REALPATH $link`;
   if [[ $real_path =~ ^$DIR/src/* ]]
   then
     echo "Removing symlink $link"

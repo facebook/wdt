@@ -52,10 +52,19 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
 std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
   os << report.getSummary();
   if (!report.failedSourceStats_.empty()) {
-    os << "\n"
-       << "Failed files :\n";
-    for (auto sourceStats : report.failedSourceStats_) {
-      os << sourceStats.getId() << "\n";
+    if (report.summary_.getNumFiles() == 0) {
+      os << " All files failed.";
+    } else {
+      os << "\n"
+         << "Failed files :\n";
+      int numOfFilesToPrint =
+          std::min(size_t(10), report.failedSourceStats_.size());
+      for (int i = 0; i < numOfFilesToPrint; i++) {
+        os << report.failedSourceStats_[i].getId() << "\n";
+      }
+      if (numOfFilesToPrint < report.failedSourceStats_.size()) {
+        os << "more...";
+      }
     }
   }
   return os;
