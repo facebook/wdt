@@ -58,7 +58,7 @@ TransferReport::TransferReport(
     : transferredSourceStats_(std::move(transferredSourceStats)),
       failedSourceStats_(std::move(failedSourceStats)),
       threadStats_(std::move(threadStats)) {
-  for (const auto& stats : threadStats) {
+  for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
   auto errCode = failedSourceStats_.empty() ? OK : ERROR;
