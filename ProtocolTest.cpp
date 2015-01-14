@@ -13,7 +13,6 @@ namespace wdt {
 using std::string;
 
 void testProtocol() {
-
   string id("abcdef");
   int64_t size = 3;
 

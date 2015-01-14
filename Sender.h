@@ -25,6 +25,9 @@
 
 #include <chrono>
 #include <memory>
+#include <condition_variable>
+#include <mutex>
+#include <iostream>
 
 namespace facebook {
 namespace wdt {
@@ -32,6 +35,7 @@ namespace wdt {
 class DirectorySourceQueue;
 
 typedef std::chrono::high_resolution_clock Clock;
+typedef void (*ProgressReporter)(const TransferStats &, size_t, size_t, double);
 
 class Sender {
  public:
@@ -41,7 +45,7 @@ class Sender {
   virtual ~Sender() {
   }
 
-  TransferReport start();
+  std::unique_ptr<TransferReport> start();
 
   void setIncludeRegex(const std::string &includeRegex);
 
@@ -56,6 +60,22 @@ class Sender {
   void setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo);
 
   void setFollowSymlinks(const bool followSymlinks);
+
+  /**
+   * @param progressReportIntervalMillis_   interval(ms) between progress
+   *                                        reports. A value of 0 indicates no
+   *                                        progress reporting
+   */
+  void setProgressReportIntervalMillis(const int progressReportIntervalMillis);
+
+  /**
+   * @param progressReporter    progress reporter to be used. By default, wdt
+   *                            uses a progress reporter which shows progress
+   *                            percentage and current throughput. It also
+   *                            visually shows progress. Sample report:
+   *                            [=====>               ] 30% 2500.00 Mbytes/sec
+   */
+  void setProgressReporter(const ProgressReporter &progressReporter);
 
   // Making the following 2 functions public for unit testing. Need to find way
   // to unit test private functions
@@ -84,6 +104,10 @@ class Sender {
       const std::vector<TransferStats> &failedSourceStats,
       const std::vector<TransferStats> &threadStats);
 
+  void reportProgress(Clock::time_point startTime,
+                      std::vector<TransferStats> &threadStats,
+                      DirectorySourceQueue &queue);
+
   std::string destHost_;
   int port_;
   int numSockets_;
@@ -93,6 +117,12 @@ class Sender {
   std::string excludeRegex_;
   std::vector<FileInfo> srcFileInfo_;
   bool followSymlinks_;
+  int progressReportIntervalMillis_;
+  ProgressReporter progressReporter_;
+
+  std::condition_variable conditionFinished_;
+  std::mutex mutex_;
+  bool transferFinished_{false};
 };
 }
 }  // namespace facebook::wdt

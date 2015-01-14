@@ -31,13 +31,44 @@ double durationSeconds(T d) {
 namespace facebook {
 namespace wdt {
 
+/// default progress reporter
+static void progressReporter(const TransferStats &stats,
+                             size_t numDiscoveredSources,
+                             size_t totalDiscoveredSize, double throughput) {
+  int progress = 0;
+  if (totalDiscoveredSize > 0) {
+    progress = stats.getEffectiveDataBytes() * 100 / totalDiscoveredSize;
+  }
+  int scaledProgress = progress / 2;
+  std::cout << '\r';
+  std::cout << '[';
+  for (int i = 0; i < scaledProgress - 1; i++) {
+    std::cout << '=';
+  }
+  if (scaledProgress != 0) {
+    std::cout << (scaledProgress == 50 ? '=' : '>');
+  }
+  for (int i = 0; i < 50 - scaledProgress - 1; i++) {
+    std::cout << ' ';
+  }
+  std::cout << "] " << progress << "% " << std::setprecision(2) << std::fixed
+            << throughput << " Mbytes/sec";
+  if (progress == 100) {
+    // transfer finished
+    std::cout << '\n';
+  }
+  std::cout.flush();
+}
+
 Sender::Sender(int port, int numSockets, const std::string &destHost,
                const std::string &srcDir)
     : Sender(destHost, srcDir) {
   this->port_ = port;
   this->numSockets_ = numSockets;
 }
-Sender::Sender(const std::string &destHost, const std::string &srcDir) {
+
+Sender::Sender(const std::string &destHost, const std::string &srcDir)
+    : progressReporter_(&progressReporter) {
   this->destHost_ = destHost;
   this->srcDir_ = srcDir;
   const auto &options = WdtOptions::get();
@@ -47,6 +78,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   this->includeRegex_ = options.includeRegex_;
   this->excludeRegex_ = options.excludeRegex_;
   this->pruneDirRegex_ = options.pruneDirRegex_;
+  this->progressReportIntervalMillis_ = options.progressReportIntervalMillis_;
 }
 
 void Sender::setIncludeRegex(const std::string &includeRegex) {
@@ -77,7 +109,16 @@ void Sender::setFollowSymlinks(const bool followSymlinks) {
   followSymlinks_ = followSymlinks;
 }
 
-TransferReport Sender::start() {
+void Sender::setProgressReportIntervalMillis(
+    const int progressReportIntervalMillis) {
+  progressReportIntervalMillis_ = progressReportIntervalMillis;
+}
+
+void Sender::setProgressReporter(const ProgressReporter &progressReporter) {
+  progressReporter_ = progressReporter;
+}
+
+std::unique_ptr<TransferReport> Sender::start() {
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.twoPhases_;
   LOG(INFO) << "Client (sending) to " << destHost_ << " port " << port_ << " : "
@@ -90,13 +131,19 @@ TransferReport Sender::start() {
   queue.setFileInfo(srcFileInfo_);
   queue.setFollowSymlinks(followSymlinks_);
   std::thread dirThread = queue.buildQueueAsynchronously();
+  std::thread progressReporterThread;
+  bool progressReportEnabled =
+      progressReporter_ && progressReportIntervalMillis_ > 0;
   double directoryTime;
   if (twoPhases) {
     dirThread.join();
     directoryTime = durationSeconds(Clock::now() - startTime);
   }
   std::vector<std::thread> vt;
-  std::vector<TransferStats> threadStats(numSockets_);
+  std::vector<TransferStats> threadStats;
+  for (int i = 0; i < numSockets_; i++) {
+    threadStats.emplace_back(true);
+  }
   std::vector<std::vector<TransferStats>> sourceStats(numSockets_);
   double avgRateBytesPerSec = options.avgMbytesPerSec_ * kMbToB;
   double peakRateBytesPerSec = options.maxMbytesPerSec_ * kMbToB;
@@ -133,6 +180,11 @@ TransferReport Sender::start() {
                     perThreadPeakRateBytesPerSec, perThreadBucketLimit,
                     std::ref(threadStats[i]), std::ref(sourceStats[i]));
   }
+  if (progressReportEnabled) {
+    std::thread reporterThread(&Sender::reportProgress, this, startTime,
+                               std::ref(threadStats), std::ref(queue));
+    progressReporterThread = std::move(reporterThread);
+  }
   if (!twoPhases) {
     dirThread.join();
     directoryTime = durationSeconds(Clock::now() - startTime);
@@ -140,26 +192,36 @@ TransferReport Sender::start() {
   for (int i = 0; i < numSockets_; i++) {
     vt[i].join();
   }
+  if (progressReportEnabled) {
+    {
+      std::unique_lock<std::mutex> lock(mutex_);
+      transferFinished_ = true;
+      conditionFinished_.notify_all();
+    }
+    progressReporterThread.join();
+  }
 
   std::vector<TransferStats> transferredSourceStats;
   if (WdtOptions::get().fullReporting_) {
-    for (auto stats : sourceStats) {
-      transferredSourceStats.insert(transferredSourceStats.end(), stats.begin(),
-                                    stats.end());
+    for (auto &stats : sourceStats) {
+      transferredSourceStats.insert(transferredSourceStats.end(),
+                                    std::make_move_iterator(stats.begin()),
+                                    std::make_move_iterator(stats.end()));
     }
     validateTransferStats(transferredSourceStats, queue.getFailedSourceStats(),
                           threadStats);
   }
-  TransferReport report(transferredSourceStats, queue.getFailedSourceStats(),
-                        threadStats);
+  std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
+      transferredSourceStats, queue.getFailedSourceStats(), threadStats);
   double totalTime = durationSeconds(Clock::now() - startTime);
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
             << directoryTime << " dirTime)"
-            << ". Transfer summary : " << report
+            << ". Transfer summary : " << *report
             << "\nTotal sender throughput = "
-            << report.getSummary().getEffectiveTotalBytes() / totalTime / kMbToB
-            << " Mbytes/sec (" << report.getSummary().getEffectiveTotalBytes() /
-                                      (totalTime - directoryTime) / kMbToB
+            << report->getSummary().getEffectiveTotalBytes() / totalTime /
+                   kMbToB << " Mbytes/sec ("
+            << report->getSummary().getEffectiveTotalBytes() /
+                   (totalTime - directoryTime) / kMbToB
             << " Mbytes/sec pure transf rate)";
   return report;
 }
@@ -178,19 +240,19 @@ void Sender::validateTransferStats(
   size_t threadDataBytes = 0;
   size_t threadEffectiveDataBytes = 0;
 
-  for (auto stat : transferredSourceStats) {
+  for (const auto &stat : transferredSourceStats) {
     sourceFailedAttempts += stat.getFailedAttempts();
     WDT_CHECK(stat.getNumFiles() == 1);
     sourceDataBytes += stat.getDataBytes();
     sourceEffectiveDataBytes += stat.getEffectiveDataBytes();
   }
-  for (auto stat : failedSourceStats) {
+  for (const auto &stat : failedSourceStats) {
     sourceFailedAttempts += stat.getFailedAttempts();
     WDT_CHECK(stat.getNumFiles() == 0);
     sourceDataBytes += stat.getDataBytes();
     sourceEffectiveDataBytes += stat.getEffectiveDataBytes();
   }
-  for (auto stat : threadStats) {
+  for (const auto &stat : threadStats) {
     threadFailedAttempts += stat.getFailedAttempts();
     threadNumFiles += stat.getNumFiles();
     threadDataBytes += stat.getDataBytes();
@@ -290,13 +352,16 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     if (options.ignoreOpenErrors_ && source->hasError()) {
       continue;
     }
-    auto transferStats = sendOneByteSource(
-        socket, throttler, source, doThrottling, threadStats.getTotalBytes());
+    TransferStats transferStats;
+    size_t totalBytes = threadStats.getTotalBytes();
+    transferStats =
+        sendOneByteSource(socket, throttler, source, doThrottling, totalBytes);
     threadStats += transferStats;
     source->addTransferStats(transferStats);
     if (transferStats.getErrorCode() == OK) {
       if (options.fullReporting_) {
-        transferredFileStats.emplace_back(source->getTransferStats());
+        transferredFileStats.emplace_back(
+            std::move(source->getTransferStats()));
       }
     } else {
       queue.returnToQueue(source);
@@ -333,8 +398,9 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   }
   numRead = socket->read(headerBuf, Protocol::kMaxHeader);
   if (numRead != 0) {
-    LOG(ERROR) << "EOF not found when expected " << numRead << ":"
-               << folly::humanify(std::string(headerBuf, numRead));
+    LOG(ERROR) << "EOF not found when expected " << (numRead < 0)
+        ? "-1"
+        : folly::humanify(std::string(headerBuf, numRead));
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return;
   }
@@ -431,6 +497,39 @@ TransferStats Sender::sendOneByteSource(
   stats.incrNumFiles();
   stats.addEffectiveBytes(stats.getHeaderBytes(), stats.getDataBytes());
   return stats;
+}
+
+void Sender::reportProgress(Clock::time_point startTime,
+                            std::vector<TransferStats> &threadStats,
+                            DirectorySourceQueue &queue) {
+  WDT_CHECK(progressReportIntervalMillis_ > 0);
+  auto waitingTime = std::chrono::milliseconds(progressReportIntervalMillis_);
+  bool done = false;
+  do {
+    {
+      std::unique_lock<std::mutex> lock(mutex_);
+      conditionFinished_.wait_for(lock, waitingTime);
+      done = transferFinished_;
+    }
+    if (!queue.fileDiscoveryFinished()) {
+      continue;
+    }
+    TransferStats stats;
+    for (int index = 0; index < threadStats.size(); index++) {
+      stats += threadStats[index];
+    }
+    auto pair = queue.getCountAndSize();
+    double totalTime = durationSeconds(Clock::now() - startTime);
+    double throughput = stats.getEffectiveTotalBytes() / totalTime / kMbToB;
+    (*progressReporter_)(stats, pair.first, pair.second, throughput);
+    if (stats.getEffectiveDataBytes() == pair.second) {
+      // transfer finished. this check is needed to ensure progress report
+      // callback does not get called with 100% done multiple time. In our
+      // default implementation of progress reporter, we print a newline after
+      // transfer completion.
+      done = true;
+    }
+  } while (!done);
 }
 }
 }  // namespace facebook::wdt

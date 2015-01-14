@@ -82,8 +82,12 @@ class MockDirectorySourceQueue : public DirectorySourceQueue {
 };
 
 class MockSender : public Sender {
+ private:
+  TransferStats stats_;
+
  public:
-  MockSender() : Sender("localhost", "22000") {
+  explicit MockSender(TransferStats &stats)
+      : Sender("localhost", "22000"), stats_(std::move(stats)) {
   }
 
   MOCK_METHOD0(makeSocket_, ClientSocket *(void));
@@ -93,11 +97,14 @@ class MockSender : public Sender {
     return unique_ptr<ClientSocket>(makeSocket_());
   }
 
-  MOCK_METHOD5(sendOneByteSource,
-               TransferStats(const unique_ptr<ClientSocket> &,
-                             const unique_ptr<Throttler> &,
-                             const unique_ptr<ByteSource> &, const bool,
-                             const size_t));
+  TransferStats sendOneByteSource(const std::unique_ptr<ClientSocket> &socket,
+                                  const std::unique_ptr<Throttler> &throttler,
+                                  const std::unique_ptr<ByteSource> &source,
+                                  const bool doThrottling,
+                                  const size_t totalBytes) {
+    return std::move(stats_);
+  }
+
   void sendOneSimple(DirectorySourceQueue &queue, TransferStats &stat) {
     vector<TransferStats> v;
     sendOne(Clock::now(), "localhost", 220000, queue, 0, 0, 0, stat, v);
@@ -107,7 +114,8 @@ class MockSender : public Sender {
 TEST(SendOne, ConnectionError) {
   MockClientSocket *socket = new MockClientSocket;
   MockDirectorySourceQueue queue;
-  MockSender sender;
+  TransferStats mockStats;
+  MockSender sender(mockStats);
 
   {
     InSequence s;
@@ -134,19 +142,17 @@ TEST(SendOne, ByteSourceSendError1) {
   MockClientSocket *socket = new MockClientSocket;
   MockDirectorySourceQueue queue;
   MockByteSource *source = new MockByteSource;
-  MockSender sender;
+  TransferStats mockStats;
+  mockStats.addHeaderBytes(2);
+  mockStats.addDataBytes(3);
+  mockStats.setErrorCode(BYTE_SOURCE_READ_ERROR);
+  MockSender sender(mockStats);
 
   {
     InSequence s;
     EXPECT_CALL(sender, makeSocket_()).WillOnce(Return(socket));
     EXPECT_CALL(*socket, connect()).WillOnce(Return(OK));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(source));
-    TransferStats stats;
-    stats.addHeaderBytes(2);
-    stats.addDataBytes(3);
-    stats.setErrorCode(BYTE_SOURCE_READ_ERROR);
-    EXPECT_CALL(sender, sendOneByteSource(_, _, _, _, _))
-        .WillOnce(Return(stats));
     EXPECT_CALL(queue, returnToQueue(_));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(nullptr));
     EXPECT_CALL(*socket, write(_, 1)).WillOnce(Return(1));
@@ -171,22 +177,19 @@ TEST(SendOne, Success) {
   MockClientSocket *socket = new MockClientSocket;
   MockDirectorySourceQueue queue;
   MockByteSource *source = new MockByteSource;
-  MockSender sender;
+  TransferStats mockStats;
+  mockStats.addHeaderBytes(3);
+  mockStats.addDataBytes(7);
+  mockStats.addEffectiveBytes(3, 7);
+  mockStats.setErrorCode(OK);
+  mockStats.incrNumFiles();
+  MockSender sender(mockStats);
 
   {
     InSequence s;
     EXPECT_CALL(sender, makeSocket_()).WillOnce(Return(socket));
     EXPECT_CALL(*socket, connect()).Times(1).WillRepeatedly(Return(OK));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(source));
-    TransferStats stats;
-    stats.addHeaderBytes(3);
-    stats.addDataBytes(7);
-    stats.addEffectiveBytes(3, 7);
-    stats.setErrorCode(OK);
-    stats.incrNumFiles();
-
-    EXPECT_CALL(sender, sendOneByteSource(_, _, _, _, _))
-        .WillOnce(Return(stats));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(nullptr));
     EXPECT_CALL(*socket, write(_, 1)).WillOnce(Return(1));
     EXPECT_CALL(*socket, read(_, 1))

@@ -86,7 +86,7 @@ while getopts ":t:a:p:s:d:h:" opt; do
 done
 printf "(Sockets,Average rate, Max_rate, Save local?, Delay)=%s,%s,%s,%s,%s\n" "$threads" "$avg_rate" "$max_rate" "$keeplog" "$delay"
 #WDTBIN_OPTS="-buffer_size=$BS -num_sockets=8 -minloglevel 2 -sleep_ms 1 -max_retries 999"
-WDTBIN_OPTS="-minloglevel=0 -sleep_ms 1 -max_retries 999 -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200"
+WDTBIN_OPTS="-minloglevel=0 -sleep_ms 1 -max_retries 999 -full_reporting -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/tmpWDT
@@ -102,11 +102,8 @@ mkdir $DIR/extsrc
 
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
-#cp -R wdt folly /usr/share $DIR/src
-#cp -R wdt folly /usr/share $DIR/src
-# TODO(@uddipta): this doesn't work / fails the _symlinks check !
-#cp -R wdt folly /usr/share/doc $DIR/src
-cp -R wdt folly /usr/lib /usr/lib64 $DIR/src
+cp -R wdt folly /usr/share $DIR/src
+#cp -R wdt folly $DIR/src
 # Removing symlinks which point to the same source tree
 for link in `find -L $DIR/src -xtype l`
 do

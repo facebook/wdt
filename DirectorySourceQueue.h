@@ -68,12 +68,17 @@ class DirectorySourceQueue : public SourceQueue {
   /// @return true iff all regular files under root dir have been consumed
   bool finished() const override;
 
+  /// @return true if all the files have been discovered, false otherwise
+  bool fileDiscoveryFinished() const;
+
   /// @return next FileByteSource to consume or nullptr when finished
   virtual std::unique_ptr<ByteSource> getNextSource() override;
 
-  size_t count() const override {
-    return numEntries_;
-  }
+  /**
+   * @return          total number and total size in bytes of sources
+   *                  enqueued/processed through the queue
+   */
+  virtual std::pair<size_t, size_t> getCountAndSize() const override;
 
   /**
    * Sets regex represnting files to include for transfer
@@ -132,7 +137,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @return                      stats for failed sources
    */
-  const std::vector<TransferStats> &getFailedSourceStats();
+  std::vector<TransferStats> &getFailedSourceStats();
 
   virtual ~DirectorySourceQueue() {
   }
@@ -224,6 +229,9 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// Total number of entries/files that have passed through the queue
   size_t numEntries_{0};
+
+  /// Total size of entries/files that have passed through the queue
+  size_t totalFileSize_{0};
 
   /// Whether to follow symlinks or not
   bool followSymlinks_{false};

@@ -62,8 +62,11 @@ class FileByteSource : public ByteSource {
   /// open the source for reading
   virtual void open();
 
-  /// @return transfer stats for the source
-  virtual const TransferStats &getTransferStats() const {
+  /**
+   * @return transfer stats for the source. If the stats is moved by the
+   *         caller, then this function can not be called again
+   */
+  virtual TransferStats &getTransferStats() {
     return transferStats_;
   }
 

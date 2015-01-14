@@ -43,8 +43,11 @@ class ByteSource {
   /// open the source for reading
   virtual void open() = 0;
 
-  /// @return transfer stats for the source
-  virtual const TransferStats &getTransferStats() const = 0;
+  /**
+   * @return transfer stats for the source. If the stats is moved by the
+   *         caller, then this function can not be called again
+   */
+  virtual TransferStats &getTransferStats() = 0;
 
   /// @param stats    Stats to be added
   virtual void addTransferStats(const TransferStats &stats) = 0;

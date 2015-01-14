@@ -5,6 +5,9 @@
 #include <vector>
 #include <string>
 
+#include <folly/RWSpinLock.h>
+#include <folly/Memory.h>
+
 namespace facebook {
 namespace wdt {
 
@@ -34,19 +37,37 @@ class TransferStats {
   /// id of the owner object
   std::string id_;
 
+  /// mutex to support synchronized access
+  std::unique_ptr<folly::RWSpinLock> mutex_{nullptr};
+
  public:
+  // making the object noncopyable
+  TransferStats(const TransferStats &stats) = delete;
+  TransferStats &operator=(const TransferStats &stats) = delete;
+  TransferStats(TransferStats &&stats) = default;
+  TransferStats &operator=(TransferStats &&stats) = default;
+
+  explicit TransferStats(bool isLocked = false) {
+    if (isLocked) {
+      mutex_ = folly::make_unique<folly::RWSpinLock>();
+    }
+  }
+
   /// @return number of header bytes transferred
   size_t getHeaderBytes() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return headerBytes_;
   }
 
   /// @return number of data bytes transferred
   size_t getDataBytes() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return dataBytes_;
   }
 
   /// @return number of total bytes transferred
   size_t getTotalBytes() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return headerBytes_ + dataBytes_;
   }
 
@@ -55,6 +76,7 @@ class TransferStats {
    *            transfer
    */
   size_t getEffectiveHeaderBytes() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return effectiveHeaderBytes_;
   }
 
@@ -63,6 +85,7 @@ class TransferStats {
    *            transfer
    */
   size_t getEffectiveDataBytes() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return effectiveDataBytes_;
   }
 
@@ -71,55 +94,66 @@ class TransferStats {
    *            transfer
    */
   size_t getEffectiveTotalBytes() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return effectiveHeaderBytes_ + effectiveDataBytes_;
   }
 
   /// @return number of files successfully transferred
   size_t getNumFiles() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return numFiles_;
   }
 
   /// @return number of failed transfers
   size_t getFailedAttempts() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return failedAttempts_;
   }
 
   /// @return status of the transfer
   ErrorCode getErrorCode() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return errCode_;
   }
 
   const std::string &getId() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return id_;
   }
 
   /// @param number of additional data bytes transferred
   void addDataBytes(size_t count) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
     dataBytes_ += count;
   }
 
   /// @param number of additional header bytes transferred
   void addHeaderBytes(size_t count) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
     headerBytes_ += count;
   }
 
   /// one more file transfer failed
   void incrFailedAttempts() {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
     failedAttempts_++;
   }
 
   /// @param status of the transfer
   void setErrorCode(ErrorCode errCode) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
     errCode_ = errCode;
   }
 
   /// @param id of the corresponding entity
   void setId(const std::string &id) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
     id_ = id;
   }
 
   /// one more file successfully transferred
   void incrNumFiles() {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
     numFiles_++;
   }
 
@@ -130,6 +164,7 @@ class TransferStats {
    *                    transfer
    */
   void addEffectiveBytes(size_t headerBytes, size_t dataBytes) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
     effectiveHeaderBytes_ += headerBytes;
     effectiveDataBytes_ += dataBytes;
   }
@@ -144,19 +179,9 @@ class TransferStats {
  */
 class TransferReport {
  public:
-  TransferReport(const std::vector<TransferStats> &transferredSourceStats,
-                 const std::vector<TransferStats> &failedSourceStats,
-                 const std::vector<TransferStats> &threadStats)
-      : transferredSourceStats_(transferredSourceStats),
-        failedSourceStats_(failedSourceStats),
-        threadStats_(threadStats) {
-    for (const auto &stats : threadStats) {
-      summary_ += stats;
-    }
-    auto errCode = failedSourceStats_.empty() ? OK : ERROR;
-    // Global status depends on failed files, not thread statuses
-    summary_.setErrorCode(errCode);
-  }
+  TransferReport(std::vector<TransferStats> &transferredSourceStats,
+                 std::vector<TransferStats> &failedSourceStats,
+                 std::vector<TransferStats> &threadStats);
   /// @return   summary of the report
   const TransferStats &getSummary() const {
     return summary_;

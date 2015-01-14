@@ -60,6 +60,10 @@ DEFINE_int64(peak_log_time_ms, 0,
              "rate of transfer. Specify the time interval (ms) for "
              "the measure of instance");
 
+DEFINE_int32(progress_report_interval_ms, 20,
+             "Interval(ms) between progress reports. If the value is 0, no "
+             "progress reporting is done");
+
 // Regex Flags
 DEFINE_string(include_regex, "",
               "Regular expression representing files to include for transfer, "
@@ -80,6 +84,9 @@ DEFINE_bool(files, false,
 DEFINE_string(
     destination, "",
     "empty is server (destination) mode, non empty is destination host");
+DEFINE_bool(full_reporting, false,
+            "If true, transfer stats for successfully transferred files are "
+            "included in the report");
 
 void initOptions() {
   auto &options = facebook::wdt::WdtOptions::getMutable();
@@ -100,6 +107,8 @@ void initOptions() {
   options.ignoreOpenErrors_ = FLAGS_ignore_open_errors;
   options.twoPhases_ = FLAGS_two_phases;
   options.followSymlinks_ = FLAGS_follow_symlinks;
+  options.fullReporting_ = FLAGS_full_reporting;
+  options.progressReportIntervalMillis_ = FLAGS_progress_report_interval_ms;
 
   options.backlog_ = FLAGS_backlog;
   options.bufferSize_ = FLAGS_buffer_size;
@@ -107,7 +116,7 @@ void initOptions() {
   options.sleepMillis_ = FLAGS_sleep_ms;
 }
 
-DECLARE_bool(logtostderr); // default of standard glog is off - let's set it on
+DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 
 using namespace facebook::wdt;
 
@@ -153,7 +162,7 @@ int main(int argc, char *argv[]) {
     sender.setPruneDirRegex(FLAGS_prune_dir_regex);
     sender.setSrcFileInfo(fileInfo);
     // TODO fix that
-    retCode = sender.start().getSummary().getErrorCode();
+    retCode = sender.start()->getSummary().getErrorCode();
   }
   return retCode;
 }

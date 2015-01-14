@@ -34,8 +34,7 @@ bool Protocol::decode(char *src, size_t &off, size_t max, std::string &id,
   br.advance(idLen);
   try {
     size = folly::decodeVarint(br);
-  }
-  catch (const std::exception &ex) {
+  } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }

@@ -129,6 +129,11 @@ class WdtOptions {
    * True if full reporting is enabled. False otherwise
    */
   bool fullReporting_;
+
+  /**
+   * IntervalMillis(in milliseconds) between progress reports
+   */
+  int progressReportIntervalMillis_;
   /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted
@@ -154,6 +159,7 @@ class WdtOptions {
     backlog_ = 1;
     maxTransferRetries_ = 3;
     fullReporting_ = false;
+    progressReportIntervalMillis_ = 0;
 
     throttlerLogTimeMillis_ = 0;
     avgMbytesPerSec_ = -1;

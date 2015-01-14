@@ -244,7 +244,7 @@ void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
   if (retries >= options_.maxTransferRetries_) {
     LOG(ERROR) << source->getIdentifier() << " failed after " << retries
                << " number of tries.";
-    failedSourceStats_.emplace_back(source->getTransferStats());
+    failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
   } else {
     sourceQueue_.push(std::move(source));
   }
@@ -257,11 +257,13 @@ void DirectorySourceQueue::createIntoQueue(const std::string &relativePath,
   std::lock_guard<std::mutex> lock(mutex_);
   sourceQueue_.push(std::move(source));
   numEntries_++;
+  totalFileSize_ += fileSize;
 }
 
-const std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
+std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
   while (!sourceQueue_.empty()) {
-    failedSourceStats_.emplace_back(sourceQueue_.top()->getTransferStats());
+    failedSourceStats_.emplace_back(
+        std::move(sourceQueue_.top()->getTransferStats()));
     sourceQueue_.pop();
   }
   return failedSourceStats_;
@@ -290,6 +292,16 @@ bool DirectorySourceQueue::enqueueFiles() {
 bool DirectorySourceQueue::finished() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return initFinished_ && sourceQueue_.empty();
+}
+
+std::pair<size_t, size_t> DirectorySourceQueue::getCountAndSize() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return std::make_pair(numEntries_, totalFileSize_);
+}
+
+bool DirectorySourceQueue::fileDiscoveryFinished() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return initFinished_;
 }
 
 std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource() {
