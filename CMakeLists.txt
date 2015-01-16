@@ -141,31 +141,31 @@ include(ExternalProject)
 # )
 
 
-# GTest
-set(GTEST_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/gtest")
+# GMock
+set(GMOCK_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/gmock")
 externalproject_add(
-  gtest
-  SVN_REPOSITORY https://googletest.googlecode.com/svn/trunk/
+  gmock
+  SVN_REPOSITORY https://googlemock.googlecode.com/svn/trunk/
   INSTALL_COMMAND "" # Disable install step
   UPDATE_COMMAND "" # Doesn't change often
-  PREFIX "${GTEST_PREFIX}"
+  PREFIX "${GMOCK_PREFIX}"
   LOG_DOWNLOAD ON
   LOG_CONFIGURE ON
   LOG_BUILD ON
 )
 
 # Specify include dir
-externalproject_get_property(gtest SOURCE_DIR)
-include_directories(${SOURCE_DIR}/include)
+externalproject_get_property(gmock SOURCE_DIR)
+include_directories(${SOURCE_DIR}/include ${SOURCE_DIR}/gtest/include)
 
 enable_testing()
 
+externalproject_get_property(gmock BINARY_DIR)
+
 add_executable(protocol_test ProtocolTest.cpp)
-externalproject_get_property(gtest BINARY_DIR)
-target_link_libraries(protocol_test wdtlib ${BINARY_DIR}/libgtest.a)
+target_link_libraries(protocol_test wdtlib ${BINARY_DIR}/libgmock.a)
 add_test(AllTestsInProtocolTest protocol_test)
 
-# Needs gmock for this... to be fixed
-#add_executable(sender_test SenderTest.cpp)
-#target_link_libraries(sender_test wdtlib ${BINARY_DIR}/libgtest.a)
-#add_test(AllTestsInSenderTest sender_test)
+add_executable(sender_test SenderTest.cpp)
+target_link_libraries(sender_test wdtlib ${BINARY_DIR}/libgmock.a)
+add_test(AllTestsInSenderTest sender_test)
