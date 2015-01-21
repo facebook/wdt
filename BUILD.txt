@@ -13,11 +13,19 @@ Notes:
 If using a vmware image/starting fresh
  sudo vmware-config-tools.pl  # to setup shared folders
 
+# Cmake 3.1 or later
+
+wget http://www.cmake.org/files/v3.1/cmake-3.1.0.tar.gz
+tar xvfz cmake-3.1.0.tar.gz
+cd cmake-3.1.0
+./bootstrap --prefix=/usr --parallel=16 && make && sudo make install
+
 # Get folly
 mkdir deps/; cd deps
 git clone https://github.com/facebook/folly.git
 
-# Getting pre built (this also installs gflags, libunwind and glog-dev)
+# Getting pre built dependencies: glog-dev (which adds gflags, libunwind)
+# boost system, double conversion
 sudo apt-get install libgoogle-glog-dev libboost-system-dev \
      libdouble-conversion-dev # and optionally: libjemalloc-dev
 
@@ -29,20 +37,70 @@ git clone https://github.com/floitsch/double-conversion.git
 cd double-conversion; cmake . ; make && sudo make install
 
 
-# Get and install gflags (with correct namespace for glog):
-# TODO: yet we use gflags/gflags.h ...
+# Get and install gflags and glog - it's important to build and configure
+# gflags correctly for glog to pick it up and avoid linking errors later
+# or getting a wdt without flags working
 git clone https://github.com/schuhschuh/gflags.git
 mkdir gflags/build
 cd gflags/build
-#cmake -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on ..
-cmake -D BUILD_SHARED_LIBS=on ..
+cmake -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on ..
 make && sudo make install
-
-# Get and install glog
+# Glog
 svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 cd glog
 ./configure && make && sudo make install
 
+
+# And finally Build wdt itself:
+cmake pathtowdtsrcdir -DBUILD_TESTING=on  # skip -D... if you don't want tests
+make -j
+make test
+sudo make install
+
 # Macos
 
-# TODO/(see wiki https://our.intern.facebook.com/intern/wiki/Folly/BuildingOnMac )
+Install Xcode 6 and the command line tools (so
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
+exists)
+
+## cmake
+# Until the fix gets to cmake (3.1.1 ? 3.2) we need the latest on a Mac to
+# get CXX 11 support: ( http://www.cmake.org/Bug/view.php?id=15355 )
+
+git clone http://cmake.org/cmake.git
+cd cmake
+./bootstrap --prefix=/usr --parallel=16
+make -j && sudo make install
+
+## Get homebrew at http://brew.sh/
+
+### Glog and gflags and boost
+brew update
+brew install glog gflags boost
+## Double conversion
+git clone https://github.com/floitsch/double-conversion.git
+cd double-conversion; cmake . ; make && sudo make install
+
+### Get folly source tree
+As above
+
+## finally build wdt itself:
+mkdir wdt_mac
+cd wdt_mac
+# For Xcode:
+cmake pathtosrccode -G Xcode -DBUILD_TESTING=on
+# Using unix makefiles
+cmake pathtosrccode -G "Unix Makefiles" -DBUILD_TESTING=on
+make -j
+make test
+sudo make install
+# For Eclipse CDT
+cmake ../wdt -G "Eclipse CDT4 - Unix Makefiles" -DBUILD_TESTING=on
+# follow instruction to import the project like on
+# http://www.cmake.org/Wiki/Eclipse_CDT4_Generator
+
+
+# Troubleshooting
+
+You may get certificate errors getting gmock and need to permanently
+accept the certificate from the commandline

@@ -51,10 +51,12 @@ a 1 second delay before we send the first payload byte
 
 ## Dependencies
 
+CMake for building WDT - See BUILD.txt
+
 gflags (google flags library) but only for the command line,  the library
 doesn't depend on that
 
-gtest (google testing) but only for tests
+gmock and gtest (google testing) but only for tests
 
 glog (google logging library)
 
@@ -68,16 +70,21 @@ glog - and you could macro way glog or replace by printing to stderr if needed
 
 ### Directories
 
-* cmake/
-CMake files additionally to CMakeLists.txt
-
 * deps/
 Dependencies (open source version)
 
 * fbonly/
-Stuff specific to facebook/not open source yet
+Stuff specific to facebook/ (not in open source version)
+
+* bench/
+Benchmark generation tools
+
 
 ### Main files
+
+* CMakeLists.txt, BUILD.txt
+Build definition file - use CMake to generate a Makefile or a project file for
+your favorite IDE - details in BUILD.txt
 
 * wdtCmdline.cpp
 
