@@ -38,7 +38,6 @@ class Receiver {
   void receiveOne(int port, int backlog, const std::string &destDir,
                   size_t bufferSize, ErrorCode &errCode);
 
- private:
   int port_;
   int numSockets_;
   std::string destDir_;

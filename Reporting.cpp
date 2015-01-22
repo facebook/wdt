@@ -4,6 +4,8 @@
 namespace facebook {
 namespace wdt {
 
+const static size_t kMaxEntriesToPrint = 10;
+
 TransferStats& TransferStats::operator+=(const TransferStats& stats) {
   folly::RWSpinLock::WriteHolder writeLock(mutex_.get());
   folly::RWSpinLock::ReadHolder readLock(stats.mutex_.get());
@@ -54,14 +56,19 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
 TransferReport::TransferReport(
     std::vector<TransferStats>& transferredSourceStats,
     std::vector<TransferStats>& failedSourceStats,
-    std::vector<TransferStats>& threadStats)
+    std::vector<TransferStats>& threadStats,
+    std::vector<std::string>& failedDirectories)
     : transferredSourceStats_(std::move(transferredSourceStats)),
       failedSourceStats_(std::move(failedSourceStats)),
-      threadStats_(std::move(threadStats)) {
+      threadStats_(std::move(threadStats)),
+      failedDirectories_(std::move(failedDirectories)) {
   for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
-  auto errCode = failedSourceStats_.empty() ? OK : ERROR;
+  ErrorCode errCode = OK;
+  if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
+    errCode = ERROR;
+  }
   // Global status depends on failed files, not thread statuses
   summary_.setErrorCode(errCode);
 }
@@ -75,13 +82,28 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
       os << "\n"
          << "Failed files :\n";
       int numOfFilesToPrint =
-          std::min(size_t(10), report.failedSourceStats_.size());
+          std::min(kMaxEntriesToPrint, report.failedSourceStats_.size());
       for (int i = 0; i < numOfFilesToPrint; i++) {
         os << report.failedSourceStats_[i].getId() << "\n";
       }
       if (numOfFilesToPrint < report.failedSourceStats_.size()) {
-        os << "more...";
+        os << "more...(" << report.failedSourceStats_.size() - numOfFilesToPrint
+           << " files)";
       }
+    }
+  }
+  if (!report.failedDirectories_.empty()) {
+    os << "\n"
+       << "Failed directories :\n";
+    int numOfDirToPrint =
+        std::min(kMaxEntriesToPrint, report.failedDirectories_.size());
+    for (int i = 0; i < numOfDirToPrint; i++) {
+      os << report.failedDirectories_[i] << "\n";
+    }
+    if (numOfDirToPrint < report.failedDirectories_.size()) {
+      os << "more...(" << report.failedDirectories_.size() - numOfDirToPrint
+         << " directories)";
+      ;
     }
   }
   return os;

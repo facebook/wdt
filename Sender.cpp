@@ -19,6 +19,7 @@ const double kMbToB = 1024 * 1024;
 const double kPeakMultiplier = 1.2;
 const int kBucketMultiplier = 2;
 const double kTimeMultiplier = 0.25;
+
 namespace {
 
 template <typename T>
@@ -212,7 +213,8 @@ std::unique_ptr<TransferReport> Sender::start() {
                           threadStats);
   }
   std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
-      transferredSourceStats, queue.getFailedSourceStats(), threadStats);
+      transferredSourceStats, queue.getFailedSourceStats(), threadStats,
+      queue.getFailedDirectories());
   double totalTime = durationSeconds(Clock::now() - startTime);
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
             << directoryTime << " dirTime)"
@@ -274,9 +276,10 @@ std::unique_ptr<ClientSocket> Sender::makeSocket(const std::string &destHost,
 std::unique_ptr<ClientSocket> Sender::connectToReceiver(
     const std::string &destHost, const int port, ErrorCode &errCode,
     Clock::time_point startTime) {
-  const auto &options = WdtOptions::get();
+  const WdtOptions &options = WdtOptions::get();
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket = makeSocket(destHost, port);
+  double retryInterval = options.sleepMillis_;
   for (int i = 1; i <= options.maxRetries_; ++i) {
     ++connectAttempts;
     errCode = socket->connect();
@@ -288,7 +291,8 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
     if (i != options.maxRetries_) {
       // sleep between attempts but not after the last
       VLOG(1) << "Sleeping after failed attempt " << i;
-      usleep(options.sleepMillis_ * 1000);
+      usleep(retryInterval * 1000);
+      retryInterval *= options.retryIntervalMultFactor_;
     }
   }
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
@@ -348,16 +352,14 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     if (!source) {
       break;
     }
-    source->open();
-    if (options.ignoreOpenErrors_ && source->hasError()) {
-      continue;
-    }
+    WDT_CHECK(!source->hasError());
     TransferStats transferStats;
     size_t totalBytes = threadStats.getTotalBytes();
     transferStats =
         sendOneByteSource(socket, throttler, source, doThrottling, totalBytes);
     threadStats += transferStats;
     source->addTransferStats(transferStats);
+    source->close();
     if (transferStats.getErrorCode() == OK) {
       if (options.fullReporting_) {
         transferredFileStats.emplace_back(
@@ -365,12 +367,11 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
       }
     } else {
       queue.returnToQueue(source);
-      if (transferStats.getErrorCode() == SOCKET_WRITE_ERROR) {
-        socket = connectToReceiver(destHost, port, code, Clock::now());
-        if (code != OK) {
-          threadStats.setErrorCode(code);
-          return;
-        }
+      socket->close();
+      socket = connectToReceiver(destHost, port, code, Clock::now());
+      if (code != OK) {
+        threadStats.setErrorCode(code);
+        return;
       }
     }
   }
@@ -428,7 +429,9 @@ TransferStats Sender::sendOneByteSource(
                    source->getIdentifier(), expectedSize);
   ssize_t written = socket->write(headerBuf, off);
   if (written != off) {
-    LOG(ERROR) << "Write error/mismatch " << written << " " << off;
+    PLOG(ERROR) << "Write error/mismatch " << written << " " << off
+                << ". fd = " << socket->getFd()
+                << ". port = " << socket->getPort();
     stats.setErrorCode(SOCKET_WRITE_ERROR);
     stats.incrFailedAttempts();
     return stats;
@@ -462,7 +465,9 @@ TransferStats Sender::sendOneByteSource(
       ssize_t w = socket->write(buffer + written, size - written);
       if (w < 0) {
         // TODO: retries, close connection etc...
-        LOG(ERROR) << "Write error " << written << " (" << size << ")";
+        PLOG(ERROR) << "Write error " << written << " (" << size << ")"
+                    << ". fd = " << socket->getFd()
+                    << ". port = " << socket->getPort();
         stats.setErrorCode(SOCKET_WRITE_ERROR);
         stats.incrFailedAttempts();
         return stats;

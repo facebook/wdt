@@ -3,6 +3,7 @@
 #include "WdtOptions.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
+
 namespace facebook {
 namespace wdt {
 
@@ -48,8 +49,7 @@ ErrorCode ClientSocket::connect() {
     if (::connect(fd_, info->ai_addr, info->ai_addrlen)) {
       PLOG(INFO) << "Error connecting on "
                  << ServerSocket::getNameInfo(info->ai_addr, info->ai_addrlen);
-      close(fd_);
-      fd_ = -1;
+      this->close();
       continue;
     }
     VLOG(1) << "Successful connect on " << fd_;
@@ -73,6 +73,10 @@ int ClientSocket::getFd() const {
   return fd_;
 }
 
+std::string ClientSocket::getPort() const {
+  return port_;
+}
+
 int ClientSocket::read(char *buf, int nbyte) const {
   return ::read(fd_, buf, nbyte);
 }
@@ -81,10 +85,24 @@ int ClientSocket::write(char *buf, int nbyte) const {
   return ::write(fd_, buf, nbyte);
 }
 
+void ClientSocket::close() {
+  if (fd_ >= 0) {
+    VLOG(1) << "Closing socket : " << fd_;
+    if (::close(fd_) < 0) {
+      VLOG(1) << "Socket close failed for fd " << fd_;
+    }
+    fd_ = -1;
+  }
+}
+
 void ClientSocket::shutdown() const {
   if (::shutdown(fd_, SHUT_WR) < 0) {
     VLOG(1) << "Socket shutdown failed for fd " << fd_;
   }
+}
+
+ClientSocket::~ClientSocket() {
+  this->close();
 }
 }
 }  // end namespace facebook::wtd

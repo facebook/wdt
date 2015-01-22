@@ -101,6 +101,7 @@ bool DirectorySourceQueue::explore() {
     DIR *dirPtr = opendir(fullPath.c_str());
     if (!dirPtr) {
       PLOG(ERROR) << "Error opening dir " << fullPath;
+      failedDirectories_.emplace_back(fullPath);
       hasError = true;
       continue;
     }
@@ -127,9 +128,10 @@ bool DirectorySourceQueue::explore() {
               << (int)dType;
       if (dirEntryRes->d_name[0] == '.') {
         if (dirEntryRes->d_name[1] == '\0' ||
-            (dirEntryRes->d_name[1] == '.' && dirEntryRes->d_name[2] == '\0'))
+            (dirEntryRes->d_name[1] == '.' && dirEntryRes->d_name[2] == '\0')) {
           VLOG(3) << "Skipping entry : " << dirEntryRes->d_name;
-        continue;
+          continue;
+        }
       }
       // Following code is a bit ugly trying to save stat() call for directories
       // yet still work for xfs which returns DT_UNKNOWN for everything
@@ -269,6 +271,10 @@ std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
   return failedSourceStats_;
 }
 
+std::vector<std::string> &DirectorySourceQueue::getFailedDirectories() {
+  return failedDirectories_;
+}
+
 bool DirectorySourceQueue::enqueueFiles() {
   for (const auto &info : fileInfo_) {
     const auto &fullPath = rootDir_ + info.first;
@@ -305,23 +311,34 @@ bool DirectorySourceQueue::fileDiscoveryFinished() const {
 }
 
 std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource() {
-  std::unique_lock<std::mutex> lock(mutex_);
-  while (sourceQueue_.empty() && !initFinished_) {
-    conditionNotEmpty_.wait(lock);
+  std::unique_ptr<ByteSource> source;
+  while (true) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    while (sourceQueue_.empty() && !initFinished_) {
+      conditionNotEmpty_.wait(lock);
+    }
+    if (sourceQueue_.empty()) {
+      return nullptr;
+    }
+    // using const_cast since priority_queue returns a const reference
+    source = std::move(
+        const_cast<std::unique_ptr<ByteSource> &>(sourceQueue_.top()));
+    sourceQueue_.pop();
+    if (sourceQueue_.empty() && initFinished_) {
+      conditionNotEmpty_.notify_all();
+    }
+    lock.unlock();
+
+    VLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
+            << " size " << source->getSize();
+    // try to open the source
+    source->open();
+    if (!source->hasError()) {
+      return source;
+    }
+    source->close();
+    failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
   }
-  if (sourceQueue_.empty()) {
-    return nullptr;
-  }
-  // using const_cast since priority_queue returns a const reference
-  std::unique_ptr<ByteSource> source =
-      std::move(const_cast<std::unique_ptr<ByteSource> &>(sourceQueue_.top()));
-  sourceQueue_.pop();
-  if (sourceQueue_.empty() && initFinished_) {
-    conditionNotEmpty_.notify_all();
-  }
-  VLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
-          << " size " << source->getSize();
-  return source;
 }
 }
 }

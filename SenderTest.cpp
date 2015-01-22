@@ -140,6 +140,7 @@ TEST(SendOne, ConnectionError) {
 
 TEST(SendOne, ByteSourceSendError1) {
   MockClientSocket *socket = new MockClientSocket;
+  MockClientSocket *socket1 = new MockClientSocket;
   MockDirectorySourceQueue queue;
   MockByteSource *source = new MockByteSource;
   TransferStats mockStats;
@@ -153,12 +154,15 @@ TEST(SendOne, ByteSourceSendError1) {
     EXPECT_CALL(sender, makeSocket_()).WillOnce(Return(socket));
     EXPECT_CALL(*socket, connect()).WillOnce(Return(OK));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(source));
+    EXPECT_CALL(*source, hasError()).WillOnce(Return(false));
     EXPECT_CALL(queue, returnToQueue(_));
+    EXPECT_CALL(sender, makeSocket_()).WillOnce(Return(socket1));
+    EXPECT_CALL(*socket1, connect()).WillOnce(Return(OK));
     EXPECT_CALL(queue, getNextSource_()).WillOnce(Return(nullptr));
-    EXPECT_CALL(*socket, write(_, 1)).WillOnce(Return(1));
-    EXPECT_CALL(*socket, read(_, 1))
+    EXPECT_CALL(*socket1, write(_, 1)).WillOnce(Return(1));
+    EXPECT_CALL(*socket1, read(_, 1))
         .WillOnce(DoAll(SetArgPointee<0>(Protocol::DONE_CMD), Return(1)));
-    EXPECT_CALL(*socket, read(_, _)).WillOnce(Return(0));
+    EXPECT_CALL(*socket1, read(_, _)).WillOnce(Return(0));
   }
 
   TransferStats stats;

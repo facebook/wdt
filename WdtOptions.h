@@ -134,6 +134,10 @@ class WdtOptions {
    * IntervalMillis(in milliseconds) between progress reports
    */
   int progressReportIntervalMillis_;
+
+  /// multiplication factor for retry interval
+  double retryIntervalMultFactor_;
+
   /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted
@@ -160,6 +164,8 @@ class WdtOptions {
     maxTransferRetries_ = 3;
     fullReporting_ = false;
     progressReportIntervalMillis_ = 0;
+
+    retryIntervalMultFactor_ = 1.0;
 
     throttlerLogTimeMillis_ = 0;
     avgMbytesPerSec_ = -1;

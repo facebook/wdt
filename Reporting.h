@@ -181,7 +181,8 @@ class TransferReport {
  public:
   TransferReport(std::vector<TransferStats> &transferredSourceStats,
                  std::vector<TransferStats> &failedSourceStats,
-                 std::vector<TransferStats> &threadStats);
+                 std::vector<TransferStats> &threadStats,
+                 std::vector<std::string> &failedDirectories);
   /// @return   summary of the report
   const TransferStats &getSummary() const {
     return summary_;
@@ -198,6 +199,9 @@ class TransferReport {
   const std::vector<TransferStats> &getThreadStats() const {
     return threadStats_;
   }
+  const std::vector<std::string> &getFailedDirectories() const {
+    return failedDirectories_;
+  }
   /// @param stats  stats to added
   void addTransferStats(const TransferStats &stats) {
     summary_ += stats;
@@ -213,6 +217,8 @@ class TransferReport {
   std::vector<TransferStats> failedSourceStats_;
   /// stats for client threads
   std::vector<TransferStats> threadStats_;
+  /// directories which could not be opened
+  std::vector<std::string> failedDirectories_;
 };
 }
 }

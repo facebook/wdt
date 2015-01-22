@@ -19,14 +19,13 @@ FileByteSource::FileByteSource(const std::string &rootPath,
       size_(size),
       bytesRead_(0),
       bufferSize_(bufferSize) {
-  transferStats_.setId(relPath_);
+  const std::string fullPath = rootPath_ + relPath_;
+  transferStats_.setId(fullPath);
 }
 
 void FileByteSource::open() {
   bytesRead_ = 0;
-  if (fd_ >= 0) {
-    close(fd_);
-  }
+  this->close();
 
   if (!buffer_ || bufferSize_ > buffer_->size_) {
     buffer_.reset(new Buffer(bufferSize_));
@@ -34,6 +33,7 @@ void FileByteSource::open() {
   const std::string fullPath = rootPath_ + relPath_;
   fd_ = ::open(fullPath.c_str(), O_RDONLY);
   if (fd_ < 0) {
+    transferStats_.setErrorCode(BYTE_SOURCE_READ_ERROR);
     PLOG(ERROR) << "error opening file " << fullPath;
   }
 }
@@ -48,13 +48,12 @@ char *FileByteSource::read(size_t &size) {
   ssize_t numRead = ::read(fd_, buffer_->data_, toRead);
   if (numRead < 0) {
     PLOG(ERROR) << "failure while reading file " << rootPath_ + relPath_;
-    close(fd_);
-    fd_ = -1;
+    this->close();
+    transferStats_.setErrorCode(BYTE_SOURCE_READ_ERROR);
     return nullptr;
   }
   if (numRead == 0) {
-    close(fd_);
-    fd_ = -1;
+    this->close();
     return nullptr;
   }
   bytesRead_ += numRead;

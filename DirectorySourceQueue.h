@@ -139,6 +139,9 @@ class DirectorySourceQueue : public SourceQueue {
    */
   std::vector<TransferStats> &getFailedSourceStats();
 
+  /// @return   returns list of directories which could not be opened
+  std::vector<std::string> &getFailedDirectories();
+
   virtual ~DirectorySourceQueue() {
   }
 
@@ -226,6 +229,9 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// Transfer stats for sources which are not transferred
   std::vector<TransferStats> failedSourceStats_;
+
+  /// directories which could not be opened
+  std::vector<std::string> failedDirectories_;
 
   /// Total number of entries/files that have passed through the queue
   size_t numEntries_{0};

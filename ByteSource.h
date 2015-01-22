@@ -43,6 +43,9 @@ class ByteSource {
   /// open the source for reading
   virtual void open() = 0;
 
+  /// close the source for reading
+  virtual void close() = 0;
+
   /**
    * @return transfer stats for the source. If the stats is moved by the
    *         caller, then this function can not be called again

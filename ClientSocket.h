@@ -14,10 +14,11 @@ class ClientSocket {
   virtual ErrorCode connect();
   virtual int read(char *buf, int nbyte) const;
   virtual int write(char *buf, int nbyte) const;
+  void close();
   int getFd() const;
+  std::string getPort() const;
   void shutdown() const;
-  virtual ~ClientSocket() {
-  }
+  virtual ~ClientSocket();
 
  private:
   const std::string dest_;

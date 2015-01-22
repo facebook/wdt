@@ -31,9 +31,7 @@ class FileByteSource : public ByteSource {
 
   /// close file descriptor if still open
   virtual ~FileByteSource() {
-    if (fd_ >= 0) {
-      close(fd_);
-    }
+    this->close();
   }
 
   /// @return filepath
@@ -61,6 +59,14 @@ class FileByteSource : public ByteSource {
 
   /// open the source for reading
   virtual void open();
+
+  /// close the source for reading
+  virtual void close() override {
+    if (fd_ >= 0) {
+      ::close(fd_);
+      fd_ = -1;
+    }
+  }
 
   /**
    * @return transfer stats for the source. If the stats is moved by the

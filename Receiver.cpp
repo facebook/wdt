@@ -5,6 +5,7 @@
 #include "SocketUtils.h"
 
 #include <folly/Conv.h>
+#include <folly/Memory.h>
 #include <folly/String.h>
 
 #include <fcntl.h>
@@ -127,14 +128,14 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
     return;
   }
   while (true) {
-    ErrorCode code = s.acceptNextConnection();
-    if (code != OK) {
-      errCode = code;
+    errCode = s.acceptNextConnection();
+    if (errCode != OK) {
       return;
     }
     // TODO test with sending bytes 1 by 1 and id len at max
     ssize_t numRead = 0;
     size_t off = 0;
+    int dest = -1;
     LOG(INFO) << "New socket on " << s.getFd() << " socket buffer is "
               << SocketUtils::getReceiveBufferSize(s.getFd());
     while (true) {
@@ -148,7 +149,13 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
       const ssize_t oldOffset = off;
       Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[off++];
       if (cmd == Protocol::EXIT_CMD) {
-        LOG(ERROR) << "Got exit command - exiting";
+        if (numRead != 1) {
+          LOG(ERROR) << "Unexpected state for exit command. probably junk "
+                        "content. ignoring...";
+          errCode = PROTOCOL_ERROR;
+          break;
+        }
+        LOG(ERROR) << "Got exit command in port " << port << " - exiting";
         exit(0);
       }
       if (cmd == Protocol::DONE_CMD) {
@@ -157,24 +164,29 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
           LOG(ERROR) << "Unexpected state for done command"
                      << " off: " << off << " numRead: " << numRead;
           errCode = PROTOCOL_ERROR;
-          return;
+          break;
         }
         s.write(buf + off - 1, 1);
         break;
       }
       if (cmd != Protocol::FILE_CMD) {
-        LOG(ERROR) << "Unexpected magic/cmd byte " << cmd;
+        LOG(ERROR) << "Unexpected magic/cmd byte " << cmd
+                   << ". numRead = " << numRead << ". port = " << port
+                   << ". offset = " << oldOffset;
         errCode = PROTOCOL_ERROR;
-        return;
+        break;
       }
       bool success = Protocol::decode(buf, off, numRead + oldOffset, id, size);
-      WDT_CHECK(success) << "Error decoding at"
-                         << " ooff:" << oldOffset << " off: " << off
-                         << " numRead: " << numRead;
+      if (!success) {
+        LOG(ERROR) << "Error decoding at"
+                   << " ooff:" << oldOffset << " off: " << off
+                   << " numRead: " << numRead;
+        errCode = PROTOCOL_ERROR;
+        break;
+      }
       VLOG(1) << "Read id:" << id << " size:" << size << " ooff:" << oldOffset
               << " off: " << off << " numRead: " << numRead;
 
-      int dest = -1;
       if (doActualWrites) {
         dest = fileCreator_->createFile(id);
         if (dest == -1) {
@@ -217,10 +229,15 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         }
         wres += nwres;
       }
+      if (wres != size) {
+        errCode = SOCKET_READ_ERROR;
+        break;
+      }
       VLOG(1) << "completed " << id << " off: " << off
               << " numRead: " << numRead << " on " << dest;
       if (doActualWrites) {
         close(dest);
+        dest = -1;
       }
       WDT_CHECK(remainingData >= 0) "Negative remainingData " << remainingData;
       if (remainingData > 0) {
@@ -243,6 +260,10 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
       } else {
         numRead = off = 0;
       }
+    }
+    if (dest > 0) {
+      VLOG(2) << "closing file writer fd " << dest;
+      close(dest);
     }
     VLOG(1) << "Done with " << s.getFd();
     s.closeCurrentConnection();

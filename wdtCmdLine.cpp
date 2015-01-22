@@ -21,6 +21,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
+#include <signal.h>
 
 // General settings Flags
 DEFINE_int32(port, 22356, "Starting port number");  // W (D) T = 0x5754
@@ -125,6 +126,7 @@ int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   initOptions();
+  signal(SIGPIPE, SIG_IGN);
   LOG(INFO) << "Starting with directory=" << FLAGS_directory
             << " and destination=" << FLAGS_destination
             << " num sockets=" << FLAGS_num_sockets
