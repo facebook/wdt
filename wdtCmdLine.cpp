@@ -164,7 +164,8 @@ int main(int argc, char *argv[]) {
     sender.setPruneDirRegex(FLAGS_prune_dir_regex);
     sender.setSrcFileInfo(fileInfo);
     // TODO fix that
-    retCode = sender.start()->getSummary().getErrorCode();
+    auto report = sender.start();
+    retCode = report->getSummary().getErrorCode();
   }
   return retCode;
 }

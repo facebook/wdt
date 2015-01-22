@@ -15,7 +15,6 @@
  * If you change any of the multipliers be
  * sure to replace them in the description above.
  */
-const double kMbToB = 1024 * 1024;
 const double kPeakMultiplier = 1.2;
 const int kBucketMultiplier = 2;
 const double kTimeMultiplier = 0.25;
@@ -32,35 +31,6 @@ double durationSeconds(T d) {
 namespace facebook {
 namespace wdt {
 
-/// default progress reporter
-static void progressReporter(const TransferStats &stats,
-                             size_t numDiscoveredSources,
-                             size_t totalDiscoveredSize, double throughput) {
-  int progress = 0;
-  if (totalDiscoveredSize > 0) {
-    progress = stats.getEffectiveDataBytes() * 100 / totalDiscoveredSize;
-  }
-  int scaledProgress = progress / 2;
-  std::cout << '\r';
-  std::cout << '[';
-  for (int i = 0; i < scaledProgress - 1; i++) {
-    std::cout << '=';
-  }
-  if (scaledProgress != 0) {
-    std::cout << (scaledProgress == 50 ? '=' : '>');
-  }
-  for (int i = 0; i < 50 - scaledProgress - 1; i++) {
-    std::cout << ' ';
-  }
-  std::cout << "] " << progress << "% " << std::setprecision(2) << std::fixed
-            << throughput << " Mbytes/sec";
-  if (progress == 100) {
-    // transfer finished
-    std::cout << '\n';
-  }
-  std::cout.flush();
-}
-
 Sender::Sender(int port, int numSockets, const std::string &destHost,
                const std::string &srcDir)
     : Sender(destHost, srcDir) {
@@ -68,8 +38,7 @@ Sender::Sender(int port, int numSockets, const std::string &destHost,
   this->numSockets_ = numSockets;
 }
 
-Sender::Sender(const std::string &destHost, const std::string &srcDir)
-    : progressReporter_(&progressReporter) {
+Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   this->destHost_ = destHost;
   this->srcDir_ = srcDir;
   const auto &options = WdtOptions::get();
@@ -80,6 +49,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
   this->excludeRegex_ = options.excludeRegex_;
   this->pruneDirRegex_ = options.pruneDirRegex_;
   this->progressReportIntervalMillis_ = options.progressReportIntervalMillis_;
+  this->progressReporter_ = folly::make_unique<ProgressReporter>();
 }
 
 void Sender::setIncludeRegex(const std::string &includeRegex) {
@@ -115,8 +85,9 @@ void Sender::setProgressReportIntervalMillis(
   progressReportIntervalMillis_ = progressReportIntervalMillis;
 }
 
-void Sender::setProgressReporter(const ProgressReporter &progressReporter) {
-  progressReporter_ = progressReporter;
+void Sender::setProgressReporter(
+    std::unique_ptr<ProgressReporter> &progressReporter) {
+  progressReporter_ = std::move(progressReporter);
 }
 
 std::unique_ptr<TransferReport> Sender::start() {
@@ -182,6 +153,7 @@ std::unique_ptr<TransferReport> Sender::start() {
                     std::ref(threadStats[i]), std::ref(sourceStats[i]));
   }
   if (progressReportEnabled) {
+    progressReporter_->start();
     std::thread reporterThread(&Sender::reportProgress, this, startTime,
                                std::ref(threadStats), std::ref(queue));
     progressReporterThread = std::move(reporterThread);
@@ -212,16 +184,19 @@ std::unique_ptr<TransferReport> Sender::start() {
     validateTransferStats(transferredSourceStats, queue.getFailedSourceStats(),
                           threadStats);
   }
+  double totalTime = durationSeconds(Clock::now() - startTime);
+  size_t totalFileSize = queue.getTotalSize();
   std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
       transferredSourceStats, queue.getFailedSourceStats(), threadStats,
-      queue.getFailedDirectories());
-  double totalTime = durationSeconds(Clock::now() - startTime);
+      queue.getFailedDirectories(), totalTime, totalFileSize);
+  if (progressReportEnabled) {
+    progressReporter_->end(report);
+  }
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
             << directoryTime << " dirTime)"
             << ". Transfer summary : " << *report
-            << "\nTotal sender throughput = "
-            << report->getSummary().getEffectiveTotalBytes() / totalTime /
-                   kMbToB << " Mbytes/sec ("
+            << "\nTotal sender throughput = " << report->getThroughputMBps()
+            << " Mbytes/sec ("
             << report->getSummary().getEffectiveTotalBytes() /
                    (totalTime - directoryTime) / kMbToB
             << " Mbytes/sec pure transf rate)";
@@ -274,9 +249,9 @@ std::unique_ptr<ClientSocket> Sender::makeSocket(const std::string &destHost,
 }
 
 std::unique_ptr<ClientSocket> Sender::connectToReceiver(
-    const std::string &destHost, const int port, ErrorCode &errCode,
-    Clock::time_point startTime) {
-  const WdtOptions &options = WdtOptions::get();
+    const std::string &destHost, const int port, Clock::time_point startTime,
+    ErrorCode &errCode) {
+  const auto &options = WdtOptions::get();
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket = makeSocket(destHost, port);
   double retryInterval = options.sleepMillis_;
@@ -340,7 +315,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
 
   ErrorCode code;
   std::unique_ptr<ClientSocket> socket =
-      connectToReceiver(destHost, port, code, startTime);
+      connectToReceiver(destHost, port, startTime, code);
   if (code != OK) {
     threadStats.setErrorCode(code);
     return;
@@ -368,7 +343,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     } else {
       queue.returnToQueue(source);
       socket->close();
-      socket = connectToReceiver(destHost, port, code, Clock::now());
+      socket = connectToReceiver(destHost, port, Clock::now(), code);
       if (code != OK) {
         threadStats.setErrorCode(code);
         return;
@@ -519,21 +494,11 @@ void Sender::reportProgress(Clock::time_point startTime,
     if (!queue.fileDiscoveryFinished()) {
       continue;
     }
-    TransferStats stats;
-    for (int index = 0; index < threadStats.size(); index++) {
-      stats += threadStats[index];
-    }
-    auto pair = queue.getCountAndSize();
+    size_t totalFileSize = queue.getTotalSize();
     double totalTime = durationSeconds(Clock::now() - startTime);
-    double throughput = stats.getEffectiveTotalBytes() / totalTime / kMbToB;
-    (*progressReporter_)(stats, pair.first, pair.second, throughput);
-    if (stats.getEffectiveDataBytes() == pair.second) {
-      // transfer finished. this check is needed to ensure progress report
-      // callback does not get called with 100% done multiple time. In our
-      // default implementation of progress reporter, we print a newline after
-      // transfer completion.
-      done = true;
-    }
+    std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
+        threadStats, totalTime, totalFileSize);
+    progressReporter_->progress(report);
   } while (!done);
 }
 }

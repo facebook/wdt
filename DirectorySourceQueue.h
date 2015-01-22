@@ -74,11 +74,11 @@ class DirectorySourceQueue : public SourceQueue {
   /// @return next FileByteSource to consume or nullptr when finished
   virtual std::unique_ptr<ByteSource> getNextSource() override;
 
-  /**
-   * @return          total number and total size in bytes of sources
-   *                  enqueued/processed through the queue
-   */
-  virtual std::pair<size_t, size_t> getCountAndSize() const override;
+  /// @return         total number of files processed/enqueued
+  virtual size_t getCount() const;
+
+  /// @return         total size of files processed/enqueued
+  virtual size_t getTotalSize() const;
 
   /**
    * Sets regex represnting files to include for transfer

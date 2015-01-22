@@ -1,6 +1,9 @@
 #include "Reporting.h"
 #include <folly/String.h>
 
+#include <iostream>
+#include <iomanip>
+
 namespace facebook {
 namespace wdt {
 
@@ -57,11 +60,14 @@ TransferReport::TransferReport(
     std::vector<TransferStats>& transferredSourceStats,
     std::vector<TransferStats>& failedSourceStats,
     std::vector<TransferStats>& threadStats,
-    std::vector<std::string>& failedDirectories)
+    std::vector<std::string>& failedDirectories, double totalTime,
+    size_t totalFileSize)
     : transferredSourceStats_(std::move(transferredSourceStats)),
       failedSourceStats_(std::move(failedSourceStats)),
       threadStats_(std::move(threadStats)),
-      failedDirectories_(std::move(failedDirectories)) {
+      failedDirectories_(std::move(failedDirectories)),
+      totalTime_(totalTime),
+      totalFileSize_(totalFileSize) {
   for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
@@ -71,6 +77,14 @@ TransferReport::TransferReport(
   }
   // Global status depends on failed files, not thread statuses
   summary_.setErrorCode(errCode);
+}
+
+TransferReport::TransferReport(const std::vector<TransferStats>& threadStats,
+                               double totalTime, size_t totalFileSize)
+    : totalTime_(totalTime), totalFileSize_(totalFileSize) {
+  for (const auto& stats : threadStats) {
+    summary_ += stats;
+  }
 }
 
 std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
@@ -107,6 +121,40 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
     }
   }
   return os;
+}
+
+void ProgressReporter::progress(const std::unique_ptr<TransferReport>& report) {
+  const TransferStats& stats = report->getSummary();
+  size_t totalDiscoveredSize = report->getTotalFileSize();
+  int progress = 0;
+  if (totalDiscoveredSize > 0) {
+    progress = stats.getEffectiveDataBytes() * 100 / totalDiscoveredSize;
+  }
+  displayProgress(progress, report->getThroughputMBps());
+}
+
+void ProgressReporter::end(const std::unique_ptr<TransferReport>& report) {
+  progress(report);
+  std::cout << '\n';
+  std::cout.flush();
+}
+
+void ProgressReporter::displayProgress(int progress, double throughput) {
+  int scaledProgress = progress / 2;
+  std::cout << '\r';
+  std::cout << '[';
+  for (int i = 0; i < scaledProgress - 1; i++) {
+    std::cout << '=';
+  }
+  if (scaledProgress != 0) {
+    std::cout << (scaledProgress == 50 ? '=' : '>');
+  }
+  for (int i = 0; i < 50 - scaledProgress - 1; i++) {
+    std::cout << ' ';
+  }
+  std::cout << "] " << progress << "% " << std::setprecision(2) << std::fixed
+            << throughput << " Mbytes/sec";
+  std::cout.flush();
 }
 }
 }

@@ -34,11 +34,11 @@ class SourceQueue {
    */
   virtual std::unique_ptr<ByteSource> getNextSource() = 0;
 
-  /**
-   * @return          total number and total size in bytes of sources
-   *                  enqueued/processed through the queue
-   */
-  virtual std::pair<size_t, size_t> getCountAndSize() const = 0;
+  /// @return         total number of files processed/enqueued
+  virtual size_t getCount() const = 0;
+
+  /// @return         total size of files processed/enqueued
+  virtual size_t getTotalSize() const = 0;
 };
 }
 }

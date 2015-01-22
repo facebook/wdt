@@ -35,7 +35,6 @@ namespace wdt {
 class DirectorySourceQueue;
 
 typedef std::chrono::high_resolution_clock Clock;
-typedef void (*ProgressReporter)(const TransferStats &, size_t, size_t, double);
 
 class Sender {
  public:
@@ -75,7 +74,7 @@ class Sender {
    *                            visually shows progress. Sample report:
    *                            [=====>               ] 30% 2500.00 Mbytes/sec
    */
-  void setProgressReporter(const ProgressReporter &progressReporter);
+  void setProgressReporter(std::unique_ptr<ProgressReporter> &progressReporter);
 
   // Making the following 2 functions public for unit testing. Need to find way
   // to unit test private functions
@@ -97,8 +96,8 @@ class Sender {
  private:
   std::unique_ptr<ClientSocket> connectToReceiver(const std::string &destHost,
                                                   const int port,
-                                                  ErrorCode &errCode,
-                                                  Clock::time_point startTime);
+                                                  Clock::time_point startTime,
+                                                  ErrorCode &errCode);
   void validateTransferStats(
       const std::vector<TransferStats> &transferredSourceStats,
       const std::vector<TransferStats> &failedSourceStats,
@@ -108,17 +107,17 @@ class Sender {
                       std::vector<TransferStats> &threadStats,
                       DirectorySourceQueue &queue);
 
-  std::string destHost_;
   int port_;
   int numSockets_;
   std::string srcDir_;
+  std::string destHost_;
   std::string pruneDirRegex_;
   std::string includeRegex_;
   std::string excludeRegex_;
   std::vector<FileInfo> srcFileInfo_;
   bool followSymlinks_;
   int progressReportIntervalMillis_;
-  ProgressReporter progressReporter_;
+  std::unique_ptr<ProgressReporter> progressReporter_;
 
   std::condition_variable conditionFinished_;
   std::mutex mutex_;

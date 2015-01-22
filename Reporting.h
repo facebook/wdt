@@ -11,8 +11,9 @@
 namespace facebook {
 namespace wdt {
 
-// TODO: make those non copyable (or at least not copied by accident)
+const double kMbToB = 1024 * 1024;
 
+// TODO: make those non copyable (or at least not copied by accident)
 /// class representing statistics related to file transfer
 class TransferStats {
  private:
@@ -179,13 +180,29 @@ class TransferStats {
  */
 class TransferReport {
  public:
+  /**
+   * This constructor moves all the stat objects to member variables. This is
+   * only called at the end of transfer.
+   */
   TransferReport(std::vector<TransferStats> &transferredSourceStats,
                  std::vector<TransferStats> &failedSourceStats,
                  std::vector<TransferStats> &threadStats,
-                 std::vector<std::string> &failedDirectories);
+                 std::vector<std::string> &failedDirectories, double totalTime,
+                 size_t totalFileSize);
+
+  /**
+   * This function does not move the thread stats passed to it. This is called
+   * by the progress reporter thread.
+   */
+  TransferReport(const std::vector<TransferStats> &threadStats,
+                 double totalTime, size_t totalFileSize);
   /// @return   summary of the report
   const TransferStats &getSummary() const {
     return summary_;
+  }
+  /// @return   transfer throughput in Mbytes/sec
+  double getThroughputMBps() const {
+    return summary_.getEffectiveTotalBytes() / totalTime_ / kMbToB;
   }
   /// @return   stats for successfully transferred sources
   const std::vector<TransferStats> &getTransferredSourceStats() const {
@@ -201,6 +218,9 @@ class TransferReport {
   }
   const std::vector<std::string> &getFailedDirectories() const {
     return failedDirectories_;
+  }
+  size_t getTotalFileSize() const {
+    return totalFileSize_;
   }
   /// @param stats  stats to added
   void addTransferStats(const TransferStats &stats) {
@@ -219,6 +239,50 @@ class TransferReport {
   std::vector<TransferStats> threadStats_;
   /// directories which could not be opened
   std::vector<std::string> failedDirectories_;
+  /// total transfer time
+  double totalTime_;
+  /// sum of all the file sizes
+  size_t totalFileSize_;
+};
+
+/**
+ * This class represents interface and default implementation of progress
+ * reporting
+ */
+class ProgressReporter {
+ public:
+  /// this method is called before the transfer starts
+  virtual void start() {
+  }
+
+  /**
+   * This method gets called repeatedly with interval defined by
+   * progress_report_interval. By default it displays transfer progress in
+   * stdout. Example output [===>    ] 30% 5.00 MBytes/sec
+   *
+   * @param report                current transfer report
+   */
+  virtual void progress(const std::unique_ptr<TransferReport> &report);
+
+  /**
+   * This method gets called after the transfer ends
+   *
+   * @param report                final transfer report
+   */
+  virtual void end(const std::unique_ptr<TransferReport> &report);
+
+  virtual ~ProgressReporter() {
+  }
+
+ private:
+  /**
+   * Displays progress of the transfer in stdout
+   *
+   * @param progress              progress percentage
+   * @param throughput            current throughput
+   *
+   */
+  void displayProgress(int progress, double throughput);
 };
 }
 }

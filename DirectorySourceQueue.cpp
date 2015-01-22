@@ -300,9 +300,14 @@ bool DirectorySourceQueue::finished() const {
   return initFinished_ && sourceQueue_.empty();
 }
 
-std::pair<size_t, size_t> DirectorySourceQueue::getCountAndSize() const {
+size_t DirectorySourceQueue::getCount() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return std::make_pair(numEntries_, totalFileSize_);
+  return numEntries_;
+}
+
+size_t DirectorySourceQueue::getTotalSize() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return totalFileSize_;
 }
 
 bool DirectorySourceQueue::fileDiscoveryFinished() const {
