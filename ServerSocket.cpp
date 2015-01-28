@@ -115,10 +115,10 @@ int ServerSocket::getFd() const {
   VLOG(1) << "fd is " << fd_;
   return fd_;
 }
-const std::string& ServerSocket::getPort() const {
+const std::string &ServerSocket::getPort() const {
   return port_;
 }
-int ServerSocket::getBackLog()  const{
+int ServerSocket::getBackLog() const {
   return backlog_;
 }
 }

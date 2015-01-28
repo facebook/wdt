@@ -80,16 +80,15 @@ class Receiver {
    *
    */
   void markTransferFinished(bool isFinished);
- protected:
 
+ protected:
   /**
    * Responsible for basic setup and starting threads
    */
   void start();
 
  private:
-  void receiveOne(ServerSocket &s,
-                  const std::string &destDir,
+  void receiveOne(ServerSocket &s, const std::string &destDir,
                   size_t bufferSize, TransferStats &threadStats,
                   std::vector<TransferStats> &receivedFilesStats);
 

@@ -64,6 +64,7 @@ size_t readAtMost(ServerSocket &s, char *buf, size_t max, size_t atMost) {
   VLOG(3) << "readAtMost " << n << " / " << atMost << " from " << s.getFd();
   return n;
 }
+
 Receiver::Receiver(int port, int numSockets)
     : port_(port), numSockets_(numSockets) {
   isJoinable_ = false;
@@ -78,6 +79,7 @@ Receiver::Receiver(int port, int numSockets, std::string destDir)
 void Receiver::setDir(const std::string &destDir) {
   this->destDir_ = destDir;
 }
+
 Receiver::~Receiver() {
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an ongoing transfer and the destructor"
@@ -90,6 +92,7 @@ bool Receiver::hasPendingTransfer() {
   std::unique_lock<std::mutex> lock(transferInstanceMutex_);
   return !transferFinished_;
 }
+
 void Receiver::markTransferFinished(bool isFinished) {
   std::unique_lock<std::mutex> lock(transferInstanceMutex_);
   transferFinished_ = isFinished;
@@ -97,36 +100,35 @@ void Receiver::markTransferFinished(bool isFinished) {
     conditionRecvFinished_.notify_all();
   }
 }
+
 std::unique_ptr<TransferReport> Receiver::finish() {
-  const auto& options = WdtOptions::get();
+  const auto &options = WdtOptions::get();
 
   if (!isJoinable_) {
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
                  << " finish and this method will never return";
   }
   for (int i = 0; i < numSockets_; i++) {
-      receiverThreads_[i].join();
+    receiverThreads_[i].join();
   }
-  /**
-   * A very important step to mark the transfer finished
-   * No other transferAsync, or runForever can be called on this
-   * instance unless the current transfer has finished
-   */
+
+  // A very important step to mark the transfer finished
+  // No other transferAsync, or runForever can be called on this
+  // instance unless the current transfer has finished
   markTransferFinished(true);
 
-  /// Make sure to join the progress thread.
+  // Make sure to join the progress thread.
   progressTrackerThread_.join();
+
   std::vector<TransferStats> transferredSourceStats;
-  /**
-   * All the following parameters for the report are useless for
-   * receiver
-   */
+  // All the following parameters for the report are useless for
+  // receiver
   std::vector<TransferStats> failedSourceStats;
   std::vector<std::string> failedDirectories;
   double totalTime = -1;
   size_t totalFileSize = -1;
   if (options.fullReporting_) {
-    /// This will only be true if the receiver is joinable
+    // This will only be true if the receiver is joinable
     WDT_CHECK(isJoinable_);
     for (auto &stats : receivedFilesStats_) {
       transferredSourceStats.insert(transferredSourceStats.end(),
@@ -134,11 +136,11 @@ std::unique_ptr<TransferReport> Receiver::finish() {
                                     std::make_move_iterator(stats.end()));
     }
   }
-  /// TODO failed source stats are intentionally kept empty but could
-  /// potentially be changed in case of disk write errors.
+  // TODO: failed source stats are intentionally kept empty but could
+  // potentially be changed in case of disk write errors.
   std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
       transferredSourceStats, failedSourceStats, threadStats_,
-      failedDirectories, totalTime, totalFileSize );
+      failedDirectories, totalTime, totalFileSize);
   LOG(WARNING) << "WDT receiver's transfer has been finished";
   LOG(INFO) << *report;
   receiverThreads_.clear();
@@ -150,10 +152,10 @@ std::unique_ptr<TransferReport> Receiver::finish() {
 
 ErrorCode Receiver::transferAsync() {
   if (hasPendingTransfer()) {
-    /// finish is the only method that should be able to
-    /// change the value of transferFinished_
+    // finish is the only method that should be able to
+    // change the value of transferFinished_
     LOG(ERROR) << "There is already a transfer running on this "
-                << "instance of receviver";
+               << "instance of receiver";
     return ERROR;
   }
   const auto &options = WdtOptions::get();
@@ -161,33 +163,34 @@ ErrorCode Receiver::transferAsync() {
   start();
   return OK;
 }
+
 ErrorCode Receiver::runForever() {
   if (hasPendingTransfer()) {
-    /// finish is the only method that should be able to
-    /// change the value of transferFinished_
+    // finish is the only method that should be able to
+    // change the value of transferFinished_
     LOG(ERROR) << "There is already a transfer running on this "
-                << "instance of receviver";
+               << "instance of receiver";
     return ERROR;
   }
-  /**
-   * Enforce the full reporting to be false in the daemon mode.
-   * These statistics are expensive, and useless as they will never
-   * be received/reviewed in a forever running process.
-   */
+
+  // Enforce the full reporting to be false in the daemon mode.
+  // These statistics are expensive, and useless as they will never
+  // be received/reviewed in a forever running process.
   auto &options = WdtOptions::getMutable();
   options.fullReporting_ = false;
   start();
   finish();
-  /// This method should never finish
+  // This method should never finish
   return ERROR;
 }
+
 void Receiver::progressTracker() {
   const auto &options = WdtOptions::get();
-  /// Progress tracker will check for progress after the time specified
-  /// in milliseconds.
+  // Progress tracker will check for progress after the time specified
+  // in milliseconds.
   int progressTrackIntervalMillis = options.timeoutCheckIntervalMillis_;
-  /// The number of failed progress checks after which the threads
-  /// should be stopped
+  // The number of failed progress checks after which the threads
+  // should be stopped
   int numFailedProgressChecks = options.failedTimeoutChecks_;
   if (progressTrackIntervalMillis < 0 || !isJoinable_) {
     return;
@@ -199,7 +202,7 @@ void Receiver::progressTracker() {
   size_t totalBytes = 0;
   int64_t zeroProgressCount = 0;
   bool done = false;
-  while(true) {
+  while (true) {
     {
       std::unique_lock<std::mutex> lock(transferInstanceMutex_);
       conditionRecvFinished_.wait_for(lock, waitingTime);
@@ -244,6 +247,7 @@ void Receiver::progressTracker() {
     }
   }
 }
+
 void Receiver::start() {
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an existing transfer in progress on this object";
@@ -268,29 +272,26 @@ void Receiver::start() {
   }
   receivedFilesStats_.resize(numSockets_);
   for (int i = 0; i < numSockets_; i++) {
-    receiverThreads_.emplace_back(&Receiver::receiveOne, this,
-                                  std::ref(threadServerSockets_[i]),
-                                  std::ref(destDir_),
-                                  bufferSize, std::ref(threadStats_[i]),
-                                  std::ref(receivedFilesStats_[i]));
+    receiverThreads_.emplace_back(
+        &Receiver::receiveOne, this, std::ref(threadServerSockets_[i]),
+        std::ref(destDir_), bufferSize, std::ref(threadStats_[i]),
+        std::ref(receivedFilesStats_[i]));
   }
   if (isJoinable_) {
-    std::thread trackerThread(&Receiver::progressTracker,
-                              this);
+    std::thread trackerThread(&Receiver::progressTracker, this);
     progressTrackerThread_ = std::move(trackerThread);
   }
 }
 
-void Receiver::receiveOne(ServerSocket &socket,
-                          const std::string &destDir,
+void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
                           size_t bufferSize, TransferStats &threadStats,
-                          vector<TransferStats> &receivedFilesStats) {
+                          std::vector<TransferStats> &receivedFilesStats) {
   const auto &options = WdtOptions::get();
   const bool doActualWrites = !options.skipWrites_;
   std::string port = socket.getPort();
-  VLOG(1) << "Server Thread for port " << port
-          << " with backlog " << socket.getBackLog()
-          << " on " << destDir << " writes= " << doActualWrites;
+  VLOG(1) << "Server Thread for port " << port << " with backlog "
+          << socket.getBackLog() << " on " << destDir
+          << " writes= " << doActualWrites;
   for (int i = 1; i < options.maxRetries_; ++i) {
     ErrorCode code = socket.listen();
     if (code == OK) {
@@ -345,8 +346,7 @@ void Receiver::receiveOne(ServerSocket &socket,
           threadStats.setErrorCode(PROTOCOL_ERROR);
           break;
         }
-        LOG(ERROR) << "Got exit command in port "
-                   << port << " - exiting";
+        LOG(ERROR) << "Got exit command in port " << port << " - exiting";
         exit(0);
       }
       ErrorCode transferStatus = (ErrorCode)buf[off++];
@@ -358,18 +358,19 @@ void Receiver::receiveOne(ServerSocket &socket,
           threadStats.setErrorCode(PROTOCOL_ERROR);
           break;
         }
+        buf[off - 1] = threadStats.getErrorCode();
         if (transferStatus != OK) {
           LOG(ERROR) << "Errors transmitted by the sender side.\n"
                      << "Final transfer status " << kErrorToStr[transferStatus]
-                     << "\nAlready existing errors on the receiver side "
+                     << "\nCurrent receiver status "
                      << kErrorToStr[threadStats.getErrorCode()];
           threadStats.setErrorCode(transferStatus);
         }
-        buf[off - 1] = threadStats.getErrorCode();
         socket.write(buf + off - 2, 2);
         threadStats.addHeaderBytes(2);
         threadStats.addEffectiveBytes(2, 0);
         if (isJoinable_) {
+          LOG(INFO) << "Receiver thread done. " << threadStats;
           free(buf);
           return;
         }
@@ -379,7 +380,6 @@ void Receiver::receiveOne(ServerSocket &socket,
         LOG(ERROR) << "Unexpected magic/cmd byte " << cmd
                    << ". numRead = " << numRead << ". port = " << port
                    << ". offset = " << oldOffset;
-        LOG(ERROR) << "Unexpected magic/cmd byte " << cmd;
         threadStats.setErrorCode(PROTOCOL_ERROR);
         break;
       }
@@ -389,15 +389,16 @@ void Receiver::receiveOne(ServerSocket &socket,
                 << kErrorToStr[transferStatus];
       }
       bool success = Protocol::decode(buf, off, numRead + oldOffset, id, size);
+      ssize_t headerBytes = off - oldOffset;
+      threadStats.addHeaderBytes(headerBytes);
       if (!success) {
         LOG(ERROR) << "Error decoding at"
                    << " ooff:" << oldOffset << " off: " << off
                    << " numRead: " << numRead;
         threadStats.setErrorCode(PROTOCOL_ERROR);
+        threadStats.incrFailedAttempts();
         break;
       }
-      ssize_t headerBytes = off - oldOffset;
-      threadStats.addHeaderBytes(headerBytes);
       VLOG(1) << "Read id:" << id << " size:" << size << " ooff:" << oldOffset
               << " off: " << off << " numRead: " << numRead;
 
@@ -413,20 +414,23 @@ void Receiver::receiveOne(ServerSocket &socket,
       if (remainingData >= size) {
         toWrite = size;
       }
+      threadStats.addDataBytes(toWrite);
       // write rest of stuff
       int64_t wres = toWrite;
+      int64_t written;
       if (dest >= 0) {
-        wres = write(dest, buf + off, toWrite);
-      }
-      if (wres != toWrite) {
-        PLOG(ERROR) << "Write error/mismatch " << wres << " " << off << " "
-                    << toWrite;
-        threadStats.setErrorCode(FILE_WRITE_ERROR);
-        close(dest);
-        dest = -1;
-      } else {
-        VLOG(3) << "Wrote intial " << wres << " / " << size << " off: " << off
-                << " numRead: " << numRead << " on " << dest;
+        written = write(dest, buf + off, toWrite);
+        if (written != toWrite) {
+          PLOG(ERROR) << "Write error/mismatch " << written << " " << off << " "
+                      << toWrite;
+          threadStats.setErrorCode(FILE_WRITE_ERROR);
+          close(dest);
+          dest = -1;
+        } else {
+          VLOG(3) << "Wrote intial " << toWrite << " / " << size
+                  << " off: " << off << " numRead: " << numRead << " on "
+                  << dest;
+        }
       }
       off += wres;
       remainingData -= wres;
@@ -437,20 +441,19 @@ void Receiver::receiveOne(ServerSocket &socket,
           break;
         }
         threadStats.addDataBytes(nres);
-        int64_t nwres = nres;
         if (dest >= 0) {
-          nwres = write(dest, buf, nres);
+          written = write(dest, buf, nres);
+          if (written != nres) {
+            PLOG(ERROR) << "Write error/mismatch " << written << " " << nres;
+            threadStats.setErrorCode(FILE_WRITE_ERROR);
+            close(dest);
+            dest = -1;
+          }
         }
-        if (nwres != nres) {
-          PLOG(ERROR) << "Write error/mismatch " << nwres << " " << nres;
-          threadStats.setErrorCode(FILE_WRITE_ERROR);
-          close(dest);
-          dest = -1;
-        }
-        wres += nwres;
+        wres += nres;
       }
       if (wres != size) {
-        threadStats.setErrorCode(SOCKET_READ_ERROR);
+        threadStats.incrFailedAttempts();
         break;
       }
       VLOG(1) << "completed " << id << " off: " << off

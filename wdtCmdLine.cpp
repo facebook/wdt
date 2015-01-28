@@ -71,10 +71,9 @@ DEFINE_int32(progress_report_interval_ms, 20,
 DEFINE_int32(timeout_check_interval_ms, 1000,
              "Interval(ms) between timeout checks");
 
-DEFINE_int32(failed_timeout_checks, 10,
+DEFINE_int32(failed_timeout_checks, 100,
              "Number of failed timeout checks after which receiver "
              "shall terminate");
-
 
 // Regex Flags
 DEFINE_string(include_regex, "",

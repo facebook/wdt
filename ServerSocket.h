@@ -24,8 +24,9 @@ class ServerSocket {
   int getListenFd() const;
   int closeCurrentConnection();
   static std::string getNameInfo(const struct sockaddr *sa, socklen_t salen);
-  const std::string& getPort() const;
+  const std::string &getPort() const;
   int getBackLog() const;
+
  private:
   const std::string port_;
   const int backlog_;
