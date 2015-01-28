@@ -1,5 +1,5 @@
 #include "ClientSocket.h"
-#include "ServerSocket.h"  // for getnameinfo
+#include "SocketUtils.h"
 #include "WdtOptions.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
@@ -40,7 +40,7 @@ ErrorCode ClientSocket::connect() {
        info = info->ai_next) {
     ++count;
     VLOG(2) << "will connect to "
-            << ServerSocket::getNameInfo(info->ai_addr, info->ai_addrlen);
+            << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
     fd_ = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd_ == -1) {
       PLOG(WARNING) << "Error making socket";
@@ -48,7 +48,7 @@ ErrorCode ClientSocket::connect() {
     }
     if (::connect(fd_, info->ai_addr, info->ai_addrlen)) {
       PLOG(INFO) << "Error connecting on "
-                 << ServerSocket::getNameInfo(info->ai_addr, info->ai_addrlen);
+                 << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
       this->close();
       continue;
     }
@@ -57,7 +57,7 @@ ErrorCode ClientSocket::connect() {
     break;
   }
   freeaddrinfo(infoList);
-  if (fd_ <= 0) {
+  if (fd_ < 0) {
     if (count > 1) {
       // Only log this if not redundant with log above (ie --ipv6=false)
       LOG(INFO) << "Unable to connect to either of the " << count << " addrs";

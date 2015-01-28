@@ -1,8 +1,8 @@
 #include "ServerSocket.h"
+#include "SocketUtils.h"
 #include "WdtOptions.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
-#include "folly/Conv.h"
 
 namespace facebook {
 namespace wdt {
@@ -33,17 +33,6 @@ ServerSocket::~ServerSocket() {
   }
 }
 
-/* static */
-string ServerSocket::getNameInfo(const struct sockaddr *sa, socklen_t salen) {
-  char host[NI_MAXHOST], service[NI_MAXSERV];
-  int res = getnameinfo(sa, salen, host, sizeof(host), service, sizeof(service),
-                        NI_NUMERICHOST | NI_NUMERICSERV);
-  if (res) {
-    LOG(ERROR) << "getnameinfo failed " << gai_strerror(res);
-  }
-  return folly::to<string>(host, " ", service);
-}
-
 ErrorCode ServerSocket::listen() {
   if (listeningFd_ > 0) {
     return OK;
@@ -60,7 +49,7 @@ ErrorCode ServerSocket::listen() {
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
     VLOG(1) << "will listen on "
-            << getNameInfo(info->ai_addr, info->ai_addrlen);
+            << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
     // TODO: set sock options : SO_REUSEADDR,...
     listeningFd_ =
         socket(info->ai_family, info->ai_socktype, info->ai_protocol);
@@ -103,7 +92,7 @@ ErrorCode ServerSocket::acceptNextConnection() {
     return CONN_ERROR;
   }
   VLOG(1) << "new connection " << fd_ << " from "
-          << getNameInfo(&addr, addrLen);
+          << SocketUtils::getNameInfo(&addr, addrLen);
   // TODO: set sock options
   return OK;
 }

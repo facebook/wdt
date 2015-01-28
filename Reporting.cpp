@@ -71,12 +71,9 @@ TransferReport::TransferReport(
   for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
-  ErrorCode errCode = OK;
   if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
-    errCode = ERROR;
+    summary_.setErrorCode(ERROR);
   }
-  // Global status depends on failed files, not thread statuses
-  summary_.setErrorCode(errCode);
 }
 
 TransferReport::TransferReport(const std::vector<TransferStats>& threadStats,

@@ -317,21 +317,22 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   std::unique_ptr<ClientSocket> socket =
       connectToReceiver(destHost, port, startTime, code);
   if (code != OK) {
-    threadStats.setErrorCode(code);
     return;
   }
   char headerBuf[Protocol::kMaxHeader];
+  std::unique_ptr<ByteSource> source;
+  ErrorCode transferStatus = OK;
 
   while (true) {
-    auto source = queue.getNextSource();
+    source = queue.getNextSource(transferStatus);
     if (!source) {
       break;
     }
     WDT_CHECK(!source->hasError());
     TransferStats transferStats;
     size_t totalBytes = threadStats.getTotalBytes();
-    transferStats =
-        sendOneByteSource(socket, throttler, source, doThrottling, totalBytes);
+    transferStats = sendOneByteSource(socket, throttler, source, doThrottling,
+                                      totalBytes, transferStatus);
     threadStats += transferStats;
     source->addTransferStats(transferStats);
     source->close();
@@ -341,28 +342,40 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
             std::move(source->getTransferStats()));
       }
     } else {
-      queue.returnToQueue(source);
+      // resetting the error code, since a single file failure does not impact
+      // overall thread status
+      threadStats.setErrorCode(OK);
       socket->close();
       socket = connectToReceiver(destHost, port, Clock::now(), code);
+      // we are returning the file to queue after trying to connect to the
+      // receiver. This ensures that receiver thread has finished writing the
+      // content of this file and there will be no concurrent writing at
+      // destination
+      queue.returnToQueue(source);
       if (code != OK) {
-        threadStats.setErrorCode(code);
+        if (threadStats.getNumFiles() > 0) {
+          // thread has transferred files, but has not received confirmation
+          // from the server. so, this connection error is not fatal.
+          threadStats.setErrorCode(code);
+        }
         return;
       }
     }
   }
   headerBuf[0] = Protocol::DONE_CMD;
-  ssize_t written = socket->write(headerBuf, 1);
-  if (written != 1) {
+  headerBuf[1] = transferStatus;
+  ssize_t written = socket->write(headerBuf, 2);
+  if (written != 2) {
     LOG(ERROR) << "Socket write failure " << written;
     threadStats.setErrorCode(SOCKET_WRITE_ERROR);
     return;
   }
-  threadStats.addHeaderBytes(1);
-  threadStats.addEffectiveBytes(1, 0);
+  threadStats.addHeaderBytes(2);
+  threadStats.addEffectiveBytes(2, 0);
   socket->shutdown();
   VLOG(1) << "Wrote done cmd on " << socket->getFd() << " waiting for reply...";
-  ssize_t numRead = socket->read(headerBuf, 1);  // TODO: returns 0 on disk full
-  if (numRead != 1) {
+  ssize_t numRead = socket->read(headerBuf, 2);  // TODO: returns 0 on disk full
+  if (numRead != 2) {
     LOG(ERROR) << "READ unexpected " << numRead;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return;
@@ -372,6 +385,8 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return;
   }
+  ErrorCode receiverStatus = (ErrorCode)headerBuf[1];
+  LOG(INFO) << "final receiver status " << kErrorToStr[receiverStatus];
   numRead = socket->read(headerBuf, Protocol::kMaxHeader);
   if (numRead != 0) {
     LOG(ERROR) << "EOF not found when expected "
@@ -380,7 +395,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return;
   }
-  threadStats.setErrorCode(OK);
+  threadStats.setErrorCode(receiverStatus);
   double totalTime = durationSeconds(Clock::now() - startTime);
   LOG(INFO) << "Got reply - all done for fd:" << socket->getFd() << ". "
             << "Transfer stat : " << threadStats << " Total throughput = "
@@ -393,11 +408,12 @@ TransferStats Sender::sendOneByteSource(
     const std::unique_ptr<ClientSocket> &socket,
     const std::unique_ptr<Throttler> &throttler,
     const std::unique_ptr<ByteSource> &source, const bool doThrottling,
-    const size_t totalBytes) {
+    const size_t totalBytes, ErrorCode transferStatus) {
   TransferStats stats;
   char headerBuf[Protocol::kMaxHeader];
   size_t off = 0;
   headerBuf[off++] = Protocol::FILE_CMD;
+  headerBuf[off++] = transferStatus;
   const size_t expectedSize = source->getSize();
   size_t actualSize = 0;
   Protocol::encode(headerBuf, off, Protocol::kMaxHeader,

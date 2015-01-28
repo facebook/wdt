@@ -315,12 +315,18 @@ bool DirectorySourceQueue::fileDiscoveryFinished() const {
   return initFinished_;
 }
 
-std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource() {
+std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
+    ErrorCode &status) {
   std::unique_ptr<ByteSource> source;
   while (true) {
     std::unique_lock<std::mutex> lock(mutex_);
     while (sourceQueue_.empty() && !initFinished_) {
       conditionNotEmpty_.wait(lock);
+    }
+    if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
+      status = ERROR;
+    } else {
+      status = OK;
     }
     if (sourceQueue_.empty()) {
       return nullptr;
@@ -342,6 +348,9 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource() {
       return source;
     }
     source->close();
+    // we need to lock again as we will be adding element to failedSourceStats
+    // vector
+    lock.lock();
     failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
   }
 }

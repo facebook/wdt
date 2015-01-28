@@ -22,7 +22,6 @@ class ServerSocket {
   int write(char *buf, int nbyte) const;
   int getFd() const;
   int closeCurrentConnection();
-  static std::string getNameInfo(const struct sockaddr *sa, socklen_t salen);
 
  private:
   const std::string port_;

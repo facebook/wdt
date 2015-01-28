@@ -16,6 +16,7 @@ namespace wdt {
   X(SOCKET_READ_ERROR)       /** Socket read error  */            \
   X(SOCKET_WRITE_ERROR)      /** Socket write error  */           \
   X(BYTE_SOURCE_READ_ERROR)  /** Byte source(file) read error  */ \
+  X(FILE_WRITE_ERROR)        /** file write error  */             \
   X(MEMORY_ALLOCATION_ERROR) /** Memory allocation failure  */    \
   X(PROTOCOL_ERROR)          /** WDT protocol error  */
 

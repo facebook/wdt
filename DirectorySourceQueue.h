@@ -71,8 +71,12 @@ class DirectorySourceQueue : public SourceQueue {
   /// @return true if all the files have been discovered, false otherwise
   bool fileDiscoveryFinished() const;
 
-  /// @return next FileByteSource to consume or nullptr when finished
-  virtual std::unique_ptr<ByteSource> getNextSource() override;
+  /**
+   * @param status  this variable is set to the status of the transfer
+   *
+   * @return next FileByteSource to consume or nullptr when finished
+   */
+  virtual std::unique_ptr<ByteSource> getNextSource(ErrorCode &status) override;
 
   /// @return         total number of files processed/enqueued
   virtual size_t getCount() const;

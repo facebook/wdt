@@ -82,7 +82,7 @@ class Sender {
       const std::unique_ptr<ClientSocket> &socket,
       const std::unique_ptr<Throttler> &throttler,
       const std::unique_ptr<ByteSource> &source, const bool doThrottling,
-      const size_t totalBytes);
+      const size_t totalBytes, ErrorCode transferStatus);
 
   void sendOne(Clock::time_point startTime, const std::string &destHost,
                int port, DirectorySourceQueue &queue, double avgRateBytes,

@@ -9,6 +9,7 @@ namespace facebook {
 namespace wdt {
 
 const static int kSimulatorSleepDurationMSec = 250;
+const static double kRetryMultFactor = 1.85;
 
 void simulateNetworkError();
 static std::thread errorSimulatorThread(&simulateNetworkError);
@@ -19,7 +20,7 @@ void simulateNetworkError() {
   while (true) {
     usleep(kSimulatorSleepDurationMSec * 1000);
     auto &options = facebook::wdt::WdtOptions::getMutable();
-    options.retryIntervalMultFactor_ = 1.5;
+    options.retryIntervalMultFactor_ = kRetryMultFactor;
 
     int fd = 3 + rand() % (2 * WdtOptions::get().numSockets_ + 1);
     // close the chosen socket

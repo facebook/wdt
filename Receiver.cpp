@@ -127,9 +127,12 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
     errCode = MEMORY_ALLOCATION_ERROR;
     return;
   }
+  errCode = OK;
   while (true) {
-    errCode = s.acceptNextConnection();
-    if (errCode != OK) {
+    ErrorCode code = s.acceptNextConnection();
+    if (code != OK) {
+      errCode = code;
+      free(buf);
       return;
     }
     // TODO test with sending bytes 1 by 1 and id len at max
@@ -158,15 +161,21 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         LOG(ERROR) << "Got exit command in port " << port << " - exiting";
         exit(0);
       }
+      ErrorCode transferStatus = (ErrorCode)buf[off++];
       if (cmd == Protocol::DONE_CMD) {
         VLOG(1) << "Got done command for " << s.getFd();
-        if (numRead != 1) {
+        if (numRead != 2) {
           LOG(ERROR) << "Unexpected state for done command"
                      << " off: " << off << " numRead: " << numRead;
           errCode = PROTOCOL_ERROR;
           break;
         }
-        s.write(buf + off - 1, 1);
+        // TODO: in single session mode, we will return from receiver when we
+        // encounter DONE cmd. using errCode and transferStatus, we
+        // can determine the exact status of the transfer
+        LOG(INFO) << "final transfer status " << kErrorToStr[transferStatus];
+        buf[off - 1] = errCode;
+        s.write(buf + off - 2, 2);
         break;
       }
       if (cmd != Protocol::FILE_CMD) {
@@ -176,12 +185,16 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         errCode = PROTOCOL_ERROR;
         break;
       }
+      if (transferStatus != OK) {
+        // TODO: use this status information to implement fail fast mode
+        VLOG(1) << "sender entered into error state "
+                << kErrorToStr[transferStatus];
+      }
       bool success = Protocol::decode(buf, off, numRead + oldOffset, id, size);
       if (!success) {
         LOG(ERROR) << "Error decoding at"
                    << " ooff:" << oldOffset << " off: " << off
                    << " numRead: " << numRead;
-        errCode = PROTOCOL_ERROR;
         break;
       }
       VLOG(1) << "Read id:" << id << " size:" << size << " ooff:" << oldOffset
@@ -191,6 +204,7 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         dest = fileCreator_->createFile(id);
         if (dest == -1) {
           LOG(ERROR) << "Unable to open " << id << " in " << destDir;
+          errCode = FILE_WRITE_ERROR;
         }
       }
       ssize_t remainingData = numRead + oldOffset - off;
@@ -200,13 +214,15 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
       }
       // write rest of stuff
       int64_t wres = toWrite;
-      if (doActualWrites) {
+      if (dest >= 0) {
         wres = write(dest, buf + off, toWrite);
       }
       if (wres != toWrite) {
         PLOG(ERROR) << "Write error/mismatch " << wres << " " << off << " "
                     << toWrite;
-        break;
+        errCode = FILE_WRITE_ERROR;
+        close(dest);
+        dest = -1;
       } else {
         VLOG(3) << "Wrote intial " << wres << " / " << size << " off: " << off
                 << " numRead: " << numRead << " on " << dest;
@@ -220,22 +236,23 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
           break;
         }
         int64_t nwres = nres;
-        if (doActualWrites) {
+        if (dest >= 0) {
           nwres = write(dest, buf, nres);
         }
         if (nwres != nres) {
           PLOG(ERROR) << "Write error/mismatch " << nwres << " " << nres;
-          break;
+          errCode = FILE_WRITE_ERROR;
+          close(dest);
+          dest = -1;
         }
         wres += nwres;
       }
       if (wres != size) {
-        errCode = SOCKET_READ_ERROR;
         break;
       }
       VLOG(1) << "completed " << id << " off: " << off
               << " numRead: " << numRead << " on " << dest;
-      if (doActualWrites) {
+      if (dest >= 0) {
         close(dest);
         dest = -1;
       }
@@ -261,7 +278,7 @@ void Receiver::receiveOne(int port, int backlog, const std::string &destDir,
         numRead = off = 0;
       }
     }
-    if (dest > 0) {
+    if (dest >= 0) {
       VLOG(2) << "closing file writer fd " << dest;
       close(dest);
     }

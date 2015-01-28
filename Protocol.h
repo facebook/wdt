@@ -16,8 +16,8 @@ class Protocol {
     EXIT_CMD = 0x65,  // e)xit
   };
 
-  /// Max size of filename + 2 max varints
-  static const size_t kMaxHeader = PATH_MAX + 10 + 10;
+  /// Max size of filename + 2 max varints + 1 byte for cmd + 1 byte for status
+  static const size_t kMaxHeader = PATH_MAX + 10 + 10 + 2;
 
   /// encodes id and size into dest+off
   /// moves the off into dest pointer, not going past max
