@@ -34,6 +34,9 @@ DEFINE_bool(ignore_open_errors, false, "will continue despite open errors");
 DEFINE_bool(two_phases, false, "do directory discovery first/separately");
 DEFINE_bool(follow_symlinks, false,
             "If true, follow symlinks and copy them as well");
+
+DEFINE_bool(run_as_daemon, true,
+            "If true, run the receiver as never ending process");
 DEFINE_int32(backlog, 1, "Accept backlog");
 // 256k is fastest for test on localhost and shm : > 5 Gbytes/sec
 DEFINE_int32(buffer_size, 256 * 1024, "Buffer size (per thread/socket)");
@@ -64,6 +67,14 @@ DEFINE_int64(peak_log_time_ms, 0,
 DEFINE_int32(progress_report_interval_ms, 20,
              "Interval(ms) between progress reports. If the value is 0, no "
              "progress reporting is done");
+
+DEFINE_int32(timeout_check_interval_ms, 1000,
+             "Interval(ms) between timeout checks");
+
+DEFINE_int32(failed_timeout_checks, 10,
+             "Number of failed timeout checks after which receiver "
+             "shall terminate");
+
 
 // Regex Flags
 DEFINE_string(include_regex, "",
@@ -115,6 +126,9 @@ void initOptions() {
   options.bufferSize_ = FLAGS_buffer_size;
   options.maxRetries_ = FLAGS_max_retries;
   options.sleepMillis_ = FLAGS_sleep_ms;
+
+  options.timeoutCheckIntervalMillis_ = FLAGS_timeout_check_interval_ms;
+  options.failedTimeoutChecks_ = FLAGS_failed_timeout_checks;
 }
 
 DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
@@ -127,20 +141,23 @@ int main(int argc, char *argv[]) {
   google::InitGoogleLogging(argv[0]);
   initOptions();
   signal(SIGPIPE, SIG_IGN);
-  LOG(INFO) << "Starting with directory=" << FLAGS_directory
-            << " and destination=" << FLAGS_destination
-            << " num sockets=" << FLAGS_num_sockets
-            << " from port=" << FLAGS_port;
+  LOG(INFO) << "Starting with directory = " << FLAGS_directory
+            << " and destination = " << FLAGS_destination
+            << " num sockets = " << FLAGS_num_sockets
+            << " from port = " << FLAGS_port;
   ErrorCode retCode = OK;
   if (FLAGS_destination.empty()) {
     Receiver receiver(FLAGS_port, FLAGS_num_sockets, FLAGS_directory);
     // TODO fix this
-    auto const &errCodes = receiver.start();
-    for (const auto &errCode : errCodes) {
-      if (errCode != OK) {
-        retCode = errCode;
-      }
+    if (!FLAGS_run_as_daemon) {
+      receiver.transferAsync();
+      std::unique_ptr<TransferReport> report = receiver.finish();
+      retCode = report->getSummary().getErrorCode();
+    } else {
+      receiver.runForever();
+      retCode = OK;
     }
+    return retCode;
   } else {
     std::vector<FileInfo> fileInfo;
     if (FLAGS_files) {

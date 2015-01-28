@@ -139,6 +139,16 @@ class WdtOptions {
   double retryIntervalMultFactor_;
 
   /**
+   * Timeout checks will be done at this interval (milliseconds)
+   */
+  int timeoutCheckIntervalMillis_;
+
+  /**
+   * Number of failed timeout checks after which receiver should terminate
+   */
+  int failedTimeoutChecks_;
+
+  /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted
    */
@@ -171,6 +181,9 @@ class WdtOptions {
     avgMbytesPerSec_ = -1;
     maxMbytesPerSec_ = 0;
     throttlerBucketLimit_ = 0;
+
+    failedTimeoutChecks_ = 100;
+    timeoutCheckIntervalMillis_ = 1000;
 
     includeRegex_ = "";
     excludeRegex_ = "";

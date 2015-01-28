@@ -389,9 +389,13 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   LOG(INFO) << "final receiver status " << kErrorToStr[receiverStatus];
   numRead = socket->read(headerBuf, Protocol::kMaxHeader);
   if (numRead != 0) {
-    LOG(ERROR) << "EOF not found when expected "
-               << ((numRead < 0) ? "-1" : folly::humanify(
-                                              std::string(headerBuf, numRead)));
+    std::string numReadString;
+    if (numRead < 0) {
+      numReadString = "-1";
+    } else {
+      numReadString = folly::humanify(std::string(headerBuf, numRead));
+    }
+    LOG(ERROR) << "EOF not found when expected " << numReadString;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return;
   }

@@ -3,7 +3,7 @@
 #include "WdtOptions.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
-
+#include <folly/Conv.h>
 namespace facebook {
 namespace wdt {
 
@@ -108,10 +108,18 @@ int ServerSocket::write(char *buf, int nbyte) const {
 int ServerSocket::closeCurrentConnection() {
   return close(fd_);
 }
-
+int ServerSocket::getListenFd() const {
+  return listeningFd_;
+}
 int ServerSocket::getFd() const {
   VLOG(1) << "fd is " << fd_;
   return fd_;
+}
+const std::string& ServerSocket::getPort() const {
+  return port_;
+}
+int ServerSocket::getBackLog()  const{
+  return backlog_;
 }
 }
 }  // end namespace facebook::wtd
