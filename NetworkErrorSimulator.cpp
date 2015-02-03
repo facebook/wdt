@@ -8,7 +8,7 @@
 namespace facebook {
 namespace wdt {
 
-const static int kSimulatorSleepDurationMSec = 250;
+const static int kSimulatorSleepDurationMillis = 250;
 const static double kRetryMultFactor = 1.85;
 
 void simulateNetworkError();
@@ -18,7 +18,7 @@ void simulateNetworkError() {
   errorSimulatorThread.detach();
 
   while (true) {
-    usleep(kSimulatorSleepDurationMSec * 1000);
+    usleep(kSimulatorSleepDurationMillis * 1000);
     auto &options = facebook::wdt::WdtOptions::getMutable();
     options.retryIntervalMultFactor_ = kRetryMultFactor;
 

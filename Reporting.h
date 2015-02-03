@@ -35,6 +35,9 @@ class TransferStats {
   /// status of the transfer
   ErrorCode errCode_ = OK;
 
+  /// status of the remote
+  ErrorCode remoteErrCode_ = OK;
+
   /// id of the owner object
   std::string id_;
 
@@ -111,10 +114,25 @@ class TransferStats {
     return failedAttempts_;
   }
 
+  /// @return error code based on combinator of local and remote error
+  ErrorCode getCombinedErrorCode() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    if (errCode_ != OK || remoteErrCode_ != OK) {
+      return ERROR;
+    }
+    return OK;
+  }
+
   /// @return status of the transfer
   ErrorCode getErrorCode() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return errCode_;
+  }
+
+  /// @return status of the transfer on the remote end
+  ErrorCode getRemoteErrorCode() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return remoteErrCode_;
   }
 
   const std::string &getId() const {
@@ -144,6 +162,12 @@ class TransferStats {
   void setErrorCode(ErrorCode errCode) {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
     errCode_ = errCode;
+  }
+
+  /// @param status of the transfer on the remote end
+  void setRemoteErrorCode(ErrorCode remoteErrCode) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    remoteErrCode_ = remoteErrCode;
   }
 
   /// @param id of the corresponding entity

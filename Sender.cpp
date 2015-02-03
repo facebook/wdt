@@ -320,11 +320,10 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     return;
   }
   char headerBuf[Protocol::kMaxHeader];
-  std::unique_ptr<ByteSource> source;
   ErrorCode transferStatus = OK;
 
   while (true) {
-    source = queue.getNextSource(transferStatus);
+    std::unique_ptr<ByteSource> source = queue.getNextSource(transferStatus);
     if (!source) {
       break;
     }
@@ -335,7 +334,6 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
                                       totalBytes, transferStatus);
     threadStats += transferStats;
     source->addTransferStats(transferStats);
-    source->close();
     if (transferStats.getErrorCode() == OK) {
       if (options.fullReporting_) {
         transferredFileStats.emplace_back(
@@ -387,6 +385,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   }
   ErrorCode receiverStatus = (ErrorCode)headerBuf[1];
   LOG(INFO) << "final receiver status " << kErrorToStr[receiverStatus];
+  threadStats.setRemoteErrorCode(receiverStatus);
   numRead = socket->read(headerBuf, Protocol::kMaxHeader);
   if (numRead != 0) {
     std::string numReadString;
@@ -399,7 +398,6 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return;
   }
-  threadStats.setErrorCode(receiverStatus);
   double totalTime = durationSeconds(Clock::now() - startTime);
   LOG(INFO) << "Got reply - all done for fd:" << socket->getFd() << ". "
             << "Transfer stat : " << threadStats << " Total throughput = "

@@ -28,6 +28,13 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
       errCode_ = ERROR;
     }
   }
+  if (stats.remoteErrCode_ != OK) {
+    if (remoteErrCode_ == OK) {
+      remoteErrCode_ = stats.remoteErrCode_;
+    } else if (stats.remoteErrCode_ != remoteErrCode_) {
+      remoteErrCode_ = ERROR;
+    }
+  }
   return *this;
 }
 
@@ -45,7 +52,8 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
   if (totalBytes) {
     failureOverhead = 100.0 * (totalBytes - effectiveTotalBytes) / totalBytes;
   }
-  os << "Transfer Status = " << kErrorToStr[stats.errCode_]
+  os << "Transfer Status (local) = " << kErrorToStr[stats.errCode_]
+     << ", (remote) = " << kErrorToStr[stats.remoteErrCode_]
      << ". Number of files transferred = " << stats.numFiles_
      << ". Data Mbytes = " << stats.effectiveDataBytes_ / kMbToB
      << ". Header kBytes = " << stats.effectiveHeaderBytes_ / 1024. << " ("

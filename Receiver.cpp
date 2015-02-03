@@ -309,7 +309,9 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
     threadStats.setErrorCode(CONN_ERROR);
     return;
   }
-  char *buf = (char *)malloc(bufferSize);
+  std::unique_ptr<char[]> bufferPtr;
+  bufferPtr.reset(new char[bufferSize]);
+  char *buf = bufferPtr.get();
   if (!buf) {
     LOG(ERROR) << "error allocating " << bufferSize;
     threadStats.setErrorCode(MEMORY_ALLOCATION_ERROR);
@@ -320,7 +322,6 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
     ErrorCode code = socket.acceptNextConnection();
     if (code != OK) {
       threadStats.setErrorCode(code);
-      free(buf);
       return;
     }
     // TODO test with sending bytes 1 by 1 and id len at max
@@ -336,7 +337,7 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         break;
       }
       std::string id;
-      int64_t size;
+      int64_t sourceSize;
       const ssize_t oldOffset = off;
       Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[off++];
       if (cmd == Protocol::EXIT_CMD) {
@@ -360,20 +361,23 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         }
         buf[off - 1] = threadStats.getErrorCode();
         if (transferStatus != OK) {
+          threadStats.setRemoteErrorCode(transferStatus);
           LOG(ERROR) << "Errors transmitted by the sender side.\n"
                      << "Final transfer status " << kErrorToStr[transferStatus]
                      << "\nCurrent receiver status "
                      << kErrorToStr[threadStats.getErrorCode()];
-          threadStats.setErrorCode(transferStatus);
         }
         socket.write(buf + off - 2, 2);
         threadStats.addHeaderBytes(2);
         threadStats.addEffectiveBytes(2, 0);
         if (isJoinable_) {
           LOG(INFO) << "Receiver thread done. " << threadStats;
-          free(buf);
           return;
         }
+        // When the done command is received the session is over for
+        // a single transfer. If this receiver is not joinable then
+        // the session for the new transfer should be marked error free
+        threadStats.setErrorCode(OK);
         break;
       }
       if (cmd != Protocol::FILE_CMD) {
@@ -388,7 +392,8 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         VLOG(1) << "sender entered into error state "
                 << kErrorToStr[transferStatus];
       }
-      bool success = Protocol::decode(buf, off, numRead + oldOffset, id, size);
+      bool success =
+          Protocol::decode(buf, off, numRead + oldOffset, id, sourceSize);
       ssize_t headerBytes = off - oldOffset;
       threadStats.addHeaderBytes(headerBytes);
       if (!success) {
@@ -399,20 +404,22 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         threadStats.incrFailedAttempts();
         break;
       }
-      VLOG(1) << "Read id:" << id << " size:" << size << " ooff:" << oldOffset
-              << " off: " << off << " numRead: " << numRead;
+      VLOG(1) << "Read id:" << id << " size:" << sourceSize
+              << " ooff:" << oldOffset << " off: " << off
+              << " numRead: " << numRead;
 
       if (doActualWrites) {
         dest = fileCreator_->createFile(id);
         if (dest == -1) {
           LOG(ERROR) << "Unable to open " << id << " in " << destDir;
           threadStats.setErrorCode(FILE_WRITE_ERROR);
+          threadStats.incrFailedAttempts();
         }
       }
       ssize_t remainingData = numRead + oldOffset - off;
       ssize_t toWrite = remainingData;
-      if (remainingData >= size) {
-        toWrite = size;
+      if (remainingData >= sourceSize) {
+        toWrite = sourceSize;
       }
       threadStats.addDataBytes(toWrite);
       // write rest of stuff
@@ -427,7 +434,7 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
           close(dest);
           dest = -1;
         } else {
-          VLOG(3) << "Wrote intial " << toWrite << " / " << size
+          VLOG(3) << "Wrote intial " << toWrite << " / " << sourceSize
                   << " off: " << off << " numRead: " << numRead << " on "
                   << dest;
         }
@@ -435,8 +442,8 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
       off += wres;
       remainingData -= wres;
       // also means no leftOver so it's ok we use buf from start
-      while (wres < size) {
-        int64_t nres = readAtMost(socket, buf, bufferSize, size - wres);
+      while (wres < sourceSize) {
+        int64_t nres = readAtMost(socket, buf, bufferSize, sourceSize - wres);
         if (nres <= 0) {
           break;
         }
@@ -452,7 +459,9 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         }
         wres += nres;
       }
-      if (wres != size) {
+      if (wres != sourceSize) {
+        // This can only happen if there are transmission errors
+        // Write errors to disk are already taken care of above
         threadStats.incrFailedAttempts();
         break;
       }
@@ -463,7 +472,7 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         dest = -1;
       }
       // Transfer of the file is complete here, mark the bytes effective
-      threadStats.addEffectiveBytes(headerBytes, size);
+      threadStats.addEffectiveBytes(headerBytes, sourceSize);
       threadStats.incrNumFiles();
       if (options.fullReporting_) {
         WDT_CHECK(isJoinable_);
@@ -471,8 +480,8 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         fileStats.setErrorCode(OK);
         fileStats.setId(id);
         fileStats.addHeaderBytes(headerBytes);
-        fileStats.addDataBytes(size);
-        fileStats.addEffectiveBytes(headerBytes, size);
+        fileStats.addDataBytes(sourceSize);
+        fileStats.addEffectiveBytes(headerBytes, sourceSize);
         receivedFilesStats.emplace_back(std::move(fileStats));
       }
       WDT_CHECK(remainingData >= 0) << "Negative remainingData "
@@ -505,7 +514,6 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
     VLOG(1) << "Done with " << socket.getFd();
     socket.closeCurrentConnection();
   }
-  free(buf);
   threadStats.setErrorCode(OK);
 }
 }

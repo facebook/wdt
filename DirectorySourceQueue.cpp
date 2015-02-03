@@ -335,11 +335,10 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
     source = std::move(
         const_cast<std::unique_ptr<ByteSource> &>(sourceQueue_.top()));
     sourceQueue_.pop();
+    lock.unlock();
     if (sourceQueue_.empty() && initFinished_) {
       conditionNotEmpty_.notify_all();
     }
-    lock.unlock();
-
     VLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
             << " size " << source->getSize();
     // try to open the source
