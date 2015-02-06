@@ -179,8 +179,10 @@ if [ $DO_VERIFY -eq 1 ] ; then
     NUM_FILES=`(cd $DIR/dst ; ( find . -type f | wc -l))`
     echo "Transfered `du -ks $DIR/dst` kbytes across $NUM_FILES files"
 
-    (cd $DIR/src ; ( find . -type f -exec md5sum '{}' + | sort ) > ../src.md5s )
-    (cd $DIR/dst ; ( find . -type f -exec md5sum '{}' + | sort ) > ../dst.md5s )
+    (cd $DIR/src ; ( find . -type f -print0 | xargs -0 md5sum | sort ) \
+        > ../src.md5s )
+    (cd $DIR/dst ; ( find . -type f -print0 | xargs -0 md5sum | sort ) \
+        > ../dst.md5s )
 
     echo "Should be no diff"
     (cd $DIR; diff -u src.md5s dst.md5s)
@@ -193,10 +195,10 @@ if [ $DO_VERIFY -eq 1 ] ; then
     NUM_FILES=`(cd $DIR/dst_symlinks; ( find . -type f | wc -l))`
     echo "Transfered `du -ks $DIR/dst_symlinks` kbytes across $NUM_FILES files"
 
-    (cd $DIR/src ; ( find -L . -type f -exec md5sum '{}' + |  \
-    sort ) > ../src_symlinks.md5s )
-    (cd $DIR/dst_symlinks ; ( find . -type f -exec md5sum '{}' + | sort ) >  \
-    ../dst_symlinks.md5s )
+    (cd $DIR/src ; ( find -L . -type f -print0 | xargs -0 md5sum | sort ) \
+        > ../src_symlinks.md5s )
+    (cd $DIR/dst_symlinks ; ( find . -type f -print0 | xargs -0 md5sum \
+        | sort ) > ../dst_symlinks.md5s )
 
     echo "Should be no diff"
     (cd $DIR; diff -u src_symlinks.md5s dst_symlinks.md5s)
