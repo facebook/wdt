@@ -42,11 +42,20 @@ class FileCreator {
    * based on cache, we try creating the dir and open again before
    * failing.
    *
-   * @relPath       path relative to root dir
+   * @param relPath   path relative to root dir
    *
-   * @return        file descriptor or -1 on error
+   * @return          file descriptor or -1 on error
    */
   int createFile(const std::string &relPath);
+
+  /**
+   * If the file size greater than i/p size, truncates the file to i/p size.
+   * Otherwise does not do anything.
+   *
+   * @param fd        file descriptor
+   * @param size      size to truncate to
+   */
+  void truncateFile(int fd, int64_t size);
 
   /// reset internal directory cache
   void reset() {

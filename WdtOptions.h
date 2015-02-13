@@ -149,6 +149,12 @@ class WdtOptions {
   int failedTimeoutChecks_;
 
   /**
+   * block size, it is used to break bigger files into smaller chunks
+   * block_size of <= 0 disables block transfer
+   */
+  int64_t blockSize_;
+
+  /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted
    */
@@ -168,6 +174,7 @@ class WdtOptions {
     port_ = 22356;
     numSockets_ = 8;
     bufferSize_ = 256 * 1024;
+    blockSize_ = 16 * 1024 * 1024;
     maxRetries_ = 20;
     sleepMillis_ = 50;
     backlog_ = 1;

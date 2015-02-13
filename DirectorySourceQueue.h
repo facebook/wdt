@@ -12,6 +12,7 @@
 
 #include "SourceQueue.h"
 #include "WdtOptions.h"
+#include "FileByteSource.h"
 
 DECLARE_int32(buffer_size);
 
@@ -147,6 +148,9 @@ class DirectorySourceQueue : public SourceQueue {
   std::vector<std::string> &getFailedDirectories();
 
   virtual ~DirectorySourceQueue() {
+    for (FileMetaData *fileData : sharedFileData_) {
+      delete fileData;
+    }
   }
 
  private:
@@ -169,10 +173,12 @@ class DirectorySourceQueue : public SourceQueue {
    * initial creation from either explore or enqueue files - always increment
    * numentries inside the lock, doesn't check for fail retries
    *
-   * @param relativePath         relative path of the file to be added
+   * @param fullPath             full path of the file to be added
+   * @param relPath              file path relative to root dir
    * @param fileSize             size of the file
    */
-  virtual void createIntoQueue(const std::string &relativePath,
+  virtual void createIntoQueue(const std::string &fullPath,
+                               const std::string &relPath,
                                const size_t fileSize);
 
   /// root directory to recurse on if fileInfo_ is empty
@@ -219,13 +225,19 @@ class DirectorySourceQueue : public SourceQueue {
       if (source1->getSize() != source2->getSize()) {
         return source1->getSize() < source2->getSize();
       }
-      return source1->getIdentifier() < source2->getIdentifier();
+      if (source1->getOffset() != source2->getOffset()) {
+        return source1->getOffset() < source2->getOffset();
+      }
+      return source1->getIdentifier() > source2->getIdentifier();
     }
   };
 
   /**
    * priority queue of sources. Sources are first ordered by increasing
-   * failedAttempts, then by decreasing size.
+   * failedAttempts, then by decreasing size. If sizes are equal(always for
+   * blocks), sources are ordered by offset. This way, we ensure that all the
+   * threads in the receiver side are not writing to the same file at the same
+   * time.
    */
   std::priority_queue<std::unique_ptr<ByteSource>,
                       std::vector<std::unique_ptr<ByteSource>>,
@@ -245,6 +257,10 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// Whether to follow symlinks or not
   bool followSymlinks_{false};
+
+  /// shared file data. this are used during transfer to add blocks
+  /// contribution
+  std::vector<FileMetaData *> sharedFileData_;
 
   const WdtOptions &options_;
 };

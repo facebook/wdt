@@ -98,6 +98,8 @@ DEFINE_string(
 DEFINE_bool(full_reporting, false,
             "If true, transfer stats for successfully transferred files are "
             "included in the report");
+DEFINE_double(block_mbytes, 16,
+              "Block size in mb. A value of -1 disables block transfer");
 
 void initOptions() {
   auto &options = facebook::wdt::WdtOptions::getMutable();
@@ -120,6 +122,7 @@ void initOptions() {
   options.followSymlinks_ = FLAGS_follow_symlinks;
   options.fullReporting_ = FLAGS_full_reporting;
   options.progressReportIntervalMillis_ = FLAGS_progress_report_interval_ms;
+  options.blockSize_ = FLAGS_block_mbytes * 1024 * 1024;
 
   options.backlog_ = FLAGS_backlog;
   options.bufferSize_ = FLAGS_buffer_size;

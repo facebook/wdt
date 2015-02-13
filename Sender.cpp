@@ -188,7 +188,7 @@ std::unique_ptr<TransferReport> Sender::start() {
   size_t totalFileSize = queue.getTotalSize();
   std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
       transferredSourceStats, queue.getFailedSourceStats(), threadStats,
-      queue.getFailedDirectories(), totalTime, totalFileSize);
+      queue.getFailedDirectories(), totalTime, totalFileSize, queue.getCount());
   if (progressReportEnabled) {
     progressReporter_->end(report);
   }
@@ -208,38 +208,38 @@ void Sender::validateTransferStats(
     const std::vector<TransferStats> &failedSourceStats,
     const std::vector<TransferStats> &threadStats) {
   size_t sourceFailedAttempts = 0;
-  size_t sourceNumFiles = transferredSourceStats.size();
   size_t sourceDataBytes = 0;
   size_t sourceEffectiveDataBytes = 0;
+  size_t sourceNumBlocks = 0;
 
   size_t threadFailedAttempts = 0;
-  size_t threadNumFiles = 0;
   size_t threadDataBytes = 0;
   size_t threadEffectiveDataBytes = 0;
+  size_t threadNumBlocks = 0;
 
   for (const auto &stat : transferredSourceStats) {
     sourceFailedAttempts += stat.getFailedAttempts();
-    WDT_CHECK(stat.getNumFiles() == 1);
     sourceDataBytes += stat.getDataBytes();
     sourceEffectiveDataBytes += stat.getEffectiveDataBytes();
+    sourceNumBlocks += stat.getNumBlocks();
   }
   for (const auto &stat : failedSourceStats) {
     sourceFailedAttempts += stat.getFailedAttempts();
-    WDT_CHECK(stat.getNumFiles() == 0);
     sourceDataBytes += stat.getDataBytes();
     sourceEffectiveDataBytes += stat.getEffectiveDataBytes();
+    sourceNumBlocks += stat.getNumBlocks();
   }
   for (const auto &stat : threadStats) {
     threadFailedAttempts += stat.getFailedAttempts();
-    threadNumFiles += stat.getNumFiles();
     threadDataBytes += stat.getDataBytes();
     threadEffectiveDataBytes += stat.getEffectiveDataBytes();
+    threadNumBlocks += stat.getNumBlocks();
   }
 
   WDT_CHECK(sourceFailedAttempts == threadFailedAttempts);
-  WDT_CHECK(sourceNumFiles == threadNumFiles);
   WDT_CHECK(sourceDataBytes == threadDataBytes);
   WDT_CHECK(sourceEffectiveDataBytes == threadEffectiveDataBytes);
+  WDT_CHECK(sourceNumBlocks == threadNumBlocks);
 }
 
 std::unique_ptr<ClientSocket> Sender::makeSocket(const std::string &destHost,
@@ -329,11 +329,12 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     }
     WDT_CHECK(!source->hasError());
     TransferStats transferStats;
-    size_t totalBytes = threadStats.getTotalBytes();
+    size_t totalBytes = threadStats.getTotalBytes(false);
     transferStats = sendOneByteSource(socket, throttler, source, doThrottling,
                                       totalBytes, transferStatus);
     threadStats += transferStats;
     source->addTransferStats(transferStats);
+    source->close();
     if (transferStats.getErrorCode() == OK) {
       if (options.fullReporting_) {
         transferredFileStats.emplace_back(
@@ -419,7 +420,8 @@ TransferStats Sender::sendOneByteSource(
   const size_t expectedSize = source->getSize();
   size_t actualSize = 0;
   Protocol::encode(headerBuf, off, Protocol::kMaxHeader,
-                   source->getIdentifier(), expectedSize);
+                   source->getIdentifier(), expectedSize, source->getOffset(),
+                   source->getTotalSize());
   ssize_t written = socket->write(headerBuf, off);
   if (written != off) {
     PLOG(ERROR) << "Write error/mismatch " << written << " " << off
@@ -492,7 +494,7 @@ TransferStats Sender::sendOneByteSource(
     return stats;
   }
   stats.setErrorCode(OK);
-  stats.incrNumFiles();
+  stats.incrNumBlocks();
   stats.addEffectiveBytes(stats.getHeaderBytes(), stats.getDataBytes());
   return stats;
 }

@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <set>
 
 namespace facebook {
 namespace wdt {
@@ -17,6 +18,7 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
   effectiveHeaderBytes_ += stats.effectiveHeaderBytes_;
   effectiveDataBytes_ += stats.effectiveDataBytes_;
   numFiles_ += stats.numFiles_;
+  numBlocks_ += stats.numBlocks_;
   failedAttempts_ += stats.failedAttempts_;
   if (stats.errCode_ != OK) {
     if (errCode_ == OK) {
@@ -52,10 +54,20 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
   if (totalBytes) {
     failureOverhead = 100.0 * (totalBytes - effectiveTotalBytes) / totalBytes;
   }
-  os << "Transfer Status (local) = " << kErrorToStr[stats.errCode_]
-     << ", (remote) = " << kErrorToStr[stats.remoteErrCode_]
-     << ". Number of files transferred = " << stats.numFiles_
-     << ". Data Mbytes = " << stats.effectiveDataBytes_ / kMbToB
+
+  if (stats.errCode_ == OK && stats.remoteErrCode_ == OK) {
+    os << "Transfer status = OK.";
+  } else {
+    os << "Transfer status (local) = " << kErrorToStr[stats.errCode_]
+       << ", (remote) = " << kErrorToStr[stats.remoteErrCode_] << ".";
+  }
+
+  if (stats.numFiles_ > 0) {
+    os << " Number of files transferred = " << stats.numFiles_ << ".";
+  } else {
+    os << " Number of blocks transferred = " << stats.numBlocks_ << ".";
+  }
+  os << " Data Mbytes = " << stats.effectiveDataBytes_ / kMbToB
      << ". Header kBytes = " << stats.effectiveHeaderBytes_ / 1024. << " ("
      << headerOverhead << "% overhead)"
      << ". Total bytes = " << effectiveTotalBytes
@@ -69,7 +81,7 @@ TransferReport::TransferReport(
     std::vector<TransferStats>& failedSourceStats,
     std::vector<TransferStats>& threadStats,
     std::vector<std::string>& failedDirectories, double totalTime,
-    size_t totalFileSize)
+    size_t totalFileSize, size_t numDiscoveredFiles)
     : transferredSourceStats_(std::move(transferredSourceStats)),
       failedSourceStats_(std::move(failedSourceStats)),
       threadStats_(std::move(threadStats)),
@@ -82,12 +94,25 @@ TransferReport::TransferReport(
   if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
     summary_.setErrorCode(ERROR);
   }
+  std::set<std::string> failedFilesSet;
+  for (auto& stats : failedSourceStats_) {
+    failedFilesSet.insert(stats.getId());
+  }
+  size_t numTransferredFiles = numDiscoveredFiles - failedFilesSet.size();
+  summary_.setNumFiles(numTransferredFiles);
 }
 
 TransferReport::TransferReport(const std::vector<TransferStats>& threadStats,
                                double totalTime, size_t totalFileSize)
     : totalTime_(totalTime), totalFileSize_(totalFileSize) {
   for (const auto& stats : threadStats) {
+    summary_ += stats;
+  }
+}
+
+TransferReport::TransferReport(std::vector<TransferStats>& threadStats)
+    : threadStats_(std::move(threadStats)) {
+  for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
 }
@@ -100,13 +125,24 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
     } else {
       os << "\n"
          << "Failed files :\n";
-      int numOfFilesToPrint =
-          std::min(kMaxEntriesToPrint, report.failedSourceStats_.size());
-      for (int i = 0; i < numOfFilesToPrint; i++) {
-        os << report.failedSourceStats_[i].getId() << "\n";
+      std::set<std::string> failedFilesSet;
+      for (auto& stats : report.getFailedSourceStats()) {
+        failedFilesSet.insert(stats.getId());
       }
-      if (numOfFilesToPrint < report.failedSourceStats_.size()) {
-        os << "more...(" << report.failedSourceStats_.size() - numOfFilesToPrint
+      int numOfFilesToPrint =
+          std::min(kMaxEntriesToPrint, failedFilesSet.size());
+
+      int displayCount = 0;
+      for (auto& fileName : failedFilesSet) {
+        if (displayCount >= numOfFilesToPrint) {
+          break;
+        }
+        os << fileName << "\n";
+        displayCount++;
+      }
+
+      if (numOfFilesToPrint < failedFilesSet.size()) {
+        os << "more...(" << failedFilesSet.size() - numOfFilesToPrint
            << " files)";
       }
     }

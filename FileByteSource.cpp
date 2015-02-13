@@ -11,31 +11,35 @@ namespace wdt {
 
 folly::ThreadLocalPtr<FileByteSource::Buffer> FileByteSource::buffer_;
 
-FileByteSource::FileByteSource(const std::string &rootPath,
-                               const std::string &relPath, uint64_t size,
-                               size_t bufferSize)
-    : rootPath_(rootPath),
-      relPath_(relPath),
+FileByteSource::FileByteSource(FileMetaData *fileData, uint64_t size,
+                               uint64_t offset, size_t bufferSize)
+    : fileData_(fileData),
       size_(size),
+      offset_(offset),
       bytesRead_(0),
       bufferSize_(bufferSize) {
-  const std::string fullPath = rootPath_ + relPath_;
-  transferStats_.setId(fullPath);
+  transferStats_.setId(getIdentifier());
 }
 
-void FileByteSource::open() {
+ErrorCode FileByteSource::open() {
   bytesRead_ = 0;
   this->close();
 
+  ErrorCode errCode = OK;
   if (!buffer_ || bufferSize_ > buffer_->size_) {
     buffer_.reset(new Buffer(bufferSize_));
   }
-  const std::string fullPath = rootPath_ + relPath_;
+  const std::string &fullPath = fileData_->getFullPath();
   fd_ = ::open(fullPath.c_str(), O_RDONLY);
   if (fd_ < 0) {
-    transferStats_.setErrorCode(BYTE_SOURCE_READ_ERROR);
+    errCode = BYTE_SOURCE_READ_ERROR;
     PLOG(ERROR) << "error opening file " << fullPath;
+  } else if (offset_ > 0 && lseek(fd_, offset_, SEEK_SET) < 0) {
+    errCode = BYTE_SOURCE_READ_ERROR;
+    PLOG(ERROR) << "error seeking file " << fullPath;
   }
+  transferStats_.setErrorCode(errCode);
+  return errCode;
 }
 
 char *FileByteSource::read(size_t &size) {
@@ -47,7 +51,7 @@ char *FileByteSource::read(size_t &size) {
       (size_t)std::min<uint64_t>(buffer_->size_, size_ - bytesRead_);
   ssize_t numRead = ::read(fd_, buffer_->data_, toRead);
   if (numRead < 0) {
-    PLOG(ERROR) << "failure while reading file " << rootPath_ + relPath_;
+    PLOG(ERROR) << "failure while reading file " << fileData_->getFullPath();
     this->close();
     transferStats_.setErrorCode(BYTE_SOURCE_READ_ERROR);
     return nullptr;

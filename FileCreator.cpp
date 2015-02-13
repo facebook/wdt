@@ -36,7 +36,7 @@ int FileCreator::createFile(const string &relPathStr) {
       }
     }
   }
-  int res = open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  int res = open(path.c_str(), O_CREAT | O_WRONLY, 0644);
   if (res < 0) {
     if (dir.empty()) {
       PLOG(ERROR) << "failed creating file " << path;
@@ -48,7 +48,7 @@ int FileCreator::createFile(const string &relPathStr) {
       LOG(ERROR) << "failed to create dir " << dir << " recursively";
       return -1;
     }
-    res = open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    res = open(path.c_str(), O_CREAT | O_WRONLY, 0644);
     if (res < 0) {
       PLOG(ERROR) << "failed creating file " << path;
       return -1;
@@ -93,6 +93,19 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
   }
 
   return true;
+}
+
+void FileCreator::truncateFile(int fd, int64_t size) {
+  struct stat fileStat;
+  if (fstat(fd, &fileStat) != 0) {
+    PLOG(ERROR) << "fstat() failed for " << fd;
+    return;
+  }
+  if (fileStat.st_size > size) {
+    if (ftruncate(fd, size) != 0) {
+      PLOG(ERROR) << "ftruncate() failed for " << fd;
+    }
+  }
 }
 
 /* static */

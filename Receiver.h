@@ -89,8 +89,7 @@ class Receiver {
 
  private:
   void receiveOne(ServerSocket &s, const std::string &destDir,
-                  size_t bufferSize, TransferStats &threadStats,
-                  std::vector<TransferStats> &receivedFilesStats);
+                  size_t bufferSize, TransferStats &threadStats);
 
   /**
    * The background process that will keep on running and monitor the
@@ -143,7 +142,6 @@ class Receiver {
   /// Bunch of stats objects given to each thread by the root thread
   /// so that finish() can summarize the result at the end of joining.
   std::vector<TransferStats> threadStats_;
-  std::vector<std::vector<TransferStats>> receivedFilesStats_;
 };
 }
 }  // namespace facebook::wdt

@@ -32,7 +32,7 @@ class MockThrottler : public Throttler {
 
 class MockByteSource : public FileByteSource {
  public:
-  MockByteSource() : FileByteSource("", "", 0, 0) {
+  MockByteSource() : FileByteSource(new FileMetaData("", "", 0), 0, 0, 0) {
   }
 
   MOCK_CONST_METHOD0(getSize, uint64_t(void));
@@ -176,7 +176,7 @@ TEST(SendOne, ByteSourceSendError1) {
   EXPECT_EQ(stats.getEffectiveTotalBytes(), 2);
   EXPECT_EQ(stats.getEffectiveHeaderBytes(), 2);
   EXPECT_EQ(stats.getEffectiveDataBytes(), 0);
-  EXPECT_EQ(stats.getNumFiles(), 0);
+  EXPECT_EQ(stats.getNumBlocks(), 0);
 }
 
 TEST(SendOne, Success) {
@@ -188,7 +188,7 @@ TEST(SendOne, Success) {
   mockStats.addDataBytes(7);
   mockStats.addEffectiveBytes(3, 7);
   mockStats.setErrorCode(OK);
-  mockStats.incrNumFiles();
+  mockStats.incrNumBlocks();
   MockSender sender(mockStats);
 
   {
@@ -213,7 +213,7 @@ TEST(SendOne, Success) {
   EXPECT_EQ(stats.getEffectiveTotalBytes(), 12);
   EXPECT_EQ(stats.getEffectiveHeaderBytes(), 5);
   EXPECT_EQ(stats.getEffectiveDataBytes(), 7);
-  EXPECT_EQ(stats.getNumFiles(), 1);
+  EXPECT_EQ(stats.getNumBlocks(), 1);
 }
 
 TEST(SendOneByteSource, HeaderWriteFailure) {
@@ -236,15 +236,15 @@ TEST(SendOneByteSource, ByteSourceReadError) {
 
   // TEST 1
   EXPECT_CALL(*source, getSize()).WillOnce(Return(10));
-  EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(4));
+  EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(6));
   EXPECT_CALL(*source, finished()).WillOnce(Return(false));
   char p[] = "abc";
   EXPECT_CALL(*source, read(_)).WillOnce(DoAll(SetArgReferee<0>(3), Return(p)));
   EXPECT_CALL(*source, hasError()).WillOnce(Return(true));
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
   EXPECT_EQ(stats.getErrorCode(), BYTE_SOURCE_READ_ERROR);
-  EXPECT_EQ(stats.getTotalBytes(), 4);
-  EXPECT_EQ(stats.getHeaderBytes(), 4);
+  EXPECT_EQ(stats.getTotalBytes(), 6);
+  EXPECT_EQ(stats.getHeaderBytes(), 6);
   EXPECT_EQ(stats.getDataBytes(), 0);
 }
 
@@ -256,7 +256,7 @@ TEST(SendOneByteSource, SocketWriteError) {
 
   // TEST 1
   EXPECT_CALL(*source, getSize()).WillOnce(Return(10));
-  EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(4));
+  EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(6));
   EXPECT_CALL(*source, finished()).WillOnce(Return(false));
   char p[] = "abc";
   EXPECT_CALL(*source, read(_)).WillOnce(DoAll(SetArgReferee<0>(3), Return(p)));
@@ -266,8 +266,8 @@ TEST(SendOneByteSource, SocketWriteError) {
 
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
   EXPECT_EQ(stats.getErrorCode(), SOCKET_WRITE_ERROR);
-  EXPECT_EQ(stats.getTotalBytes(), 4);
-  EXPECT_EQ(stats.getHeaderBytes(), 4);
+  EXPECT_EQ(stats.getTotalBytes(), 6);
+  EXPECT_EQ(stats.getHeaderBytes(), 6);
   EXPECT_EQ(stats.getDataBytes(), 0);
 
   // TEST 2
@@ -275,7 +275,7 @@ TEST(SendOneByteSource, SocketWriteError) {
   throttler = new MockThrottler;
   socket = new MockClientSocket;
   EXPECT_CALL(*source, getSize()).WillOnce(Return(10));
-  EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(4));
+  EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(6));
   EXPECT_CALL(*source, finished()).WillOnce(Return(false));
   EXPECT_CALL(*source, read(_)).WillOnce(DoAll(SetArgReferee<0>(3), Return(p)));
   EXPECT_CALL(*source, hasError()).WillOnce(Return(false));
@@ -284,8 +284,8 @@ TEST(SendOneByteSource, SocketWriteError) {
 
   stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
   EXPECT_EQ(stats.getErrorCode(), SOCKET_WRITE_ERROR);
-  EXPECT_EQ(stats.getTotalBytes(), 8);
-  EXPECT_EQ(stats.getHeaderBytes(), 4);
+  EXPECT_EQ(stats.getTotalBytes(), 10);
+  EXPECT_EQ(stats.getHeaderBytes(), 6);
   EXPECT_EQ(stats.getDataBytes(), 4);
 }
 
@@ -299,7 +299,7 @@ TEST(SendOneByteSource, SingleChunkSuccess) {
   {
     InSequence s;  // ordered expectations
     EXPECT_CALL(*source, getSize()).WillOnce(Return(3));
-    EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(4));
+    EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(6));
     EXPECT_CALL(*source, finished()).WillOnce(Return(false));
     char p[] = "abc";
     EXPECT_CALL(*source, read(_))
@@ -312,8 +312,8 @@ TEST(SendOneByteSource, SingleChunkSuccess) {
 
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
   EXPECT_EQ(stats.getErrorCode(), OK);
-  EXPECT_EQ(stats.getTotalBytes(), 7);
-  EXPECT_EQ(stats.getHeaderBytes(), 4);
+  EXPECT_EQ(stats.getTotalBytes(), 9);
+  EXPECT_EQ(stats.getHeaderBytes(), 6);
   EXPECT_EQ(stats.getDataBytes(), 3);
 
   // TEST short write
@@ -323,7 +323,7 @@ TEST(SendOneByteSource, SingleChunkSuccess) {
   {
     InSequence s;  // ordered expectations
     EXPECT_CALL(*source, getSize()).WillOnce(Return(3));
-    EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(4));
+    EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(6));
     EXPECT_CALL(*source, finished()).WillOnce(Return(false));
     char p[] = "abc";
     EXPECT_CALL(*source, read(_))
@@ -337,8 +337,8 @@ TEST(SendOneByteSource, SingleChunkSuccess) {
 
   stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
   EXPECT_EQ(stats.getErrorCode(), OK);
-  EXPECT_EQ(stats.getTotalBytes(), 7);
-  EXPECT_EQ(stats.getHeaderBytes(), 4);
+  EXPECT_EQ(stats.getTotalBytes(), 9);
+  EXPECT_EQ(stats.getHeaderBytes(), 6);
   EXPECT_EQ(stats.getDataBytes(), 3);
 }
 
@@ -351,7 +351,7 @@ TEST(SendOneByteSource, MultiChunkSuccess) {
   {
     InSequence s;  // ordered expectations
     EXPECT_CALL(*source, getSize()).WillOnce(Return(5));
-    EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(4));
+    EXPECT_CALL(*socket, write(_, _)).WillOnce(Return(6));
     EXPECT_CALL(*source, finished()).WillOnce(Return(false));
     char p[] = "abc";
     EXPECT_CALL(*source, read(_))
@@ -371,8 +371,8 @@ TEST(SendOneByteSource, MultiChunkSuccess) {
 
   auto stats = sender.sendOneByteSource_(socket, throttler, source, true, 0);
   EXPECT_EQ(stats.getErrorCode(), OK);
-  EXPECT_EQ(stats.getTotalBytes(), 9);
-  EXPECT_EQ(stats.getHeaderBytes(), 4);
+  EXPECT_EQ(stats.getTotalBytes(), 11);
+  EXPECT_EQ(stats.getHeaderBytes(), 6);
   EXPECT_EQ(stats.getDataBytes(), 5);
 }
 }

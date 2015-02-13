@@ -120,31 +120,11 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   // Make sure to join the progress thread.
   progressTrackerThread_.join();
 
-  std::vector<TransferStats> transferredSourceStats;
-  // All the following parameters for the report are useless for
-  // receiver
-  std::vector<TransferStats> failedSourceStats;
-  std::vector<std::string> failedDirectories;
-  double totalTime = -1;
-  size_t totalFileSize = -1;
-  if (options.fullReporting_) {
-    // This will only be true if the receiver is joinable
-    WDT_CHECK(isJoinable_);
-    for (auto &stats : receivedFilesStats_) {
-      transferredSourceStats.insert(transferredSourceStats.end(),
-                                    std::make_move_iterator(stats.begin()),
-                                    std::make_move_iterator(stats.end()));
-    }
-  }
-  // TODO: failed source stats are intentionally kept empty but could
-  // potentially be changed in case of disk write errors.
-  std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
-      transferredSourceStats, failedSourceStats, threadStats_,
-      failedDirectories, totalTime, totalFileSize);
+  std::unique_ptr<TransferReport> report =
+      folly::make_unique<TransferReport>(threadStats_);
   LOG(WARNING) << "WDT receiver's transfer has been finished";
   LOG(INFO) << *report;
   receiverThreads_.clear();
-  receivedFilesStats_.clear();
   threadServerSockets_.clear();
   threadStats_.clear();
   return report;
@@ -177,7 +157,6 @@ ErrorCode Receiver::runForever() {
   // These statistics are expensive, and useless as they will never
   // be received/reviewed in a forever running process.
   auto &options = WdtOptions::getMutable();
-  options.fullReporting_ = false;
   start();
   finish();
   // This method should never finish
@@ -270,12 +249,10 @@ void Receiver::start() {
     threadServerSockets_.emplace_back(folly::to<std::string>(port_ + i),
                                       options.backlog_);
   }
-  receivedFilesStats_.resize(numSockets_);
   for (int i = 0; i < numSockets_; i++) {
     receiverThreads_.emplace_back(
         &Receiver::receiveOne, this, std::ref(threadServerSockets_[i]),
-        std::ref(destDir_), bufferSize, std::ref(threadStats_[i]),
-        std::ref(receivedFilesStats_[i]));
+        std::ref(destDir_), bufferSize, std::ref(threadStats_[i]));
   }
   if (isJoinable_) {
     std::thread trackerThread(&Receiver::progressTracker, this);
@@ -284,8 +261,7 @@ void Receiver::start() {
 }
 
 void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
-                          size_t bufferSize, TransferStats &threadStats,
-                          std::vector<TransferStats> &receivedFilesStats) {
+                          size_t bufferSize, TransferStats &threadStats) {
   const auto &options = WdtOptions::get();
   const bool doActualWrites = !options.skipWrites_;
   std::string port = socket.getPort();
@@ -338,6 +314,8 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
       }
       std::string id;
       int64_t sourceSize;
+      int64_t offset;
+      int64_t fileSize;
       const ssize_t oldOffset = off;
       Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[off++];
       if (cmd == Protocol::EXIT_CMD) {
@@ -392,8 +370,8 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         VLOG(1) << "sender entered into error state "
                 << kErrorToStr[transferStatus];
       }
-      bool success =
-          Protocol::decode(buf, off, numRead + oldOffset, id, sourceSize);
+      bool success = Protocol::decode(buf, off, numRead + oldOffset, id,
+                                      sourceSize, offset, fileSize);
       ssize_t headerBytes = off - oldOffset;
       threadStats.addHeaderBytes(headerBytes);
       if (!success) {
@@ -413,7 +391,12 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
         if (dest == -1) {
           LOG(ERROR) << "Unable to open " << id << " in " << destDir;
           threadStats.setErrorCode(FILE_WRITE_ERROR);
-          threadStats.incrFailedAttempts();
+        } else if (offset > 0 && lseek(dest, offset, SEEK_SET) < 0) {
+          PLOG(ERROR) << "Unable to seek " << id;
+          threadStats.setErrorCode(FILE_WRITE_ERROR);
+          dest = -1;
+        } else if (offset == 0) {
+          fileCreator_->truncateFile(dest, fileSize);
         }
       }
       ssize_t remainingData = numRead + oldOffset - off;
@@ -473,17 +456,7 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
       }
       // Transfer of the file is complete here, mark the bytes effective
       threadStats.addEffectiveBytes(headerBytes, sourceSize);
-      threadStats.incrNumFiles();
-      if (options.fullReporting_) {
-        WDT_CHECK(isJoinable_);
-        TransferStats fileStats;
-        fileStats.setErrorCode(OK);
-        fileStats.setId(id);
-        fileStats.addHeaderBytes(headerBytes);
-        fileStats.addDataBytes(sourceSize);
-        fileStats.addEffectiveBytes(headerBytes, sourceSize);
-        receivedFilesStats.emplace_back(std::move(fileStats));
-      }
+      threadStats.incrNumBlocks();
       WDT_CHECK(remainingData >= 0) << "Negative remainingData "
                                     << remainingData;
       if (remainingData > 0) {

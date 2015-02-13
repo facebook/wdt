@@ -29,6 +29,10 @@ class TransferStats {
 
   /// number of files successfully transferred
   size_t numFiles_ = 0;
+
+  /// number of blocks successfully transferred
+  size_t numBlocks_ = 0;
+
   /// number of failed transfers
   size_t failedAttempts_ = 0;
 
@@ -57,6 +61,11 @@ class TransferStats {
     }
   }
 
+  explicit TransferStats(const std::string &id, bool isLocked = false)
+      : TransferStats(isLocked) {
+    id_ = id;
+  }
+
   /// @return number of header bytes transferred
   size_t getHeaderBytes() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
@@ -69,9 +78,19 @@ class TransferStats {
     return dataBytes_;
   }
 
-  /// @return number of total bytes transferred
-  size_t getTotalBytes() const {
-    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+  /**
+   * @param needLocking     specifies whether we need to lock or not. this is
+   *                        for performance improvement. in sender, we do not
+   *                        need locking for this call, even though the other
+   *                        calls have to be locked
+   *
+   * @return                number of total bytes transferred
+   */
+  size_t getTotalBytes(bool needLocking = true) const {
+    if (needLocking) {
+      folly::RWSpinLock::ReadHolder lock(mutex_.get());
+      return headerBytes_ + dataBytes_;
+    }
     return headerBytes_ + dataBytes_;
   }
 
@@ -106,6 +125,12 @@ class TransferStats {
   size_t getNumFiles() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return numFiles_;
+  }
+
+  /// @return number of blocks successfully transferred
+  size_t getNumBlocks() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return numBlocks_;
   }
 
   /// @return number of failed transfers
@@ -176,10 +201,16 @@ class TransferStats {
     id_ = id;
   }
 
-  /// one more file successfully transferred
-  void incrNumFiles() {
+  /// @param numFiles number of files successfully send
+  void setNumFiles(size_t numFiles) {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
-    numFiles_++;
+    numFiles_ = numFiles;
+  }
+
+  /// one more block successfully transferred
+  void incrNumBlocks() {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    numBlocks_++;
   }
 
   /**
@@ -212,7 +243,7 @@ class TransferReport {
                  std::vector<TransferStats> &failedSourceStats,
                  std::vector<TransferStats> &threadStats,
                  std::vector<std::string> &failedDirectories, double totalTime,
-                 size_t totalFileSize);
+                 size_t totalFileSize, size_t numDiscoveredFiles);
 
   /**
    * This function does not move the thread stats passed to it. This is called
@@ -220,6 +251,9 @@ class TransferReport {
    */
   TransferReport(const std::vector<TransferStats> &threadStats,
                  double totalTime, size_t totalFileSize);
+
+  /// constructor used by receiver, does move the thread stats
+  explicit TransferReport(std::vector<TransferStats> &threadStats);
   /// @return   summary of the report
   const TransferStats &getSummary() const {
     return summary_;
@@ -264,9 +298,9 @@ class TransferReport {
   /// directories which could not be opened
   std::vector<std::string> failedDirectories_;
   /// total transfer time
-  double totalTime_;
+  double totalTime_{0};
   /// sum of all the file sizes
-  size_t totalFileSize_;
+  size_t totalFileSize_{0};
 };
 
 /**

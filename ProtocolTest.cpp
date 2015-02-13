@@ -18,45 +18,64 @@ void testProtocol() {
 
   char buf[128];
   size_t off = 0;
-  bool success = Protocol::encode(buf, off, sizeof(buf), id, size);
+  int64_t blockOffset = 4;
+  int64_t fileSize = 10;
+  bool success =
+      Protocol::encode(buf, off, sizeof(buf), id, size, blockOffset, fileSize);
   EXPECT_TRUE(success);
-  EXPECT_EQ(off, id.size() + 1 + 1);  // 1 byte varint for id len and size
+  EXPECT_EQ(off, id.size() + 1 + 1 + 1 +
+                     1);  // 1 byte varint for id len, size, offset and filesize
   string nid;
   int64_t nsize;
   size_t noff = 0;
-  success = Protocol::decode(buf, noff, sizeof(buf), nid, nsize);
+  int64_t nblockOffset = 0;
+  int64_t nfileSize = 0;
+  success = Protocol::decode(buf, noff, sizeof(buf), nid, nsize, nblockOffset,
+                             nfileSize);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
   EXPECT_EQ(nid, id);
   EXPECT_EQ(nsize, size);
+  EXPECT_EQ(nblockOffset, blockOffset);
+  EXPECT_EQ(nfileSize, fileSize);
   noff = 0;
   // exact size:
-  success = Protocol::decode(buf, noff, off, nid, nsize);
+  success =
+      Protocol::decode(buf, noff, off, nid, nsize, nblockOffset, nfileSize);
   EXPECT_TRUE(success);
 
   LOG(INFO) << "error tests, expect errors";
   // too short
   noff = 0;
-  success = Protocol::decode(buf, noff, off - 1, nid, nsize);
+  success =
+      Protocol::decode(buf, noff, off - 1, nid, nsize, nblockOffset, nfileSize);
   EXPECT_FALSE(success);
 
   // Long size:
   size = (int64_t)100 * 1024 * 1024 * 1024;  // 100Gb
   id.assign("different");
   off = 0;
-  success = Protocol::encode(buf, off, sizeof(buf), id, size);
+  blockOffset = 3;
+  fileSize = 128;
+  success =
+      Protocol::encode(buf, off, sizeof(buf), id, size, blockOffset, fileSize);
   EXPECT_TRUE(success);
-  EXPECT_EQ(off, id.size() + 1 + 6);  // 1 byte varint for id len and size
+  EXPECT_EQ(off,
+            id.size() + 1 + 6 + 1 + 2);  // 1 byte varint for id len and size
   noff = 0;
-  success = Protocol::decode(buf, noff, sizeof(buf), nid, nsize);
+  success = Protocol::decode(buf, noff, sizeof(buf), nid, nsize, nblockOffset,
+                             nfileSize);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
   EXPECT_EQ(nid, id);
   EXPECT_EQ(nsize, size);
+  EXPECT_EQ(nblockOffset, blockOffset);
+  EXPECT_EQ(nfileSize, fileSize);
   LOG(INFO) << "got size of " << nsize;
   // too short for size encoding:
   noff = 0;
-  success = Protocol::decode(buf, noff, off - 2, nid, nsize);
+  success =
+      Protocol::decode(buf, noff, off - 2, nid, nsize, nblockOffset, nfileSize);
   EXPECT_FALSE(success);
 }
 

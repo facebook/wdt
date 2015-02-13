@@ -15,8 +15,14 @@ class ByteSource {
   /// @return identifier for the source
   virtual const std::string &getIdentifier() const = 0;
 
-  /// @return number of bytes in source
+  /// @return number of bytes in this source
   virtual uint64_t getSize() const = 0;
+
+  /// @return number of bytes in the original source
+  virtual uint64_t getTotalSize() const = 0;
+
+  /// @return offset from which to start reading
+  virtual uint64_t getOffset() const = 0;
 
   /// @return true iff all data read successfully
   virtual bool finished() const = 0;
@@ -41,7 +47,7 @@ class ByteSource {
   virtual char *read(size_t &size) = 0;
 
   /// open the source for reading
-  virtual void open() = 0;
+  virtual ErrorCode open() = 0;
 
   /// close the source for reading
   virtual void close() = 0;

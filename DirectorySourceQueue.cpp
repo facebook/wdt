@@ -6,7 +6,6 @@
 #include <utility>
 
 #include <folly/Memory.h>
-#include "FileByteSource.h"
 #include <regex>
 
 namespace facebook {
@@ -211,8 +210,7 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          createIntoQueue(newRelativePath, fileStat.st_size);
-          conditionNotEmpty_.notify_one();
+          createIntoQueue(newFullPath, newRelativePath, fileStat.st_size);
           continue;
         }
       }
@@ -241,25 +239,70 @@ bool DirectorySourceQueue::explore() {
 }
 
 void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
-  std::lock_guard<std::mutex> lock(mutex_);
   size_t retries = source->getTransferStats().getFailedAttempts();
+  std::unique_lock<std::mutex> lock(mutex_);
   if (retries >= options_.maxTransferRetries_) {
     LOG(ERROR) << source->getIdentifier() << " failed after " << retries
                << " number of tries.";
     failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
   } else {
     sourceQueue_.push(std::move(source));
+    lock.unlock();
+    conditionNotEmpty_.notify_one();
   }
 }
 
-void DirectorySourceQueue::createIntoQueue(const std::string &relativePath,
+void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
+                                           const std::string &relPath,
                                            const size_t fileSize) {
-  std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
-      rootDir_, relativePath, fileSize, fileSourceBufferSize_);
-  std::lock_guard<std::mutex> lock(mutex_);
-  sourceQueue_.push(std::move(source));
-  numEntries_++;
-  totalFileSize_ += fileSize;
+  // TODO: currently we are treating small files(size less than blocksize) as
+  // blocks. Also, we transfer file name in the header for all the blocks for a
+  // large file. This can be optimized as follows -
+  // a) if filesize < blocksize, we do not send blocksize and offset in the
+  // header. This should be useful for tiny files(0-few hundred bytes). We will
+  // have to use separate header format and commands for files and blocks.
+  // b) if filesize > blocksize, we can use send filename only in the first
+  // block and use a shorter header for subsequent blocks. Also, we can remove
+  // block size once negotiated, since blocksize is sort of fixed.
+
+  bool enableBlockTransfer = options_.blockSize_ > 0;
+  if (!enableBlockTransfer) {
+    VLOG(2) << "Block transfer disabled for this transfer";
+  }
+  // if block transfer is disabled, treating fileSize as block size. This
+  // ensures that we create a single block
+  auto blockSize = enableBlockTransfer ? options_.blockSize_ : fileSize;
+
+  FileMetaData *fileData = new FileMetaData(fullPath, relPath, fileSize);
+  sharedFileData_.emplace_back(fileData);
+  int blockCount = 0;
+  size_t offset = 0;
+  size_t remainingBytes = fileSize;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    do {
+      size_t size = std::min<size_t>(remainingBytes, blockSize);
+      std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
+          fileData, size, offset, fileSourceBufferSize_);
+      sourceQueue_.push(std::move(source));
+      remainingBytes -= size;
+      offset += size;
+      blockCount++;
+    } while (remainingBytes > 0);
+    numEntries_++;
+    totalFileSize_ += fileSize;
+  }
+  // for large files with lots of blocks, we don't want to call notify_one
+  // unnecessarily large amount of times. maximum number of effective
+  // notify_one is number of threads. So, if number of blocks is greater than
+  // num_threads, we use notify_all
+  if (blockCount < options_.numSockets_) {
+    for (int i = 0; i < blockCount; i++) {
+      conditionNotEmpty_.notify_one();
+    }
+  } else {
+    conditionNotEmpty_.notify_all();
+  }
 }
 
 std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
@@ -289,8 +332,7 @@ bool DirectorySourceQueue::enqueueFiles() {
     } else {
       filesize = info.second;
     }
-    createIntoQueue(info.first, filesize);
-    conditionNotEmpty_.notify_one();
+    createIntoQueue(fullPath, info.first, filesize);
   }
   return true;
 }
@@ -335,15 +377,14 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
     source = std::move(
         const_cast<std::unique_ptr<ByteSource> &>(sourceQueue_.top()));
     sourceQueue_.pop();
-    lock.unlock();
     if (sourceQueue_.empty() && initFinished_) {
       conditionNotEmpty_.notify_all();
     }
+    lock.unlock();
     VLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
             << " size " << source->getSize();
     // try to open the source
-    source->open();
-    if (!source->hasError()) {
+    if (source->open() == OK) {
       return source;
     }
     source->close();
