@@ -58,7 +58,7 @@ ${FOLLY_SOURCE_DIR}/folly/Malloc.cpp
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
-add_library(wdtlib
+add_library(wdtlib_min
 ClientSocket.cpp
 DirectorySourceQueue.cpp
 FileByteSource.cpp
@@ -72,7 +72,10 @@ SocketUtils.cpp
 Throttler.cpp
 WdtOptions.cpp
 )
-
+add_library(wdtlib
+WdtFlags.cpp
+)
+target_link_libraries(wdtlib wdtlib_min)
 # Folly uses boost system
 #set(Boost_USE_STATIC_LIBS on)
 find_package(Boost COMPONENTS system REQUIRED)
@@ -155,7 +158,7 @@ target_link_libraries(wdt wdtlib)
 
 ### Install rules
 
-install(TARGETS wdt wdtlib folly4wdt CONFIGURATIONS Release
+install(TARGETS wdt wdtlib wdtlib_min folly4wdt CONFIGURATIONS Release
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib

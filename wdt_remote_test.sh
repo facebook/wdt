@@ -16,7 +16,7 @@ SKIP_WRITES="true"
 echo "Run from ~fbcode (wdt's parent dir). Skip writes is $SKIP_WRITES"
 
 #WDTBIN_OPTS="-minloglevel 2 -sleep_ms 10 -max_retries 5 -num_sockets 15"
-WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 16"
+WDTBIN_OPTS="-wdt_sleep_ms 1 -wdt_max_retries 3 -wdt_num_ports 16"
 #WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 16 -ipv4=true"
 
 BASEDIR=/dev/shm/tmpWDT
@@ -53,7 +53,7 @@ $SCP $WDTORIGDIR/$WDTNAME $REMOTEUSER@$SRCHOST:$WDTBIN
 # Start server/recipient first (so it's likely ready by the time we are done
 # staging the src)
 echo "Starting server on destination side $DSTHOST"
-$RSHDST "date; $WDTCMD -directory $DIR/dst -skip_writes=$SKIP_WRITES > $DIR/server.log 2>&1 &"
+$RSHDST "date; $WDTCMD -directory $DIR/dst -wdt_skip_writes=$SKIP_WRITES > $DIR/server.log 2>&1 &"
 
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src

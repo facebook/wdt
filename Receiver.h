@@ -25,7 +25,7 @@
 #include <string>
 #include <condition_variable>
 #include <mutex>
-
+#include <thread>
 namespace facebook {
 namespace wdt {
 class Receiver {
@@ -81,6 +81,11 @@ class Receiver {
    */
   void markTransferFinished(bool isFinished);
 
+  /**
+   * Use the method to get a list of ports
+   */
+  const std::vector<int64_t> &getPorts();
+
  protected:
   /**
    * Responsible for basic setup and starting threads
@@ -107,10 +112,8 @@ class Receiver {
   bool transferFinished_{true};
   /// Flag based on which threads finish processing on receiving a done
   bool isJoinable_;
-  /// The starting port number for the receiver threads
-  int port_;
-  /// The number of threads receiving files
-  int numSockets_;
+  /// The ports on which the receiver will be listening
+  std::vector<int64_t> ports_;
   /// Destination directory where the received files will be written
   std::string destDir_;
   /// Responsible for writing files on the disk

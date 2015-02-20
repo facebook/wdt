@@ -1,19 +1,11 @@
 #include "Sender.h"
-#include "WdtOptions.h"
+#include "WdtFlags.h"
 #include "FileByteSource.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "Protocol.h"
 
 using namespace testing;
-
-DEFINE_int32(num_sockets, 8, "");
-DEFINE_int32(port, 22356, "");
-DEFINE_bool(follow_symlinks, false, "");
-DEFINE_int32(max_retries, 2, "");
-DEFINE_int32(sleep_ms, 50, "");
-DEFINE_int32(buffer_size, 256 * 1024, "");
-
 namespace facebook {
 namespace wdt {
 
@@ -102,7 +94,7 @@ class MockSender : public Sender {
                                   const std::unique_ptr<ByteSource> &source,
                                   const bool doThrottling,
                                   const size_t totalBytes,
-                                  ErrorCode transferStatus) {
+                                  ErrorCode transferStatus) override {
     return std::move(stats_);
   }
 
@@ -379,12 +371,7 @@ TEST(SendOneByteSource, MultiChunkSuccess) {
 }
 void initOptions() {
   auto &options = facebook::wdt::WdtOptions::getMutable();
-  options.numSockets_ = FLAGS_num_sockets;
-  options.port_ = FLAGS_port;
-  options.followSymlinks_ = FLAGS_follow_symlinks;
-  options.maxRetries_ = FLAGS_max_retries;
-  options.sleepMillis_ = FLAGS_sleep_ms;
-  options.bufferSize_ = FLAGS_buffer_size;
+  options.maxRetries_ = 2;
 }
 int main(int argc, char *argv[]) {
   testing::InitGoogleTest(&argc, argv);

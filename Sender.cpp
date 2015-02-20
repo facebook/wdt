@@ -31,25 +31,46 @@ double durationSeconds(T d) {
 namespace facebook {
 namespace wdt {
 
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
+  std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
+  return os;
+}
+
 Sender::Sender(int port, int numSockets, const std::string &destHost,
                const std::string &srcDir)
     : Sender(destHost, srcDir) {
-  this->port_ = port;
-  this->numSockets_ = numSockets;
+  this->destHost_ = destHost;
+  this->srcDir_ = srcDir;
+  ports_.resize(numSockets);
+  for (int i = 0; i < numSockets; i++) {
+    ports_[i] = port + i;
+  }
 }
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
-  this->destHost_ = destHost;
-  this->srcDir_ = srcDir;
   const auto &options = WdtOptions::get();
-  this->port_ = options.port_;
-  this->numSockets_ = options.numSockets_;
+  int port = options.port_;
+  int numSockets = options.numSockets_;
+  for (int i = 0; i < numSockets; i++) {
+    ports_.push_back(port + i);
+  }
   this->followSymlinks_ = options.followSymlinks_;
   this->includeRegex_ = options.includeRegex_;
   this->excludeRegex_ = options.excludeRegex_;
   this->pruneDirRegex_ = options.pruneDirRegex_;
   this->progressReportIntervalMillis_ = options.progressReportIntervalMillis_;
   this->progressReporter_ = folly::make_unique<ProgressReporter>();
+  this->destHost_ = destHost;
+  this->srcDir_ = srcDir;
+}
+
+Sender::Sender(const std::string &destHost, const std::string &srcDir,
+               const std::vector<int64_t> &ports,
+               const std::vector<FileInfo> &srcFileInfo)
+    : Sender(destHost, srcDir) {
+  ports_ = ports;
+  srcFileInfo_ = srcFileInfo;
 }
 
 void Sender::setIncludeRegex(const std::string &includeRegex) {
@@ -62,14 +83,6 @@ void Sender::setExcludeRegex(const std::string &excludeRegex) {
 
 void Sender::setPruneDirRegex(const std::string &pruneDirRegex) {
   pruneDirRegex_ = pruneDirRegex;
-}
-
-void Sender::setPort(const int port) {
-  port_ = port;
-}
-
-void Sender::setNumSockets(const int numSockets) {
-  numSockets_ = numSockets;
 }
 
 void Sender::setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo) {
@@ -93,8 +106,9 @@ void Sender::setProgressReporter(
 std::unique_ptr<TransferReport> Sender::start() {
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.twoPhases_;
-  LOG(INFO) << "Client (sending) to " << destHost_ << " port " << port_ << " : "
-            << numSockets_ << " sockets, source dir " << srcDir_;
+  const size_t bufferSize = options.bufferSize_;
+  LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
+            << ports_ << "]";
   auto startTime = Clock::now();
   DirectorySourceQueue queue(srcDir_);
   queue.setIncludePattern(includeRegex_);
@@ -113,16 +127,18 @@ std::unique_ptr<TransferReport> Sender::start() {
   }
   std::vector<std::thread> vt;
   std::vector<TransferStats> threadStats;
-  for (int i = 0; i < numSockets_; i++) {
+  for (int i = 0; i < ports_.size(); i++) {
     threadStats.emplace_back(true);
   }
-  std::vector<std::vector<TransferStats>> sourceStats(numSockets_);
+  std::vector<std::vector<TransferStats>> sourceStats(ports_.size());
+
+  int numSockets = ports_.size();
   double avgRateBytesPerSec = options.avgMbytesPerSec_ * kMbToB;
   double peakRateBytesPerSec = options.maxMbytesPerSec_ * kMbToB;
   double bucketLimitBytes = options.throttlerBucketLimit_ * kMbToB;
-  double perThreadAvgRateBytesPerSec = avgRateBytesPerSec / numSockets_;
-  double perThreadPeakRateBytesPerSec = peakRateBytesPerSec / numSockets_;
-  double perThreadBucketLimit = bucketLimitBytes / numSockets_;
+  double perThreadAvgRateBytesPerSec = avgRateBytesPerSec / numSockets;
+  double perThreadPeakRateBytesPerSec = peakRateBytesPerSec / numSockets;
+  double perThreadBucketLimit = bucketLimitBytes / numSockets;
   if (avgRateBytesPerSec < 1.0 && avgRateBytesPerSec >= 0) {
     LOG(FATAL) << "Realistic average rate"
                   " should be greater than 1.0 bytes/sec";
@@ -145,10 +161,10 @@ std::unique_ptr<TransferReport> Sender::start() {
   VLOG(1) << "Per thread (Avg Rate, Peak Rate) = "
           << "(" << perThreadAvgRateBytesPerSec << ", "
           << perThreadPeakRateBytesPerSec << ")";
-  for (int i = 0; i < numSockets_; i++) {
+  for (int i = 0; i < numSockets; i++) {
     threadStats[i].setId(folly::to<std::string>(i));
     vt.emplace_back(&Sender::sendOne, this, startTime, std::ref(destHost_),
-                    port_ + i, std::ref(queue), perThreadAvgRateBytesPerSec,
+                    ports_[i], std::ref(queue), perThreadAvgRateBytesPerSec,
                     perThreadPeakRateBytesPerSec, perThreadBucketLimit,
                     std::ref(threadStats[i]), std::ref(sourceStats[i]));
   }
@@ -162,7 +178,7 @@ std::unique_ptr<TransferReport> Sender::start() {
     dirThread.join();
     directoryTime = durationSeconds(Clock::now() - startTime);
   }
-  for (int i = 0; i < numSockets_; i++) {
+  for (int i = 0; i < numSockets; i++) {
     vt[i].join();
   }
   if (progressReportEnabled) {

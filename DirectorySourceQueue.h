@@ -14,8 +14,6 @@
 #include "WdtOptions.h"
 #include "FileByteSource.h"
 
-DECLARE_int32(buffer_size);
-
 namespace facebook {
 namespace wdt {
 
@@ -80,10 +78,10 @@ class DirectorySourceQueue : public SourceQueue {
   virtual std::unique_ptr<ByteSource> getNextSource(ErrorCode &status) override;
 
   /// @return         total number of files processed/enqueued
-  virtual size_t getCount() const;
+  virtual size_t getCount() const override;
 
   /// @return         total size of files processed/enqueued
-  virtual size_t getTotalSize() const;
+  virtual size_t getTotalSize() const override;
 
   /**
    * Sets regex represnting files to include for transfer

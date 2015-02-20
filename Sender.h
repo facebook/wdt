@@ -39,8 +39,14 @@ typedef std::chrono::high_resolution_clock Clock;
 class Sender {
  public:
   Sender(const std::string &destHost, const std::string &srcDir);
+
+  Sender(const std::string &destHost, const std::string &srcDir,
+         const std::vector<int64_t> &ports,
+         const std::vector<FileInfo> &srcFileInfo);
+
   Sender(int port, int numSockets, const std::string &destHost,
          const std::string &srcDir);
+
   virtual ~Sender() {
   }
 
@@ -51,8 +57,6 @@ class Sender {
   void setExcludeRegex(const std::string &excludeRegex);
 
   void setPruneDirRegex(const std::string &pruneDirRegex);
-
-  void setPort(const int port);
 
   void setNumSockets(const int numSockets);
 
@@ -107,8 +111,7 @@ class Sender {
                       std::vector<TransferStats> &threadStats,
                       DirectorySourceQueue &queue);
 
-  int port_;
-  int numSockets_;
+  std::vector<int64_t> ports_;
   std::string srcDir_;
   std::string destHost_;
   std::string pruneDirRegex_;

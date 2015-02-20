@@ -18,7 +18,13 @@
 using std::vector;
 namespace facebook {
 namespace wdt {
-/// len is initial/already read len
+
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
+  std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
+  return os;
+}
+
 size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
                    ssize_t len) {
   VLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
@@ -65,10 +71,12 @@ size_t readAtMost(ServerSocket &s, char *buf, size_t max, size_t atMost) {
   return n;
 }
 
-Receiver::Receiver(int port, int numSockets)
-    : port_(port), numSockets_(numSockets) {
+Receiver::Receiver(int port, int numSockets) {
   isJoinable_ = false;
   transferFinished_ = true;
+  for (int i = 0; i < numSockets; i++) {
+    ports_.push_back(port + i);
+  }
 }
 
 Receiver::Receiver(int port, int numSockets, std::string destDir)
@@ -86,6 +94,10 @@ Receiver::~Receiver() {
                  << " is being called. Trying to finish the transfer";
     finish();
   }
+}
+
+const vector<int64_t> &Receiver::getPorts() {
+  return ports_;
 }
 
 bool Receiver::hasPendingTransfer() {
@@ -108,7 +120,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
                  << " finish and this method will never return";
   }
-  for (int i = 0; i < numSockets_; i++) {
+  for (int i = 0; i < ports_.size(); i++) {
     receiverThreads_[i].join();
   }
 
@@ -206,18 +218,18 @@ void Receiver::progressTracker() {
     if (zeroProgressCount > numFailedProgressChecks) {
       LOG(INFO) << "No progress for the last " << numFailedProgressChecks
                 << " checks.";
-      for (int i = 0; i < numSockets_; i++) {
+      for (int i = 0; i < ports_.size(); i++) {
         int listenFd = threadServerSockets_[i].getListenFd();
         if (shutdown(listenFd, SHUT_RDWR) < 0) {
-          int port = port_ + i;
+          int port = ports_[i];
           LOG(WARNING) << "Progress tracker could not shut down listening "
                        << " file descriptor for the thread with port " << port;
         }
       }
-      for (int i = 0; i < numSockets_; i++) {
+      for (int i = 0; i < ports_.size(); i++) {
         int fd = threadServerSockets_[i].getFd();
         if (shutdown(fd, SHUT_RDWR) < 0) {
-          int port = port_ + i;
+          int port = ports_[i];
           LOG(WARNING) << "Progress tracker could not shut down file "
                        << "descriptor for the thread " << port;
         }
@@ -231,8 +243,8 @@ void Receiver::start() {
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an existing transfer in progress on this object";
   }
-  LOG(INFO) << "Starting (receiving) server on " << port_ << " : "
-            << numSockets_ << " sockets, target dir " << destDir_;
+  LOG(INFO) << "Starting (receiving) server on ports [ " << ports_
+            << "] Target dir : " << destDir_;
   markTransferFinished(false);
   const auto &options = WdtOptions::get();
   size_t bufferSize = options.bufferSize_;
@@ -244,12 +256,12 @@ void Receiver::start() {
               << bufferSize << " instead";
   }
   fileCreator_.reset(new FileCreator(destDir_));
-  for (int i = 0; i < numSockets_; i++) {
+  for (int i = 0; i < ports_.size(); i++) {
     threadStats_.emplace_back(true);
-    threadServerSockets_.emplace_back(folly::to<std::string>(port_ + i),
+    threadServerSockets_.emplace_back(folly::to<std::string>(ports_[i]),
                                       options.backlog_);
   }
-  for (int i = 0; i < numSockets_; i++) {
+  for (int i = 0; i < ports_.size(); i++) {
     receiverThreads_.emplace_back(
         &Receiver::receiveOne, this, std::ref(threadServerSockets_[i]),
         std::ref(destDir_), bufferSize, std::ref(threadStats_[i]));

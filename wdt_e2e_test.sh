@@ -86,7 +86,8 @@ while getopts ":t:a:p:s:d:h:" opt; do
 done
 printf "(Sockets,Average rate, Max_rate, Save local?, Delay)=%s,%s,%s,%s,%s\n" "$threads" "$avg_rate" "$max_rate" "$keeplog" "$delay"
 #WDTBIN_OPTS="-buffer_size=$BS -num_sockets=8 -minloglevel 2 -sleep_ms 1 -max_retries 999"
-WDTBIN_OPTS="-minloglevel=0 -sleep_ms 1 -max_retries 999 -full_reporting -avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate -num_sockets=$threads -peak_log_time_ms=200"
+WDTBIN_OPTS="-minloglevel=0 -wdt_sleep_ms 1 -wdt_max_retries 999 -wdt_full_reporting "\
+"-wdt_avg_mbytes_per_sec=$avg_rate -wdt_max_mbytes_per_sec=$max_rate -wdt_num_ports=$threads -wdt_throttler_log_time_ms=200"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/tmpWDT
@@ -161,8 +162,8 @@ time $WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log
 echo -n e | $NC localhost 22356
 
 $WDTBIN -directory $DIR/dst_symlinks >> $DIR/server.log 2>&1 &
-echo "$WDTBIN -follow_symlinks -directory $DIR/src -destination $HOSTNAME |& tee -a $DIR/client.log"
-time $WDTBIN -follow_symlinks -directory $DIR/src -destination $HOSTNAME |& tee -a $DIR/client.log
+echo "$WDTBIN -wdt_follow_symlinks -directory $DIR/src -destination $HOSTNAME |& tee -a $DIR/client.log"
+time $WDTBIN -wdt_follow_symlinks -directory $DIR/src -destination $HOSTNAME |& tee -a $DIR/client.log
 
 echo -n e | $NC localhost 22356
 

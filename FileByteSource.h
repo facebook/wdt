@@ -77,40 +77,40 @@ class FileByteSource : public ByteSource {
   }
 
   /// @return filepath
-  virtual const std::string &getIdentifier() const {
+  virtual const std::string &getIdentifier() const override {
     return fileData_->getRelPath();
   }
 
   /// @return size of file in bytes
-  virtual uint64_t getSize() const {
+  virtual uint64_t getSize() const override {
     return size_;
   }
 
   /// @return number of bytes in the original source
-  virtual uint64_t getTotalSize() const {
+  virtual uint64_t getTotalSize() const override {
     return fileData_->getFileSize();
   }
 
   /// @return offset from which to start reading
-  virtual uint64_t getOffset() const {
+  virtual uint64_t getOffset() const override {
     return offset_;
   }
 
   /// @return true iff finished reading file successfully
-  virtual bool finished() const {
+  virtual bool finished() const override {
     return bytesRead_ == size_ && !hasError();
   }
 
   /// @return true iff there was an error reading file
-  virtual bool hasError() const {
+  virtual bool hasError() const override {
     return fd_ < 0;
   }
 
   /// @see ByteSource.h
-  virtual char *read(size_t &size);
+  virtual char *read(size_t &size) override;
 
   /// open the source for reading
-  virtual ErrorCode open();
+  virtual ErrorCode open() override;
 
   /// close the source for reading
   virtual void close() override {
@@ -124,12 +124,12 @@ class FileByteSource : public ByteSource {
    * @return transfer stats for the source. If the stats is moved by the
    *         caller, then this function can not be called again
    */
-  virtual TransferStats &getTransferStats() {
+  virtual TransferStats &getTransferStats() override {
     return transferStats_;
   }
 
   /// @param stats    Stats to be added
-  virtual void addTransferStats(const TransferStats &stats) {
+  virtual void addTransferStats(const TransferStats &stats) override {
     transferStats_ += stats;
   }
 

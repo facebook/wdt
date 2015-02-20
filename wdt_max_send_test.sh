@@ -33,7 +33,7 @@ SKIP_WRITES="true"
 # Without throttling:
 #WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 13"
 # With, still gets almost same max (21G) with throttling set high enough
-WDTBIN_OPTS="-sleep_ms 1 -max_retries 3 -num_sockets 13 --avg_mbytes_per_sec=26000 --max_mbytes_per_sec=26001"
+WDTBIN_OPTS="-wdt_sleep_ms 1 -wdt_max_retries 3 -wdt_num_ports 13 --wdt_avg_mbytes_per_sec=26000 --wdt_max_mbytes_per_sec=26001"
 CLIENT_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
 %Mmax)k\n%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps\nCLIENT_PROFILE %U \
 %S %e"
@@ -68,7 +68,7 @@ do
 done
 echo "Done with staging src test files"
 
-/usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst -skip_writes=$SKIP_WRITES > \
+/usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst -wdt_skip_writes=$SKIP_WRITES > \
 $DIR/server.log 2>&1 &
 
 # wait for server to be up
