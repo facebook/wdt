@@ -84,7 +84,7 @@ do
   echo "starting ${i}th run"
   TWO_PHASE_ARG=""
   # every other run will be two_phases
-  [ $(($i % 2)) -eq 0 ] && TWO_PHASE_ARG="-two_phases"
+  [ $(($i % 2)) -eq 0 ] && TWO_PHASE_ARG="-wdt_two_phases"
 
   /usr/bin/time -f "$CLIENT_PROFILE_FORMAT" $WDTCMD -directory $DIR/src \
   -destination $REMOTE $TWO_PHASE_ARG |& tee $DIR/client$i.log
