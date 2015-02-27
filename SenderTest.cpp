@@ -371,7 +371,7 @@ TEST(SendOneByteSource, MultiChunkSuccess) {
 }
 void initOptions() {
   auto &options = facebook::wdt::WdtOptions::getMutable();
-  options.maxRetries_ = 2;
+  options.max_retries = 2;
 }
 int main(int argc, char *argv[]) {
   testing::InitGoogleTest(&argc, argv);

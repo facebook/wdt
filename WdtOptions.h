@@ -25,66 +25,66 @@ class WdtOptions {
   /**
    * Use ipv6 while establishing connection
    */
-  bool ipv6_;
+  bool ipv6{true};
   /**
    * Use ipv4, this takes precedence over ipv6
    */
-  bool ipv4_;
+  bool ipv4{false};
   /**
    * Run wdt in a mode where the receiver doesn't
    * write anything to the disk
    */
-  bool skipWrites_;
+  bool skip_writes{false};
   /**
    * Continue the operation even if there are
    * socket errors
    */
-  bool ignoreOpenErrors_;
+  bool ignore_open_errors{false};
   /**
    * Run the sender in two phases. First phase is
    * discovery phase and the second one is sending
    * the files over wire.
    */
-  bool twoPhases_;
+  bool two_phases{false};
   /**
    * This option specifies whether wdt should
    * discover symlinks and transfer those files
    */
-  bool followSymlinks_;
+  bool follow_symlinks{false};
 
   /**
-   * Starting port for wdt. Number of ports allocated
+   * Starting start_port for wdt. Number of ports allocated
    * are contigous sequence starting of numSockets
-   * starting from this port
+   * starting from this start_port
    */
-  int32_t port_;
-  int32_t numSockets_;
+  int32_t start_port{22356};
+  int32_t num_ports{8};
   /**
    * Maximum buffer size for the write on the sender
    * as well as while reading on receiver.
    */
-  int32_t bufferSize_;
+  int32_t buffer_size{256 * 1024};
   /**
    * Maximum number of retries for the sender in case of
    * failures before exiting
    */
-  int32_t maxRetries_;
+  int32_t max_retries{20};
   /**
    * Time in ms to sleep before retrying after each connection
    * failure
    */
-  int32_t sleepMillis_;
+  int32_t sleep_millis{50};
   /**
    * Specify the backlog to start the server socket with. Look
    * into ServerSocket.h
    */
-  int32_t backlog_;
+  int32_t backlog{1};
 
   /**
    * Rate at which we would like data to be transferred,
    * specifying this as < 0 makes it unlimited
    */
-  double avgMbytesPerSec_;
+  double avg_mbytes_per_sec{-1};
   /**
    * Rate at which tokens will be generated in TB algorithm.
    * When we lag behind, this will allow us to go faster,
@@ -93,66 +93,66 @@ class WdtOptions {
    * auto conf as (kPeakMultiplier * avgMbytesPerSec_)
    * Find details in Sender.cpp
    */
-  double maxMbytesPerSec_;
+  double max_mbytes_per_sec{0};
   /**
    * Maximum bucket size of TB algorithm in mbytes
    * This together with maxBytesPerSec_ will
    * make for maximum burst rate. If specified as 0 it is
    * auto configured in Sender.cpp
    */
-  double throttlerBucketLimit_;
+  double throttler_bucket_limit{0};
   /**
    * Throttler logs statistics like average and max rate.
    * This option specifies on how frequently should those
    * be logged
    */
-  int64_t throttlerLogTimeMillis_;
+  int64_t throttler_log_time_millis{0};
   /**
    * Regex for the files to be included in discovery
    */
-  std::string includeRegex_;
+  std::string include_regex{""};
   /**
    * Regex for the files to be excluded from the discovery
    */
-  std::string excludeRegex_;
+  std::string exclude_regex{""};
   /**
    * Regex for the directories that shouldn't be explored
    */
-  std::string pruneDirRegex_;
+  std::string prune_dir_regex{""};
 
   /**
    * Maximu number of retries for transferring a file
    */
-  int maxTransferRetries_;
+  int max_transfer_retries{3};
 
   /**
    * True if full reporting is enabled. False otherwise
    */
-  bool fullReporting_;
+  bool full_reporting{false};
 
   /**
    * IntervalMillis(in milliseconds) between progress reports
    */
-  int progressReportIntervalMillis_;
+  int progress_report_interval_millis{20};
 
   /// multiplication factor for retry interval
-  double retryIntervalMultFactor_;
+  double retry_interval_mult_factor{1.0};
 
   /**
    * Timeout checks will be done at this interval (milliseconds)
    */
-  int timeoutCheckIntervalMillis_;
+  int timeout_check_interval_millis{1000};
 
   /**
    * Number of failed timeout checks after which receiver should terminate
    */
-  int failedTimeoutChecks_;
+  int failed_timeout_checks{100};
 
   /**
    * block size, it is used to break bigger files into smaller chunks
    * block_size of <= 0 disables block transfer
    */
-  int64_t blockSize_;
+  int64_t block_size{16 * 1024 * 1024};
 
   /**
    * Since this is a singelton copy constructor
@@ -160,42 +160,10 @@ class WdtOptions {
    */
   WdtOptions(const WdtOptions&) = delete;
   WdtOptions& operator=(const WdtOptions&) = delete;
+  WdtOptions() {
 
+  }
  private:
   static WdtOptions* instance_;
-  WdtOptions() {
-    ipv6_ = true;
-    ipv4_ = false;
-    skipWrites_ = false;
-    ignoreOpenErrors_ = false;
-    twoPhases_ = false;
-    followSymlinks_ = false;
-
-    port_ = 22356;
-    numSockets_ = 8;
-    bufferSize_ = 256 * 1024;
-    blockSize_ = 16 * 1024 * 1024;
-    maxRetries_ = 20;
-    sleepMillis_ = 50;
-    backlog_ = 1;
-    maxTransferRetries_ = 3;
-    fullReporting_ = false;
-    progressReportIntervalMillis_ = 0;
-
-    retryIntervalMultFactor_ = 1.0;
-
-    throttlerLogTimeMillis_ = 0;
-    avgMbytesPerSec_ = -1;
-    maxMbytesPerSec_ = 0;
-    throttlerBucketLimit_ = 0;
-
-    failedTimeoutChecks_ = 100;
-    timeoutCheckIntervalMillis_ = 1000;
-
-    includeRegex_ = "";
-    excludeRegex_ = "";
-    pruneDirRegex_ = "";
-  }
 };
-}
-}
+}}

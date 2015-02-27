@@ -179,10 +179,10 @@ void Receiver::progressTracker() {
   const auto &options = WdtOptions::get();
   // Progress tracker will check for progress after the time specified
   // in milliseconds.
-  int progressTrackIntervalMillis = options.timeoutCheckIntervalMillis_;
+  int progressTrackIntervalMillis = options.timeout_check_interval_millis;
   // The number of failed progress checks after which the threads
   // should be stopped
-  int numFailedProgressChecks = options.failedTimeoutChecks_;
+  int numFailedProgressChecks = options.failed_timeout_checks;
   if (progressTrackIntervalMillis < 0 || !isJoinable_) {
     return;
   }
@@ -247,11 +247,11 @@ void Receiver::start() {
             << "] Target dir : " << destDir_;
   markTransferFinished(false);
   const auto &options = WdtOptions::get();
-  size_t bufferSize = options.bufferSize_;
+  size_t bufferSize = options.buffer_size;
   if (bufferSize < Protocol::kMaxHeader) {
     // round up to even k
     bufferSize = 2 * 1024 * ((Protocol::kMaxHeader - 1) / (2 * 1024) + 1);
-    LOG(INFO) << "Specified -buffer_size " << options.bufferSize_
+    LOG(INFO) << "Specified -buffer_size " << options.buffer_size
               << " smaller than " << Protocol::kMaxHeader << " using "
               << bufferSize << " instead";
   }
@@ -259,7 +259,7 @@ void Receiver::start() {
   for (int i = 0; i < ports_.size(); i++) {
     threadStats_.emplace_back(true);
     threadServerSockets_.emplace_back(folly::to<std::string>(ports_[i]),
-                                      options.backlog_);
+                                      options.backlog);
   }
   for (int i = 0; i < ports_.size(); i++) {
     receiverThreads_.emplace_back(
@@ -275,12 +275,12 @@ void Receiver::start() {
 void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
                           size_t bufferSize, TransferStats &threadStats) {
   const auto &options = WdtOptions::get();
-  const bool doActualWrites = !options.skipWrites_;
+  const bool doActualWrites = !options.skip_writes;
   std::string port = socket.getPort();
   VLOG(1) << "Server Thread for port " << port << " with backlog "
           << socket.getBackLog() << " on " << destDir
           << " writes= " << doActualWrites;
-  for (int i = 1; i < options.maxRetries_; ++i) {
+  for (int i = 1; i < options.max_retries; ++i) {
     ErrorCode code = socket.listen();
     if (code == OK) {
       break;
@@ -289,7 +289,8 @@ void Receiver::receiveOne(ServerSocket &socket, const std::string &destDir,
       return;
     }
     LOG(INFO) << "Sleeping after failed attempt " << i;
-    usleep(options.sleepMillis_ * 1000);
+    /* sleep override */
+    usleep(options.sleep_millis * 1000);
   }
   // one more/last try (stays true if it worked above)
   if (socket.listen() != OK) {

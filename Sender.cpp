@@ -50,16 +50,16 @@ Sender::Sender(int port, int numSockets, const std::string &destHost,
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   const auto &options = WdtOptions::get();
-  int port = options.port_;
-  int numSockets = options.numSockets_;
+  int port = options.start_port;
+  int numSockets = options.num_ports;
   for (int i = 0; i < numSockets; i++) {
     ports_.push_back(port + i);
   }
-  this->followSymlinks_ = options.followSymlinks_;
-  this->includeRegex_ = options.includeRegex_;
-  this->excludeRegex_ = options.excludeRegex_;
-  this->pruneDirRegex_ = options.pruneDirRegex_;
-  this->progressReportIntervalMillis_ = options.progressReportIntervalMillis_;
+  this->followSymlinks_ = options.follow_symlinks;
+  this->includeRegex_ = options.include_regex;
+  this->excludeRegex_ = options.exclude_regex;
+  this->pruneDirRegex_ = options.prune_dir_regex;
+  this->progressReportIntervalMillis_ = options.progress_report_interval_millis;
   this->progressReporter_ = folly::make_unique<ProgressReporter>();
   this->destHost_ = destHost;
   this->srcDir_ = srcDir;
@@ -105,8 +105,8 @@ void Sender::setProgressReporter(
 
 std::unique_ptr<TransferReport> Sender::start() {
   const auto &options = WdtOptions::get();
-  const bool twoPhases = options.twoPhases_;
-  const size_t bufferSize = options.bufferSize_;
+  const bool twoPhases = options.two_phases;
+  const size_t bufferSize = options.buffer_size;
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
             << ports_ << "]";
   auto startTime = Clock::now();
@@ -133,9 +133,9 @@ std::unique_ptr<TransferReport> Sender::start() {
   std::vector<std::vector<TransferStats>> sourceStats(ports_.size());
 
   int numSockets = ports_.size();
-  double avgRateBytesPerSec = options.avgMbytesPerSec_ * kMbToB;
-  double peakRateBytesPerSec = options.maxMbytesPerSec_ * kMbToB;
-  double bucketLimitBytes = options.throttlerBucketLimit_ * kMbToB;
+  double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
+  double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
+  double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
   double perThreadAvgRateBytesPerSec = avgRateBytesPerSec / numSockets;
   double perThreadPeakRateBytesPerSec = peakRateBytesPerSec / numSockets;
   double perThreadBucketLimit = bucketLimitBytes / numSockets;
@@ -191,7 +191,7 @@ std::unique_ptr<TransferReport> Sender::start() {
   }
 
   std::vector<TransferStats> transferredSourceStats;
-  if (WdtOptions::get().fullReporting_) {
+  if (WdtOptions::get().full_reporting) {
     for (auto &stats : sourceStats) {
       transferredSourceStats.insert(transferredSourceStats.end(),
                                     std::make_move_iterator(stats.begin()),
@@ -270,8 +270,8 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
   const auto &options = WdtOptions::get();
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket = makeSocket(destHost, port);
-  double retryInterval = options.sleepMillis_;
-  for (int i = 1; i <= options.maxRetries_; ++i) {
+  double retryInterval = options.sleep_millis;
+  for (int i = 1; i <= options.max_retries; ++i) {
     ++connectAttempts;
     errCode = socket->connect();
     if (errCode == OK) {
@@ -279,11 +279,11 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
     } else if (errCode == CONN_ERROR) {
       return nullptr;
     }
-    if (i != options.maxRetries_) {
+    if (i != options.max_retries) {
       // sleep between attempts but not after the last
       VLOG(1) << "Sleeping after failed attempt " << i;
       usleep(retryInterval * 1000);
-      retryInterval *= options.retryIntervalMultFactor_;
+      retryInterval *= options.retry_interval_mult_factor;
     }
   }
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
@@ -302,7 +302,7 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
 /**
  * @param startTime              Time when this thread was spawned
  * @param destHost               Address to the destination, see ClientSocket
- * @param port                   Port to establish connect
+ * @param start_port                   Port to establish connect
  * @param queue                  DirectorySourceQueue object for reading files
  * @param avgRateBytes           Average rate of throttler in bytes/sec
  * @param maxRateBytes           Peak rate for Token Bucket algorithm in
@@ -322,9 +322,9 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
   const auto &options = WdtOptions::get();
   const bool doThrottling = (avgRateBytes > 0 || maxRateBytes > 0);
   if (doThrottling) {
-    throttler = folly::make_unique<Throttler>(startTime, avgRateBytes,
-                                              maxRateBytes, bucketLimitBytes,
-                                              options.throttlerLogTimeMillis_);
+    throttler = folly::make_unique<Throttler>(
+        startTime, avgRateBytes, maxRateBytes, bucketLimitBytes,
+        options.throttler_log_time_millis);
   } else {
     VLOG(1) << "No throttling in effect";
   }
@@ -352,7 +352,7 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     source->addTransferStats(transferStats);
     source->close();
     if (transferStats.getErrorCode() == OK) {
-      if (options.fullReporting_) {
+      if (options.full_reporting) {
         transferredFileStats.emplace_back(
             std::move(source->getTransferStats()));
       }

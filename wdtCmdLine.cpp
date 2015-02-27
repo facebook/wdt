@@ -21,8 +21,9 @@
 #include <glog/logging.h>
 #include <iostream>
 #include <signal.h>
+#define STANDALONE_APP
 #include "WdtFlags.h"
-
+#include "WdtFlags.cpp.inc"
 DEFINE_bool(run_as_daemon, true,
             "If true, run the receiver as never ending process");
 
@@ -43,18 +44,20 @@ int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   signal(SIGPIPE, SIG_IGN);
-  WdtFlags::initializeFromFlags();
+
+  #define STANDALONE_APP
+  #define ASSIGN_OPT
+  #include "WdtFlags.cpp.inc" //nolint
+
   LOG(INFO) << "Starting with directory = " << FLAGS_directory
             << " and destination = " << FLAGS_destination
-            << " num sockets = " << FLAGS_wdt_num_ports
-            << " from port = " << FLAGS_wdt_start_port;
+            << " num sockets = " << FLAGS_num_ports
+            << " from port = " << FLAGS_start_port;
   const auto &options = WdtOptions::getMutable();
-  LOG(INFO) << "options " << options.port_ << " " << options.numSockets_;
-
+  LOG(INFO) << options.num_ports << " " << options.start_port;
   ErrorCode retCode = OK;
   if (FLAGS_destination.empty()) {
-    Receiver receiver(FLAGS_wdt_start_port, FLAGS_wdt_num_ports,
-                      FLAGS_directory);
+    Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
     // TODO fix this
     if (!FLAGS_run_as_daemon) {
       receiver.transferAsync();
@@ -83,9 +86,9 @@ int main(int argc, char *argv[]) {
       }
     }
     Sender sender(FLAGS_destination, FLAGS_directory);
-    sender.setIncludeRegex(FLAGS_wdt_include_regex);
-    sender.setExcludeRegex(FLAGS_wdt_exclude_regex);
-    sender.setPruneDirRegex(FLAGS_wdt_prune_dir_regex);
+    sender.setIncludeRegex(FLAGS_include_regex);
+    sender.setExcludeRegex(FLAGS_exclude_regex);
+    sender.setPruneDirRegex(FLAGS_prune_dir_regex);
     sender.setSrcFileInfo(fileInfo);
     // TODO fix that
     auto report = sender.start();

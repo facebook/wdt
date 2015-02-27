@@ -17,7 +17,7 @@ DirectorySourceQueue::DirectorySourceQueue(const std::string &rootDir)
   if (rootDir_.back() != '/') {
     rootDir_.push_back('/');
   }
-  fileSourceBufferSize_ = options_.bufferSize_;
+  fileSourceBufferSize_ = options_.buffer_size;
 };
 
 void DirectorySourceQueue::setIncludePattern(
@@ -241,7 +241,7 @@ bool DirectorySourceQueue::explore() {
 void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
   size_t retries = source->getTransferStats().getFailedAttempts();
   std::unique_lock<std::mutex> lock(mutex_);
-  if (retries >= options_.maxTransferRetries_) {
+  if (retries >= options_.max_transfer_retries) {
     LOG(ERROR) << source->getIdentifier() << " failed after " << retries
                << " number of tries.";
     failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
@@ -265,13 +265,13 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   // block and use a shorter header for subsequent blocks. Also, we can remove
   // block size once negotiated, since blocksize is sort of fixed.
 
-  bool enableBlockTransfer = options_.blockSize_ > 0;
+  bool enableBlockTransfer = options_.block_size > 0;
   if (!enableBlockTransfer) {
     VLOG(2) << "Block transfer disabled for this transfer";
   }
   // if block transfer is disabled, treating fileSize as block size. This
   // ensures that we create a single block
-  auto blockSize = enableBlockTransfer ? options_.blockSize_ : fileSize;
+  auto blockSize = enableBlockTransfer ? options_.block_size : fileSize;
 
   FileMetaData *fileData = new FileMetaData(fullPath, relPath, fileSize);
   sharedFileData_.emplace_back(fileData);
@@ -296,7 +296,7 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   // unnecessarily large amount of times. maximum number of effective
   // notify_one is number of threads. So, if number of blocks is greater than
   // num_threads, we use notify_all
-  if (blockCount < options_.numSockets_) {
+  if (blockCount < options_.num_ports) {
     for (int i = 0; i < blockCount; i++) {
       conditionNotEmpty_.notify_one();
     }

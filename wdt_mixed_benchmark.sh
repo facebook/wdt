@@ -10,7 +10,7 @@ if [ -z $TEST_COUNT ]; then
   TEST_COUNT=1
 fi
 
-WDTBIN_OPTS="-minloglevel=0 -wdt_num_ports=8"
+WDTBIN_OPTS="-minloglevel=0 -num_ports=8"
 if [ -z "$1" ]; then
   WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 else
@@ -49,7 +49,7 @@ for ((i = 1; i <= TEST_COUNT; i++))
 do
   TWO_PHASE_ARG=""
   # every other run will be two_phases
-  [ $(($i % 2)) -eq 0 ] && TWO_PHASE_ARG="-wdt_two_phases"
+  [ $(($i % 2)) -eq 0 ] && TWO_PHASE_ARG="-two_phases"
   /usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTBIN -directory $DIR/dst$i > \
   $DIR/server$i.log 2>&1 &
 

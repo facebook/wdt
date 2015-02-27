@@ -13,7 +13,7 @@ ServerSocket::ServerSocket(string port, int backlog)
     : port_(port), backlog_(backlog), listeningFd_(-1), fd_(-1) {
   memset(&sa_, 0, sizeof(sa_));
   const auto &options = WdtOptions::get();
-  if (options.ipv6_) {
+  if (options.ipv6) {
     sa_.ai_family = AF_INET6;
   }
   sa_.ai_socktype = SOCK_STREAM;

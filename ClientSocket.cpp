@@ -13,10 +13,10 @@ ClientSocket::ClientSocket(string dest, string port)
     : dest_(dest), port_(port), fd_(-1) {
   memset(&sa_, 0, sizeof(sa_));
   const auto &options = WdtOptions::get();
-  if (options.ipv6_) {
+  if (options.ipv6) {
     sa_.ai_family = AF_INET6;
   }
-  if (options.ipv4_) {
+  if (options.ipv4) {
     sa_.ai_family = AF_INET;
   }
   sa_.ai_socktype = SOCK_STREAM;
