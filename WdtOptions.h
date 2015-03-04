@@ -121,7 +121,7 @@ class WdtOptions {
   std::string prune_dir_regex{""};
 
   /**
-   * Maximu number of retries for transferring a file
+   * Maximum number of retries for transferring a file
    */
   int max_transfer_retries{3};
 
@@ -152,7 +152,7 @@ class WdtOptions {
    * block size, it is used to break bigger files into smaller chunks
    * block_size of <= 0 disables block transfer
    */
-  int64_t block_size{16 * 1024 * 1024};
+  double block_size_mbytes{16};
 
   /**
    * Since this is a singelton copy constructor

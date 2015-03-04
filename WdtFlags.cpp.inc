@@ -77,6 +77,9 @@ WDT_OPT(buffer_size, int32, "Buffer size (per thread/socket)");
 WDT_OPT(max_retries, int32, "how many attempts to connect/listen");
 WDT_OPT(max_transfer_retries, int32, "Max number of retries for a source");
 WDT_OPT(sleep_millis, int32, "how many ms to wait between attempts");
+WDT_OPT(block_size_mbytes, double,
+        "Size of the blocks that files will be divided in, specify negative "
+        "to disable the file splitting mode");
 WDT_OPT(retry_interval_mult_factor, double,
         "Factor to multiply with the retry interval for connnecting");
 WDT_OPT(avg_mbytes_per_sec, double,

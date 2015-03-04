@@ -264,14 +264,14 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   // b) if filesize > blocksize, we can use send filename only in the first
   // block and use a shorter header for subsequent blocks. Also, we can remove
   // block size once negotiated, since blocksize is sort of fixed.
-
-  bool enableBlockTransfer = options_.block_size > 0;
+  int64_t blockSizeBytes = options_.block_size_mbytes * 1024 * 1024;
+  bool enableBlockTransfer = blockSizeBytes > 0;
   if (!enableBlockTransfer) {
     VLOG(2) << "Block transfer disabled for this transfer";
   }
   // if block transfer is disabled, treating fileSize as block size. This
   // ensures that we create a single block
-  auto blockSize = enableBlockTransfer ? options_.block_size : fileSize;
+  auto blockSize = enableBlockTransfer ? blockSizeBytes : fileSize;
 
   FileMetaData *fileData = new FileMetaData(fullPath, relPath, fileSize);
   sharedFileData_.emplace_back(fileData);
