@@ -66,6 +66,15 @@ class TransferStats {
     id_ = id;
   }
 
+  void reset() {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    headerBytes_ = dataBytes_ = 0;
+    effectiveHeaderBytes_ = effectiveDataBytes_ = 0;
+    numFiles_ = numBlocks_ = 0;
+    failedAttempts_ = 0;
+    errCode_ = remoteErrCode_ = OK;
+  }
+
   /// @return number of header bytes transferred
   size_t getHeaderBytes() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
@@ -213,6 +222,11 @@ class TransferStats {
     numBlocks_++;
   }
 
+  void decrNumBlocks() {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    numBlocks_--;
+  }
+
   /**
    * @param headerBytes header bytes transfered part of a successful file
    *                    transfer
@@ -223,6 +237,12 @@ class TransferStats {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
     effectiveHeaderBytes_ += headerBytes;
     effectiveDataBytes_ += dataBytes;
+  }
+
+  void subtractEffectiveBytes(size_t headerBytes, size_t dataBytes) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    effectiveHeaderBytes_ -= headerBytes;
+    effectiveDataBytes_ -= dataBytes;
   }
 
   TransferStats &operator+=(const TransferStats &stats);
@@ -283,6 +303,9 @@ class TransferReport {
   /// @param stats  stats to added
   void addTransferStats(const TransferStats &stats) {
     summary_ += stats;
+  }
+  void setErrorCode(ErrorCode errCode) {
+    summary_.setErrorCode(errCode);
   }
   friend std::ostream &operator<<(std::ostream &os,
                                   const TransferReport &report);

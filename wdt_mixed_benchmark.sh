@@ -54,12 +54,12 @@ do
   $DIR/server$i.log 2>&1 &
 
   # wait for server to be up
-  while [ `/bin/true | nc $HOSTNAME 22356; echo $?` -eq 1 ]
-  do
-    echo "Server not up yet...`date`..."
-    sleep 0.5
-  done
-  echo "Server is up on $HOSTNAME 22356 - `date` - starting client run"
+  #while [ `/bin/true | nc $HOSTNAME 22356; echo $?` -eq 1 ]
+  #do
+  #  echo "Server not up yet...`date`..."
+  #  sleep 0.5
+  #done
+  #echo "Server is up on $HOSTNAME 22356 - `date` - starting client run"
 
   /usr/bin/time -f "$CLIENT_PROFILE_FORMAT" $WDTBIN -directory $DIR/src \
   -destination $HOSTNAME $TWO_PHASE_ARG |& tee $DIR/client$i.log

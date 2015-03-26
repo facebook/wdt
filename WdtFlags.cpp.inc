@@ -2,15 +2,15 @@
  * This file is responsible for making flags.
  * When STANDALONE_APP is not defined then all the flags are
  * prefixed with wdt_.
- * The default values for the flags are picked from the corresponding 
+ * The default values for the flags are picked from the corresponding
  * WdtOptions.
- * There are multiple checks which check if the flags are defined or not, 
+ * There are multiple checks which check if the flags are defined or not,
  * and undefine/redefine them. This is because this file can be
  * included multiple times for e.g. WdtFlags.cpp included this file
  * the first time through WdtFlags.h and second time in the method
  * initializeFromFlags()
  */
-#ifdef GENMACRO_X 
+#ifdef GENMACRO_X
 #undef GENMACRO_X
 #endif
 #ifdef GENMACRO
@@ -25,18 +25,17 @@
 #define VALUE(A) facebook::wdt::WdtOptions::get().A
 
 #ifdef DECLARE_ONLY
-#define GENMACRO_X(type, argument, value, description) \
-        DECLARE_##type(argument);
+#define GENMACRO_X(type, argument, value, description) DECLARE_##type(argument);
 #else
 #define GENMACRO_X(type, argument, value, description) \
-        DEFINE_##type(argument, value, description);
+  DEFINE_##type(argument, value, description);
 #endif
 #ifdef STANDALONE_APP
 #define GENMACRO(type, argument, description) \
-        GENMACRO_X(type, argument, VALUE(argument), description)
+  GENMACRO_X(type, argument, VALUE(argument), description)
 #else
 #define GENMACRO(type, argument, description) \
-        GENMACRO_X(type, wdt_##argument, VALUE(argument), description)
+  GENMACRO_X(type, wdt_##argument, VALUE(argument), description)
 #endif
 
 #ifndef WDT_OPT
@@ -53,7 +52,7 @@
 #undef WDT_OPT
 #endif
 #define WDT_OPT(argument, type, description) \
-    facebook::wdt::WdtOptions::getMutable().argument = FLAG_VALUE(argument);
+  facebook::wdt::WdtOptions::getMutable().argument = FLAG_VALUE(argument);
 #endif
 
 #ifdef PRINT_OPT
@@ -61,7 +60,7 @@
 #undef WDT_OPT
 #endif
 #define WDT_OPT(argument, type, description) \
-    LOG(INFO) << #argument << " " << facebook::wdt::WdtOptions::get().argument;
+  LOG(INFO) << #argument << " " << facebook::wdt::WdtOptions::get().argument;
 #endif
 WDT_OPT(start_port, int32, "Starting port number for wdt");
 WDT_OPT(num_ports, int32, "Number of sockets");
@@ -80,8 +79,6 @@ WDT_OPT(sleep_millis, int32, "how many ms to wait between attempts");
 WDT_OPT(block_size_mbytes, double,
         "Size of the blocks that files will be divided in, specify negative "
         "to disable the file splitting mode");
-WDT_OPT(retry_interval_mult_factor, double,
-        "Factor to multiply with the retry interval for connnecting");
 WDT_OPT(avg_mbytes_per_sec, double,
         "Target transfer rate in mbytes/sec that should be "
         "maintained, specify negative for unlimited");
@@ -123,3 +120,17 @@ WDT_OPT(exclude_regex, string,
 WDT_OPT(prune_dir_regex, string,
         "Regular expression representing directories to exclude for "
         "transfer, default/empty is to recurse in all directories");
+WDT_OPT(accept_timeout_millis, int32,
+        "accept timeout for wdt receiver in milliseconds");
+WDT_OPT(max_accept_retries, int32,
+        "max number of retries for accept call in receiver. First "
+        "connection from sender must come before max_accept_retries * "
+        "accept_timeout_ms milliseconds.");
+WDT_OPT(accept_window_millis, int32,
+        "accept window size in milliseconds. For a session, after the "
+        "first connection is received, other connections must be "
+        "received within this duration");
+WDT_OPT(read_timeout_millis, int32, "socket read timeout in milliseconds");
+WDT_OPT(write_timeout_millis, int32, "socket write timeout in milliseconds");
+WDT_OPT(connect_timeout_millis, int32,
+        "socket connect timeout in milliseconds");

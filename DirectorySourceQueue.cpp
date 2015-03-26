@@ -238,18 +238,39 @@ bool DirectorySourceQueue::explore() {
   return !hasError;
 }
 
-void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
-  size_t retries = source->getTransferStats().getFailedAttempts();
-  std::unique_lock<std::mutex> lock(mutex_);
-  if (retries >= options_.max_transfer_retries) {
-    LOG(ERROR) << source->getIdentifier() << " failed after " << retries
-               << " number of tries.";
-    failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
-  } else {
-    sourceQueue_.push(std::move(source));
-    lock.unlock();
+void DirectorySourceQueue::smartNotify(uint32_t addedSource) {
+  if (addedSource >= options_.num_ports) {
+    conditionNotEmpty_.notify_all();
+    return;
+  }
+  for (int i = 0; i < addedSource; i++) {
     conditionNotEmpty_.notify_one();
   }
+}
+
+void DirectorySourceQueue::returnToQueue(
+    std::vector<std::unique_ptr<ByteSource>> &sources) {
+  int returnedCount = 0;
+  std::unique_lock<std::mutex> lock(mutex_);
+  for (auto &source : sources) {
+    size_t retries = source->getTransferStats().getFailedAttempts();
+    if (retries >= options_.max_transfer_retries) {
+      LOG(ERROR) << source->getIdentifier() << " failed after " << retries
+                 << " number of tries.";
+      failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
+    } else {
+      sourceQueue_.push(std::move(source));
+      returnedCount++;
+    }
+  }
+  lock.unlock();
+  smartNotify(returnedCount);
+}
+
+void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
+  std::vector<std::unique_ptr<ByteSource>> sources;
+  sources.emplace_back(std::move(source));
+  returnToQueue(sources);
 }
 
 void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
@@ -290,19 +311,10 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
       blockCount++;
     } while (remainingBytes > 0);
     numEntries_++;
+    numBlocks_ += blockCount;
     totalFileSize_ += fileSize;
   }
-  // for large files with lots of blocks, we don't want to call notify_one
-  // unnecessarily large amount of times. maximum number of effective
-  // notify_one is number of threads. So, if number of blocks is greater than
-  // num_threads, we use notify_all
-  if (blockCount < options_.num_ports) {
-    for (int i = 0; i < blockCount; i++) {
-      conditionNotEmpty_.notify_one();
-    }
-  } else {
-    conditionNotEmpty_.notify_all();
-  }
+  smartNotify(blockCount);
 }
 
 std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
@@ -345,6 +357,16 @@ bool DirectorySourceQueue::finished() const {
 size_t DirectorySourceQueue::getCount() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return numEntries_;
+}
+
+std::pair<int64_t, ErrorCode> DirectorySourceQueue::getNumBlocksAndStatus()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  ErrorCode status = OK;
+  if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
+    status = ERROR;
+  }
+  return std::make_pair(numBlocks_, status);
 }
 
 size_t DirectorySourceQueue::getTotalSize() const {

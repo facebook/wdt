@@ -20,8 +20,8 @@ void testProtocol() {
   size_t off = 0;
   int64_t blockOffset = 4;
   int64_t fileSize = 10;
-  bool success =
-      Protocol::encode(buf, off, sizeof(buf), id, size, blockOffset, fileSize);
+  bool success = Protocol::encodeHeader(buf, off, sizeof(buf), id, size,
+                                        blockOffset, fileSize);
   EXPECT_TRUE(success);
   EXPECT_EQ(off, id.size() + 1 + 1 + 1 +
                      1);  // 1 byte varint for id len, size, offset and filesize
@@ -30,8 +30,8 @@ void testProtocol() {
   size_t noff = 0;
   int64_t nblockOffset = 0;
   int64_t nfileSize = 0;
-  success = Protocol::decode(buf, noff, sizeof(buf), nid, nsize, nblockOffset,
-                             nfileSize);
+  success = Protocol::decodeHeader(buf, noff, sizeof(buf), nid, nsize,
+                                   nblockOffset, nfileSize);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
   EXPECT_EQ(nid, id);
@@ -40,15 +40,15 @@ void testProtocol() {
   EXPECT_EQ(nfileSize, fileSize);
   noff = 0;
   // exact size:
-  success =
-      Protocol::decode(buf, noff, off, nid, nsize, nblockOffset, nfileSize);
+  success = Protocol::decodeHeader(buf, noff, off, nid, nsize, nblockOffset,
+                                   nfileSize);
   EXPECT_TRUE(success);
 
   LOG(INFO) << "error tests, expect errors";
   // too short
   noff = 0;
-  success =
-      Protocol::decode(buf, noff, off - 1, nid, nsize, nblockOffset, nfileSize);
+  success = Protocol::decodeHeader(buf, noff, off - 1, nid, nsize, nblockOffset,
+                                   nfileSize);
   EXPECT_FALSE(success);
 
   // Long size:
@@ -57,14 +57,14 @@ void testProtocol() {
   off = 0;
   blockOffset = 3;
   fileSize = 128;
-  success =
-      Protocol::encode(buf, off, sizeof(buf), id, size, blockOffset, fileSize);
+  success = Protocol::encodeHeader(buf, off, sizeof(buf), id, size, blockOffset,
+                                   fileSize);
   EXPECT_TRUE(success);
   EXPECT_EQ(off,
             id.size() + 1 + 6 + 1 + 2);  // 1 byte varint for id len and size
   noff = 0;
-  success = Protocol::decode(buf, noff, sizeof(buf), nid, nsize, nblockOffset,
-                             nfileSize);
+  success = Protocol::decodeHeader(buf, noff, sizeof(buf), nid, nsize,
+                                   nblockOffset, nfileSize);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
   EXPECT_EQ(nid, id);
@@ -74,8 +74,8 @@ void testProtocol() {
   LOG(INFO) << "got size of " << nsize;
   // too short for size encoding:
   noff = 0;
-  success =
-      Protocol::decode(buf, noff, off - 2, nid, nsize, nblockOffset, nfileSize);
+  success = Protocol::decodeHeader(buf, noff, off - 2, nid, nsize, nblockOffset,
+                                   nfileSize);
   EXPECT_FALSE(success);
 }
 

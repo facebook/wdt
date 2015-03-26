@@ -45,9 +45,9 @@ int main(int argc, char *argv[]) {
   google::InitGoogleLogging(argv[0]);
   signal(SIGPIPE, SIG_IGN);
 
-  #define STANDALONE_APP
-  #define ASSIGN_OPT
-  #include "WdtFlags.cpp.inc" //nolint
+#define STANDALONE_APP
+#define ASSIGN_OPT
+#include "WdtFlags.cpp.inc"  //nolint
 
   LOG(INFO) << "Starting with directory = " << FLAGS_directory
             << " and destination = " << FLAGS_destination

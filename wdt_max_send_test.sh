@@ -72,19 +72,19 @@ echo "Done with staging src test files"
 $DIR/server.log 2>&1 &
 
 # wait for server to be up
-while [ `/bin/true | nc $REMOTE 22356; echo $?` -eq 1 ]
-do
-  echo "Server not up yet...`date`..."
-  sleep 0.5
-done
-echo "Server is up on $REMOTE 22356 - `date` - starting client run"
+#while [ `/bin/true | nc $REMOTE 22356; echo $?` -eq 1 ]
+#do
+#  echo "Server not up yet...`date`..."
+#  sleep 0.5
+#done
+#echo "Server is up on $REMOTE 22356 - `date` - starting client run"
 
 for ((i = 1; i <= TEST_COUNT; i++))
 do
   echo "starting ${i}th run"
   TWO_PHASE_ARG=""
   # every other run will be two_phases
-  [ $(($i % 2)) -eq 0 ] && TWO_PHASE_ARG="-wdt_two_phases"
+  [ $(($i % 2)) -eq 0 ] && TWO_PHASE_ARG="-two_phases"
 
   /usr/bin/time -f "$CLIENT_PROFILE_FORMAT" $WDTCMD -directory $DIR/src \
   -destination $REMOTE $TWO_PHASE_ARG |& tee $DIR/client$i.log

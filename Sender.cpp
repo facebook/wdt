@@ -1,12 +1,13 @@
 #include "Sender.h"
 
 #include "ClientSocket.h"
-#include "Protocol.h"
 #include "Throttler.h"
+#include "SocketUtils.h"
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/String.h>
+#include <folly/Bits.h>
 
 #include <thread>
 
@@ -36,6 +37,95 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
   return os;
 }
+
+ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue &queue,
+                                             TransferStats &threadStats)
+    : queue_(queue), threadStats_(threadStats) {
+}
+
+bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
+  folly::SpinLockGuard guard(lock_);
+  if (globalCheckpoint_) {
+    // already received an error for this thread
+    VLOG(1) << "adding source after global checkpoint is received. returning "
+               "the source to the queue";
+    markSourceAsFailed(source);
+    queue_.returnToQueue(source);
+    return false;
+  }
+  history_.emplace_back(std::move(source));
+  return true;
+}
+
+int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
+    int64_t numReceivedSources, bool globalCheckpoint) {
+  folly::SpinLockGuard guard(lock_);
+  if (numReceivedSources > history_.size()) {
+    LOG(ERROR)
+        << "checkpoint is greater than total number of sources transfereed "
+        << history_.size() << " " << numReceivedSources;
+    return -1;
+  }
+  if (numReceivedSources < numAcknowledged_) {
+    LOG(ERROR) << "new checkpoint is less than older checkpoint "
+               << numAcknowledged_ << " " << numReceivedSources;
+    return -1;
+  }
+  globalCheckpoint_ |= globalCheckpoint;
+  numAcknowledged_ = numReceivedSources;
+  int64_t numFailedSources = history_.size() - numReceivedSources;
+  std::vector<std::unique_ptr<ByteSource>> sourcesToReturn;
+  while (history_.size() > numReceivedSources) {
+    std::unique_ptr<ByteSource> source = std::move(history_.back());
+    history_.pop_back();
+    markSourceAsFailed(source);
+    sourcesToReturn.emplace_back(std::move(source));
+  }
+  queue_.returnToQueue(sourcesToReturn);
+  return numFailedSources;
+}
+
+std::vector<TransferStats> ThreadTransferHistory::popAckedSourceStats() {
+  WDT_CHECK(numAcknowledged_ == history_.size());
+  // no locking needed, as this should be called after transfer has finished
+  std::vector<TransferStats> sourceStats;
+  while (!history_.empty()) {
+    sourceStats.emplace_back(std::move(history_.back()->getTransferStats()));
+    history_.pop_back();
+  }
+  return sourceStats;
+}
+
+void ThreadTransferHistory::markAllAcknowledged() {
+  folly::SpinLockGuard guard(lock_);
+  numAcknowledged_ = history_.size();
+}
+
+int64_t ThreadTransferHistory::returnUnackedSourcesToQueue() {
+  return setCheckpointAndReturnToQueue(numAcknowledged_, false);
+}
+
+void ThreadTransferHistory::markSourceAsFailed(
+    std::unique_ptr<ByteSource> &source) {
+  TransferStats &sourceStats = source->getTransferStats();
+  auto dataBytes = sourceStats.getEffectiveDataBytes();
+  auto headerBytes = sourceStats.getEffectiveHeaderBytes();
+  sourceStats.subtractEffectiveBytes(headerBytes, dataBytes);
+  sourceStats.decrNumBlocks();
+  sourceStats.setErrorCode(SOCKET_WRITE_ERROR);
+  sourceStats.incrFailedAttempts();
+
+  threadStats_.subtractEffectiveBytes(headerBytes, dataBytes);
+  threadStats_.decrNumBlocks();
+  threadStats_.incrFailedAttempts();
+}
+
+const Sender::StateFunction Sender::stateMap_[] = {
+    &Sender::connect,        &Sender::readLocalCheckPoint,
+    &Sender::sendSettings,   &Sender::sendBlocks,
+    &Sender::sendDoneCmd,    &Sender::readReceiverCmd,
+    &Sender::processDoneCmd, &Sender::processWaitCmd,
+    &Sender::processErrCmd};
 
 Sender::Sender(int port, int numSockets, const std::string &destHost,
                const std::string &srcDir)
@@ -127,15 +217,18 @@ std::unique_ptr<TransferReport> Sender::start() {
   }
   std::vector<std::thread> vt;
   std::vector<TransferStats> threadStats;
-  for (int i = 0; i < ports_.size(); i++) {
+  int numSockets = ports_.size();
+  for (int i = 0; i < numSockets; i++) {
     threadStats.emplace_back(true);
   }
-  std::vector<std::vector<TransferStats>> sourceStats(ports_.size());
 
-  int numSockets = ports_.size();
   double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
   double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
   double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
+  std::vector<ThreadTransferHistory> transferHistories;
+  for (int i = 0; i < numSockets; i++) {
+    transferHistories.emplace_back(queue, threadStats[i]);
+  }
   double perThreadAvgRateBytesPerSec = avgRateBytesPerSec / numSockets;
   double perThreadPeakRateBytesPerSec = peakRateBytesPerSec / numSockets;
   double perThreadBucketLimit = bucketLimitBytes / numSockets;
@@ -163,10 +256,10 @@ std::unique_ptr<TransferReport> Sender::start() {
           << perThreadPeakRateBytesPerSec << ")";
   for (int i = 0; i < numSockets; i++) {
     threadStats[i].setId(folly::to<std::string>(i));
-    vt.emplace_back(&Sender::sendOne, this, startTime, std::ref(destHost_),
-                    ports_[i], std::ref(queue), perThreadAvgRateBytesPerSec,
-                    perThreadPeakRateBytesPerSec, perThreadBucketLimit,
-                    std::ref(threadStats[i]), std::ref(sourceStats[i]));
+    vt.emplace_back(&Sender::sendOne, this, startTime, i, std::ref(queue),
+                    perThreadAvgRateBytesPerSec, perThreadPeakRateBytesPerSec,
+                    perThreadBucketLimit, std::ref(threadStats[i]),
+                    std::ref(transferHistories));
   }
   if (progressReportEnabled) {
     progressReporter_->start();
@@ -190,16 +283,36 @@ std::unique_ptr<TransferReport> Sender::start() {
     progressReporterThread.join();
   }
 
+  bool allSourcesAcked = false;
+  for (auto &stats : threadStats) {
+    if (stats.getErrorCode() == OK) {
+      // at least one thread finished correctly
+      // that means all transferred sources are acked
+      allSourcesAcked = true;
+      break;
+    }
+  }
+
   std::vector<TransferStats> transferredSourceStats;
-  if (WdtOptions::get().full_reporting) {
-    for (auto &stats : sourceStats) {
+  for (auto &transferHistory : transferHistories) {
+    if (allSourcesAcked) {
+      transferHistory.markAllAcknowledged();
+    } else {
+      transferHistory.returnUnackedSourcesToQueue();
+    }
+    if (WdtOptions::get().full_reporting) {
+      std::vector<TransferStats> stats = transferHistory.popAckedSourceStats();
       transferredSourceStats.insert(transferredSourceStats.end(),
                                     std::make_move_iterator(stats.begin()),
                                     std::make_move_iterator(stats.end()));
     }
+  }
+
+  if (WdtOptions::get().full_reporting) {
     validateTransferStats(transferredSourceStats, queue.getFailedSourceStats(),
                           threadStats);
   }
+
   double totalTime = durationSeconds(Clock::now() - startTime);
   size_t totalFileSize = queue.getTotalSize();
   std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
@@ -264,12 +377,12 @@ std::unique_ptr<ClientSocket> Sender::makeSocket(const std::string &destHost,
                                           folly::to<std::string>(port));
 }
 
-std::unique_ptr<ClientSocket> Sender::connectToReceiver(
-    const std::string &destHost, const int port, Clock::time_point startTime,
-    ErrorCode &errCode) {
+std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
+                                                        ErrorCode &errCode) {
+  auto startTime = Clock::now();
   const auto &options = WdtOptions::get();
   int connectAttempts = 0;
-  std::unique_ptr<ClientSocket> socket = makeSocket(destHost, port);
+  std::unique_ptr<ClientSocket> socket = makeSocket(destHost_, port);
   double retryInterval = options.sleep_millis;
   for (int i = 1; i <= options.max_retries; ++i) {
     ++connectAttempts;
@@ -283,7 +396,6 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
       // sleep between attempts but not after the last
       VLOG(1) << "Sleeping after failed attempt " << i;
       usleep(retryInterval * 1000);
-      retryInterval *= options.retry_interval_mult_factor;
     }
   }
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
@@ -295,31 +407,291 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
   }
   ((connectAttempts > 1) ? LOG(WARNING) : LOG(INFO))
       << "Connection took " << connectAttempts << " attempt(s) and "
-      << elapsedSecsConn << " seconds.";
+      << elapsedSecsConn << " seconds. port " << port;
   return socket;
 }
 
-/**
- * @param startTime              Time when this thread was spawned
- * @param destHost               Address to the destination, see ClientSocket
- * @param start_port                   Port to establish connect
- * @param queue                  DirectorySourceQueue object for reading files
- * @param avgRateBytes           Average rate of throttler in bytes/sec
- * @param maxRateBytes           Peak rate for Token Bucket algorithm in
- bytes/sec
-                                 Checkout Throttler.h for Token Bucket
- * @param bucketLimitBytes       Bucket Limit for Token Bucket algorithm in
- bytes
- * @param threadStats            Per thread statistics
- * @param transferredFileStats   Stats for successfully transferred files
- */
-void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
-                     int port, DirectorySourceQueue &queue, double avgRateBytes,
+Sender::SenderState Sender::connect(ThreadData &data) {
+  LOG(INFO) << "entered CONNECT state " << data.threadIndex_;
+  int port = ports_[data.threadIndex_];
+  TransferStats &threadStats = data.threadStats_;
+  auto &socket = data.socket_;
+
+  ErrorCode code;
+
+  if (socket) {
+    socket->close();
+  }
+  socket = connectToReceiver(port, code);
+  if (code != OK) {
+    threadStats.setErrorCode(code);
+    return END;
+  }
+  auto nextState =
+      threadStats.getErrorCode() == OK ? SEND_SETTINGS : READ_LOCAL_CHECKPOINT;
+  // clear the error code, as this is a new transfer
+  threadStats.setErrorCode(OK);
+  return nextState;
+}
+
+Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
+  LOG(INFO) << "entered READ_LOCAL_CHECKPOINT state " << data.threadIndex_;
+  int port = ports_[data.threadIndex_];
+  TransferStats &threadStats = data.threadStats_;
+  ThreadTransferHistory &transferHistory = data.getTransferHistory();
+
+  std::vector<Checkpoint> checkpoints;
+  size_t decodeOffset = 0;
+  char *buf = data.buf_;
+  ssize_t numRead = data.socket_->read(buf, Protocol::kMaxLocalCheckpoint);
+  if (numRead != Protocol::kMaxLocalCheckpoint) {
+    VLOG(1) << "read mismatch " << Protocol::kMaxLocalCheckpoint << " "
+            << numRead << " port " << port;
+    threadStats.setErrorCode(SOCKET_READ_ERROR);
+    return CONNECT;
+  }
+  if (!Protocol::decodeCheckpoints(
+          buf, decodeOffset, Protocol::kMaxLocalCheckpoint, checkpoints)) {
+    LOG(ERROR) << "checkpoint decode failure "
+               << folly::humanify(
+                      std::string(buf, Protocol::kMaxLocalCheckpoint));
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return END;
+  }
+  if (checkpoints.size() != 1 || checkpoints[0].first != data.threadIndex_) {
+    LOG(ERROR) << "illegal local checkpoint "
+               << folly::humanify(
+                      std::string(buf, Protocol::kMaxLocalCheckpoint));
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return END;
+  }
+  auto checkpoint = checkpoints[0].second;
+  VLOG(1) << "received local checkpoint " << port << " " << checkpoint;
+
+  if (checkpoint == -1) {
+    // Receiver failed while sending DONE cmd
+    return READ_RECEIVER_CMD;
+  }
+
+  auto numReturned =
+      transferHistory.setCheckpointAndReturnToQueue(checkpoint, false);
+  if (numReturned == -1) {
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return END;
+  }
+  VLOG(1) << numRead << " number of source(s) returned to queue";
+  return SEND_SETTINGS;
+}
+
+Sender::SenderState Sender::sendSettings(ThreadData &data) {
+  LOG(INFO) << "entered SEND_SETTINGS state " << data.threadIndex_;
+
+  TransferStats &threadStats = data.threadStats_;
+  char *buf = data.buf_;
+  auto &socket = data.socket_;
+  auto &options = WdtOptions::get();
+  int64_t readTimeoutMillis = options.read_timeout_millis;
+  int64_t writeTimeoutMillis = options.write_timeout_millis;
+  size_t off = 0;
+  buf[off++] = Protocol::SETTINGS_CMD;
+
+  bool success = Protocol::encodeSettings(
+      buf, off, Protocol::kMaxSettings, readTimeoutMillis, writeTimeoutMillis);
+  WDT_CHECK(success);
+  ssize_t written = socket->write(buf, off);
+  if (written != off) {
+    LOG(ERROR) << "Socket write failure " << written << " " << off;
+    threadStats.setErrorCode(SOCKET_WRITE_ERROR);
+    return CONNECT;
+  }
+  threadStats.addHeaderBytes(off);
+  threadStats.addEffectiveBytes(off, 0);
+  return SEND_BLOCKS;
+}
+
+Sender::SenderState Sender::sendBlocks(ThreadData &data) {
+  LOG(INFO) << "entered SEND_BLOCKS state " << data.threadIndex_;
+  TransferStats &threadStats = data.threadStats_;
+  ThreadTransferHistory &transferHistory = data.getTransferHistory();
+  DirectorySourceQueue &queue = data.queue_;
+
+  ErrorCode transferStatus;
+  while (true) {
+    std::unique_ptr<ByteSource> source = queue.getNextSource(transferStatus);
+    if (!source) {
+      break;
+    }
+    WDT_CHECK(!source->hasError());
+    size_t totalBytes = threadStats.getTotalBytes(false);
+    TransferStats transferStats = sendOneByteSource(
+        data.socket_, data.throttler_, source, totalBytes, transferStatus);
+    threadStats += transferStats;
+    source->addTransferStats(transferStats);
+    source->close();
+    if (transferStats.getErrorCode() == OK) {
+      if (!transferHistory.addSource(source)) {
+        // global checkpoint received for this thread. no point in
+        // continuing
+        LOG(ERROR) << "global checkpoint received, no point in continuing";
+        threadStats.setErrorCode(CONN_ERROR);
+        return END;
+      }
+    } else {
+      queue.returnToQueue(source);
+      return CONNECT;
+    }
+  }
+  return SEND_DONE_CMD;
+}
+
+Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
+  LOG(INFO) << "entered SEND_DONE_CMD state " << data.threadIndex_;
+  TransferStats &threadStats = data.threadStats_;
+  char *buf = data.buf_;
+  auto &socket = data.socket_;
+  auto &queue = data.queue_;
+  size_t off = 0;
+  buf[off++] = Protocol::DONE_CMD;
+
+  auto pair = queue.getNumBlocksAndStatus();
+  int64_t numBlocksDiscovered = pair.first;
+  ErrorCode transferStatus = pair.second;
+  buf[off++] = transferStatus;
+
+  bool success =
+      Protocol::encodeDone(buf, off, Protocol::kMaxDone, numBlocksDiscovered);
+  WDT_CHECK(success);
+
+  int toWrite = Protocol::kMinBufLength;
+  ssize_t written = socket->write(buf, toWrite);
+  if (written != toWrite) {
+    LOG(ERROR) << "Socket write failure " << written << " " << toWrite;
+    threadStats.setErrorCode(SOCKET_WRITE_ERROR);
+    return CONNECT;
+  }
+  threadStats.addHeaderBytes(toWrite);
+  threadStats.addEffectiveBytes(toWrite, 0);
+  VLOG(1) << "Wrote done cmd on " << socket->getFd() << " waiting for reply...";
+  return READ_RECEIVER_CMD;
+}
+
+Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
+  LOG(INFO) << "entered READ_RECEIVER_CMD state " << data.threadIndex_;
+  TransferStats &threadStats = data.threadStats_;
+  char *buf = data.buf_;
+  ssize_t numRead = data.socket_->read(buf, 1);
+  if (numRead != 1) {
+    LOG(ERROR) << "READ unexpected " << numRead;
+    threadStats.setErrorCode(SOCKET_READ_ERROR);
+    return CONNECT;
+  }
+  Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[0];
+  if (cmd == Protocol::ERR_CMD) {
+    return PROCESS_ERR_CMD;
+  }
+  if (cmd == Protocol::WAIT_CMD) {
+    return PROCESS_WAIT_CMD;
+  }
+  if (cmd == Protocol::DONE_CMD) {
+    return PROCESS_DONE_CMD;
+  }
+  threadStats.setErrorCode(PROTOCOL_ERROR);
+  return END;
+}
+
+Sender::SenderState Sender::processDoneCmd(ThreadData &data) {
+  LOG(INFO) << "entered PROCESS_DONE_CMD state " << data.threadIndex_;
+  int port = ports_[data.threadIndex_];
+  char *buf = data.buf_;
+  auto &socket = data.socket_;
+  TransferStats &threadStats = data.threadStats_;
+  ThreadTransferHistory &transferHistory = data.getTransferHistory();
+  transferHistory.markAllAcknowledged();
+
+  // send ack for DONE
+  buf[0] = Protocol::DONE_CMD;
+  socket->write(buf, 1);
+
+  socket->shutdown();
+  auto numRead = socket->read(buf, Protocol::kMinBufLength);
+  if (numRead != 0) {
+    LOG(WARNING) << "EOF not found when expected";
+    return END;
+  }
+  LOG(INFO) << "done with transfer, port " << port;
+  return END;
+}
+
+Sender::SenderState Sender::processWaitCmd(ThreadData &data) {
+  LOG(INFO) << "entered PROCESS_WAIT_CMD state " << data.threadIndex_;
+  int port = ports_[data.threadIndex_];
+  ThreadTransferHistory &transferHistory = data.getTransferHistory();
+  VLOG(1) << "received WAIT_CMD, port " << port;
+  transferHistory.markAllAcknowledged();
+  return READ_RECEIVER_CMD;
+}
+
+Sender::SenderState Sender::processErrCmd(ThreadData &data) {
+  LOG(INFO) << "entered PROCESS_ERR_CMD state " << data.threadIndex_;
+  int port = ports_[data.threadIndex_];
+  ThreadTransferHistory &transferHistory = data.getTransferHistory();
+  TransferStats &threadStats = data.threadStats_;
+  auto &transferHistories = data.transferHistories_;
+  auto &socket = data.socket_;
+  char *buf = data.buf_;
+
+  auto toRead = sizeof(uint16_t);
+  auto numRead = socket->read(buf, toRead);
+  if (numRead != toRead) {
+    LOG(ERROR) << "read unexpected " << toRead << " " << numRead;
+    threadStats.setErrorCode(SOCKET_READ_ERROR);
+    return CONNECT;
+  }
+
+  uint16_t checkpointsLen = folly::loadUnaligned<uint16_t>(buf);
+  checkpointsLen = folly::Endian::little(checkpointsLen);
+  char checkpointBuf[checkpointsLen];
+  numRead = socket->read(checkpointBuf, checkpointsLen);
+  if (numRead != checkpointsLen) {
+    LOG(ERROR) << "read unexpected " << checkpointsLen << " " << numRead;
+    threadStats.setErrorCode(SOCKET_READ_ERROR);
+    return CONNECT;
+  }
+
+  std::vector<Checkpoint> checkpoints;
+  size_t decodeOffset = 0;
+  if (!Protocol::decodeCheckpoints(checkpointBuf, decodeOffset, checkpointsLen,
+                                   checkpoints)) {
+    LOG(ERROR) << "checkpoint decode failure "
+               << folly::humanify(std::string(checkpointBuf, checkpointsLen));
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return END;
+  }
+  transferHistory.markAllAcknowledged();
+  for (auto &checkpoint : checkpoints) {
+    auto errThread = checkpoint.first;
+    if (errThread < transferHistories.size()) {
+      auto errPoint = checkpoint.second;
+      VLOG(1) << "received global checkpoint " << errThread << " " << errPoint;
+      transferHistories[errThread].setCheckpointAndReturnToQueue(errPoint,
+                                                                 true);
+    } else {
+      LOG(ERROR)
+          << "received checkpoint for thread " << errThread
+          << ". Most likely number of threads different in the receiver side";
+    }
+  }
+  return SEND_BLOCKS;
+}
+
+void Sender::sendOne(Clock::time_point startTime, int threadIndex,
+                     DirectorySourceQueue &queue, double avgRateBytes,
                      double maxRateBytes, double bucketLimitBytes,
                      TransferStats &threadStats,
-                     std::vector<TransferStats> &transferredFileStats) {
-  std::unique_ptr<Throttler> throttler;
+                     std::vector<ThreadTransferHistory> &transferHistories) {
   const auto &options = WdtOptions::get();
+  int port = ports_[threadIndex];
+  std::unique_ptr<Throttler> throttler;
   const bool doThrottling = (avgRateBytes > 0 || maxRateBytes > 0);
   if (doThrottling) {
     throttler = folly::make_unique<Throttler>(
@@ -329,94 +701,18 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
     VLOG(1) << "No throttling in effect";
   }
 
-  ErrorCode code;
-  std::unique_ptr<ClientSocket> socket =
-      connectToReceiver(destHost, port, startTime, code);
-  if (code != OK) {
-    return;
+  ThreadData threadData(threadIndex, queue, threadStats, transferHistories);
+  if (doThrottling) {
+    threadData.throttler_ = std::move(throttler);
   }
-  char headerBuf[Protocol::kMaxHeader];
-  ErrorCode transferStatus = OK;
 
-  while (true) {
-    std::unique_ptr<ByteSource> source = queue.getNextSource(transferStatus);
-    if (!source) {
-      break;
-    }
-    WDT_CHECK(!source->hasError());
-    TransferStats transferStats;
-    size_t totalBytes = threadStats.getTotalBytes(false);
-    transferStats = sendOneByteSource(socket, throttler, source, doThrottling,
-                                      totalBytes, transferStatus);
-    threadStats += transferStats;
-    source->addTransferStats(transferStats);
-    source->close();
-    if (transferStats.getErrorCode() == OK) {
-      if (options.full_reporting) {
-        transferredFileStats.emplace_back(
-            std::move(source->getTransferStats()));
-      }
-    } else {
-      // resetting the error code, since a single file failure does not impact
-      // overall thread status
-      threadStats.setErrorCode(OK);
-      socket->close();
-      socket = connectToReceiver(destHost, port, Clock::now(), code);
-      // we are returning the file to queue after trying to connect to the
-      // receiver. This ensures that receiver thread has finished writing the
-      // content of this file and there will be no concurrent writing at
-      // destination
-      queue.returnToQueue(source);
-      if (code != OK) {
-        if (threadStats.getNumFiles() > 0) {
-          // thread has transferred files, but has not received confirmation
-          // from the server. so, this connection error is not fatal.
-          threadStats.setErrorCode(code);
-        }
-        return;
-      }
-    }
+  SenderState state = CONNECT;
+  while (state != END) {
+    state = (this->*stateMap_[state])(threadData);
   }
-  headerBuf[0] = Protocol::DONE_CMD;
-  headerBuf[1] = transferStatus;
-  ssize_t written = socket->write(headerBuf, 2);
-  if (written != 2) {
-    LOG(ERROR) << "Socket write failure " << written;
-    threadStats.setErrorCode(SOCKET_WRITE_ERROR);
-    return;
-  }
-  threadStats.addHeaderBytes(2);
-  threadStats.addEffectiveBytes(2, 0);
-  socket->shutdown();
-  VLOG(1) << "Wrote done cmd on " << socket->getFd() << " waiting for reply...";
-  ssize_t numRead = socket->read(headerBuf, 2);  // TODO: returns 0 on disk full
-  if (numRead != 2) {
-    LOG(ERROR) << "READ unexpected " << numRead;
-    threadStats.setErrorCode(SOCKET_READ_ERROR);
-    return;
-  }
-  if (headerBuf[0] != Protocol::DONE_CMD) {
-    LOG(ERROR) << "Unexpected reply " << headerBuf[0];
-    threadStats.setErrorCode(PROTOCOL_ERROR);
-    return;
-  }
-  ErrorCode receiverStatus = (ErrorCode)headerBuf[1];
-  LOG(INFO) << "final receiver status " << kErrorToStr[receiverStatus];
-  threadStats.setRemoteErrorCode(receiverStatus);
-  numRead = socket->read(headerBuf, Protocol::kMaxHeader);
-  if (numRead != 0) {
-    std::string numReadString;
-    if (numRead < 0) {
-      numReadString = "-1";
-    } else {
-      numReadString = folly::humanify(std::string(headerBuf, numRead));
-    }
-    LOG(ERROR) << "EOF not found when expected " << numReadString;
-    threadStats.setErrorCode(SOCKET_READ_ERROR);
-    return;
-  }
+
   double totalTime = durationSeconds(Clock::now() - startTime);
-  LOG(INFO) << "Got reply - all done for fd:" << socket->getFd() << ". "
+  LOG(INFO) << "Got reply - all done for port :" << port << ". "
             << "Transfer stat : " << threadStats << " Total throughput = "
             << threadStats.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
@@ -426,18 +722,22 @@ void Sender::sendOne(Clock::time_point startTime, const std::string &destHost,
 TransferStats Sender::sendOneByteSource(
     const std::unique_ptr<ClientSocket> &socket,
     const std::unique_ptr<Throttler> &throttler,
-    const std::unique_ptr<ByteSource> &source, const bool doThrottling,
-    const size_t totalBytes, ErrorCode transferStatus) {
+    const std::unique_ptr<ByteSource> &source, const size_t totalBytes,
+    ErrorCode transferStatus) {
   TransferStats stats;
   char headerBuf[Protocol::kMaxHeader];
   size_t off = 0;
   headerBuf[off++] = Protocol::FILE_CMD;
   headerBuf[off++] = transferStatus;
+  char *headerLenPtr = headerBuf + off;
+  off += sizeof(uint16_t);
   const size_t expectedSize = source->getSize();
   size_t actualSize = 0;
-  Protocol::encode(headerBuf, off, Protocol::kMaxHeader,
-                   source->getIdentifier(), expectedSize, source->getOffset(),
-                   source->getTotalSize());
+  Protocol::encodeHeader(headerBuf, off, Protocol::kMaxHeader,
+                         source->getIdentifier(), expectedSize,
+                         source->getOffset(), source->getTotalSize());
+  uint16_t littleEndianOff = folly::Endian::little((uint16_t)off);
+  folly::storeUnaligned<uint16_t>(headerLenPtr, littleEndianOff);
   ssize_t written = socket->write(headerBuf, off);
   if (written != off) {
     PLOG(ERROR) << "Write error/mismatch " << written << " " << off
@@ -460,7 +760,7 @@ TransferStats Sender::sendOneByteSource(
     }
     WDT_CHECK(buffer && size > 0);
     written = 0;
-    if (doThrottling) {
+    if (throttler) {
       /**
        * If throttling is enabled we call limit(totalBytes) which
        * used both the methods of throttling peak and average.

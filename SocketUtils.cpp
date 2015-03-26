@@ -1,4 +1,5 @@
 #include "SocketUtils.h"
+#include "WdtOptions.h"
 
 #include <glog/logging.h>
 #include <folly/Conv.h>
@@ -29,11 +30,28 @@ std::string SocketUtils::getNameInfo(const struct sockaddr *sa,
 }
 
 /* static */
-void SocketUtils::setReadTimeout(int fd, int timeout) {
-  struct timeval tv;
-  tv.tv_sec = timeout;
-  tv.tv_usec = 0;
-  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
+void SocketUtils::setReadTimeout(int fd) {
+  const auto &options = WdtOptions::get();
+  if (options.read_timeout_millis > 0) {
+    struct timeval tv;
+    tv.tv_sec = options.read_timeout_millis / 1000;            // milli to sec
+    tv.tv_usec = (options.read_timeout_millis % 1000) * 1000;  // milli to micro
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,
+               sizeof(struct timeval));
+  }
+}
+
+/* statis */
+void SocketUtils::setWriteTimeout(int fd) {
+  const auto &options = WdtOptions::get();
+  if (options.write_timeout_millis > 0) {
+    struct timeval tv;
+    tv.tv_sec = options.write_timeout_millis / 1000;  // milli to sec
+    tv.tv_usec =
+        (options.write_timeout_millis % 1000) * 1000;  // milli to micro
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv,
+               sizeof(struct timeval));
+  }
 }
 }
 }

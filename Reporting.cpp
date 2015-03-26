@@ -93,6 +93,8 @@ TransferReport::TransferReport(
   }
   if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
     summary_.setErrorCode(ERROR);
+  } else {
+    summary_.setErrorCode(OK);
   }
   std::set<std::string> failedFilesSet;
   for (auto& stats : failedSourceStats_) {

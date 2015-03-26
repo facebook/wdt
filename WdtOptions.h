@@ -74,6 +74,7 @@ class WdtOptions {
    * failure
    */
   int32_t sleep_millis{50};
+
   /**
    * Specify the backlog to start the server socket with. Look
    * into ServerSocket.h
@@ -135,9 +136,6 @@ class WdtOptions {
    */
   int progress_report_interval_millis{20};
 
-  /// multiplication factor for retry interval
-  double retry_interval_mult_factor{1.0};
-
   /**
    * Timeout checks will be done at this interval (milliseconds)
    */
@@ -152,7 +150,40 @@ class WdtOptions {
    * block size, it is used to break bigger files into smaller chunks
    * block_size of <= 0 disables block transfer
    */
-  double block_size_mbytes{16};
+  double block_size_mbytes{-1};
+
+  /**
+   * timeout in accept call at the server
+   */
+  int32_t accept_timeout_millis{100};
+
+  /**
+   * maximum number of retries for accept call in joinable mode. we try to
+   * accept with timeout of accept_timeout_millis. fisr connection from sender
+   * must come before max_accept_retries.
+   */
+  int32_t max_accept_retries{500};
+
+  /**
+   * accept window size in millis. For a session, after the first connection is
+   * received, other connections must be received before this duration.
+   */
+  int32_t accept_window_millis{2000};
+
+  /**
+   * timeout for socket read
+   */
+  int read_timeout_millis{5000};
+
+  /**
+   * timeout for socket write
+   */
+  int write_timeout_millis{5000};
+
+  /**
+   * timeout for socket connect
+   */
+  int connect_timeout_millis{2000};
 
   /**
    * Since this is a singelton copy constructor
@@ -161,9 +192,10 @@ class WdtOptions {
   WdtOptions(const WdtOptions&) = delete;
   WdtOptions& operator=(const WdtOptions&) = delete;
   WdtOptions() {
-
   }
+
  private:
   static WdtOptions* instance_;
 };
-}}
+}
+}

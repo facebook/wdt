@@ -3,9 +3,18 @@
 #include "WdtOptions.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
+#include <fcntl.h>
+#include <chrono>
 
 namespace facebook {
 namespace wdt {
+
+typedef std::chrono::high_resolution_clock Clock;
+
+template <typename T>
+int durationMillis(T d) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(d).count();
+}
 
 using std::string;
 
@@ -46,12 +55,89 @@ ErrorCode ClientSocket::connect() {
       PLOG(WARNING) << "Error making socket";
       continue;
     }
-    if (::connect(fd_, info->ai_addr, info->ai_addrlen)) {
-      PLOG(INFO) << "Error connecting on "
-                 << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
+
+    // make the socket non blocking
+    int sockArg = fcntl(fd_, F_GETFL, nullptr);
+    sockArg |= O_NONBLOCK;
+    int retValue = fcntl(fd_, F_SETFL, sockArg);
+    if (retValue == -1) {
+      PLOG(ERROR) << "Could not make the socket non-blocking " << port_;
       this->close();
       continue;
     }
+
+    if (::connect(fd_, info->ai_addr, info->ai_addrlen) != 0) {
+      if (errno != EINPROGRESS) {
+        PLOG(INFO) << "Error connecting on "
+                   << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
+        this->close();
+        continue;
+      }
+      auto startTime = Clock::now();
+      int connectTimeout = WdtOptions::get().connect_timeout_millis;
+
+      while (true) {
+        // we need this loop because select() can return before any file handles
+        // have changes or before timing out. In that case, we check whether it
+        // is becuse of EINTR or not. If true, we have to try select with
+        // reduced timeout
+        int timeElapsed = durationMillis(Clock::now() - startTime);
+        if (timeElapsed >= connectTimeout) {
+          LOG(ERROR) << "connect() timed out";
+          this->close();
+          return CONN_ERROR;
+        }
+        int selectTimeout = connectTimeout - timeElapsed;
+        struct timeval tv;
+        tv.tv_sec = selectTimeout / 1000;
+        tv.tv_usec = (selectTimeout % 1000) * 1000;
+
+        fd_set wfds;
+        FD_ZERO(&wfds);
+        FD_SET(fd_, &wfds);
+
+        int retValue;
+        if ((retValue = select(fd_ + 1, nullptr, &wfds, nullptr, &tv)) <= 0) {
+          if (errno == EINTR) {
+            VLOG(1) << "select() call interrupted. retrying...";
+            continue;
+          }
+          if (retValue == 0) {
+            LOG(ERROR) << "select() timed out " << port_;
+          } else {
+            PLOG(ERROR) << "select() failed " << port_;
+          }
+          this->close();
+          return CONN_ERROR;
+        }
+        break;
+      }
+
+      // have to check whether the connection attempt succeeded
+      int connectResult;
+      socklen_t len = sizeof(connectResult);
+      if (getsockopt(fd_, SOL_SOCKET, SO_ERROR, &connectResult, &len) < 0) {
+        PLOG(WARNING) << "getsockopt() failed";
+        this->close();
+        continue;
+      }
+      if (connectResult != 0) {
+        LOG(WARNING) << "connect did not succeed : " << strerror(connectResult);
+        this->close();
+        continue;
+      }
+    }
+
+    // Set to blocking mode again
+    sockArg = fcntl(fd_, F_GETFL, nullptr);
+    sockArg &= (~O_NONBLOCK);
+    retValue = fcntl(fd_, F_SETFL, sockArg);
+    if (retValue == -1) {
+      PLOG(ERROR) << "Could not make the socket blocking " << port_;
+      this->close();
+      continue;
+    }
+
     VLOG(1) << "Successful connect on " << fd_;
     sa_ = *info;
     break;
@@ -64,7 +150,8 @@ ErrorCode ClientSocket::connect() {
     }
     return CONN_ERROR_RETRYABLE;
   }
-  // TODO: set sock options
+  SocketUtils::setReadTimeout(fd_);
+  SocketUtils::setWriteTimeout(fd_);
   return OK;
 }
 

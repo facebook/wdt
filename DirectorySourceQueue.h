@@ -83,6 +83,9 @@ class DirectorySourceQueue : public SourceQueue {
   /// @return         total size of files processed/enqueued
   virtual size_t getTotalSize() const override;
 
+  /// @return         total number of blocks and status of the transfer
+  std::pair<int64_t, ErrorCode> getNumBlocksAndStatus() const;
+
   /**
    * Sets regex represnting files to include for transfer
    *
@@ -126,12 +129,20 @@ class DirectorySourceQueue : public SourceQueue {
   void setFollowSymlinks(const bool followSymlinks);
 
   /**
+   * returns sources to the queue, checks for fail/retries, doesn't increment
+   * numentries
+   *
+   * @param sources               sources to be returned to the queue
+   */
+  void returnToQueue(std::vector<std::unique_ptr<ByteSource>> &sources);
+
+  /**
    * returns a source to the queue, checks for fail/retries, doesn't increment
    * numentries
    *
-   * @param source               source to be returned to the queue
+   * @param source                source to be returned to the queue
    */
-  virtual void returnToQueue(std::unique_ptr<ByteSource> &source);
+  void returnToQueue(std::unique_ptr<ByteSource> &source);
 
   /**
    * Returns list of files which were not transfereed. It empties the queue and
@@ -178,6 +189,15 @@ class DirectorySourceQueue : public SourceQueue {
   virtual void createIntoQueue(const std::string &fullPath,
                                const std::string &relPath,
                                const size_t fileSize);
+
+  /**
+   * when adding multiple files, we have the option of using notify_one multiple
+   * times or notify_all once. depening on number of added sources, this
+   * function uses either notify_one or notify_all
+   *
+   * @param addedSource     number of sources added
+   */
+  void smartNotify(uint32_t addedSource);
 
   /// root directory to recurse on if fileInfo_ is empty
   std::string rootDir_;
@@ -247,8 +267,13 @@ class DirectorySourceQueue : public SourceQueue {
   /// directories which could not be opened
   std::vector<std::string> failedDirectories_;
 
-  /// Total number of entries/files that have passed through the queue
+  /// Total number of files that have passed through the queue
   size_t numEntries_{0};
+
+  /// total number of blocks that have passed through the queue. Even when
+  /// blocks are actually disabled, our code internally treats files like single
+  /// blocks. So, numBlocks_ >= numFiles_.
+  int64_t numBlocks_{0};
 
   /// Total size of entries/files that have passed through the queue
   size_t totalFileSize_{0};

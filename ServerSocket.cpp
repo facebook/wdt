@@ -4,8 +4,17 @@
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <folly/Conv.h>
+#include <fcntl.h>
+#include <chrono>
 namespace facebook {
 namespace wdt {
+
+typedef std::chrono::high_resolution_clock Clock;
+
+template <typename T>
+int durationMillis(T d) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(d).count();
+}
 
 using std::string;
 
@@ -81,11 +90,43 @@ ErrorCode ServerSocket::listen() {
   return OK;
 }
 
-ErrorCode ServerSocket::acceptNextConnection() {
+ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
   WDT_CHECK(listen() == OK);
+
+  if (timeoutMillis > 0) {
+    // zero value disables timeout
+    auto startTime = Clock::now();
+    while (true) {
+      // we need this loop because select() can return before any file handles
+      // have changes or before timing out. In that case, we check whether it
+      // is becuse of EINTR or not. If true, we have to try select with
+      // reduced timeout
+      int timeElapsed = durationMillis(Clock::now() - startTime);
+      if (timeElapsed >= timeoutMillis) {
+        LOG(ERROR) << "accept() timed out";
+        return CONN_ERROR;
+      }
+      int selectTimeout = timeoutMillis - timeElapsed;
+      fd_set rfds;
+      FD_ZERO(&rfds);
+      FD_SET(listeningFd_, &rfds);
+      struct timeval tv;
+      tv.tv_sec = selectTimeout / 1000;
+      tv.tv_usec = (selectTimeout % 1000) * 1000;
+      if (select(FD_SETSIZE, &rfds, nullptr, nullptr, &tv) <= 0) {
+        if (errno == EINTR) {
+          VLOG(1) << "select() call interrupted. retrying...";
+          continue;
+        }
+        VLOG(1) << "select() timed out";
+        return CONN_ERROR;
+      }
+      break;
+    }
+  }
+
   struct sockaddr addr;
   socklen_t addrLen = sizeof(addr);
-  VLOG(1) << "Waiting for new connection...";
   fd_ = accept(listeningFd_, &addr, &addrLen);
   if (fd_ < 0) {
     PLOG(ERROR) << "accept error";
@@ -93,12 +134,20 @@ ErrorCode ServerSocket::acceptNextConnection() {
   }
   VLOG(1) << "new connection " << fd_ << " from "
           << SocketUtils::getNameInfo(&addr, addrLen);
-  // TODO: set sock options
+  SocketUtils::setReadTimeout(fd_);
+  SocketUtils::setWriteTimeout(fd_);
   return OK;
 }
 
 int ServerSocket::read(char *buf, int nbyte) const {
-  return ::read(fd_, buf, nbyte);
+  while (true) {
+    int retValue = ::read(fd_, buf, nbyte);
+    if (retValue < 0 && errno == EINTR) {
+      VLOG(2) << "received EINTR. continuing...";
+      continue;
+    }
+    return retValue;
+  }
 }
 
 int ServerSocket::write(char *buf, int nbyte) const {
@@ -106,8 +155,14 @@ int ServerSocket::write(char *buf, int nbyte) const {
 }
 
 int ServerSocket::closeCurrentConnection() {
-  return close(fd_);
+  int retValue = 0;
+  if (fd_ >= 0) {
+    retValue = close(fd_);
+    fd_ = -1;
+  }
+  return retValue;
 }
+
 int ServerSocket::getListenFd() const {
   return listeningFd_;
 }

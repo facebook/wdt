@@ -17,7 +17,7 @@ class ServerSocket {
   /// on flag)).
   ErrorCode listen();
   /// will accept next (/only) incoming connection
-  ErrorCode acceptNextConnection();
+  ErrorCode acceptNextConnection(int timeoutMillis);
   int read(char *buf, int nbyte) const;
   int write(char *buf, int nbyte) const;
   int getFd() const;
