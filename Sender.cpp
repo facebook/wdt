@@ -416,10 +416,27 @@ Sender::SenderState Sender::connect(ThreadData &data) {
   int port = ports_[data.threadIndex_];
   TransferStats &threadStats = data.threadStats_;
   auto &socket = data.socket_;
+  ThreadTransferHistory &transferHistory = data.getTransferHistory();
 
   ErrorCode code;
 
   if (socket) {
+    char *buf = data.buf_;
+    ssize_t toRead = 1 + sizeof(uint64_t);
+    ssize_t numRead = data.socket_->read(buf, toRead);
+    if (numRead == toRead) {
+      Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[0];
+      // Check if an Abort was received and then try to
+      // read checkpoint and return the sources to queue accordingly
+      if (cmd == Protocol::ABORT_CMD) {
+        LOG(WARNING) << "Received an abort on " << data.threadIndex_;
+        auto checkpoint = folly::loadUnaligned<uint64_t>(buf + 1);
+        checkpoint = folly::Endian::little(checkpoint);
+        // treat this as global checkpoint
+        transferHistory.setCheckpointAndReturnToQueue(checkpoint, true);
+        return END;
+      }
+    }
     socket->close();
   }
   socket = connectToReceiver(port, code);

@@ -104,6 +104,7 @@ class Receiver {
     PROCESS_DONE_CMD,
     SEND_GLOBAL_CHECKPOINTS,
     SEND_DONE_CMD,
+    SEND_ABORT_CMD,
     WAIT_FOR_FINISH_OR_NEW_CHECKPOINT,
     WAIT_FOR_FINISH_WITH_THREAD_ERROR,
     FAILED,
@@ -292,6 +293,13 @@ class Receiver {
    *               ACCEPT_WITH_TIMEOUT(failure)
    */
   ReceiverState sendDoneCmd(ThreadData &data);
+
+  /**
+   * Sends ABORT cmd back to the sender
+   * Previous states : PROCESS_FILE_CMD
+   * Next states : WAIT_FOR_FINISH_WITH_THREAD_ERROR
+   */
+  ReceiverState sendAbortCmd(ThreadData &data);
 
   /**
    * waits for transfer to finish or new checkpoints. This state first

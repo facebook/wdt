@@ -84,6 +84,7 @@ const Receiver::StateFunction Receiver::stateMap_[] = {
     &Receiver::processDoneCmd,
     &Receiver::sendGlobalCheckpoint,
     &Receiver::sendDoneCmd,
+    &Receiver::sendAbortCmd,
     &Receiver::waitForFinishOrNewCheckpoint,
     &Receiver::waitForFinishWithThreadError};
 
@@ -456,7 +457,6 @@ Receiver::ReceiverState Receiver::acceptWithTimeout(ThreadData &data) {
   auto &senderReadTimeout = data.senderReadTimeout_;
   auto &senderWriteTimeout = data.senderWriteTimeout_;
   auto &doneSendFailure = data.doneSendFailure_;
-
   socket.closeCurrentConnection();
 
   auto timeout = options.accept_window_millis;
@@ -685,6 +685,10 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     } else if (offset == 0) {
       fileCreator_->truncateFile(dest, fileSize);
     }
+    if (dest == -1) {
+      threadStats.setErrorCode(FILE_WRITE_ERROR);
+      return SEND_ABORT_CMD;
+    }
   }
   ssize_t remainingData = numRead + oldOffset - off;
   ssize_t toWrite = remainingData;
@@ -702,6 +706,8 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
                   << toWrite;
       close(dest);
       dest = -1;
+      threadStats.setErrorCode(FILE_WRITE_ERROR);
+      return SEND_ABORT_CMD;
     } else {
       VLOG(3) << "Wrote intial " << toWrite << " / " << sourceSize
               << " off: " << off << " numRead: " << numRead << " on " << dest;
@@ -722,6 +728,8 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
         PLOG(ERROR) << "Write error/mismatch " << written << " " << nres;
         close(dest);
         dest = -1;
+        threadStats.setErrorCode(FILE_WRITE_ERROR);
+        return SEND_ABORT_CMD;
       }
     }
     wres += nres;
@@ -833,6 +841,24 @@ Receiver::ReceiverState Receiver::sendGlobalCheckpoint(ThreadData &data) {
     numRead = off = 0;
     return READ_NEXT_CMD;
   }
+}
+
+Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
+  LOG(INFO) << "Entered SEND_ABORT_CMD state " << data.threadIndex_;
+  auto &threadStats = data.threadStats_;
+  char *buf = data.getBuf();
+  auto &socket = data.socket_;
+  buf[0] = Protocol::ABORT_CMD;
+  auto checkpoint = folly::Endian::little(threadStats.getNumBlocks());
+  folly::storeUnaligned<uint64_t>(buf + 1, checkpoint);
+  socket.write(buf, 1 + sizeof(uint64_t));
+  // No need to check if we were successful in sending ABORT
+  // This thread will simply disconnect and sender thread on the
+  // other side will timeout
+  socket.closeCurrentConnection();
+  threadStats.addHeaderBytes(1);
+  threadStats.addEffectiveBytes(1, 0);
+  return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
 }
 
 Receiver::ReceiverState Receiver::sendDoneCmd(ThreadData &data) {

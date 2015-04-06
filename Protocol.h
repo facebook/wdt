@@ -19,6 +19,7 @@ class Protocol {
     WAIT_CMD = 0x57,      // W)ait
     ERR_CMD = 0x45,       // E)rr
     SETTINGS_CMD = 0x53,  // S)ettings
+    ABORT_CMD = 0x41,     // A)bort
     EXIT_CMD = 0x65,      // e)xit
   };
 
