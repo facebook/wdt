@@ -23,6 +23,9 @@ bool FileCreator::setFileSize(int fd, size_t fileSize) {
       return false;
     }
   }
+  if (fileSize == 0) {
+    return true;
+  }
   int status = posix_fallocate(fd, 0, fileSize);
   if (status != 0) {
     LOG(ERROR) << "fallocate() failed " << strerror(status);
