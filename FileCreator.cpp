@@ -1,4 +1,5 @@
 #include "FileCreator.h"
+#include "ErrorCodes.h"
 
 #include <string.h>
 #include <sys/stat.h>
@@ -8,6 +9,97 @@
 
 namespace facebook {
 namespace wdt {
+
+bool FileCreator::setFileSize(int fd, size_t fileSize) {
+  struct stat fileStat;
+  if (fstat(fd, &fileStat) != 0) {
+    PLOG(ERROR) << "fstat() failed for " << fd;
+    return false;
+  }
+  if (fileStat.st_size > fileSize) {
+    // existing file is larger than required
+    if (ftruncate(fd, fileSize) != 0) {
+      PLOG(ERROR) << "ftruncate() failed for " << fd;
+      return false;
+    }
+  }
+  int status = posix_fallocate(fd, 0, fileSize);
+  if (status != 0) {
+    LOG(ERROR) << "fallocate() failed " << strerror(status);
+    return false;
+  }
+  return true;
+}
+
+int FileCreator::openAndSetSize(const std::string &relPath, size_t size) {
+  int fd = createFile(relPath);
+  if (fd < 0) {
+    return -1;
+  }
+  if (!setFileSize(fd, size)) {
+    close(fd);
+    return -1;
+  }
+  return fd;
+}
+
+int FileCreator::openForFirstBlock(int threadIndex, const std::string &relPath,
+                                   uint64_t seqId, size_t size) {
+  int fd = openAndSetSize(relPath, size);
+  {
+    folly::SpinLockGuard guard(lock_);
+    auto it = fileStatusMap_.find(seqId);
+    WDT_CHECK(it != fileStatusMap_.end());
+    it->second = fd >= 0 ? ALLOCATED : FAILED;
+  }
+  std::unique_lock<std::mutex> waitLock(allocationMutex_);
+  threadConditionVariables_[threadIndex].notify_all();
+  return fd;
+}
+
+bool FileCreator::waitForAllocationFinish(int allocatingThreadIndex,
+                                          uint64_t seqId) {
+  std::unique_lock<std::mutex> waitLock(allocationMutex_);
+  while (true) {
+    {
+      folly::SpinLockGuard guard(lock_);
+      auto it = fileStatusMap_.find(seqId);
+      WDT_CHECK(it != fileStatusMap_.end());
+      if (it->second == ALLOCATED) {
+        return true;
+      }
+      if (it->second == FAILED) {
+        return false;
+      }
+    }
+    threadConditionVariables_[allocatingThreadIndex].wait(waitLock);
+  }
+}
+
+int FileCreator::openForBlocks(int threadIndex, const std::string &relPath,
+                               uint64_t seqId, size_t size) {
+  lock_.lock();
+  auto it = fileStatusMap_.find(seqId);
+  if (it == fileStatusMap_.end()) {
+    // allocation has not started for this file
+    fileStatusMap_.insert(std::make_pair(seqId, threadIndex));
+    lock_.unlock();
+    return openForFirstBlock(threadIndex, relPath, seqId, size);
+  }
+  auto status = it->second;
+  lock_.unlock();
+  if (status == FAILED) {
+    // allocation failed previously
+    return -1;
+  }
+  if (status != ALLOCATED) {
+    // allocation in progress
+    if (!waitForAllocationFinish(it->second, seqId)) {
+      return -1;
+    }
+  }
+  return createFile(relPath);
+}
 
 using std::string;
 
@@ -36,7 +128,8 @@ int FileCreator::createFile(const string &relPathStr) {
       }
     }
   }
-  int res = open(path.c_str(), O_CREAT | O_WRONLY, 0644);
+  int openFlags = O_CREAT | O_WRONLY;
+  int res = open(path.c_str(), openFlags, 0644);
   if (res < 0) {
     if (dir.empty()) {
       PLOG(ERROR) << "failed creating file " << path;
@@ -48,7 +141,7 @@ int FileCreator::createFile(const string &relPathStr) {
       LOG(ERROR) << "failed to create dir " << dir << " recursively";
       return -1;
     }
-    res = open(path.c_str(), O_CREAT | O_WRONLY, 0644);
+    res = open(path.c_str(), openFlags, 0644);
     if (res < 0) {
       PLOG(ERROR) << "failed creating file " << path;
       return -1;
@@ -93,19 +186,6 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
   }
 
   return true;
-}
-
-void FileCreator::truncateFile(int fd, int64_t size) {
-  struct stat fileStat;
-  if (fstat(fd, &fileStat) != 0) {
-    PLOG(ERROR) << "fstat() failed for " << fd;
-    return;
-  }
-  if (fileStat.st_size > size) {
-    if (ftruncate(fd, size) != 0) {
-      PLOG(ERROR) << "ftruncate() failed for " << fd;
-    }
-  }
 }
 
 /* static */

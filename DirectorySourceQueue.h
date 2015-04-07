@@ -244,7 +244,7 @@ class DirectorySourceQueue : public SourceQueue {
         return source1->getSize() < source2->getSize();
       }
       if (source1->getOffset() != source2->getOffset()) {
-        return source1->getOffset() < source2->getOffset();
+        return source1->getOffset() > source2->getOffset();
       }
       return source1->getIdentifier() > source2->getIdentifier();
     }

@@ -290,17 +290,17 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   if (!enableBlockTransfer) {
     VLOG(2) << "Block transfer disabled for this transfer";
   }
+  int blockCount = 0;
   // if block transfer is disabled, treating fileSize as block size. This
   // ensures that we create a single block
   auto blockSize = enableBlockTransfer ? blockSizeBytes : fileSize;
-
-  FileMetaData *fileData = new FileMetaData(fullPath, relPath, fileSize);
-  sharedFileData_.emplace_back(fileData);
-  int blockCount = 0;
-  size_t offset = 0;
-  size_t remainingBytes = fileSize;
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    FileMetaData *fileData =
+        new FileMetaData(fullPath, relPath, numEntries_, fileSize);
+    sharedFileData_.emplace_back(fileData);
+    size_t offset = 0;
+    size_t remainingBytes = fileSize;
     do {
       size_t size = std::min<size_t>(remainingBytes, blockSize);
       std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(

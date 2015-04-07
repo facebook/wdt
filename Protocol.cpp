@@ -11,12 +11,14 @@ using namespace facebook::wdt;
 
 /* static */
 bool Protocol::encodeHeader(char *dest, size_t &off, size_t max, std::string id,
-                            int64_t size, int64_t offset, int64_t fileSize) {
+                            uint64_t seqId, int64_t size, int64_t offset,
+                            int64_t fileSize) {
   // TODO: add version and/or magic number
   size_t idLen = id.size();
   off += folly::encodeVarint(idLen, (uint8_t *)dest + off);
   memcpy(dest + off, id.data(), idLen);
   off += idLen;
+  off += folly::encodeVarint(seqId, (uint8_t *)dest + off);
   off += folly::encodeVarint(size, (uint8_t *)dest + off);
   off += folly::encodeVarint(offset, (uint8_t *)dest + off);
   off += folly::encodeVarint(fileSize, (uint8_t *)dest + off);
@@ -25,7 +27,8 @@ bool Protocol::encodeHeader(char *dest, size_t &off, size_t max, std::string id,
 }
 
 bool Protocol::decodeHeader(char *src, size_t &off, size_t max, std::string &id,
-                            int64_t &size, int64_t &offset, int64_t &fileSize) {
+                            uint64_t &seqId, int64_t &size, int64_t &offset,
+                            int64_t &fileSize) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   size_t idLen = folly::decodeVarint(br);
   if (idLen + off + 1 >= max) {
@@ -36,6 +39,7 @@ bool Protocol::decodeHeader(char *src, size_t &off, size_t max, std::string &id,
   id.assign((const char *)(br.start()), idLen);
   br.advance(idLen);
   try {
+    seqId = folly::decodeVarint(br);
     size = folly::decodeVarint(br);
     offset = folly::decodeVarint(br);
     fileSize = folly::decodeVarint(br);

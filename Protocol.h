@@ -24,7 +24,7 @@ class Protocol {
   };
 
   /// Max size of filename + 4 max varints + 1 byte for cmd + 1 byte for status
-  static const size_t kMaxHeader = PATH_MAX + 4 * 10 + 2 + 2;
+  static const size_t kMaxHeader = PATH_MAX + 5 * 10 + 2 + 2;
   /// min number of bytes that must be send to unblock receiver
   static const size_t kMinBufLength = 256;
   /// max size of local checkpoint encoding
@@ -34,16 +34,19 @@ class Protocol {
   /// max size of settings command encoding
   static const size_t kMaxSettings = 1 + 2 * 10;
 
-  /// encodes id and size into dest+off
+  /// encodes id, sequence-id, block-size, block-offset and file-size
+  /// into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
   static bool encodeHeader(char *dest, size_t &off, size_t max, std::string id,
-                           int64_t size, int64_t offset, int64_t fileSize);
+                           uint64_t seqId, int64_t size, int64_t offset,
+                           int64_t fileSize);
   /// decodes from src+off and consumes/moves off but not past max
-  /// sets id and size
+  /// sets id, sequence-id, block-size, block-offset and file-size
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeHeader(char *src, size_t &off, size_t max, std::string &id,
-                           int64_t &size, int64_t &offset, int64_t &fileSize);
+                           uint64_t &seqId, int64_t &size, int64_t &offset,
+                           int64_t &fileSize);
 
   /// encodes checkpoints into dest+off
   /// moves the off into dest pointer, not going past max

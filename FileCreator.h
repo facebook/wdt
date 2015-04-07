@@ -4,6 +4,9 @@
 #include <mutex>
 #include <string>
 #include <unordered_set>
+#include <folly/SpinLock.h>
+#include <map>
+#include <condition_variable>
 
 namespace facebook {
 namespace wdt {
@@ -21,7 +24,7 @@ namespace wdt {
 class FileCreator {
  public:
   /// rootDir is assumed to exist
-  explicit FileCreator(const std::string &rootDir) {
+  explicit FileCreator(const std::string &rootDir, int numThreads) {
     CHECK(!rootDir.empty());
 
     // For creating root directory, we are using createDirRecursively.
@@ -31,10 +34,56 @@ class FileCreator {
     std::string rootDirPath = rootDir;
     addTrailingSlash(rootDirPath);
     createDirRecursively(rootDirPath, false);
-    reset();
+    resetDirCache();
     rootDir_ = rootDirPath;
+    threadConditionVariables_ = new std::condition_variable[numThreads];
   }
 
+  virtual ~FileCreator() {
+    delete[] threadConditionVariables_;
+  }
+
+  /**
+   * Opens the file and sets its size. If the existing file size is greater than
+   * required size, the file is truncated using ftruncate. Space is
+   * allocated using posix_fallocate.
+   *
+   * @param relPath   path of the file relative to root directory
+   * @param size      size of the file
+   *
+   * @return          file descriptor in case of success, -1 otherwise
+   */
+  int openAndSetSize(const std::string &relPath, size_t size);
+
+  /**
+   * This is used to open the file in block mode. If the current thread is the
+   * first one to try to open the file, then it allocates space using
+   * openAndSetSize function. Other threads wait for the first thread to finish
+   * and opens the file without setting size.
+   *
+   * @param threadIndex   index of the calling thread
+   * @param relPath       path of the file relative to root directory
+   * @param seqId         sequence id of the file
+   * @param size          size of the file
+   *
+   * @return              file descriptor in case of success, -1 otherwise
+   */
+  int openForBlocks(int threadIndex, const std::string &relPath, uint64_t seqId,
+                    size_t size);
+
+  /// reset internal directory cache
+  void resetDirCache() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    createdDirs_.clear();
+  }
+
+  /// clears allocation status map, called after end of each session
+  void clearAllocationMap() {
+    folly::SpinLockGuard guard(lock_);
+    fileStatusMap_.clear();
+  }
+
+ private:
   /**
    * Create a file and open for writing, recursively create subdirs.
    * Subdirs are only created once due to createdDirs_ cache, but
@@ -49,21 +98,34 @@ class FileCreator {
   int createFile(const std::string &relPath);
 
   /**
-   * If the file size greater than i/p size, truncates the file to i/p size.
-   * Otherwise does not do anything.
+   * sets the size of the file. If the current size is greater than quired size,
+   * file is truncated using ftruncate. Space is allocated using fallocate.
    *
    * @param fd        file descriptor
-   * @param size      size to truncate to
+   * @param fileSize  size of the file
+   *
+   * @return          true for suzzess, false otherwise
    */
-  void truncateFile(int fd, int64_t size);
+  bool setFileSize(int fd, size_t fileSize);
 
-  /// reset internal directory cache
-  void reset() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    createdDirs_.clear();
-  }
+  /**
+   * opens the file and sets it size. Called only for the first block to request
+   * opening a multi-block file. Sets the allocation status in fileStatusMap_
+   * and notifies other waiting thread.
+   *
+   * @param threadIndex   index of the calling thread
+   * @param relPath   path relative to root dir
+   * @param seqId         sequence id of the file
+   * @param size          size of the file
+   *
+   * @return          file descriptor or -1 on error
+   */
+  int openForFirstBlock(int threadIndex, const std::string &relPath,
+                        uint64_t seqId, size_t size);
 
- private:
+  /// waits for allocation of a file to finish
+  bool waitForAllocationFinish(int allocatingThreadIndex, uint64_t seqId);
+
   /// appends a trailing / if not already there to path
   static void addTrailingSlash(std::string &path);
 
@@ -94,6 +156,21 @@ class FileCreator {
 
   /// protects createdDirs_
   std::mutex mutex_;
+
+  const static int ALLOCATED = -1;
+  const static int FAILED = -2;
+
+  /// map from file sequence id to allocation status. There are four possible
+  /// allocation status. NOT STARTED(no entry in the map), ALLOCATED(-1),
+  /// FAILED(-2) and IN_PROGRESS(map value is the index of the allocating
+  /// thread)
+  std::map<uint64_t, int> fileStatusMap_;
+  /// mutex to coordinate waiting among threads
+  std::mutex allocationMutex_;
+  /// array of condition_variables for different threads
+  std::condition_variable *threadConditionVariables_;
+  /// lock protecting fileStatusMap_
+  folly::SpinLock lock_;
 };
 }
 }

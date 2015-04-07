@@ -751,8 +751,9 @@ TransferStats Sender::sendOneByteSource(
   const size_t expectedSize = source->getSize();
   size_t actualSize = 0;
   Protocol::encodeHeader(headerBuf, off, Protocol::kMaxHeader,
-                         source->getIdentifier(), expectedSize,
-                         source->getOffset(), source->getTotalSize());
+                         source->getIdentifier(), source->getSeqId(),
+                         expectedSize, source->getOffset(),
+                         source->getTotalSize());
   uint16_t littleEndianOff = folly::Endian::little((uint16_t)off);
   folly::storeUnaligned<uint16_t>(headerLenPtr, littleEndianOff);
   ssize_t written = socket->write(headerBuf, off);

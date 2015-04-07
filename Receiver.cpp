@@ -295,7 +295,7 @@ void Receiver::start() {
               << " smaller than " << Protocol::kMaxHeader << " using "
               << bufferSize << " instead";
   }
-  fileCreator_.reset(new FileCreator(destDir_));
+  fileCreator_.reset(new FileCreator(destDir_, ports_.size()));
   for (int i = 0; i < ports_.size(); i++) {
     threadStats_.emplace_back(true);
     threadServerSockets_.emplace_back(folly::to<std::string>(ports_[i]),
@@ -331,6 +331,7 @@ void Receiver::endCurGlobalSession() {
   waitingThreadCount_ = 0;
   waitingWithErrorThreadCount_ = 0;
   checkpoints_.clear();
+  fileCreator_->clearAllocationMap();
   conditionAllFinished_.notify_all();
 }
 
@@ -608,6 +609,7 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
 Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   VLOG(1) << "entered PROCESS_FILE_CMD state " << data.threadIndex_;
   auto &socket = data.socket_;
+  auto &threadIndex = data.threadIndex_;
   auto &threadStats = data.threadStats_;
   char *buf = data.getBuf();
   auto &numRead = data.numRead_;
@@ -621,6 +623,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   int dest = -1;
   bool doActualWrites = !options.skip_writes;
   std::string id;
+  uint64_t seqId;
   int64_t sourceSize;
   int64_t offset;
   int64_t fileSize;
@@ -656,7 +659,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   }
   off += sizeof(uint16_t);
   bool success = Protocol::decodeHeader(buf, off, numRead + oldOffset, id,
-                                        sourceSize, offset, fileSize);
+                                        seqId, sourceSize, offset, fileSize);
   ssize_t headerBytes = off - oldOffset;
   // transferred header length must match decoded header length
   WDT_CHECK(headerLen == headerBytes);
@@ -675,21 +678,26 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
           << " off: " << off << " numRead: " << numRead;
 
   if (doActualWrites) {
-    dest = fileCreator_->createFile(id);
-    if (dest == -1) {
-      LOG(ERROR) << "Unable to open " << id << " in " << destDir_;
-    } else if (offset > 0 && lseek(dest, offset, SEEK_SET) < 0) {
-      PLOG(ERROR) << "Unable to seek " << id;
-      close(dest);
-      dest = -1;
-    } else if (offset == 0) {
-      fileCreator_->truncateFile(dest, fileSize);
+    if (fileSize == sourceSize) {
+      // single block file
+      WDT_CHECK(offset == 0);
+      dest = fileCreator_->openAndSetSize(id, fileSize);
+    } else {
+      // multi block file
+      dest = fileCreator_->openForBlocks(threadIndex, id, seqId, fileSize);
+      if (dest >= 0 && offset > 0 && lseek(dest, offset, SEEK_SET) < 0) {
+        PLOG(ERROR) << "Unable to seek " << id;
+        close(dest);
+        dest = -1;
+      }
     }
     if (dest == -1) {
+      LOG(ERROR) << "File open/seek failed for " << id;
       threadStats.setErrorCode(FILE_WRITE_ERROR);
       return SEND_ABORT_CMD;
     }
   }
+
   ssize_t remainingData = numRead + oldOffset - off;
   ssize_t toWrite = remainingData;
   if (remainingData >= sourceSize) {
@@ -702,8 +710,8 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   if (dest >= 0) {
     written = write(dest, buf + off, toWrite);
     if (written != toWrite) {
-      PLOG(ERROR) << "Write error/mismatch " << written << " " << off << " "
-                  << toWrite;
+      PLOG(ERROR) << "Disk write error/mismatch for " << id << " " << written
+                  << " " << toWrite;
       close(dest);
       dest = -1;
       threadStats.setErrorCode(FILE_WRITE_ERROR);
@@ -725,7 +733,8 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     if (dest >= 0) {
       written = write(dest, buf, nres);
       if (written != nres) {
-        PLOG(ERROR) << "Write error/mismatch " << written << " " << nres;
+        PLOG(ERROR) << "Disk write error/mismatch for " << id << " " << written
+                    << " " << nres;
         close(dest);
         dest = -1;
         threadStats.setErrorCode(FILE_WRITE_ERROR);

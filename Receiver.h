@@ -27,7 +27,6 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
-#include <map>
 
 namespace facebook {
 namespace wdt {
@@ -400,6 +399,7 @@ class Receiver {
   std::string destDir_;
   /// Responsible for writing files on the disk
   std::unique_ptr<FileCreator> fileCreator_;
+
   /**
    * Progress tracker thread is a thread which has to be joined when the
    * transfer is finished. The root thread in finish() and the progress

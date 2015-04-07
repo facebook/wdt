@@ -15,6 +15,9 @@ class ByteSource {
   /// @return identifier for the source
   virtual const std::string &getIdentifier() const = 0;
 
+  /// @return sequence number assigned to the source
+  virtual uint64_t getSeqId() const = 0;
+
   /// @return number of bytes in this source
   virtual uint64_t getSize() const = 0;
 

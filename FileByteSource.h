@@ -17,11 +17,15 @@ class FileMetaData {
    *                    rather than root path, because we only need full path,
    *                    and creating full path from root and rel path involves
    *                    string concatenation
+   * @param seqId       sequence id of the file
    * @param fileSize    size of the file
    */
   FileMetaData(const std::string &fullPath, const std::string &relPath,
-               size_t fileSize)
-      : fullPath_(fullPath), relPath_(relPath), fileSize_(fileSize) {
+               uint64_t seqId, size_t fileSize)
+      : fullPath_(fullPath),
+        relPath_(relPath),
+        seqId_(seqId),
+        fileSize_(fileSize) {
   }
 
   /// @return           full path of the file
@@ -32,6 +36,11 @@ class FileMetaData {
   /// @return           relative path of the file
   const std::string &getRelPath() {
     return relPath_;
+  }
+
+  /// @return           sequence id of the file
+  const uint64_t getSeqId() const {
+    return seqId_;
   }
 
   /// @return           size of the file
@@ -45,6 +54,9 @@ class FileMetaData {
 
   /// relative pathname
   const std::string relPath_;
+
+  /// sequence number associated with the file
+  const uint64_t seqId_;
 
   /// size of the entire file
   const size_t fileSize_;
@@ -79,6 +91,18 @@ class FileByteSource : public ByteSource {
   /// @return filepath
   virtual const std::string &getIdentifier() const override {
     return fileData_->getRelPath();
+  }
+
+  /**
+   * @return sequence number associated with the file. Sequence number
+   *         represents the order in which files were first added to the queue.
+   *         This is a file level identifier. It is same for blocks belonging
+   *         to the same file. This is efficient while using in sets. Instead
+   *         of using full path of the file, we can use this to identify the
+   *         file.
+   */
+  virtual uint64_t getSeqId() const override {
+    return fileData_->getSeqId();
   }
 
   /// @return size of file in bytes

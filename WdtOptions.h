@@ -150,7 +150,7 @@ class WdtOptions {
    * block size, it is used to break bigger files into smaller chunks
    * block_size of <= 0 disables block transfer
    */
-  double block_size_mbytes{-1};
+  double block_size_mbytes{16};
 
   /**
    * timeout in accept call at the server
