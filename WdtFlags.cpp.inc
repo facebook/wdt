@@ -134,3 +134,5 @@ WDT_OPT(read_timeout_millis, int32, "socket read timeout in milliseconds");
 WDT_OPT(write_timeout_millis, int32, "socket write timeout in milliseconds");
 WDT_OPT(connect_timeout_millis, int32,
         "socket connect timeout in milliseconds");
+WDT_OPT(disk_sync_interval_mb, double,
+        "Disk sync interval in mb. A negative value disables syncing");

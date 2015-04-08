@@ -326,6 +326,26 @@ class Receiver {
   /// mapping from receiver states to state functions
   static const StateFunction stateMap_[];
 
+  class DiskWriteSyncer {
+   public:
+    DiskWriteSyncer(int fd, uint64_t offset)
+        : fd_{fd}, nextSyncOffset_{offset} {
+    }
+
+    /**
+     * calls sync_file_range at disk_sync_interval_mb intervals.
+     *
+     * @param written     number of bytes last written
+     * @param forced      whether to force syncing or not
+     */
+    void syncFileRange(int64_t written, bool forced);
+
+   private:
+    int fd_;
+    uint64_t nextSyncOffset_;
+    uint64_t writtenSinceLastSync_{0};
+  };
+
   /**
    * Responsible for basic setup and starting threads
    */

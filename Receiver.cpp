@@ -697,7 +697,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
       return SEND_ABORT_CMD;
     }
   }
-
+  DiskWriteSyncer writeSyncer(dest, offset);
   ssize_t remainingData = numRead + oldOffset - off;
   ssize_t toWrite = remainingData;
   if (remainingData >= sourceSize) {
@@ -719,6 +719,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     } else {
       VLOG(3) << "Wrote intial " << toWrite << " / " << sourceSize
               << " off: " << off << " numRead: " << numRead << " on " << dest;
+      writeSyncer.syncFileRange(written, false);
     }
   }
   off += wres;
@@ -739,6 +740,8 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
         dest = -1;
         threadStats.setErrorCode(FILE_WRITE_ERROR);
         return SEND_ABORT_CMD;
+      } else {
+        writeSyncer.syncFileRange(written, false);
       }
     }
     wres += nres;
@@ -753,6 +756,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   }
   VLOG(2) << "completed " << id << " off: " << off << " numRead: " << numRead
           << " on " << dest;
+  writeSyncer.syncFileRange(0, true);
   // Transfer of the file is complete here, mark the bytes effective
   threadStats.addEffectiveBytes(headerBytes, sourceSize);
   threadStats.incrNumBlocks();
@@ -777,6 +781,35 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     numRead = off = 0;
   }
   return READ_NEXT_CMD;
+}
+
+void Receiver::DiskWriteSyncer::syncFileRange(int64_t written, bool forced) {
+  auto &options = WdtOptions::get();
+  int64_t syncIntervalBytes = options.disk_sync_interval_mb * 1024 * 1024;
+  if (fd_ < 0 || syncIntervalBytes < 0) {
+    return;
+  }
+  writtenSinceLastSync_ += written;
+  if (writtenSinceLastSync_ == 0) {
+    // no need to sync
+    VLOG(1) << "skipping syncFileRange " << written << "  " << forced;
+    return;
+  }
+  if (forced || writtenSinceLastSync_ > syncIntervalBytes) {
+    // sync_file_range with flag SYNC_FILE_RANGE_WRITE is an asynchronous
+    // operation. So, this is not that costly. Source :
+    // http://yoshinorimatsunobu.blogspot.com/2014/03/how-syncfilerange-really-works.html
+    auto status = sync_file_range(fd_, nextSyncOffset_, writtenSinceLastSync_,
+                                  SYNC_FILE_RANGE_WRITE);
+    if (status != 0) {
+      PLOG(ERROR) << "sync_file_range() failed for fd " << fd_;
+      return;
+    }
+    VLOG(1) << "file range synced " << nextSyncOffset_ << " "
+            << writtenSinceLastSync_;
+    nextSyncOffset_ += writtenSinceLastSync_;
+    writtenSinceLastSync_ = 0;
+  }
 }
 
 Receiver::ReceiverState Receiver::processDoneCmd(ThreadData &data) {

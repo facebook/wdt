@@ -186,6 +186,11 @@ class WdtOptions {
   int connect_timeout_millis{2000};
 
   /**
+  * Disk sync interval in mb. A negative value disables syncing
+  */
+  double disk_sync_interval_mb{0.5};
+
+  /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted
    */
