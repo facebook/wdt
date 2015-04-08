@@ -162,6 +162,11 @@ class DirectorySourceQueue : public SourceQueue {
     }
   }
 
+  /// Returns the time it took to traverse the directory tree
+  double getDirectoryTime() const {
+    return directoryTime_;
+  }
+
  private:
   /**
    * Traverse rootDir_ to gather files and sizes to enqueue
@@ -286,6 +291,10 @@ class DirectorySourceQueue : public SourceQueue {
   std::vector<FileMetaData *> sharedFileData_;
 
   const WdtOptions &options_;
+
+  /// Stores the time difference between the start and the end of the
+  /// traversal of directory
+  double directoryTime_;
 };
 }
 }

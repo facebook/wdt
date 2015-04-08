@@ -8,7 +8,7 @@
 #include <folly/Memory.h>
 #include <folly/String.h>
 #include <folly/Bits.h>
-
+#include <folly/ScopeGuard.h>
 #include <thread>
 
 // Constants for different calculations
@@ -131,8 +131,8 @@ const Sender::StateFunction Sender::stateMap_[] = {
 Sender::Sender(int port, int numSockets, const std::string &destHost,
                const std::string &srcDir)
     : Sender(destHost, srcDir) {
-  this->destHost_ = destHost;
-  this->srcDir_ = srcDir;
+  destHost_ = destHost;
+  srcDir_ = srcDir;
   ports_.resize(numSockets);
   for (int i = 0; i < numSockets; i++) {
     ports_[i] = port + i;
@@ -140,20 +140,24 @@ Sender::Sender(int port, int numSockets, const std::string &destHost,
 }
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
+  destHost_ = destHost;
+  srcDir_ = srcDir;
+  transferFinished_ = true;
   const auto &options = WdtOptions::get();
   int port = options.start_port;
   int numSockets = options.num_ports;
   for (int i = 0; i < numSockets; i++) {
     ports_.push_back(port + i);
   }
-  this->followSymlinks_ = options.follow_symlinks;
-  this->includeRegex_ = options.include_regex;
-  this->excludeRegex_ = options.exclude_regex;
-  this->pruneDirRegex_ = options.prune_dir_regex;
-  this->progressReportIntervalMillis_ = options.progress_report_interval_millis;
-  this->progressReporter_ = folly::make_unique<ProgressReporter>();
-  this->destHost_ = destHost;
-  this->srcDir_ = srcDir;
+  dirQueue_.reset(new DirectorySourceQueue(srcDir_));
+  VLOG(3) << "Configuring the  directory queue";
+  dirQueue_->setIncludePattern(options.include_regex);
+  dirQueue_->setExcludePattern(options.exclude_regex);
+  dirQueue_->setPruneDirPattern(options.prune_dir_regex);
+  dirQueue_->setFileInfo(srcFileInfo_);
+  dirQueue_->setFollowSymlinks(options.follow_symlinks);
+  progressReportIntervalMillis_ = options.progress_report_interval_millis;
+  progressReporter_ = folly::make_unique<ProgressReporter>();
 }
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir,
@@ -165,23 +169,23 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir,
 }
 
 void Sender::setIncludeRegex(const std::string &includeRegex) {
-  includeRegex_ = includeRegex;
+  dirQueue_->setIncludePattern(includeRegex);
 }
 
 void Sender::setExcludeRegex(const std::string &excludeRegex) {
-  excludeRegex_ = excludeRegex;
+  dirQueue_->setExcludePattern(excludeRegex);
 }
 
 void Sender::setPruneDirRegex(const std::string &pruneDirRegex) {
-  pruneDirRegex_ = pruneDirRegex;
+  dirQueue_->setPruneDirPattern(pruneDirRegex);
 }
 
 void Sender::setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo) {
-  srcFileInfo_ = srcFileInfo;
+  dirQueue_->setFileInfo(srcFileInfo);
 }
 
 void Sender::setFollowSymlinks(const bool followSymlinks) {
-  followSymlinks_ = followSymlinks;
+  dirQueue_->setFollowSymlinks(followSymlinks);
 }
 
 void Sender::setProgressReportIntervalMillis(
@@ -194,48 +198,36 @@ void Sender::setProgressReporter(
   progressReporter_ = std::move(progressReporter);
 }
 
-std::unique_ptr<TransferReport> Sender::start() {
-  const auto &options = WdtOptions::get();
-  const bool twoPhases = options.two_phases;
-  const size_t bufferSize = options.buffer_size;
-  LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
-            << ports_ << "]";
-  auto startTime = Clock::now();
-  DirectorySourceQueue queue(srcDir_);
-  queue.setIncludePattern(includeRegex_);
-  queue.setExcludePattern(excludeRegex_);
-  queue.setPruneDirPattern(pruneDirRegex_);
-  queue.setFileInfo(srcFileInfo_);
-  queue.setFollowSymlinks(followSymlinks_);
-  std::thread dirThread = queue.buildQueueAsynchronously();
-  std::thread progressReporterThread;
-  bool progressReportEnabled =
-      progressReporter_ && progressReportIntervalMillis_ > 0;
-  double directoryTime;
-  if (twoPhases) {
-    dirThread.join();
-    directoryTime = durationSeconds(Clock::now() - startTime);
-  }
-  std::vector<std::thread> vt;
-  std::vector<TransferStats> threadStats;
-  int numSockets = ports_.size();
-  for (int i = 0; i < numSockets; i++) {
-    threadStats.emplace_back(true);
-  }
+std::unique_ptr<TransferReport> Sender::getTransferReport() {
+  size_t totalFileSize = dirQueue_->getTotalSize();
+  double totalTime = durationSeconds(Clock::now() - startTime_);
+  std::unique_ptr<TransferReport> transferReport =
+      folly::make_unique<TransferReport>(globalThreadStats_, totalTime,
+                                         totalFileSize);
+  return transferReport;
+}
 
+bool Sender::isTransferFinished() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  return transferFinished_;
+}
+
+Clock::time_point Sender::getEndTime() {
+  return endTime_;
+}
+
+void Sender::fillThrottlerOptions(ThrottlerOptions &throttlerOptions) {
+  VLOG(1) << "Configuring throttler options";
+  const auto &options = WdtOptions::get();
+  int numSockets = ports_.size();
   double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
   double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
   double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
-  std::vector<ThreadTransferHistory> transferHistories;
-  for (int i = 0; i < numSockets; i++) {
-    transferHistories.emplace_back(queue, threadStats[i]);
-  }
   double perThreadAvgRateBytesPerSec = avgRateBytesPerSec / numSockets;
   double perThreadPeakRateBytesPerSec = peakRateBytesPerSec / numSockets;
   double perThreadBucketLimit = bucketLimitBytes / numSockets;
   if (avgRateBytesPerSec < 1.0 && avgRateBytesPerSec >= 0) {
-    LOG(FATAL) << "Realistic average rate"
-                  " should be greater than 1.0 bytes/sec";
+    LOG(FATAL) << "Realistic average rate should be greater than 1.0 bytes/sec";
   }
   if (perThreadPeakRateBytesPerSec < perThreadAvgRateBytesPerSec &&
       perThreadPeakRateBytesPerSec >= 0) {
@@ -255,37 +247,35 @@ std::unique_ptr<TransferReport> Sender::start() {
   VLOG(1) << "Per thread (Avg Rate, Peak Rate) = "
           << "(" << perThreadAvgRateBytesPerSec << ", "
           << perThreadPeakRateBytesPerSec << ")";
-  for (int i = 0; i < numSockets; i++) {
-    threadStats[i].setId(folly::to<std::string>(i));
-    vt.emplace_back(&Sender::sendOne, this, startTime, i, std::ref(queue),
-                    perThreadAvgRateBytesPerSec, perThreadPeakRateBytesPerSec,
-                    perThreadBucketLimit, std::ref(threadStats[i]),
-                    std::ref(transferHistories));
-  }
-  if (progressReportEnabled) {
-    progressReporter_->start();
-    std::thread reporterThread(&Sender::reportProgress, this, startTime,
-                               std::ref(threadStats), std::ref(queue));
-    progressReporterThread = std::move(reporterThread);
-  }
+
+  throttlerOptions.avgRateBytes = perThreadAvgRateBytesPerSec;
+  throttlerOptions.maxRateBytes = perThreadPeakRateBytesPerSec;
+  throttlerOptions.bucketLimitBytes = perThreadBucketLimit;
+}
+
+std::unique_ptr<TransferReport> Sender::finish() {
+  const auto &options = WdtOptions::get();
+  const bool twoPhases = options.two_phases;
+  double directoryTime;
   if (!twoPhases) {
-    dirThread.join();
-    directoryTime = durationSeconds(Clock::now() - startTime);
+    dirThread_.join();
   }
-  for (int i = 0; i < numSockets; i++) {
-    vt[i].join();
+  directoryTime = dirQueue_->getDirectoryTime();
+  for (int i = 0; i < ports_.size(); i++) {
+    senderThreads_[i].join();
   }
-  if (progressReportEnabled) {
+  WDT_CHECK(numActiveThreads_ == 0);
+  if (progressReporter_) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       transferFinished_ = true;
       conditionFinished_.notify_all();
     }
-    progressReporterThread.join();
+    progressReporterThread_.join();
   }
 
   bool allSourcesAcked = false;
-  for (auto &stats : threadStats) {
+  for (auto &stats : globalThreadStats_) {
     if (stats.getErrorCode() == OK) {
       // at least one thread finished correctly
       // that means all transferred sources are acked
@@ -295,7 +285,7 @@ std::unique_ptr<TransferReport> Sender::start() {
   }
 
   std::vector<TransferStats> transferredSourceStats;
-  for (auto &transferHistory : transferHistories) {
+  for (auto &transferHistory : transferHistories_) {
     if (allSourcesAcked) {
       transferHistory.markAllAcknowledged();
     } else {
@@ -310,27 +300,69 @@ std::unique_ptr<TransferReport> Sender::start() {
   }
 
   if (WdtOptions::get().full_reporting) {
-    validateTransferStats(transferredSourceStats, queue.getFailedSourceStats(),
-                          threadStats);
+    validateTransferStats(transferredSourceStats,
+                          dirQueue_->getFailedSourceStats(),
+                          globalThreadStats_);
   }
-
-  double totalTime = durationSeconds(Clock::now() - startTime);
-  size_t totalFileSize = queue.getTotalSize();
-  std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
-      transferredSourceStats, queue.getFailedSourceStats(), threadStats,
-      queue.getFailedDirectories(), totalTime, totalFileSize, queue.getCount());
-  if (progressReportEnabled) {
-    progressReporter_->end(report);
-  }
+  size_t totalFileSize = dirQueue_->getTotalSize();
+  double totalTime = durationSeconds(endTime_ - startTime_);
+  std::unique_ptr<TransferReport> transferReport =
+      folly::make_unique<TransferReport>(
+          transferredSourceStats, dirQueue_->getFailedSourceStats(),
+          globalThreadStats_, dirQueue_->getFailedDirectories(), totalTime,
+          totalFileSize, dirQueue_->getCount());
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
             << directoryTime << " dirTime)"
-            << ". Transfer summary : " << *report
-            << "\nTotal sender throughput = " << report->getThroughputMBps()
-            << " Mbytes/sec ("
-            << report->getSummary().getEffectiveTotalBytes() /
+            << ". Transfer summary : " << *transferReport
+            << "\nTotal sender throughput = "
+            << transferReport->getThroughputMBps() << " Mbytes/sec ("
+            << transferReport->getSummary().getEffectiveTotalBytes() /
                    (totalTime - directoryTime) / kMbToB
             << " Mbytes/sec pure transf rate)";
-  return report;
+  return transferReport;
+}
+
+ErrorCode Sender::transferAsync() {
+  return start();
+}
+
+std::unique_ptr<TransferReport> Sender::transfer() {
+  start();
+  return finish();
+}
+
+ErrorCode Sender::start() {
+  const auto &options = WdtOptions::get();
+  const bool twoPhases = options.two_phases;
+  const size_t bufferSize = options.buffer_size;
+  LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
+            << ports_ << "]";
+  startTime_ = Clock::now();
+  dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
+  bool progressReportEnabled =
+      progressReporter_ && progressReportIntervalMillis_ > 0;
+  if (twoPhases) {
+    dirThread_.join();
+  }
+  ThrottlerOptions perThreadThrottlerOptions;
+  fillThrottlerOptions(perThreadThrottlerOptions);
+  for (int i = 0; i < ports_.size(); i++) {
+    globalThreadStats_.emplace_back(true);
+    transferHistories_.emplace_back(*dirQueue_, globalThreadStats_[i]);
+  }
+  numActiveThreads_ = ports_.size();
+  transferFinished_ = false;
+  for (int i = 0; i < ports_.size(); i++) {
+    globalThreadStats_[i].setId(folly::to<std::string>(i));
+    senderThreads_.emplace_back(&Sender::sendOne, this, i,
+                                std::cref(perThreadThrottlerOptions));
+  }
+  if (progressReportEnabled) {
+    progressReporter_->start();
+    std::thread reporterThread(&Sender::reportProgress, this);
+    progressReporterThread_ = std::move(reporterThread);
+  }
+  return OK;
 }
 
 void Sender::validateTransferStats(
@@ -698,7 +730,7 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
   transferHistory.markAllAcknowledged();
   for (auto &checkpoint : checkpoints) {
     auto errThread = checkpoint.first;
-    if (errThread < transferHistories.size()) {
+    if (errThread < transferHistories_.size()) {
       auto errPoint = checkpoint.second;
       VLOG(1) << "received global checkpoint " << errThread << " " << errPoint;
       transferHistories[errThread].setCheckpointAndReturnToQueue(errPoint,
@@ -734,14 +766,28 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
   return END;
 }
 
-void Sender::sendOne(Clock::time_point startTime, int threadIndex,
-                     DirectorySourceQueue &queue, double avgRateBytes,
-                     double maxRateBytes, double bucketLimitBytes,
-                     TransferStats &threadStats,
-                     std::vector<ThreadTransferHistory> &transferHistories) {
+void Sender::sendOne(int threadIndex,
+                     const ThrottlerOptions &throttlerOptions) {
+  std::vector<ThreadTransferHistory> &transferHistories = transferHistories_;
+  TransferStats &threadStats = globalThreadStats_[threadIndex];
+  DirectorySourceQueue &queue(*dirQueue_);
+  Clock::time_point startTime = Clock::now();
   const auto &options = WdtOptions::get();
   int port = ports_[threadIndex];
+  folly::ScopeGuard completionGuard = folly::makeGuard([&] {
+    std::unique_lock<std::mutex> lock(mutex_);
+    numActiveThreads_--;
+    if (numActiveThreads_ == 0) {
+      LOG(WARNING) << "Last thread finished "
+                   << durationSeconds(Clock::now() - startTime_);
+      endTime_ = Clock::now();
+      transferFinished_ = true;
+    }
+  });
   std::unique_ptr<Throttler> throttler;
+  double avgRateBytes = throttlerOptions.avgRateBytes;
+  double maxRateBytes = throttlerOptions.maxRateBytes;
+  double bucketLimitBytes = throttlerOptions.bucketLimitBytes;
   const bool doThrottling = (avgRateBytes > 0 || maxRateBytes > 0);
   if (doThrottling) {
     throttler = folly::make_unique<Throttler>(
@@ -866,26 +912,32 @@ TransferStats Sender::sendOneByteSource(
   return stats;
 }
 
-void Sender::reportProgress(Clock::time_point startTime,
-                            std::vector<TransferStats> &threadStats,
-                            DirectorySourceQueue &queue) {
+void Sender::reportProgress() {
   WDT_CHECK(progressReportIntervalMillis_ > 0);
   auto waitingTime = std::chrono::milliseconds(progressReportIntervalMillis_);
   bool done = false;
+  int numSockets = ports_.size();
+  LOG(INFO) << "Progress reporter tracking every "
+            << progressReportIntervalMillis_ << " ms";
   do {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       conditionFinished_.wait_for(lock, waitingTime);
+      if (numActiveThreads_ == 0) {
+        VLOG(1) << "All threads finished";
+        WDT_CHECK(transferFinished_ == true);
+      }
       done = transferFinished_;
     }
-    if (!queue.fileDiscoveryFinished()) {
+    if (!dirQueue_->fileDiscoveryFinished()) {
       continue;
     }
-    size_t totalFileSize = queue.getTotalSize();
-    double totalTime = durationSeconds(Clock::now() - startTime);
-    std::unique_ptr<TransferReport> report = folly::make_unique<TransferReport>(
-        threadStats, totalTime, totalFileSize);
-    progressReporter_->progress(report);
+    std::unique_ptr<TransferReport> transferReport = getTransferReport();
+    if (!done) {
+      progressReporter_->progress(transferReport);
+    } else {
+      progressReporter_->end(transferReport);
+    }
   } while (!done);
 }
 }

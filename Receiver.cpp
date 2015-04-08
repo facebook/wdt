@@ -619,7 +619,6 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   auto &checkpointIndex = data.checkpointIndex_;
   auto &pendingCheckpointIndex = data.pendingCheckpointIndex_;
   auto &options = WdtOptions::get();
-
   int dest = -1;
   bool doActualWrites = !options.skip_writes;
   std::string id;
@@ -933,7 +932,7 @@ Receiver::ReceiverState Receiver::sendDoneCmd(ThreadData &data) {
     doneSendFailure = true;
     return ACCEPT_WITH_TIMEOUT;
   }
-
+  socket.closeCurrentConnection();
   LOG(INFO) << "Got ack for DONE. Transfer finished for " << socket.getPort();
   return END;
 }

@@ -282,6 +282,10 @@ class TransferReport {
   double getThroughputMBps() const {
     return summary_.getEffectiveTotalBytes() / totalTime_ / kMbToB;
   }
+  /// @return total time taken in transfer
+  double getTotalTime() const {
+    return totalTime_;
+  }
   /// @return   stats for successfully transferred sources
   const std::vector<TransferStats> &getTransferredSourceStats() const {
     return transferredSourceStats_;

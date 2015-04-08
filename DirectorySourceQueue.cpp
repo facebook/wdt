@@ -4,13 +4,19 @@
 #include <unistd.h>
 #include <set>
 #include <utility>
+#include <chrono>
 
 #include <folly/Memory.h>
 #include <regex>
-
+namespace {
+template <typename T>
+double durationSeconds(T d) {
+  return std::chrono::duration_cast<std::chrono::duration<double>>(d).count();
+}
+}
 namespace facebook {
 namespace wdt {
-
+typedef std::chrono::high_resolution_clock Clock;
 DirectorySourceQueue::DirectorySourceQueue(const std::string &rootDir)
     : rootDir_(rootDir), options_(WdtOptions::get()) {
   CHECK(!rootDir_.empty());
@@ -55,6 +61,7 @@ std::thread DirectorySourceQueue::buildQueueAsynchronously() {
 }
 
 bool DirectorySourceQueue::buildQueueSynchronously() {
+  auto startTime = Clock::now();
   VLOG(1) << "buildQueueSynchronously() called";
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -79,6 +86,7 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
       conditionNotEmpty_.notify_all();
     }
   }
+  directoryTime_ = durationSeconds(Clock::now() - startTime);
   VLOG(1) << "finished initialization of DirectorySourceQueue";
   return res;
 }

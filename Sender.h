@@ -101,6 +101,18 @@ class ThreadTransferHistory {
   folly::SpinLock lock_;
 };
 
+struct ThrottlerOptions {
+  double avgRateBytes;
+  double maxRateBytes;
+  double bucketLimitBytes;
+};
+/**
+ * The sender for the transfer. One instance of sender should only be
+ * responsible for one transfer. For a second transfer you should make
+ * another instance of the sender.
+ * The object will not be destroyed till the transfer finishes. This
+ * class is not thread safe.
+ */
 class Sender {
  public:
   Sender(const std::string &destHost, const std::string &srcDir);
@@ -113,20 +125,49 @@ class Sender {
          const std::string &srcDir);
 
   virtual ~Sender() {
+    if (!isTransferFinished()) {
+      finish();
+    }
   }
 
-  std::unique_ptr<TransferReport> start();
+  /**
+   * API to initiate a transfer and return back to the context
+   * from where it was called. Caller would have to call finish
+   * to get the stats for the transfer
+   */
+  ErrorCode transferAsync();
 
+  /**
+   * This method should only be called when an async transfer was
+   * initiated using the API transferAsync
+   */
+  std::unique_ptr<TransferReport> finish();
+
+  /**
+   * A blocking call which will initiate a transfer based on
+   * the configuration and return back the stats for the transfer
+   */
+  std::unique_ptr<TransferReport> transfer();
+
+  /// Returns whether transfer is finished
+  bool isTransferFinished();
+
+  /// End time of the transfer
+  Clock::time_point getEndTime();
+
+  /// Sets regex representing files to include for transfer
   void setIncludeRegex(const std::string &includeRegex);
 
+  /// Sets regex representing files to exclude for transfer
   void setExcludeRegex(const std::string &excludeRegex);
 
+  /// Sets regex representing directories to exclude for transfer
   void setPruneDirRegex(const std::string &pruneDirRegex);
 
-  void setNumSockets(const int numSockets);
-
+  /// Sets specific files to be transferred
   void setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo);
 
+  /// Sets whether to follow symlink or not
   void setFollowSymlinks(const bool followSymlinks);
 
   /**
@@ -144,6 +185,9 @@ class Sender {
    *                            [=====>               ] 30% 2500.00 Mbytes/sec
    */
   void setProgressReporter(std::unique_ptr<ProgressReporter> &progressReporter);
+
+  /// Makes the minimal transfer report using transfer stats of the thread
+  std::unique_ptr<TransferReport> getTransferReport();
 
  private:
   /// state machine states
@@ -284,57 +328,92 @@ class Sender {
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];
 
+  /// Method responsible for sending one source to the destination
   virtual TransferStats sendOneByteSource(
       const std::unique_ptr<ClientSocket> &socket,
       const std::unique_ptr<Throttler> &throttler,
       const std::unique_ptr<ByteSource> &source, const size_t totalBytes,
       ErrorCode transferStatus);
 
-  /**
-   * @param startTime           Time when this thread was spawned
-   * @param threadIndex         Index of the thread
-   * @param queue               DirectorySourceQueue object for reading files
-   * @param avgRateBytes        Average rate of throttler in bytes/sec
-   * @param maxRateBytes        Peak rate for Token Bucket algorithm in
-   *                            bytes/sec
-   * @param bucketLimitBytes    Bucket Limit for Token Bucket algorithm in
-   *                            bytes
-   * @param threadStats         Per thread statistics
-   * @param transferHistories   list of transfer histories of all threads
-   */
-  void sendOne(Clock::time_point startTime, int threadIndex,
-               DirectorySourceQueue &queue, double avgRateBytes,
-               double maxRateBytes, double bucketLimitBytes,
-               TransferStats &threadStats,
-               std::vector<ThreadTransferHistory> &transferHistories);
+  /// Every sender thread executes this method to send the data
+  void sendOne(int threadIndex, const ThrottlerOptions &throttlerOptions);
 
+  /// Responsible for making socket to connect to the receiver
   virtual std::unique_ptr<ClientSocket> makeSocket(const std::string &destHost,
                                                    int port);
+
   std::unique_ptr<ClientSocket> connectToReceiver(const int port,
                                                   ErrorCode &errCode);
+
+  /**
+   * Internal API that triggers the directory thread, sets up the sender
+   * threads and starts the transfer. Returns after the sender threads
+   * have been spawned
+   */
+  ErrorCode start();
+
+  /**
+   * @param transferredSourceStats      Stats for the successfully transmitted
+   *                                    sources
+   * @param failedSourceStats           Stats for the failed sources
+   * @param threadStats                 Stats calcaulted by each sender thread
+   */
   void validateTransferStats(
       const std::vector<TransferStats> &transferredSourceStats,
       const std::vector<TransferStats> &failedSourceStats,
       const std::vector<TransferStats> &threadStats);
 
-  void reportProgress(Clock::time_point startTime,
-                      std::vector<TransferStats> &threadStats,
-                      DirectorySourceQueue &queue);
+  /**
+   * Responsible for doing a periodic check.
+   * 1. Takes a lock on the thread stats to make a summary
+   * 2. Sends the progress report with the summary to the progress reporter
+   *    which can be provided by the user
+   */
+  void reportProgress();
 
+  /**
+   * Configures per thread throttler options such as avg rate
+   * and peak rate in bytes/sec and bucket limit for Tocken Bucket
+   */
+  void fillThrottlerOptions(ThrottlerOptions &throttlerOptions);
+
+  /// Pointer to DirectorySourceQueue which reads the srcDir and the files
+  std::unique_ptr<DirectorySourceQueue> dirQueue_;
+  /// List of ports where the receiver threads are running on the destination
   std::vector<int64_t> ports_;
+  /// Number of active threads, decremented everytime a thread is finished
+  uint32_t numActiveThreads_;
+  /// The directory from where the files are read
   std::string srcDir_;
+  /// Address of the destination host where the files are sent
   std::string destHost_;
-  std::string pruneDirRegex_;
-  std::string includeRegex_;
-  std::string excludeRegex_;
+  /// Sender can also work with a list of files instead of src directory
   std::vector<FileInfo> srcFileInfo_;
-  bool followSymlinks_;
+  /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
+  /// Holds the instance of the progress reporter default or customized
   std::unique_ptr<ProgressReporter> progressReporter_;
-
+  /// Thread that is running the discovery of files using the dirQueue_
+  std::thread dirThread_;
+  /// Threads which are responsible for transfer of the sources
+  std::vector<std::thread> senderThreads_;
+  /// Thread responsible for doing the progress checks. Uses reportProgress()
+  std::thread progressReporterThread_;
+  /// Vector of per thread stats, this same instance is used in reporting
+  std::vector<TransferStats> globalThreadStats_;
+  /// This condition is notified when the transfer is finished
   std::condition_variable conditionFinished_;
+  /// Mutex which is shared between the parent thread, sender thread and
+  /// progress reporter thread
   std::mutex mutex_;
-  bool transferFinished_{false};
+  /// Set to false when the transfer begins and then turned on when it ends
+  bool transferFinished_;
+  /// Time at which the transfer was started
+  std::chrono::time_point<Clock> startTime_;
+  /// Time at which the transfer finished
+  std::chrono::time_point<Clock> endTime_;
+  /// Per thread transfer history
+  std::vector<ThreadTransferHistory> transferHistories_;
 };
 }
 }  // namespace facebook::wdt

@@ -38,7 +38,11 @@ DEFINE_string(
 DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 
 using namespace facebook::wdt;
-
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
+  std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
+  return os;
+}
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -60,6 +64,7 @@ int main(int argc, char *argv[]) {
     Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
     // TODO fix this
     if (!FLAGS_run_as_daemon) {
+      LOG(WARNING) << "Initiating transfer";
       receiver.transferAsync();
       std::unique_ptr<TransferReport> report = receiver.finish();
       retCode = report->getSummary().getErrorCode();
@@ -91,7 +96,7 @@ int main(int argc, char *argv[]) {
     sender.setPruneDirRegex(FLAGS_prune_dir_regex);
     sender.setSrcFileInfo(fileInfo);
     // TODO fix that
-    auto report = sender.start();
+    std::unique_ptr<TransferReport> report = sender.transfer();
     retCode = report->getSummary().getErrorCode();
   }
   return retCode;
