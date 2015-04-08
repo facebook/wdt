@@ -121,11 +121,12 @@ void ThreadTransferHistory::markSourceAsFailed(
 }
 
 const Sender::StateFunction Sender::stateMap_[] = {
-    &Sender::connect,        &Sender::readLocalCheckPoint,
-    &Sender::sendSettings,   &Sender::sendBlocks,
-    &Sender::sendDoneCmd,    &Sender::readReceiverCmd,
-    &Sender::processDoneCmd, &Sender::processWaitCmd,
-    &Sender::processErrCmd};
+    &Sender::connect,         &Sender::readLocalCheckPoint,
+    &Sender::sendSettings,    &Sender::sendBlocks,
+    &Sender::sendDoneCmd,     &Sender::checkForAbort,
+    &Sender::readReceiverCmd, &Sender::processDoneCmd,
+    &Sender::processWaitCmd,  &Sender::processErrCmd,
+    &Sender::processAbortCmd};
 
 Sender::Sender(int port, int numSockets, const std::string &destHost,
                const std::string &srcDir)
@@ -418,27 +419,11 @@ Sender::SenderState Sender::connect(ThreadData &data) {
   auto &socket = data.socket_;
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
 
-  ErrorCode code;
-
   if (socket) {
-    char *buf = data.buf_;
-    ssize_t toRead = 1 + sizeof(uint64_t);
-    ssize_t numRead = data.socket_->read(buf, toRead);
-    if (numRead == toRead) {
-      Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[0];
-      // Check if an Abort was received and then try to
-      // read checkpoint and return the sources to queue accordingly
-      if (cmd == Protocol::ABORT_CMD) {
-        LOG(WARNING) << "Received an abort on " << data.threadIndex_;
-        auto checkpoint = folly::loadUnaligned<uint64_t>(buf + 1);
-        checkpoint = folly::Endian::little(checkpoint);
-        // treat this as global checkpoint
-        transferHistory.setCheckpointAndReturnToQueue(checkpoint, true);
-        return END;
-      }
-    }
     socket->close();
   }
+
+  ErrorCode code;
   socket = connectToReceiver(port, code);
   if (code != OK) {
     threadStats.setErrorCode(code);
@@ -555,7 +540,7 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
       }
     } else {
       queue.returnToQueue(source);
-      return CONNECT;
+      return CHECK_FOR_ABORT;
     }
   }
   return SEND_DONE_CMD;
@@ -584,12 +569,35 @@ Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
   if (written != toWrite) {
     LOG(ERROR) << "Socket write failure " << written << " " << toWrite;
     threadStats.setErrorCode(SOCKET_WRITE_ERROR);
-    return CONNECT;
+    return CHECK_FOR_ABORT;
   }
   threadStats.addHeaderBytes(toWrite);
   threadStats.addEffectiveBytes(toWrite, 0);
   VLOG(1) << "Wrote done cmd on " << socket->getFd() << " waiting for reply...";
   return READ_RECEIVER_CMD;
+}
+
+Sender::SenderState Sender::checkForAbort(ThreadData &data) {
+  LOG(INFO) << "entered CHECK_FOR_ABORT state " << data.threadIndex_;
+  char *buf = data.buf_;
+  auto &threadStats = data.threadStats_;
+  auto &socket = data.socket_;
+
+  auto numRead = socket->read(buf, 1);
+  if (numRead != 1) {
+    VLOG(1) << "No abort cmd found";
+    return CONNECT;
+  }
+  Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[0];
+  if (cmd != Protocol::ABORT_CMD) {
+    LOG(ERROR) << "Unexpected result found while reading for abort";
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return END;
+  }
+  LOG(WARNING) << "Received abort on " << data.threadIndex_;
+  threadStats.addHeaderBytes(1);
+  threadStats.addEffectiveBytes(1, 0);
+  return PROCESS_ABORT_CMD;
 }
 
 Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
@@ -611,6 +619,9 @@ Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
   }
   if (cmd == Protocol::DONE_CMD) {
     return PROCESS_DONE_CMD;
+  }
+  if (cmd == Protocol::ABORT_CMD) {
+    return PROCESS_ABORT_CMD;
   }
   threadStats.setErrorCode(PROTOCOL_ERROR);
   return END;
@@ -699,6 +710,28 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
     }
   }
   return SEND_BLOCKS;
+}
+
+Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
+  LOG(INFO) << "entered PROCESS_ABORT_CMD state " << data.threadIndex_;
+  char *buf = data.buf_;
+  auto &threadStats = data.threadStats_;
+  auto &socket = data.socket_;
+  ThreadTransferHistory &transferHistory = data.getTransferHistory();
+
+  threadStats.setErrorCode(ABORT);
+  int toRead = sizeof(uint64_t);
+  auto numRead = socket->read(buf, toRead);
+  if (numRead != toRead) {
+    // can not read checkpoint, but still must exit because of ABORT
+    LOG(ERROR) << "Read mismatch " << numRead << " " << toRead;
+    return END;
+  }
+  uint64_t checkpoint = folly::loadUnaligned<uint64_t>(buf);
+  checkpoint = folly::Endian::little(checkpoint);
+  // treat this as global checkpoint
+  transferHistory.setCheckpointAndReturnToQueue(checkpoint, true);
+  return END;
 }
 
 void Sender::sendOne(Clock::time_point startTime, int threadIndex,

@@ -11,6 +11,7 @@ namespace wdt {
 #define ERRORS                                                    \
   X(OK)                      /** No error  */                     \
   X(ERROR)                   /** Generic error  */                \
+  X(ABORT)                   /** Abort */                         \
   X(CONN_ERROR)              /** Connection Error */              \
   X(CONN_ERROR_RETRYABLE)    /** Retryable connection error  */   \
   X(SOCKET_READ_ERROR)       /** Socket read error  */            \

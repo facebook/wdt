@@ -213,6 +213,9 @@ do
   if [ $STATUS -eq 0 ] ; then
     STATUS=$CUR_STATUS
   fi
+  # treating PROTOCOL_ERROR as errors
+  (cd $DIR; grep "PROTOCOL_ERROR" server${i}.log > /dev/null && STATUS=1)
+  (cd $DIR; grep "PROTOCOL_ERROR" client${i}.log > /dev/null && STATUS=1)
 done
 
 if [ $STATUS -eq 0 ] ; then

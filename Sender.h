@@ -153,10 +153,12 @@ class Sender {
     SEND_SETTINGS,
     SEND_BLOCKS,
     SEND_DONE_CMD,
+    CHECK_FOR_ABORT,
     READ_RECEIVER_CMD,
     PROCESS_DONE_CMD,
     PROCESS_WAIT_CMD,
     PROCESS_ERR_CMD,
+    PROCESS_ABORT_CMD,
     END
   };
 
@@ -233,6 +235,15 @@ class Sender {
    */
   SenderState sendDoneCmd(ThreadData &data);
   /**
+   * checks to see if the receiver has sent ABORT or not
+   * Previous states : SEND_BLOCKS,
+   *                   SEND_DONE_CMD
+   * Next states : CONNECT(no ABORT cmd),
+   *               END(protocol error),
+   *               PROCESS_ABORT_CMD(read ABORT cmd)
+   */
+  SenderState checkForAbort(ThreadData &data);
+  /**
    * reads receiver cmd
    * Previous states : SEND_DONE_CMD
    * Next states : PROCESS_DONE_CMD,
@@ -262,6 +273,13 @@ class Sender {
    *               SEND_BLOCKS(success)
    */
   SenderState processErrCmd(ThreadData &data);
+  /**
+   * processes ABORT cmd
+   * Previous states : CHECK_FOR_ABORT,
+   *                   READ_RECEIVER_CMD
+   * Next states : END
+   */
+  SenderState processAbortCmd(ThreadData &data);
 
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];
