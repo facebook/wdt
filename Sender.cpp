@@ -43,6 +43,18 @@ ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue &queue,
     : queue_(queue), threadStats_(threadStats) {
 }
 
+std::string ThreadTransferHistory::getSourceId(int64_t index) {
+  folly::SpinLockGuard guard(lock_);
+  std::string sourceId;
+  if (index >= 0 && index < history_.size()) {
+    sourceId = history_[index]->getIdentifier();
+  } else {
+    LOG(WARNING) << "Trying to read out of bounds data " << index << " "
+                 << history_.size();
+  }
+  return sourceId;
+}
+
 bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
   folly::SpinLockGuard guard(lock_);
   if (globalCheckpoint_) {
@@ -166,6 +178,13 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir,
     : Sender(destHost, srcDir) {
   ports_ = ports;
   srcFileInfo_ = srcFileInfo;
+}
+
+Sender::~Sender() {
+  if (!isTransferFinished()) {
+    abort();
+    finish();
+  }
 }
 
 void Sender::setIncludeRegex(const std::string &includeRegex) {
@@ -539,7 +558,6 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
     return CONNECT;
   }
   threadStats.addHeaderBytes(off);
-  threadStats.addEffectiveBytes(off, 0);
   return SEND_BLOCKS;
 }
 
@@ -604,7 +622,6 @@ Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
     return CHECK_FOR_ABORT;
   }
   threadStats.addHeaderBytes(toWrite);
-  threadStats.addEffectiveBytes(toWrite, 0);
   VLOG(1) << "Wrote done cmd on " << socket->getFd() << " waiting for reply...";
   return READ_RECEIVER_CMD;
 }
@@ -626,9 +643,7 @@ Sender::SenderState Sender::checkForAbort(ThreadData &data) {
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  LOG(WARNING) << "Received abort on " << data.threadIndex_;
   threadStats.addHeaderBytes(1);
-  threadStats.addEffectiveBytes(1, 0);
   return PROCESS_ABORT_CMD;
 }
 
@@ -752,17 +767,23 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
 
   threadStats.setErrorCode(ABORT);
-  int toRead = sizeof(uint64_t);
+  int toRead = 1 + sizeof(int64_t);
   auto numRead = socket->read(buf, toRead);
   if (numRead != toRead) {
     // can not read checkpoint, but still must exit because of ABORT
-    LOG(ERROR) << "Read mismatch " << numRead << " " << toRead;
+    LOG(ERROR) << "Error while trying to read ABORT cmd " << numRead << " "
+               << toRead;
     return END;
   }
-  uint64_t checkpoint = folly::loadUnaligned<uint64_t>(buf);
+  int64_t checkpoint = folly::loadUnaligned<int64_t>(buf + 1);
   checkpoint = folly::Endian::little(checkpoint);
-  // treat this as global checkpoint
-  transferHistory.setCheckpointAndReturnToQueue(checkpoint, true);
+  ErrorCode remoteError = (ErrorCode)buf[0];
+  threadStats.setRemoteErrorCode(remoteError);
+  std::string failedFileName = transferHistory.getSourceId(checkpoint);
+  LOG(WARNING) << "Received abort on " << data.threadIndex_
+               << " remote error code " << errorCodeToStr(remoteError)
+               << " file " << failedFileName << " checkpoint " << checkpoint;
+  abort();
   return END;
 }
 
@@ -804,6 +825,11 @@ void Sender::sendOne(int threadIndex,
 
   SenderState state = CONNECT;
   while (state != END) {
+    if (isAborted()) {
+      LOG(ERROR) << "Transfer aborted " << port;
+      threadStats.setErrorCode(ABORT);
+      break;
+    }
     state = (this->*stateMap_[state])(threadData);
   }
 
@@ -813,6 +839,16 @@ void Sender::sendOne(int threadIndex,
             << threadStats.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
   return;
+}
+
+void Sender::abort() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  transferAborted_ = true;
+}
+
+bool Sender::isAborted() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return transferAborted_;
 }
 
 TransferStats Sender::sendOneByteSource(

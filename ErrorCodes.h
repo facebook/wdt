@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <folly/String.h>
 
 namespace facebook {
 namespace wdt {
@@ -32,6 +33,14 @@ std::string const kErrorToStr[] = {
     ERRORS
 #undef X
 };
+
+/**
+ * returns string description of an error code
+ *
+ * @param code  error-code
+ * @return      string representation
+ */
+std::string errorCodeToStr(ErrorCode code);
 }
 }
 #undef ERRORS

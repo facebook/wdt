@@ -520,7 +520,6 @@ Receiver::ReceiverState Receiver::sendLocalCheckpoint(ThreadData &data) {
     return ACCEPT_WITH_TIMEOUT;
   }
   threadStats.addHeaderBytes(Protocol::kMaxLocalCheckpoint);
-  threadStats.addEffectiveBytes(Protocol::kMaxLocalCheckpoint, 0);
   if (doneSendFailure) {
     return SEND_DONE_CMD;
   }
@@ -640,7 +639,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   if (transferStatus != OK) {
     // TODO: use this status information to implement fail fast mode
     VLOG(1) << "sender entered into error state "
-            << kErrorToStr[transferStatus];
+            << errorCodeToStr(transferStatus);
   }
   uint16_t headerLen = folly::loadUnaligned<uint16_t>(buf + off);
   headerLen = folly::Endian::little(headerLen);
@@ -877,7 +876,6 @@ Receiver::ReceiverState Receiver::sendGlobalCheckpoint(ThreadData &data) {
     return ACCEPT_WITH_TIMEOUT;
   } else {
     threadStats.addHeaderBytes(off);
-    threadStats.addEffectiveBytes(off, 0);
     pendingCheckpointIndex = checkpointIndex + newCheckpoints.size();
     numRead = off = 0;
     return READ_NEXT_CMD;
@@ -889,16 +887,18 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
   auto &threadStats = data.threadStats_;
   char *buf = data.getBuf();
   auto &socket = data.socket_;
-  buf[0] = Protocol::ABORT_CMD;
-  auto checkpoint = folly::Endian::little(threadStats.getNumBlocks());
-  folly::storeUnaligned<uint64_t>(buf + 1, checkpoint);
-  socket.write(buf, 1 + sizeof(uint64_t));
+  int offset = 0;
+  buf[offset++] = Protocol::ABORT_CMD;
+  buf[offset++] = threadStats.getErrorCode();
+  int64_t checkpoint = folly::Endian::little(threadStats.getNumBlocks());
+  folly::storeUnaligned<int64_t>(buf + offset, checkpoint);
+  offset += sizeof(int64_t);
+  socket.write(buf, offset);
   // No need to check if we were successful in sending ABORT
   // This thread will simply disconnect and sender thread on the
   // other side will timeout
   socket.closeCurrentConnection();
-  threadStats.addHeaderBytes(1);
-  threadStats.addEffectiveBytes(1, 0);
+  threadStats.addHeaderBytes(offset);
   return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
 }
 
@@ -917,7 +917,6 @@ Receiver::ReceiverState Receiver::sendDoneCmd(ThreadData &data) {
   }
 
   threadStats.addHeaderBytes(1);
-  threadStats.addEffectiveBytes(1, 0);
 
   auto read = socket.read(buf, 1);
   if (read != 1 || buf[0] != Protocol::DONE_CMD) {
@@ -1035,7 +1034,6 @@ Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
       return END;
     }
     threadStats.addHeaderBytes(1);
-    threadStats.addEffectiveBytes(1, 0);
     lock.lock();
   }
 }

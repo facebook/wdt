@@ -50,6 +50,13 @@ class ThreadTransferHistory {
                         TransferStats &threadStats);
 
   /**
+   * @param             index of the source
+   * @return            if index is in bounds, returns the identifier for the
+   *                    source, else returns empty string
+   */
+  std::string getSourceId(int64_t index);
+
+  /**
    * Adds the source to the history. If global checkpoint has already been
    * received, then the source is returned to the queue.
    *
@@ -124,11 +131,7 @@ class Sender {
   Sender(int port, int numSockets, const std::string &destHost,
          const std::string &srcDir);
 
-  virtual ~Sender() {
-    if (!isTransferFinished()) {
-      finish();
-    }
-  }
+  virtual ~Sender();
 
   /**
    * API to initiate a transfer and return back to the context
@@ -352,6 +355,12 @@ class Sender {
    */
   ErrorCode start();
 
+  /// aborts current transfer
+  void abort();
+
+  /// @return   whether the transfer is aborted or not
+  bool isAborted();
+
   /**
    * @param transferredSourceStats      Stats for the successfully transmitted
    *                                    sources
@@ -414,6 +423,8 @@ class Sender {
   std::chrono::time_point<Clock> endTime_;
   /// Per thread transfer history
   std::vector<ThreadTransferHistory> transferHistories_;
+  /// flag representing whether transfer has been aborted or not
+  bool transferAborted_{false};
 };
 }
 }  // namespace facebook::wdt

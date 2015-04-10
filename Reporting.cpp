@@ -43,23 +43,20 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
 std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
   folly::RWSpinLock::ReadHolder lock(stats.mutex_.get());
   const double kMbToB = 1024 * 1024;
-  double headerOverhead = 0;
-  size_t effectiveTotalBytes =
-      stats.effectiveHeaderBytes_ + stats.effectiveDataBytes_;
-  if (effectiveTotalBytes) {
-    headerOverhead = 100.0 * stats.effectiveHeaderBytes_ / effectiveTotalBytes;
-  }
-  double failureOverhead = 0;
-  size_t totalBytes = stats.headerBytes_ + stats.dataBytes_;
-  if (totalBytes) {
-    failureOverhead = 100.0 * (totalBytes - effectiveTotalBytes) / totalBytes;
+  double headerOverhead = 100;
+  double failureOverhead = 100;
+
+  if (stats.effectiveDataBytes_ > 0) {
+    headerOverhead = 100.0 * stats.headerBytes_ / stats.effectiveDataBytes_;
+    failureOverhead = 100.0 * (stats.dataBytes_ - stats.effectiveDataBytes_) /
+                      stats.effectiveDataBytes_;
   }
 
   if (stats.errCode_ == OK && stats.remoteErrCode_ == OK) {
     os << "Transfer status = OK.";
   } else {
-    os << "Transfer status (local) = " << kErrorToStr[stats.errCode_]
-       << ", (remote) = " << kErrorToStr[stats.remoteErrCode_] << ".";
+    os << "Transfer status (local) = " << errorCodeToStr(stats.errCode_)
+       << ", (remote) = " << errorCodeToStr(stats.remoteErrCode_) << ".";
   }
 
   if (stats.numFiles_ > 0) {
@@ -68,11 +65,12 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
     os << " Number of blocks transferred = " << stats.numBlocks_ << ".";
   }
   os << " Data Mbytes = " << stats.effectiveDataBytes_ / kMbToB
-     << ". Header kBytes = " << stats.effectiveHeaderBytes_ / 1024. << " ("
+     << ". Header kBytes = " << stats.headerBytes_ / 1024. << " ("
      << headerOverhead << "% overhead)"
-     << ". Total bytes = " << effectiveTotalBytes
-     << ". Wasted bytes due to failure = " << totalBytes - effectiveTotalBytes
-     << " (" << failureOverhead << "% overhead).";
+     << ". Total bytes = " << (stats.dataBytes_ + stats.headerBytes_)
+     << ". Wasted bytes due to failure = "
+     << (stats.dataBytes_ - stats.effectiveDataBytes_) << " ("
+     << failureOverhead << "% overhead).";
   return os;
 }
 
