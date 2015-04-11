@@ -1,5 +1,18 @@
 #! /bin/bash
 
+# without the following line, wdt piped to tee effectively has exit status of
+# tee. source : http://petereisentraut.blogspot.com/2010/11/pipefail.html
+set -o pipefail
+
+checkLastCmdStatus() {
+  LAST_STATUS=$?
+  if [ $LAST_STATUS -ne 0 ] ; then
+    sudo iptables-restore < $DIR/iptable
+    echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
+    exit $LAST_STATUS
+  fi
+}
+
 NC="nc -4" # ipv4 only
 
 threads=4
@@ -38,7 +51,9 @@ pidofreceiver=$!
 _bin/wdt/wdt -num_ports=$((threads - 1)) -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
@@ -48,7 +63,9 @@ pidofreceiver=$!
 _bin/wdt/wdt -num_ports=$((threads + 1)) -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
@@ -60,7 +77,9 @@ $WDTBIN -directory $DIR/dst${TEST_COUNT} > $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
 $WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 sudo iptables-restore < $DIR/iptable
 TEST_COUNT=$((TEST_COUNT + 1))
 
@@ -72,7 +91,9 @@ $WDTBIN -directory $DIR/dst${TEST_COUNT} > $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
 $WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 sudo iptables-restore < $DIR/iptable
 TEST_COUNT=$((TEST_COUNT + 1))
 
@@ -89,7 +110,9 @@ sudo iptables-save > $DIR/iptable
 echo "blocking $STARTING_PORT"
 sudo iptables -A INPUT -p tcp --sport $STARTING_PORT -j DROP
 wait $pidofsender 
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 sudo iptables-restore < $DIR/iptable
 TEST_COUNT=$((TEST_COUNT + 1))
 
@@ -105,7 +128,9 @@ sudo iptables-save > $DIR/iptable
 echo "blocking $STARTING_PORT"
 sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
 wait $pidofsender 
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 sudo iptables-restore < $DIR/iptable
 TEST_COUNT=$((TEST_COUNT + 1))
 
@@ -122,7 +147,9 @@ sudo iptables-save > $DIR/iptable
 echo "blocking $STARTING_PORT"
 sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
 wait $pidofsender 
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 sudo iptables-restore < $DIR/iptable
 TEST_COUNT=$((TEST_COUNT + 1))
 
@@ -139,7 +166,9 @@ sudo iptables-save > $DIR/iptable
 echo "blocking $STARTING_PORT"
 sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
 wait $pidofsender 
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 sudo iptables-restore < $DIR/iptable
 TEST_COUNT=$((TEST_COUNT + 1))
 
@@ -168,7 +197,9 @@ do
   sudo iptables-restore < $DIR/iptable
 done
 wait $pidofsender # wait for the sender to finish
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
@@ -196,7 +227,9 @@ do
   sudo iptables-restore < $DIR/iptable
 done
 wait $pidofsender # wait for the sender to finish
+checkLastCmdStatus
 wait $pidofreceiver
+checkLastCmdStatus
 TEST_COUNT=$((TEST_COUNT + 1))
 
 STATUS=0
@@ -214,8 +247,8 @@ do
     STATUS=$CUR_STATUS
   fi
   # treating PROTOCOL_ERROR as errors
-  (cd $DIR; grep "PROTOCOL_ERROR" server${i}.log > /dev/null && STATUS=1)
-  (cd $DIR; grep "PROTOCOL_ERROR" client${i}.log > /dev/null && STATUS=1)
+  cd $DIR; grep "PROTOCOL_ERROR" server${i}.log > /dev/null && STATUS=1
+  cd $DIR; grep "PROTOCOL_ERROR" client${i}.log > /dev/null && STATUS=1
 done
 
 if [ $STATUS -eq 0 ] ; then

@@ -365,8 +365,13 @@ ErrorCode Sender::start() {
   }
   ThrottlerOptions perThreadThrottlerOptions;
   fillThrottlerOptions(perThreadThrottlerOptions);
+  // WARNING: Do not MERGE the follwing two loops. ThreadTransferHistory keeps a
+  // reference of TransferStats. And, any emplace operation on a vector
+  // invalidates all its references
   for (int i = 0; i < ports_.size(); i++) {
     globalThreadStats_.emplace_back(true);
+  }
+  for (int i = 0; i < ports_.size(); i++) {
     transferHistories_.emplace_back(*dirQueue_, globalThreadStats_[i]);
   }
   numActiveThreads_ = ports_.size();
