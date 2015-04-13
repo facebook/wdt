@@ -44,6 +44,19 @@ do
   cp -R $DIR/src/dir1 $DIR/src/dir${i}
 done
 
+# Testing with different start ports
+echo "Testing with different start ports in sender and receiver"
+$WDTBIN -directory $DIR/dst${TEST_COUNT} > $DIR/server${TEST_COUNT}.log 2>&1 &
+pidofreceiver=$!
+_bin/wdt/wdt -num_ports=$threads -start_port=$((STARTING_PORT + 1)) \
+-destination $HOSTNAME -directory $DIR/src -full_reporting \
+|& tee -a $DIR/client${TEST_COUNT}.log
+checkLastCmdStatus
+wait $pidofreceiver
+checkLastCmdStatus
+TEST_COUNT=$((TEST_COUNT + 1))
+
+
 # Testing with different less number of threads in sender
 echo "Testing with less number of threads in client"
 $WDTBIN -directory $DIR/dst${TEST_COUNT} > $DIR/server${TEST_COUNT}.log 2>&1 &

@@ -8,7 +8,9 @@
 namespace facebook {
 namespace wdt {
 
-typedef std::pair<int16_t, int64_t> Checkpoint;
+/// checkpoint is a pair of port number and number of successfully transferred
+/// blocks
+typedef std::pair<int32_t, int64_t> Checkpoint;
 
 class Protocol {
  public:

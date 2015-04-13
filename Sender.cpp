@@ -516,7 +516,7 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  if (checkpoints.size() != 1 || checkpoints[0].first != data.threadIndex_) {
+  if (checkpoints.size() != 1 || checkpoints[0].first != port) {
     LOG(ERROR) << "illegal local checkpoint "
                << folly::humanify(
                       std::string(buf, Protocol::kMaxLocalCheckpoint));
@@ -749,17 +749,17 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
   }
   transferHistory.markAllAcknowledged();
   for (auto &checkpoint : checkpoints) {
-    auto errThread = checkpoint.first;
-    if (errThread < transferHistories_.size()) {
-      auto errPoint = checkpoint.second;
-      VLOG(1) << "received global checkpoint " << errThread << " " << errPoint;
-      transferHistories[errThread].setCheckpointAndReturnToQueue(errPoint,
-                                                                 true);
-    } else {
-      LOG(ERROR)
-          << "received checkpoint for thread " << errThread
-          << ". Most likely number of threads different in the receiver side";
+    auto errPort = checkpoint.first;
+    auto errPoint = checkpoint.second;
+    auto it = std::find(ports_.begin(), ports_.end(), errPort);
+    if (it == ports_.end()) {
+      LOG(ERROR) << "Invalid checkpoint " << errPoint
+                 << ". No sender thread running on port " << errPort;
+      continue;
     }
+    auto errThread = it - ports_.begin();
+    VLOG(1) << "received global checkpoint " << errThread << " -> " << errPoint;
+    transferHistories[errThread].setCheckpointAndReturnToQueue(errPoint, true);
   }
   return SEND_BLOCKS;
 }

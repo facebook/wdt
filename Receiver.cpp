@@ -507,7 +507,7 @@ Receiver::ReceiverState Receiver::sendLocalCheckpoint(ThreadData &data) {
   // condition
   auto checkpoint = doneSendFailure ? -1 : threadStats.getNumBlocks();
   std::vector<Checkpoint> checkpoints;
-  checkpoints.emplace_back(data.threadIndex_, checkpoint);
+  checkpoints.emplace_back(ports_[data.threadIndex_], checkpoint);
   size_t off = 0;
   bool success = Protocol::encodeCheckpoints(
       buf, off, Protocol::kMaxLocalCheckpoint, checkpoints);
@@ -948,7 +948,7 @@ Receiver::ReceiverState Receiver::waitForFinishWithThreadError(
   std::unique_lock<std::mutex> lock(mutex_);
   // post checkpoint in case of an error
   Checkpoint localCheckpoint =
-      std::make_pair(data.threadIndex_, threadStats.getNumBlocks());
+      std::make_pair(ports_[data.threadIndex_], threadStats.getNumBlocks());
   addCheckpoint(localCheckpoint);
   waitingWithErrorThreadCount_++;
 
