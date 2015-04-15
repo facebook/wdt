@@ -146,6 +146,9 @@ class Sender {
    */
   std::unique_ptr<TransferReport> finish();
 
+  /// aborts current transfer
+  void abort();
+
   /**
    * A blocking call which will initiate a transfer based on
    * the configuration and return back the stats for the transfer
@@ -354,9 +357,6 @@ class Sender {
    * have been spawned
    */
   ErrorCode start();
-
-  /// aborts current transfer
-  void abort();
 
   /// @return   whether the transfer is aborted or not
   bool isAborted();
