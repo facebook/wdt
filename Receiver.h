@@ -37,6 +37,14 @@ class Receiver {
 
   Receiver(int port, int numSockets, std::string destDir);
 
+  /// Starts listening on as many ports as possible from the ports
+  /// provided in the constructor
+  int32_t registerPorts(bool stopOnFailure = false);
+
+  /// Cancel the transfer by closing the connections on each socket
+  /// This makes the threads exit from any network call they might be doing
+  void cancelTransfer();
+
   /**
    * Joins on the threads spawned by start. This method
    * is called by default when the wdt receiver is expected
@@ -87,7 +95,7 @@ class Receiver {
   /**
    * Use the method to get a list of ports
    */
-  const std::vector<int64_t> &getPorts();
+  std::vector<int32_t> getPorts();
 
  protected:
   /// receiver state
@@ -413,8 +421,6 @@ class Receiver {
   bool transferFinished_{true};
   /// Flag based on which threads finish processing on receiving a done
   bool isJoinable_;
-  /// The ports on which the receiver will be listening
-  std::vector<int64_t> ports_;
   /// Destination directory where the received files will be written
   std::string destDir_;
   /// Responsible for writing files on the disk

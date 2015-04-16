@@ -73,18 +73,12 @@ size_t readAtMost(ServerSocket &s, char *buf, size_t max, size_t atMost) {
 }
 
 const Receiver::StateFunction Receiver::stateMap_[] = {
-    &Receiver::listen,
-    &Receiver::acceptFirstConnection,
-    &Receiver::acceptWithTimeout,
-    &Receiver::sendLocalCheckpoint,
-    &Receiver::readNextCmd,
-    &Receiver::processFileCmd,
-    &Receiver::processExitCmd,
-    &Receiver::processSettingsCmd,
-    &Receiver::processDoneCmd,
-    &Receiver::sendGlobalCheckpoint,
-    &Receiver::sendDoneCmd,
-    &Receiver::sendAbortCmd,
+    &Receiver::listen, &Receiver::acceptFirstConnection,
+    &Receiver::acceptWithTimeout, &Receiver::sendLocalCheckpoint,
+    &Receiver::readNextCmd, &Receiver::processFileCmd,
+    &Receiver::processExitCmd, &Receiver::processSettingsCmd,
+    &Receiver::processDoneCmd, &Receiver::sendGlobalCheckpoint,
+    &Receiver::sendDoneCmd, &Receiver::sendAbortCmd,
     &Receiver::waitForFinishOrNewCheckpoint,
     &Receiver::waitForFinishWithThreadError};
 
@@ -106,8 +100,9 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
 Receiver::Receiver(int port, int numSockets) {
   isJoinable_ = false;
   transferFinished_ = true;
+  const auto &options = WdtOptions::get();
   for (int i = 0; i < numSockets; i++) {
-    ports_.push_back(port + i);
+    threadServerSockets_.emplace_back(port + i, options.backlog);
   }
 }
 
@@ -116,20 +111,54 @@ Receiver::Receiver(int port, int numSockets, std::string destDir)
   this->destDir_ = destDir;
 }
 
+int32_t Receiver::registerPorts(bool stopOnFailure) {
+  const auto &options = WdtOptions::get();
+  int32_t numSuccess = 0;
+  for (ServerSocket &socket : threadServerSockets_) {
+    ErrorCode code = ERROR;
+    int max_retries = WdtOptions::get().max_retries;
+    for (int retries = 0; retries < max_retries; retries++) {
+      if (socket.listen() == OK) {
+        break;
+      }
+    }
+    if (socket.listen() == OK) {
+      numSuccess++;
+      continue;
+    }
+    if (stopOnFailure) {
+      break;
+    }
+  }
+  return numSuccess;
+}
+
 void Receiver::setDir(const std::string &destDir) {
   this->destDir_ = destDir;
+}
+
+void Receiver::cancelTransfer() {
+  LOG(WARNING) << "Cancelling the transfer";
+  for (auto &socket : threadServerSockets_) {
+    socket.close();
+  }
 }
 
 Receiver::~Receiver() {
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an ongoing transfer and the destructor"
                  << " is being called. Trying to finish the transfer";
+    cancelTransfer();
     finish();
   }
 }
 
-const vector<int64_t> &Receiver::getPorts() {
-  return ports_;
+vector<int32_t> Receiver::getPorts() {
+  vector<int32_t> ports;
+  for (const auto &socket : threadServerSockets_) {
+    ports.push_back(socket.getPort());
+  }
+  return ports;
 }
 
 bool Receiver::hasPendingTransfer() {
@@ -150,7 +179,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
                  << " finish and this method will never return";
   }
-  for (int i = 0; i < ports_.size(); i++) {
+  for (int i = 0; i < threadServerSockets_.size(); i++) {
     receiverThreads_[i].join();
   }
 
@@ -257,23 +286,8 @@ void Receiver::progressTracker() {
             << deltaBytes;
     if (zeroProgressCount > numFailedProgressChecks) {
       LOG(INFO) << "No progress for the last " << numFailedProgressChecks
-                << " checks.";
-      for (int i = 0; i < ports_.size(); i++) {
-        int listenFd = threadServerSockets_[i].getListenFd();
-        if (shutdown(listenFd, SHUT_RDWR) < 0) {
-          int port = ports_[i];
-          LOG(WARNING) << "Progress tracker could not shut down listening "
-                       << " file descriptor for the thread with port " << port;
-        }
-      }
-      for (int i = 0; i < ports_.size(); i++) {
-        int fd = threadServerSockets_[i].getFd();
-        if (shutdown(fd, SHUT_RDWR) < 0) {
-          int port = ports_[i];
-          LOG(WARNING) << "Progress tracker could not shut down file "
-                       << "descriptor for the thread " << port;
-        }
-      }
+                << " checks. Shutting down the transfer";
+      cancelTransfer();
       return;
     }
   }
@@ -283,7 +297,7 @@ void Receiver::start() {
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an existing transfer in progress on this object";
   }
-  LOG(INFO) << "Starting (receiving) server on ports [ " << ports_
+  LOG(INFO) << "Starting (receiving) server on ports [ " << getPorts()
             << "] Target dir : " << destDir_;
   markTransferFinished(false);
   const auto &options = WdtOptions::get();
@@ -295,13 +309,11 @@ void Receiver::start() {
               << " smaller than " << Protocol::kMaxHeader << " using "
               << bufferSize << " instead";
   }
-  fileCreator_.reset(new FileCreator(destDir_, ports_.size()));
-  for (int i = 0; i < ports_.size(); i++) {
+  fileCreator_.reset(new FileCreator(destDir_, threadServerSockets_.size()));
+  for (int i = 0; i < threadServerSockets_.size(); i++) {
     threadStats_.emplace_back(true);
-    threadServerSockets_.emplace_back(folly::to<std::string>(ports_[i]),
-                                      options.backlog);
   }
-  for (int i = 0; i < ports_.size(); i++) {
+  for (int i = 0; i < threadServerSockets_.size(); i++) {
     receiverThreads_.emplace_back(&Receiver::receiveOne, this, i,
                                   std::ref(threadServerSockets_[i]), bufferSize,
                                   std::ref(threadStats_[i]));
@@ -312,7 +324,7 @@ void Receiver::start() {
 
 bool Receiver::areAllThreadsFinished(bool checkpointAdded) {
   bool finished = (failedThreadCount_ + waitingThreadCount_ +
-                   waitingWithErrorThreadCount_) == ports_.size();
+                   waitingWithErrorThreadCount_) == threadServerSockets_.size();
   if (checkpointAdded) {
     // The thread has added a global checkpoint. So,
     // even if all the threads are waiting, the session does no end. However,
@@ -380,7 +392,7 @@ Receiver::ReceiverState Receiver::listen(ThreadData &data) {
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
 
-  std::string port = socket.getPort();
+  int32_t port = socket.getPort();
   VLOG(1) << "Server Thread for port " << port << " with backlog "
           << socket.getBackLog() << " on " << destDir_
           << " writes= " << doActualWrites;
@@ -507,7 +519,8 @@ Receiver::ReceiverState Receiver::sendLocalCheckpoint(ThreadData &data) {
   // condition
   auto checkpoint = doneSendFailure ? -1 : threadStats.getNumBlocks();
   std::vector<Checkpoint> checkpoints;
-  checkpoints.emplace_back(ports_[data.threadIndex_], checkpoint);
+  checkpoints.emplace_back(threadServerSockets_[data.threadIndex_].getPort(),
+                           checkpoint);
   size_t off = 0;
   bool success = Protocol::encodeCheckpoints(
       buf, off, Protocol::kMaxLocalCheckpoint, checkpoints);
@@ -948,7 +961,8 @@ Receiver::ReceiverState Receiver::waitForFinishWithThreadError(
   std::unique_lock<std::mutex> lock(mutex_);
   // post checkpoint in case of an error
   Checkpoint localCheckpoint =
-      std::make_pair(ports_[data.threadIndex_], threadStats.getNumBlocks());
+      std::make_pair(threadServerSockets_[data.threadIndex_].getPort(),
+                     threadStats.getNumBlocks());
   addCheckpoint(localCheckpoint);
   waitingWithErrorThreadCount_++;
 

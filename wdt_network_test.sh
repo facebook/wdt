@@ -22,7 +22,7 @@ STARTING_PORT=22400
 ERROR_COUNT=25
 TEST_COUNT=0
 
-WDTBIN_OPTS="-ipv4 -start_port=$STARTING_PORT \
+WDTBIN_OPTS="-ipv4 -ipv6=false -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500"
 WDTBIN="_bin/wdt/wdt -num_ports=$threads $WDTBIN_OPTS"
@@ -48,7 +48,7 @@ done
 echo "Testing with different start ports in sender and receiver"
 $WDTBIN -directory $DIR/dst${TEST_COUNT} > $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-_bin/wdt/wdt -num_ports=$threads -start_port=$((STARTING_PORT + 1)) \
+_bin/wdt/wdt -ipv6=false -num_ports=$threads -start_port=$((STARTING_PORT + 1)) \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
 checkLastCmdStatus
@@ -61,7 +61,7 @@ TEST_COUNT=$((TEST_COUNT + 1))
 echo "Testing with less number of threads in client"
 $WDTBIN -directory $DIR/dst${TEST_COUNT} > $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-_bin/wdt/wdt -num_ports=$((threads - 1)) -start_port=$STARTING_PORT \
+_bin/wdt/wdt -ipv6=false -num_ports=$((threads - 1)) -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
 checkLastCmdStatus
@@ -73,7 +73,7 @@ TEST_COUNT=$((TEST_COUNT + 1))
 echo "Testing with more number of threads in client"
 $WDTBIN -directory $DIR/dst${TEST_COUNT} > $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-_bin/wdt/wdt -num_ports=$((threads + 1)) -start_port=$STARTING_PORT \
+_bin/wdt/wdt -ipv6=false -num_ports=$((threads + 1)) -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
 checkLastCmdStatus

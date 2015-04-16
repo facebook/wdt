@@ -62,6 +62,11 @@ int main(int argc, char *argv[]) {
   ErrorCode retCode = OK;
   if (FLAGS_destination.empty()) {
     Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
+    int numSuccess = receiver.registerPorts();
+    if (numSuccess == 0) {
+      LOG(ERROR) << "Couldn't bind on any port";
+      return 0;
+    }
     // TODO fix this
     if (!FLAGS_run_as_daemon) {
       LOG(WARNING) << "Initiating transfer";

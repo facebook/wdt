@@ -125,7 +125,7 @@ class Sender {
   Sender(const std::string &destHost, const std::string &srcDir);
 
   Sender(const std::string &destHost, const std::string &srcDir,
-         const std::vector<int64_t> &ports,
+         const std::vector<int32_t> &ports,
          const std::vector<FileInfo> &srcFileInfo);
 
   Sender(int port, int numSockets, const std::string &destHost,
@@ -389,7 +389,7 @@ class Sender {
   /// Pointer to DirectorySourceQueue which reads the srcDir and the files
   std::unique_ptr<DirectorySourceQueue> dirQueue_;
   /// List of ports where the receiver threads are running on the destination
-  std::vector<int64_t> ports_;
+  std::vector<int32_t> ports_;
   /// Number of active threads, decremented everytime a thread is finished
   uint32_t numActiveThreads_;
   /// The directory from where the files are read

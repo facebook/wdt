@@ -133,14 +133,12 @@ void ThreadTransferHistory::markSourceAsFailed(
 }
 
 const Sender::StateFunction Sender::stateMap_[] = {
-    &Sender::connect,         &Sender::readLocalCheckPoint,
-    &Sender::sendSettings,    &Sender::sendBlocks,
-    &Sender::sendDoneCmd,     &Sender::checkForAbort,
-    &Sender::readReceiverCmd, &Sender::processDoneCmd,
-    &Sender::processWaitCmd,  &Sender::processErrCmd,
-    &Sender::processAbortCmd};
+    &Sender::connect, &Sender::readLocalCheckPoint, &Sender::sendSettings,
+    &Sender::sendBlocks, &Sender::sendDoneCmd, &Sender::checkForAbort,
+    &Sender::readReceiverCmd, &Sender::processDoneCmd, &Sender::processWaitCmd,
+    &Sender::processErrCmd, &Sender::processAbortCmd};
 
-Sender::Sender(int port, int numSockets, const std::string &destHost,
+Sender::Sender(int32_t port, int numSockets, const std::string &destHost,
                const std::string &srcDir)
     : Sender(destHost, srcDir) {
   destHost_ = destHost;
@@ -173,7 +171,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir) {
 }
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir,
-               const std::vector<int64_t> &ports,
+               const std::vector<int32_t> &ports,
                const std::vector<FileInfo> &srcFileInfo)
     : Sender(destHost, srcDir) {
   ports_ = ports;
@@ -457,8 +455,9 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
   }
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
   if (errCode != OK) {
-    LOG(ERROR) << "Unable to connect despite " << connectAttempts
-               << " retries in " << elapsedSecsConn << " seconds.";
+    LOG(ERROR) << "Unable to connect to " << destHost_ << " " << port
+               << " despite " << connectAttempts << " retries in "
+               << elapsedSecsConn << " seconds.";
     errCode = CONN_ERROR;
     return nullptr;
   }
