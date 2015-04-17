@@ -31,7 +31,7 @@ class ServerSocket {
   int32_t getPort() const;
   int getBackLog() const;
   /// Destroy the active connection and the listening fd
-  void close();
+  void closeAll();
 
  private:
   int32_t port_;

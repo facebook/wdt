@@ -140,7 +140,7 @@ void Receiver::setDir(const std::string &destDir) {
 void Receiver::cancelTransfer() {
   LOG(WARNING) << "Cancelling the transfer";
   for (auto &socket : threadServerSockets_) {
-    socket.close();
+    socket.closeAll();
   }
 }
 
@@ -957,6 +957,9 @@ Receiver::ReceiverState Receiver::waitForFinishWithThreadError(
   auto &socket = data.socket_;
   // should only be in this state if there is some error
   WDT_CHECK(threadStats.getErrorCode() != OK);
+
+  // close the socket, so that sender receives an error during connect
+  socket.closeAll();
 
   std::unique_lock<std::mutex> lock(mutex_);
   // post checkpoint in case of an error

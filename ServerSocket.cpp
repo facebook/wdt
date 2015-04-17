@@ -54,7 +54,7 @@ ServerSocket &ServerSocket::operator=(ServerSocket &&that) {
   return *this;
 }
 
-void ServerSocket::close() {
+void ServerSocket::closeAll() {
   VLOG(1) << "Destroying server socket (port, listen fd, fd)" << port_ << ", "
           << listeningFd_ << ", " << fd_;
   if (listeningFd_ >= 0) {
@@ -68,7 +68,7 @@ void ServerSocket::close() {
 }
 
 ServerSocket::~ServerSocket() {
-  close();
+  closeAll();
 }
 
 ErrorCode ServerSocket::listen() {

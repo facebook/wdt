@@ -273,6 +273,8 @@ void Sender::fillThrottlerOptions(ThrottlerOptions &throttlerOptions) {
 std::unique_ptr<TransferReport> Sender::finish() {
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
+  bool progressReportEnabled =
+      progressReporter_ && progressReportIntervalMillis_ > 0;
   double directoryTime;
   if (!twoPhases) {
     dirThread_.join();
@@ -282,7 +284,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
     senderThreads_[i].join();
   }
   WDT_CHECK(numActiveThreads_ == 0);
-  if (progressReporter_) {
+  if (progressReportEnabled) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       transferFinished_ = true;
@@ -328,6 +330,9 @@ std::unique_ptr<TransferReport> Sender::finish() {
           transferredSourceStats, dirQueue_->getFailedSourceStats(),
           globalThreadStats_, dirQueue_->getFailedDirectories(), totalTime,
           totalFileSize, dirQueue_->getCount());
+  if (progressReportEnabled) {
+    progressReporter_->end(transferReport);
+  }
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
             << directoryTime << " dirTime)"
             << ". Transfer summary : " << *transferReport
@@ -959,26 +964,20 @@ void Sender::reportProgress() {
   int numSockets = ports_.size();
   LOG(INFO) << "Progress reporter tracking every "
             << progressReportIntervalMillis_ << " ms";
-  do {
+  while (true) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       conditionFinished_.wait_for(lock, waitingTime);
-      if (numActiveThreads_ == 0) {
-        VLOG(1) << "All threads finished";
-        WDT_CHECK(transferFinished_ == true);
+      if (transferFinished_) {
+        break;
       }
-      done = transferFinished_;
     }
     if (!dirQueue_->fileDiscoveryFinished()) {
       continue;
     }
     std::unique_ptr<TransferReport> transferReport = getTransferReport();
-    if (!done) {
-      progressReporter_->progress(transferReport);
-    } else {
-      progressReporter_->end(transferReport);
-    }
-  } while (!done);
+    progressReporter_->progress(transferReport);
+  }
 }
 }
 }  // namespace facebook::wdt
