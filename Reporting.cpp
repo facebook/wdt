@@ -42,7 +42,6 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
 
 std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
   folly::RWSpinLock::ReadHolder lock(stats.mutex_.get());
-  const double kMbToB = 1024 * 1024;
   double headerOverhead = 100;
   double failureOverhead = 100;
 
@@ -171,7 +170,8 @@ void ProgressReporter::progress(const std::unique_ptr<TransferReport>& report) {
   if (totalDiscoveredSize > 0) {
     progress = stats.getEffectiveDataBytes() * 100 / totalDiscoveredSize;
   }
-  displayProgress(progress, report->getThroughputMBps());
+  displayProgress(progress, report->getThroughputMBps(),
+                  report->getCurrentThroughputMBps());
 }
 
 void ProgressReporter::end(const std::unique_ptr<TransferReport>& report) {
@@ -180,7 +180,8 @@ void ProgressReporter::end(const std::unique_ptr<TransferReport>& report) {
   std::cout.flush();
 }
 
-void ProgressReporter::displayProgress(int progress, double throughput) {
+void ProgressReporter::displayProgress(int progress, double averageThroughput,
+                                       double currentThroughput) {
   int scaledProgress = progress / 2;
   std::cout << '\r';
   std::cout << '[';
@@ -194,7 +195,7 @@ void ProgressReporter::displayProgress(int progress, double throughput) {
     std::cout << ' ';
   }
   std::cout << "] " << progress << "% " << std::setprecision(2) << std::fixed
-            << throughput << " Mbytes/sec";
+            << averageThroughput << " " << currentThroughput << " Mbytes/sec";
   std::cout.flush();
 }
 }

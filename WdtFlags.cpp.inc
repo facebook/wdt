@@ -136,3 +136,6 @@ WDT_OPT(connect_timeout_millis, int32,
         "socket connect timeout in milliseconds");
 WDT_OPT(disk_sync_interval_mb, double,
         "Disk sync interval in mb. A negative value disables syncing");
+WDT_OPT(throughput_update_interval, int32,
+        "Number of intervals after which"
+        " progress reporter updates current throughput");

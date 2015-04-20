@@ -959,6 +959,14 @@ TransferStats Sender::sendOneByteSource(
 
 void Sender::reportProgress() {
   WDT_CHECK(progressReportIntervalMillis_ > 0);
+  int throughputUpdateInterval = WdtOptions::get().throughput_update_interval;
+  WDT_CHECK(throughputUpdateInterval >= 0);
+
+  int64_t lastEffectiveBytes = 0;
+  std::chrono::time_point<Clock> lastUpdateTime = Clock::now();
+  int intervalsSinceLastUpdate = 0;
+  double currentThroughput = 0;
+
   auto waitingTime = std::chrono::milliseconds(progressReportIntervalMillis_);
   bool done = false;
   int numSockets = ports_.size();
@@ -975,7 +983,21 @@ void Sender::reportProgress() {
     if (!dirQueue_->fileDiscoveryFinished()) {
       continue;
     }
+
     std::unique_ptr<TransferReport> transferReport = getTransferReport();
+    intervalsSinceLastUpdate++;
+    if (intervalsSinceLastUpdate >= throughputUpdateInterval) {
+      auto curTime = Clock::now();
+      int64_t curEffectiveBytes =
+          transferReport->getSummary().getEffectiveDataBytes();
+      double time = durationSeconds(curTime - lastUpdateTime);
+      currentThroughput = (curEffectiveBytes - lastEffectiveBytes) / time;
+      lastEffectiveBytes = curEffectiveBytes;
+      lastUpdateTime = curTime;
+      intervalsSinceLastUpdate = 0;
+    }
+    transferReport->setCurrentThroughput(currentThroughput);
+
     progressReporter_->progress(transferReport);
   }
 }

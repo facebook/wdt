@@ -304,9 +304,17 @@ class TransferReport {
   size_t getTotalFileSize() const {
     return totalFileSize_;
   }
+  /// @return   recent throughput in mbps
+  double getCurrentThroughputMBps() const {
+    return currentThroughput_ / kMbToB;
+  }
   /// @param stats  stats to added
   void addTransferStats(const TransferStats &stats) {
     summary_ += stats;
+  }
+  /// @param currentThroughput  current throughput
+  void setCurrentThroughput(double currentThroughput) {
+    currentThroughput_ = currentThroughput;
   }
   void setErrorCode(ErrorCode errCode) {
     summary_.setErrorCode(errCode);
@@ -328,6 +336,8 @@ class TransferReport {
   double totalTime_{0};
   /// sum of all the file sizes
   size_t totalFileSize_{0};
+  /// recent throughput in bytes/sec
+  double currentThroughput_{0};
 };
 
 /**
@@ -364,10 +374,11 @@ class ProgressReporter {
    * Displays progress of the transfer in stdout
    *
    * @param progress              progress percentage
-   * @param throughput            current throughput
-   *
+   * @param throughput            average throughput
+   * @param currentThroughput     recent throughput
    */
-  void displayProgress(int progress, double throughput);
+  void displayProgress(int progress, double averageThroughput,
+                       double currentThroughput);
 };
 }
 }
