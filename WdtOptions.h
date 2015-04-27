@@ -183,7 +183,7 @@ class WdtOptions {
   /**
    * timeout for socket connect
    */
-  int connect_timeout_millis{2000};
+  int32_t connect_timeout_millis{2000};
 
   /**
   * Disk sync interval in mb. A negative value disables syncing

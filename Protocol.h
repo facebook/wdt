@@ -25,6 +25,8 @@ class Protocol {
     EXIT_CMD = 0x65,      // e)xit
   };
 
+  /// Max size of sender or receiver id
+  static const size_t kMaxTransferIdLength = 50;
   /// Max size of filename + 4 max varints + 1 byte for cmd + 1 byte for status
   static const size_t kMaxHeader = PATH_MAX + 5 * 10 + 2 + 2;
   /// min number of bytes that must be send to unblock receiver
@@ -34,7 +36,7 @@ class Protocol {
   /// max size of done command encoding
   static const size_t kMaxDone = 2 + 10;
   /// max size of settings command encoding
-  static const size_t kMaxSettings = 1 + 2 * 10;
+  static const size_t kMaxSettings = 1 + 4 * 10 + kMaxTransferIdLength;
 
   /// encodes id, sequence-id, block-size, block-offset and file-size
   /// into dest+off
@@ -74,19 +76,22 @@ class Protocol {
   static bool decodeDone(char *src, size_t &off, size_t max,
                          int64_t &numBlocks);
 
-  /// encodes read and write timeout into dest+off
+  /// encodes protocol version, read and write timeout, sender-id into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
   static bool encodeSettings(char *dest, size_t &off, size_t max,
-                             int64_t readTimeoutMillis,
-                             int64_t writeTimeoutMillis);
+                             int32_t protocolVersion, int64_t readTimeoutMillis,
+                             int64_t writeTimeoutMillis,
+                             const std::string &senderId);
 
   /// decodes from src+off and consumes/moves off but not past max
-  /// sets readTimeoutMillis and writeTimeoutMillis
+  /// sets protocolVersion, readTimeoutMillis, writeTimeoutMillis and senderId
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeSettings(char *src, size_t &off, size_t max,
+                             int32_t &protocolVersion,
                              int64_t &readTimeoutMillis,
-                             int64_t &writeTimeoutMillis);
+                             int64_t &writeTimeoutMillis,
+                             std::string &senderId);
 };
 }
 }  // namespace facebook::wdt

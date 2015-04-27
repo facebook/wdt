@@ -3,6 +3,7 @@
 #include "WdtOptions.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
+#include <poll.h>
 #include <folly/Conv.h>
 #include <fcntl.h>
 #include <chrono>
@@ -130,28 +131,29 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
     // zero value disables timeout
     auto startTime = Clock::now();
     while (true) {
-      // we need this loop because select() can return before any file handles
+      // we need this loop because poll() can return before any file handles
       // have changes or before timing out. In that case, we check whether it
-      // is becuse of EINTR or not. If true, we have to try select with
+      // is becuse of EINTR or not. If true, we have to try poll with
       // reduced timeout
       int timeElapsed = durationMillis(Clock::now() - startTime);
       if (timeElapsed >= timeoutMillis) {
         LOG(ERROR) << "accept() timed out";
         return CONN_ERROR;
       }
-      int selectTimeout = timeoutMillis - timeElapsed;
-      fd_set rfds;
-      FD_ZERO(&rfds);
-      FD_SET(listeningFd_, &rfds);
-      struct timeval tv;
-      tv.tv_sec = selectTimeout / 1000;
-      tv.tv_usec = (selectTimeout % 1000) * 1000;
-      if (select(FD_SETSIZE, &rfds, nullptr, nullptr, &tv) <= 0) {
+      int pollTimeout = timeoutMillis - timeElapsed;
+      struct pollfd pollFds[] = {{listeningFd_, POLLIN}};
+
+      int retValue;
+      if ((retValue = poll(pollFds, 1, pollTimeout)) <= 0) {
         if (errno == EINTR) {
-          VLOG(1) << "select() call interrupted. retrying...";
+          VLOG(1) << "poll() call interrupted. retrying...";
           continue;
         }
-        VLOG(1) << "select() timed out";
+        if (retValue == 0) {
+          VLOG(1) << "poll() timed out" << port_ << " " << listeningFd_;
+        } else {
+          PLOG(ERROR) << "poll() failed " << port_ << " " << listeningFd_;
+        }
         return CONN_ERROR;
       }
       break;

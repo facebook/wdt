@@ -176,6 +176,9 @@ class Sender {
   /// Sets whether to follow symlink or not
   void setFollowSymlinks(const bool followSymlinks);
 
+  /// @param senderId   unique id of the sender
+  void setSenderId(const std::string &senderId);
+
   /**
    * @param progressReportIntervalMillis_   interval(ms) between progress
    *                                        reports. A value of 0 indicates no
@@ -388,6 +391,9 @@ class Sender {
 
   /// Pointer to DirectorySourceQueue which reads the srcDir and the files
   std::unique_ptr<DirectorySourceQueue> dirQueue_;
+  /// unique id of this sender object. This is send to the receiver for
+  /// identification
+  std::string senderId_;
   /// List of ports where the receiver threads are running on the destination
   std::vector<int32_t> ports_;
   /// Number of active threads, decremented everytime a thread is finished

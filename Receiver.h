@@ -72,6 +72,9 @@ class Receiver {
    */
   void setDir(const std::string &destDir);
 
+  /// @param receiverId   unique id of this receiver
+  void setReceiverId(const std::string &receiverId);
+
   /**
    * Destructor for the receiver should try to join threads.
    * Since the threads are part of the object. We can't destroy the
@@ -425,6 +428,10 @@ class Receiver {
   std::string destDir_;
   /// Responsible for writing files on the disk
   std::unique_ptr<FileCreator> fileCreator_;
+
+  /// Unique id of this receiver object, this must match sender-id sent as part
+  /// of settings
+  std::string receiverId_;
 
   /**
    * Progress tracker thread is a thread which has to be joined when the

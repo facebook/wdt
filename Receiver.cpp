@@ -134,7 +134,13 @@ int32_t Receiver::registerPorts(bool stopOnFailure) {
 }
 
 void Receiver::setDir(const std::string &destDir) {
-  this->destDir_ = destDir;
+  destDir_ = destDir;
+}
+
+void Receiver::setReceiverId(const std::string &receiverId) {
+  WDT_CHECK(receiverId.length() <= Protocol::kMaxTransferIdLength);
+  receiverId_ = receiverId;
+  LOG(INFO) << "receiver id " << receiverId_;
 }
 
 void Receiver::cancelTransfer() {
@@ -604,13 +610,28 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   auto &senderReadTimeout = data.senderReadTimeout_;
   auto &senderWriteTimeout = data.senderWriteTimeout_;
   auto &threadStats = data.threadStats_;
-  bool success =
-      Protocol::decodeSettings(buf, off, oldOffset + Protocol::kMaxSettings,
-                               senderReadTimeout, senderWriteTimeout);
+  auto &options = WdtOptions::get();
+  int32_t protocolVersion;
+  std::string senderId;
+  bool success = Protocol::decodeSettings(
+      buf, off, oldOffset + Protocol::kMaxSettings, protocolVersion,
+      senderReadTimeout, senderWriteTimeout, senderId);
   if (!success) {
     LOG(ERROR) << "Unable to decode settings cmd";
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
+  }
+  if (protocolVersion != options.protocol_version) {
+    LOG(ERROR) << "Receiver and sender protocol version mismatch"
+               << protocolVersion << " " << options.protocol_version;
+    threadStats.setErrorCode(VERSION_MISMATCH);
+    return SEND_ABORT_CMD;
+  }
+  if (receiverId_ != senderId) {
+    LOG(ERROR) << "Receiver and sender id mismatch " << senderId << " "
+               << receiverId_;
+    threadStats.setErrorCode(ID_MISMATCH);
+    return SEND_ABORT_CMD;
   }
   auto msgLen = off - oldOffset;
   numRead -= msgLen;
@@ -900,8 +921,13 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
   auto &threadStats = data.threadStats_;
   char *buf = data.getBuf();
   auto &socket = data.socket_;
+  auto &options = WdtOptions::get();
+  int32_t protocolVersion = options.protocol_version;
   int offset = 0;
   buf[offset++] = Protocol::ABORT_CMD;
+  folly::storeUnaligned<int32_t>(buf + offset,
+                                 folly::Endian::little(protocolVersion));
+  offset += sizeof(int32_t);
   buf[offset++] = threadStats.getErrorCode();
   int64_t checkpoint = folly::Endian::little(threadStats.getNumBlocks());
   folly::storeUnaligned<int64_t>(buf + offset, checkpoint);

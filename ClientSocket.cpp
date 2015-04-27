@@ -1,8 +1,10 @@
 #include "ClientSocket.h"
 #include "SocketUtils.h"
 #include "WdtOptions.h"
+#include <folly/ScopeGuard.h>
 #include <glog/logging.h>
 #include <sys/socket.h>
+#include <poll.h>
 #include <fcntl.h>
 #include <chrono>
 
@@ -36,7 +38,12 @@ ErrorCode ClientSocket::connect() {
     return OK;
   }
   // Lookup
-  struct addrinfo *infoList;
+  struct addrinfo *infoList = nullptr;
+  folly::ScopeGuard guard = folly::makeGuard([&] {
+    if (infoList) {
+      freeaddrinfo(infoList);
+    }
+  });
   int res = getaddrinfo(dest_.c_str(), port_.c_str(), &sa_, &infoList);
   if (res) {
     // not errno, can't use PLOG (perror)
@@ -52,9 +59,10 @@ ErrorCode ClientSocket::connect() {
             << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
     fd_ = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd_ == -1) {
-      PLOG(WARNING) << "Error making socket";
+      PLOG(WARNING) << "Error making socket for port " << port_;
       continue;
     }
+    VLOG(1) << "new socket " << fd_ << " for port " << port_;
 
     // make the socket non blocking
     int sockArg = fcntl(fd_, F_GETFL, nullptr);
@@ -77,9 +85,9 @@ ErrorCode ClientSocket::connect() {
       int connectTimeout = WdtOptions::get().connect_timeout_millis;
 
       while (true) {
-        // we need this loop because select() can return before any file handles
+        // we need this loop because poll() can return before any file handles
         // have changes or before timing out. In that case, we check whether it
-        // is becuse of EINTR or not. If true, we have to try select with
+        // is becuse of EINTR or not. If true, we have to try poll with
         // reduced timeout
         int timeElapsed = durationMillis(Clock::now() - startTime);
         if (timeElapsed >= connectTimeout) {
@@ -87,25 +95,19 @@ ErrorCode ClientSocket::connect() {
           this->close();
           return CONN_ERROR;
         }
-        int selectTimeout = connectTimeout - timeElapsed;
-        struct timeval tv;
-        tv.tv_sec = selectTimeout / 1000;
-        tv.tv_usec = (selectTimeout % 1000) * 1000;
-
-        fd_set wfds;
-        FD_ZERO(&wfds);
-        FD_SET(fd_, &wfds);
+        int pollTimeout = connectTimeout - timeElapsed;
+        struct pollfd pollFds[] = {{fd_, POLLOUT}};
 
         int retValue;
-        if ((retValue = select(fd_ + 1, nullptr, &wfds, nullptr, &tv)) <= 0) {
+        if ((retValue = poll(pollFds, 1, pollTimeout)) <= 0) {
           if (errno == EINTR) {
-            VLOG(1) << "select() call interrupted. retrying...";
+            VLOG(1) << "poll() call interrupted. retrying...";
             continue;
           }
           if (retValue == 0) {
-            LOG(ERROR) << "select() timed out " << port_;
+            LOG(ERROR) << "poll() timed out " << port_;
           } else {
-            PLOG(ERROR) << "select() failed " << port_;
+            PLOG(ERROR) << "poll() failed " << port_ << " " << fd_;
           }
           this->close();
           return CONN_ERROR;
@@ -122,7 +124,7 @@ ErrorCode ClientSocket::connect() {
         continue;
       }
       if (connectResult != 0) {
-        LOG(WARNING) << "connect did not succeed : " << strerror(connectResult);
+        LOG(WARNING) << "connect did not succeed : " << connectResult;
         this->close();
         continue;
       }
@@ -142,7 +144,6 @@ ErrorCode ClientSocket::connect() {
     sa_ = *info;
     break;
   }
-  freeaddrinfo(infoList);
   if (fd_ < 0) {
     if (count > 1) {
       // Only log this if not redundant with log above (ie --ipv6=false)

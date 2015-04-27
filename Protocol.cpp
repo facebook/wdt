@@ -113,21 +113,34 @@ bool Protocol::decodeDone(char *src, size_t &off, size_t max,
 }
 
 bool Protocol::encodeSettings(char *dest, size_t &off, size_t max,
+                              int32_t protocolVersion,
                               int64_t readTimeoutMillis,
-                              int64_t writeTimeoutMillis) {
+                              int64_t writeTimeoutMillis,
+                              const std::string &senderId) {
+  off += folly::encodeVarint(protocolVersion, (uint8_t *)dest + off);
   off += folly::encodeVarint(readTimeoutMillis, (uint8_t *)dest + off);
   off += folly::encodeVarint(writeTimeoutMillis, (uint8_t *)dest + off);
+  size_t idLen = senderId.size();
+  off += folly::encodeVarint(idLen, (uint8_t *)dest + off);
+  memcpy(dest + off, senderId.data(), idLen);
+  off += idLen;
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
   return true;
 }
 
 bool Protocol::decodeSettings(char *src, size_t &off, size_t max,
+                              int32_t &protocolVersion,
                               int64_t &readTimeoutMillis,
-                              int64_t &writeTimeoutMillis) {
+                              int64_t &writeTimeoutMillis,
+                              std::string &senderId) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
+    protocolVersion = folly::decodeVarint(br);
     readTimeoutMillis = folly::decodeVarint(br);
     writeTimeoutMillis = folly::decodeVarint(br);
+    size_t idLen = folly::decodeVarint(br);
+    senderId.assign((const char *)(br.start()), idLen);
+    br.advance(idLen);
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;

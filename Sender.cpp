@@ -210,6 +210,12 @@ void Sender::setProgressReportIntervalMillis(
   progressReportIntervalMillis_ = progressReportIntervalMillis;
 }
 
+void Sender::setSenderId(const std::string &senderId) {
+  WDT_CHECK(senderId.length() <= Protocol::kMaxTransferIdLength);
+  senderId_ = senderId;
+  LOG(INFO) << "sender id " << senderId_;
+}
+
 void Sender::setProgressReporter(
     std::unique_ptr<ProgressReporter> &progressReporter) {
   progressReporter_ = std::move(progressReporter);
@@ -558,7 +564,8 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   buf[off++] = Protocol::SETTINGS_CMD;
 
   bool success = Protocol::encodeSettings(
-      buf, off, Protocol::kMaxSettings, readTimeoutMillis, writeTimeoutMillis);
+      buf, off, Protocol::kMaxSettings, options.protocol_version,
+      readTimeoutMillis, writeTimeoutMillis, senderId_);
   WDT_CHECK(success);
   ssize_t written = socket->write(buf, off);
   if (written != off) {
@@ -776,7 +783,7 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
 
   threadStats.setErrorCode(ABORT);
-  int toRead = 1 + sizeof(int64_t);
+  int toRead = 1 + sizeof(int32_t) + sizeof(int64_t);
   auto numRead = socket->read(buf, toRead);
   if (numRead != toRead) {
     // can not read checkpoint, but still must exit because of ABORT
@@ -784,12 +791,18 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
                << toRead;
     return END;
   }
-  int64_t checkpoint = folly::loadUnaligned<int64_t>(buf + 1);
-  checkpoint = folly::Endian::little(checkpoint);
-  ErrorCode remoteError = (ErrorCode)buf[0];
+
+  int offset = 0;
+  int32_t protocolVersion = folly::loadUnaligned<int32_t>(buf + offset);
+  protocolVersion = folly::Endian::little(protocolVersion);
+  offset += sizeof(int32_t);
+  ErrorCode remoteError = (ErrorCode)buf[offset++];
   threadStats.setRemoteErrorCode(remoteError);
+  int64_t checkpoint = folly::loadUnaligned<int64_t>(buf + offset);
+  checkpoint = folly::Endian::little(checkpoint);
   std::string failedFileName = transferHistory.getSourceId(checkpoint);
   LOG(WARNING) << "Received abort on " << data.threadIndex_
+               << " remote protocol version " << protocolVersion
                << " remote error code " << errorCodeToStr(remoteError)
                << " file " << failedFileName << " checkpoint " << checkpoint;
   abort();
