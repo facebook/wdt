@@ -345,7 +345,7 @@ class Sender {
       ErrorCode transferStatus);
 
   /// Every sender thread executes this method to send the data
-  void sendOne(int threadIndex, const ThrottlerOptions &throttlerOptions);
+  void sendOne(int threadIndex);
 
   /// Responsible for making socket to connect to the receiver
   virtual std::unique_ptr<ClientSocket> makeSocket(const std::string &destHost,
@@ -431,6 +431,8 @@ class Sender {
   std::vector<ThreadTransferHistory> transferHistories_;
   /// flag representing whether transfer has been aborted or not
   bool transferAborted_{false};
+  /// Throttler options
+  ThrottlerOptions perThreadThrottlerOptions_;
 };
 }
 }  // namespace facebook::wdt

@@ -372,8 +372,7 @@ ErrorCode Sender::start() {
   if (twoPhases) {
     dirThread_.join();
   }
-  ThrottlerOptions perThreadThrottlerOptions;
-  fillThrottlerOptions(perThreadThrottlerOptions);
+  fillThrottlerOptions(perThreadThrottlerOptions_);
   // WARNING: Do not MERGE the follwing two loops. ThreadTransferHistory keeps a
   // reference of TransferStats. And, any emplace operation on a vector
   // invalidates all its references
@@ -387,8 +386,7 @@ ErrorCode Sender::start() {
   transferFinished_ = false;
   for (int i = 0; i < ports_.size(); i++) {
     globalThreadStats_[i].setId(folly::to<std::string>(i));
-    senderThreads_.emplace_back(&Sender::sendOne, this, i,
-                                std::cref(perThreadThrottlerOptions));
+    senderThreads_.emplace_back(&Sender::sendOne, this, i);
   }
   if (progressReportEnabled) {
     progressReporter_->start();
@@ -809,8 +807,7 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
   return END;
 }
 
-void Sender::sendOne(int threadIndex,
-                     const ThrottlerOptions &throttlerOptions) {
+void Sender::sendOne(int threadIndex) {
   std::vector<ThreadTransferHistory> &transferHistories = transferHistories_;
   TransferStats &threadStats = globalThreadStats_[threadIndex];
   DirectorySourceQueue &queue(*dirQueue_);
@@ -828,9 +825,9 @@ void Sender::sendOne(int threadIndex,
     }
   });
   std::unique_ptr<Throttler> throttler;
-  double avgRateBytes = throttlerOptions.avgRateBytes;
-  double maxRateBytes = throttlerOptions.maxRateBytes;
-  double bucketLimitBytes = throttlerOptions.bucketLimitBytes;
+  double avgRateBytes = perThreadThrottlerOptions_.avgRateBytes;
+  double maxRateBytes = perThreadThrottlerOptions_.maxRateBytes;
+  double bucketLimitBytes = perThreadThrottlerOptions_.bucketLimitBytes;
   const bool doThrottling = (avgRateBytes > 0 || maxRateBytes > 0);
   if (doThrottling) {
     throttler = folly::make_unique<Throttler>(
