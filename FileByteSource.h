@@ -93,6 +93,11 @@ class FileByteSource : public ByteSource {
     return fileData_->getRelPath();
   }
 
+  /// @see ByteSource.h
+  virtual const std::string &getFullPath() const override {
+    return fileData_->getFullPath();
+  }
+
   /**
    * @return sequence number associated with the file. Sequence number
    *         represents the order in which files were first added to the queue.

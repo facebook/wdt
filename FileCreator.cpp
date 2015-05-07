@@ -28,7 +28,7 @@ bool FileCreator::setFileSize(int fd, size_t fileSize) {
   }
   int status = posix_fallocate(fd, 0, fileSize);
   if (status != 0) {
-    LOG(ERROR) << "fallocate() failed " << status;
+    LOG(ERROR) << "fallocate() failed " << folly::errnoStr(status);
     return false;
   }
   return true;

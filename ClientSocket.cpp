@@ -124,7 +124,8 @@ ErrorCode ClientSocket::connect() {
         continue;
       }
       if (connectResult != 0) {
-        LOG(WARNING) << "connect did not succeed : " << connectResult;
+        LOG(WARNING) << "connect did not succeed : "
+                     << folly::errnoStr(connectResult);
         this->close();
         continue;
       }

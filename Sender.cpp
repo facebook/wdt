@@ -9,6 +9,7 @@
 #include <folly/String.h>
 #include <folly/Bits.h>
 #include <folly/ScopeGuard.h>
+#include <sys/stat.h>
 #include <thread>
 
 // Constants for different calculations
@@ -953,10 +954,18 @@ TransferStats Sender::sendOneByteSource(
     actualSize += written;
   }
   if (actualSize != expectedSize) {
-    LOG(ERROR) << "UGH " << source->getIdentifier() << " " << expectedSize
-               << " " << actualSize;
     // Can only happen if sender thread can not read complete source byte
     // stream
+    LOG(ERROR) << "UGH " << source->getIdentifier() << " " << expectedSize
+               << " " << actualSize;
+    struct stat fileStat;
+    if (stat(source->getFullPath().c_str(), &fileStat) != 0) {
+      PLOG(ERROR) << "stat failed on path " << source->getFullPath();
+    } else {
+      LOG(WARNING) << "file " << source->getIdentifier() << " previous size "
+                   << source->getTotalSize() << " current size "
+                   << fileStat.st_size;
+    }
     stats.setErrorCode(BYTE_SOURCE_READ_ERROR);
     stats.incrFailedAttempts();
     return stats;

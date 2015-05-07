@@ -15,6 +15,9 @@ class ByteSource {
   /// @return identifier for the source
   virtual const std::string &getIdentifier() const = 0;
 
+  /// @return full path of the source
+  virtual const std::string &getFullPath() const = 0;
+
   /// @return sequence number assigned to the source
   virtual uint64_t getSeqId() const = 0;
 
