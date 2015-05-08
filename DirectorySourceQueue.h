@@ -115,7 +115,8 @@ class DirectorySourceQueue : public SourceQueue {
   void setFileSourceBufferSize(const size_t fileSourceBufferSize);
 
   /**
-   * Sets specific files to be transferred
+   * Stat the FileInfo input files (if their size aren't already specified) and
+   * insert them in the queue
    *
    * @param fileInfo              files to transferred
    */
@@ -176,9 +177,7 @@ class DirectorySourceQueue : public SourceQueue {
   bool explore();
 
   /**
-   * Stat the input files and populate sizeToPath_ (alternative to
-   * explore used when fileInfo was specified)
-   *
+   * Stat the input files and populate queue
    * @return                true on success, false on error
    */
   bool enqueueFiles();
@@ -225,10 +224,10 @@ class DirectorySourceQueue : public SourceQueue {
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<FileInfo> fileInfo_;
 
-  /// protects initCalled_/initFinished_/sizeToPath_
+  /// protects initCalled_/initFinished_/sourceQueue_
   mutable std::mutex mutex_;
 
-  /// condition variable indicating sizeToPath_ is not empty
+  /// condition variable indicating sourceQueue_ is not empty
   mutable std::condition_variable conditionNotEmpty_;
 
   /// Indicates whether init() has been called to prevent multiple calls

@@ -74,6 +74,8 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
   // either traverse directory or we already have a fixed set of candidate
   // files
   if (!fileInfo_.empty()) {
+    LOG(INFO) << "Using list of file info. Number of files "
+              << fileInfo_.size();
     res = enqueueFiles();
   } else {
     res = explore();
@@ -92,6 +94,10 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
 }
 
 bool DirectorySourceQueue::explore() {
+  LOG(INFO) << "Exploring root dir " << rootDir_
+            << " include_pattern : " << includePattern_
+            << " exclude_pattern : " << excludePattern_
+            << " prune_dir_pattern : " << pruneDirPattern_;
   bool hasError = false;
   std::set<std::string> visited;
   std::regex includeRegex(includePattern_);
@@ -242,7 +248,8 @@ bool DirectorySourceQueue::explore() {
     }
     closedir(dirPtr);
   }
-  VLOG(1) << "All done... errors = " << hasError;
+  LOG(INFO) << "Number of files explored " << numEntries_
+            << " errors : " << std::boolalpha << hasError;
   return !hasError;
 }
 

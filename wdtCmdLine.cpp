@@ -95,11 +95,15 @@ int main(int argc, char *argv[]) {
         fileInfo.emplace_back(fields[0], filesize);
       }
     }
-    Sender sender(FLAGS_destination, FLAGS_directory);
+    std::vector<int32_t> ports;
+    const auto &options = WdtOptions::get();
+    for (int i = 0; i < options.num_ports; i++) {
+      ports.push_back(options.start_port + i);
+    }
+    Sender sender(FLAGS_destination, FLAGS_directory, ports, fileInfo);
     sender.setIncludeRegex(FLAGS_include_regex);
     sender.setExcludeRegex(FLAGS_exclude_regex);
     sender.setPruneDirRegex(FLAGS_prune_dir_regex);
-    sender.setSrcFileInfo(fileInfo);
     // TODO fix that
     std::unique_ptr<TransferReport> report = sender.transfer();
     retCode = report->getSummary().getErrorCode();

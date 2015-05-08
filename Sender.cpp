@@ -139,17 +139,6 @@ const Sender::StateFunction Sender::stateMap_[] = {
     &Sender::readReceiverCmd, &Sender::processDoneCmd, &Sender::processWaitCmd,
     &Sender::processErrCmd, &Sender::processAbortCmd};
 
-Sender::Sender(int32_t port, int numSockets, const std::string &destHost,
-               const std::string &srcDir)
-    : Sender(destHost, srcDir) {
-  destHost_ = destHost;
-  srcDir_ = srcDir;
-  ports_.resize(numSockets);
-  for (int i = 0; i < numSockets; i++) {
-    ports_[i] = port + i;
-  }
-}
-
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   destHost_ = destHost;
   srcDir_ = srcDir;
@@ -165,7 +154,6 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   dirQueue_->setIncludePattern(options.include_regex);
   dirQueue_->setExcludePattern(options.exclude_regex);
   dirQueue_->setPruneDirPattern(options.prune_dir_regex);
-  dirQueue_->setFileInfo(srcFileInfo_);
   dirQueue_->setFollowSymlinks(options.follow_symlinks);
   progressReportIntervalMillis_ = options.progress_report_interval_millis;
   progressReporter_ = folly::make_unique<ProgressReporter>();
@@ -176,7 +164,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir,
                const std::vector<FileInfo> &srcFileInfo)
     : Sender(destHost, srcDir) {
   ports_ = ports;
-  srcFileInfo_ = srcFileInfo;
+  dirQueue_->setFileInfo(srcFileInfo);
 }
 
 Sender::~Sender() {

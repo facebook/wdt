@@ -128,9 +128,6 @@ class Sender {
          const std::vector<int32_t> &ports,
          const std::vector<FileInfo> &srcFileInfo);
 
-  Sender(int port, int numSockets, const std::string &destHost,
-         const std::string &srcDir);
-
   virtual ~Sender();
 
   /**
@@ -402,8 +399,6 @@ class Sender {
   std::string srcDir_;
   /// Address of the destination host where the files are sent
   std::string destHost_;
-  /// Sender can also work with a list of files instead of src directory
-  std::vector<FileInfo> srcFileInfo_;
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
   /// Holds the instance of the progress reporter default or customized
