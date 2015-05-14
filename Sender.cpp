@@ -565,38 +565,36 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
 }
 
 Sender::SenderState Sender::sendBlocks(ThreadData &data) {
-  LOG(INFO) << "entered SEND_BLOCKS state " << data.threadIndex_;
+  VLOG(1) << "entered SEND_BLOCKS state " << data.threadIndex_;
   TransferStats &threadStats = data.threadStats_;
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
   DirectorySourceQueue &queue = data.queue_;
 
   ErrorCode transferStatus;
-  while (true) {
-    std::unique_ptr<ByteSource> source = queue.getNextSource(transferStatus);
-    if (!source) {
-      break;
-    }
-    WDT_CHECK(!source->hasError());
-    size_t totalBytes = threadStats.getTotalBytes(false);
-    TransferStats transferStats = sendOneByteSource(
-        data.socket_, data.throttler_, source, totalBytes, transferStatus);
-    threadStats += transferStats;
-    source->addTransferStats(transferStats);
-    source->close();
-    if (transferStats.getErrorCode() == OK) {
-      if (!transferHistory.addSource(source)) {
-        // global checkpoint received for this thread. no point in
-        // continuing
-        LOG(ERROR) << "global checkpoint received, no point in continuing";
-        threadStats.setErrorCode(CONN_ERROR);
-        return END;
-      }
-    } else {
-      queue.returnToQueue(source);
-      return CHECK_FOR_ABORT;
-    }
+  std::unique_ptr<ByteSource> source = queue.getNextSource(transferStatus);
+  if (!source) {
+    return SEND_DONE_CMD;
   }
-  return SEND_DONE_CMD;
+  WDT_CHECK(!source->hasError());
+  size_t totalBytes = threadStats.getTotalBytes(false);
+  TransferStats transferStats = sendOneByteSource(
+      data.socket_, data.throttler_, source, totalBytes, transferStatus);
+  threadStats += transferStats;
+  source->addTransferStats(transferStats);
+  source->close();
+  if (transferStats.getErrorCode() == OK) {
+    if (!transferHistory.addSource(source)) {
+      // global checkpoint received for this thread. no point in
+      // continuing
+      LOG(ERROR) << "global checkpoint received, no point in continuing";
+      threadStats.setErrorCode(CONN_ERROR);
+      return END;
+    }
+  } else {
+    queue.returnToQueue(source);
+    return CHECK_FOR_ABORT;
+  }
+  return SEND_BLOCKS;
 }
 
 Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {

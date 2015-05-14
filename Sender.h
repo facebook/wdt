@@ -272,9 +272,10 @@ class Sender {
    * state.
    * Previous states : SEND_SETTINGS,
    *                   PROCESS_ERR_CMD
-   * Next states : END(global checkpoint received),
-   *               CONNECT(socket write failure),
-   *               SEND_DONE_CMD(success)
+   * Next states : SEND_BLOCKS(success),
+   *               END(global checkpoint received),
+   *               CHECK_FOR_ABORT(socket write failure),
+   *               SEND_DONE_CMD(no more blocks left to transfer)
    */
   SenderState sendBlocks(ThreadData &data);
   /**
