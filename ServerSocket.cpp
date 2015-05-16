@@ -98,7 +98,7 @@ ErrorCode ServerSocket::listen() {
       continue;
     }
     if (bind(listeningFd_, info->ai_addr, info->ai_addrlen)) {
-      PLOG(WARNING) << "Error binding";
+      PLOG(WARNING) << "Error binding " << port_;
       ::close(listeningFd_);
       listeningFd_ = -1;
       continue;
