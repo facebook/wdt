@@ -109,11 +109,11 @@ ErrorCode ServerSocket::listen() {
   }
   freeaddrinfo(infoList);
   if (listeningFd_ <= 0) {
-    LOG(ERROR) << "Unable to bind";
+    LOG(ERROR) << "Unable to bind port " << port_;
     return CONN_ERROR_RETRYABLE;
   }
   if (::listen(listeningFd_, backlog_)) {
-    PLOG(ERROR) << "listen error";
+    PLOG(ERROR) << "listen error for port " << port_;
     ::close(listeningFd_);
     listeningFd_ = -1;
     return CONN_ERROR_RETRYABLE;
