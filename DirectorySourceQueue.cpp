@@ -214,7 +214,7 @@ bool DirectorySourceQueue::explore() {
         // if we were DT_UNKNOWN this could still be a symlink, block device
         // etc... (xfs)
         if (S_ISREG(fileStat.st_mode)) {
-          VLOG(1) << "Found file " << newFullPath << " of size "
+          VLOG(2) << "Found file " << newFullPath << " of size "
                   << fileStat.st_size;
           if (!excludePattern_.empty() &&
               std::regex_match(newRelativePath, excludeRegex)) {
@@ -241,7 +241,7 @@ bool DirectorySourceQueue::explore() {
         newRelativePath.push_back('/');
         if (pruneDirPattern_.empty() ||
             !std::regex_match(newRelativePath, pruneDirRegex)) {
-          VLOG(1) << "Adding " << newRelativePath;
+          VLOG(2) << "Adding " << newRelativePath;
           todoList.push_back(std::move(newRelativePath));
         }
       }

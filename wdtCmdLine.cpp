@@ -35,6 +35,8 @@ DEFINE_string(
     destination, "",
     "empty is server (destination) mode, non empty is destination host");
 
+DEFINE_string(transfer_id, "", "Transfer id (optional, should match");
+
 DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 
 using namespace facebook::wdt;
@@ -45,6 +47,17 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
 }
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
+  // Ugliness in gflags' api; to be able to use program name
+  google::SetArgv(argc, const_cast<const char**>(argv));
+  google::SetVersionString(WDT_VERSION_STR);
+  std::string usage("WDT Warp-speed Data Transfer. version ");
+  usage.append(google::VersionString());
+  usage.append(". Sample usage:\n\t");
+  usage.append(google::ProgramInvocationShortName());
+  usage.append(" # for a server/receiver\n\t");
+  usage.append(google::ProgramInvocationShortName());
+  usage.append(" -destination host # for a sender");
+  google::SetUsageMessage(usage);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   signal(SIGPIPE, SIG_IGN);
@@ -58,10 +71,11 @@ int main(int argc, char *argv[]) {
             << " num sockets = " << FLAGS_num_ports
             << " from port = " << FLAGS_start_port;
   const auto &options = WdtOptions::getMutable();
-  LOG(INFO) << options.num_ports << " " << options.start_port;
   ErrorCode retCode = OK;
   if (FLAGS_destination.empty()) {
+    // TODO: inconsistent! switch to option like sender...
     Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
+    receiver.setReceiverId(FLAGS_transfer_id);
     int numSuccess = receiver.registerPorts();
     if (numSuccess == 0) {
       LOG(ERROR) << "Couldn't bind on any port";
@@ -101,6 +115,7 @@ int main(int argc, char *argv[]) {
       ports.push_back(options.start_port + i);
     }
     Sender sender(FLAGS_destination, FLAGS_directory, ports, fileInfo);
+    sender.setSenderId(FLAGS_transfer_id);
     sender.setIncludeRegex(FLAGS_include_regex);
     sender.setExcludeRegex(FLAGS_exclude_regex);
     sender.setPruneDirRegex(FLAGS_prune_dir_regex);

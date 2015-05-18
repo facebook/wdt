@@ -344,7 +344,8 @@ bool Receiver::areAllThreadsFinished(bool checkpointAdded) {
 
 void Receiver::endCurGlobalSession() {
   WDT_CHECK(transferFinishedCount_ + 1 == transferStartedCount_);
-  LOG(INFO) << "Transfer " << transferStartedCount_ << " finished";
+  LOG(INFO) << "Received done for all threads. Transfer session "
+            << transferStartedCount_ << " finished";
   transferFinishedCount_++;
   waitingThreadCount_ = 0;
   waitingWithErrorThreadCount_ = 0;
@@ -392,7 +393,7 @@ void Receiver::endCurThreadSession(ThreadData &data) {
 
 /***LISTEN STATE***/
 Receiver::ReceiverState Receiver::listen(ThreadData &data) {
-  LOG(INFO) << "entered LISTEN state " << data.threadIndex_;
+  VLOG(1) << "entered LISTEN state " << data.threadIndex_;
   const auto &options = WdtOptions::get();
   const bool doActualWrites = !options.skip_writes;
   auto &socket = data.socket_;
@@ -427,7 +428,7 @@ Receiver::ReceiverState Receiver::listen(ThreadData &data) {
 
 /***ACCEPT_FIRST_CONNECTION***/
 Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
-  LOG(INFO) << "entered ACCEPT_FIRST_CONNECTION state " << data.threadIndex_;
+  VLOG(1) << "entered ACCEPT_FIRST_CONNECTION state " << data.threadIndex_;
   const auto &options = WdtOptions::get();
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
@@ -602,7 +603,7 @@ Receiver::ReceiverState Receiver::processExitCmd(ThreadData &data) {
 
 /***PROCESS_SETTINGS_CMD***/
 Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
-  LOG(INFO) << "entered PROCESS_SETTINGS_CMD state " << data.threadIndex_;
+  VLOG(1) << "entered PROCESS_SETTINGS_CMD state " << data.threadIndex_;
   char *buf = data.getBuf();
   auto &off = data.off_;
   auto &oldOffset = data.oldOffset_;
@@ -816,6 +817,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
 }
 
 void Receiver::DiskWriteSyncer::syncFileRange(int64_t written, bool forced) {
+#ifdef HAS_SYNC_FILE_RANGE
   auto &options = WdtOptions::get();
   int64_t syncIntervalBytes = options.disk_sync_interval_mb * 1024 * 1024;
   if (fd_ < 0 || syncIntervalBytes < 0) {
@@ -842,10 +844,11 @@ void Receiver::DiskWriteSyncer::syncFileRange(int64_t written, bool forced) {
     nextSyncOffset_ += writtenSinceLastSync_;
     writtenSinceLastSync_ = 0;
   }
+#endif
 }
 
 Receiver::ReceiverState Receiver::processDoneCmd(ThreadData &data) {
-  LOG(INFO) << "entered PROCESS_DONE_CMD state " << data.threadIndex_;
+  VLOG(1) << "entered PROCESS_DONE_CMD state " << data.threadIndex_;
   auto &numRead = data.numRead_;
   auto &threadStats = data.threadStats_;
   auto &checkpointIndex = data.checkpointIndex_;
@@ -942,7 +945,7 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
 }
 
 Receiver::ReceiverState Receiver::sendDoneCmd(ThreadData &data) {
-  LOG(INFO) << "entered SEND_DONE_CMD state " << data.threadIndex_;
+  VLOG(1) << "entered SEND_DONE_CMD state " << data.threadIndex_;
   char *buf = data.getBuf();
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
@@ -1009,8 +1012,8 @@ Receiver::ReceiverState Receiver::waitForFinishWithThreadError(
 
 Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
     ThreadData &data) {
-  LOG(INFO) << "entered WAIT_FOR_FINISH_OR_NEW_CHECKPOINT state "
-            << data.threadIndex_;
+  VLOG(1) << "entered WAIT_FOR_FINISH_OR_NEW_CHECKPOINT state "
+          << data.threadIndex_;
   auto &threadStats = data.threadStats_;
   auto &senderReadTimeout = data.senderReadTimeout_;
   auto &checkpointIndex = data.checkpointIndex_;

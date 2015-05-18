@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include <folly/String.h>
 
 namespace facebook {
 namespace wdt {
@@ -43,6 +42,12 @@ std::string const kErrorToStr[] = {
  * @return      string representation
  */
 std::string errorCodeToStr(ErrorCode code);
+
+/**
+ * Thread safe version of strerror(), easier than strerror_r
+ * (similar to folly::errnoStr() but without pulling in all the dependencies)
+ */
+std::string strerrorStr(int errnum);
 }
 }
 #undef ERRORS

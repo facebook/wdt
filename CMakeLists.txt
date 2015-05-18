@@ -20,7 +20,8 @@
 cmake_minimum_required(VERSION 3.1)
 
 # There is no C per se in WDT but if you use CXX only here many checks fail
-project("WDT" C CXX)
+# Version is Major.Minor.YYMMDDX for up to 10 releases per day
+project("WDT" LANGUAGES C CXX VERSION 0.2.1505160)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -61,6 +62,7 @@ ${FOLLY_SOURCE_DIR}/folly/Malloc.cpp
 add_library(wdtlib_min
 ClientSocket.cpp
 DirectorySourceQueue.cpp
+ErrorCodes.cpp
 FileByteSource.cpp
 FileCreator.cpp
 Protocol.cpp
@@ -129,8 +131,14 @@ check_cxx_source_compiles(
 int main(int argc, char** argv) {
   return (cmkcheckweak) ? 1 : 0 ;
 }" FOLLY_HAVE_WEAK_SYMBOLS)
+# For WDT itself:
+check_function_exists(posix_fallocate HAS_POSIX_FALLOCATE)
+check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
 # Now record all this :
+# Folly's:
 configure_file(folly-config.h.in folly/folly-config.h)
+# Wdt's config/version
+configure_file(WdtConfig.h.in WdtConfig.h)
 
 # Malloc stuff  tied to not supporting weaksympbols
 if (NOT FOLLY_HAVE_WEAK_SYMBOLS)

@@ -1,4 +1,5 @@
 #pragma once
+#include "WdtConfig.h"
 #include <folly/String.h>
 #include <memory>
 #include <thread>

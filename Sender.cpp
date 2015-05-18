@@ -466,7 +466,7 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
 }
 
 Sender::SenderState Sender::connect(ThreadData &data) {
-  LOG(INFO) << "entered CONNECT state " << data.threadIndex_;
+  VLOG(1) << "entered CONNECT state " << data.threadIndex_;
   int port = ports_[data.threadIndex_];
   TransferStats &threadStats = data.threadStats_;
   auto &socket = data.socket_;
@@ -539,7 +539,7 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
 }
 
 Sender::SenderState Sender::sendSettings(ThreadData &data) {
-  LOG(INFO) << "entered SEND_SETTINGS state " << data.threadIndex_;
+  VLOG(1) << "entered SEND_SETTINGS state " << data.threadIndex_;
 
   TransferStats &threadStats = data.threadStats_;
   char *buf = data.buf_;
@@ -598,7 +598,7 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
 }
 
 Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
-  LOG(INFO) << "entered SEND_DONE_CMD state " << data.threadIndex_;
+  VLOG(1) << "entered SEND_DONE_CMD state " << data.threadIndex_;
   TransferStats &threadStats = data.threadStats_;
   char *buf = data.buf_;
   auto &socket = data.socket_;
@@ -649,7 +649,7 @@ Sender::SenderState Sender::checkForAbort(ThreadData &data) {
 }
 
 Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
-  LOG(INFO) << "entered READ_RECEIVER_CMD state " << data.threadIndex_;
+  VLOG(1) << "entered READ_RECEIVER_CMD state " << data.threadIndex_;
   TransferStats &threadStats = data.threadStats_;
   char *buf = data.buf_;
   ssize_t numRead = data.socket_->read(buf, 1);
@@ -676,7 +676,7 @@ Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
 }
 
 Sender::SenderState Sender::processDoneCmd(ThreadData &data) {
-  LOG(INFO) << "entered PROCESS_DONE_CMD state " << data.threadIndex_;
+  VLOG(1) << "entered PROCESS_DONE_CMD state " << data.threadIndex_;
   int port = ports_[data.threadIndex_];
   char *buf = data.buf_;
   auto &socket = data.socket_;
@@ -694,7 +694,7 @@ Sender::SenderState Sender::processDoneCmd(ThreadData &data) {
     LOG(WARNING) << "EOF not found when expected";
     return END;
   }
-  LOG(INFO) << "done with transfer, port " << port;
+  VLOG(1) << "done with transfer, port " << port;
   return END;
 }
 

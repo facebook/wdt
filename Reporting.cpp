@@ -188,14 +188,19 @@ void ProgressReporter::displayProgress(int progress, double averageThroughput,
   for (int i = 0; i < scaledProgress - 1; i++) {
     std::cout << '=';
   }
-  if (scaledProgress != 0) {
-    std::cout << (scaledProgress == 50 ? '=' : '>');
+  if (scaledProgress != 0 && scaledProgress != 50) {
+    std::cout << '>';
   }
   for (int i = 0; i < 50 - scaledProgress - 1; i++) {
     std::cout << ' ';
   }
-  std::cout << "] " << progress << "% " << std::setprecision(2) << std::fixed
-            << averageThroughput << " " << currentThroughput << " Mbytes/sec";
+  std::cout << "] " << progress << "% " << std::setprecision(1) << std::fixed
+            << averageThroughput;
+  if (progress < 100) {
+    std::cout << " " << currentThroughput << " Mbytes/s  ";
+  } else {
+    std::cout << " Mbytes/s          ";
+  }
   std::cout.flush();
 }
 }

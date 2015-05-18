@@ -1,13 +1,14 @@
 #! /bin/bash
 
-# Quick hack pending block/splitting support in wdt itself
+# Wrapper shell to ease use of WDT command line for remote cp
 # Source of this file is fbcode/wdt/wcp.sh
-# This copies a single file - if you have a lot of files - use wdt directly
-# (without the splitting step - don't make a compressed archive!)
 
+# todo: make it work for multiple files and remote src/dir (full(er) scp syntax)
+# and remove pkill once we have support for picking available ports
+# (remote wdt will exit on its own after succesfull transfer)
 
 usage="Usage:\n
-`basename $0` [-p portbase] [-l loglevel] [-n] singlebigsrcfile
+`basename $0` [-p portbase] [-l loglevel] [-n] sourcefile
 [user@]desthost:directory\n
   p : port base to use (8 sockets used by default from that port or 22356\n
   l : logging verbosity level to use\n
@@ -21,7 +22,7 @@ MINLOGLEVEL=2
 PORTBASE=22356
 DOCOMPRESSION=1
 
-while getopts "p:l:h" opt
+while getopts "p:l:hn" opt
 do case "$opt" in
         p)  PORTBASE="$OPTARG";;
         l)  MINLOGLEVEL="$OPTARG";;
@@ -58,6 +59,8 @@ if [ $? -ne 0 ] ; then
   exit 1
 fi
 
+TRANSFERID=$$
+
 echo "Copying $FILENAME ($SRCPATH) to $REMOTE (using $SSHREMOTE in $REMOTEDIR)"
 
 # Here we try to start asynchronously - the effect is things may fail on the
@@ -66,10 +69,10 @@ echo "Copying $FILENAME ($SRCPATH) to $REMOTE (using $SSHREMOTE in $REMOTEDIR)"
 echo "Starting destination side server"
 if [ $DOCOMPRESSION -eq 1 ] ; then
     # Gzip compression:
-    ssh -f $SSHREMOTE "pkill wdt; mkdir -p $REMOTEDIR; cd $REMOTEDIR; rm -f wdtTMP; wdt --minloglevel=$MINLOGLEVEL --port $PORTBASE && cat wdtTMP* | time gzip -d -c > $FILENAME && rm wdtTMP* ; echo 'Complete!';date; echo 'Dst checksum'; md5sum $FILENAME"
+    ssh -f $SSHREMOTE "pkill wdt; mkdir -p $REMOTEDIR; cd $REMOTEDIR; wdt --run_as_daemon=false --minloglevel=$MINLOGLEVEL --start_port $PORTBASE --transfer_id=$TRANSFERID && time gunzip $FILENAME.gz && echo 'Complete!';date; echo 'Dst checksum'; md5sum $FILENAME"
 else
     # No compression:
-    ssh -f $SSHREMOTE "pkill wdt; mkdir -p $REMOTEDIR; cd $REMOTEDIR; rm -f wdtTMP; wdt --minloglevel=$MINLOGLEVEL && cat wdtTMP* > $FILENAME && rm wdtTMP* ; echo 'Complete!';date; echo 'Dst checksum'; md5sum $FILENAME"
+    ssh -f $SSHREMOTE "pkill wdt; mkdir -p $REMOTEDIR; cd $REMOTEDIR; wdt --run_as_daemon=false --minloglevel=$MINLOGLEVEL --start_port $PORTBASE --transfer_id=$TRANSFERID; echo 'Complete!';date; echo 'Dst checksum'; md5sum $FILENAME"
 fi
 #REMOTEPID=$!
 
@@ -78,26 +81,21 @@ START_NANO=`date +%s%N`
 START_MS=`expr $START_NANO / 1000000`
 echo "Starting at `date` ($START_MS)"
 
-# We compress so most likely we'll have less blocks than that
-SPLIT=`expr $SIZE / 48 / 1024 + 1`
-
-if [ $DOCOMPRESSION ] ; then
+if [ $DOCOMPRESSION -eq 1 ] ; then
   # Gzip
-  SPLIT=`expr $SIZE / 48 / 1024 + 1`
-  echo "Compressing $SRCPATH ($SIZE) up to 48 ways ($SPLIT k chunks) in $DIR"
-  time gzip -1 -c $SRCPATH | (cd $DIR ; time split -b ${SPLIT}K - wdtTMP )
+  echo "Compressing $SRCPATH ($SIZE)"
+  time gzip -1 -c $SRCPATH > $DIR/$FILENAME.gz
   # LZ4
   #time lz4 -3 -z $SRCPATH - | (cd $DIR ; time split -b ${SPLIT}K - wdtTMP )
 else
   # No compression
-  SPLIT=`expr $SIZE / 24 / 1024 + 1`
-  echo "Splitting $SRCPATH ($SIZE) 24 ways ($SPLIT kbyte chunks) in $DIR"
-  cat $SRCPATH | (cd $DIR ; time split -b ${SPLIT}K - wdtTMP )
+  ln -s $SRCPATH $DIR/$FILENAME
 fi
 
 date "+%s.%N"
 time wdt --minloglevel=$MINLOGLEVEL --directory $DIR \
-    --destination $REMOTE  --port $PORTBASE --ipv6=false # try both v4 and v6
+    --follow_symlinks --transfer_id=$TRANSFERID\
+    --destination $REMOTE  --start_port $PORTBASE --ipv6=false # try both v4 and v6
 STATUS=$?
 
 END_NANO=`date +%s%N`
@@ -113,7 +111,7 @@ fi
 
 echo "All done client side! cleanup..."
 rm -r $DIR &
-echo -n "e" | nc $REMOTE $PORTBASE
+#echo -n "e" | nc $REMOTE $PORTBASE
 
 echo "Overall transfer @ $RATE Mbytes/sec ($DURATION ms for $SIZE uncompressed)"
 
