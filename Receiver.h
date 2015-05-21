@@ -36,9 +36,12 @@ typedef std::chrono::high_resolution_clock Clock;
 
 class Receiver {
  public:
-  Receiver(int port, int numSockets);
+  /// Constructor that only needs start port and number of ports
+  Receiver(int startPort, int numPorts);
 
-  Receiver(int port, int numSockets, std::string destDir);
+  /// Constructor which also takes the directory where receiver
+  /// will be writing files
+  Receiver(int port, int numSockets, const std::string &destDir);
 
   /// Starts listening on as many ports as possible from the ports
   /// provided in the constructor
@@ -74,6 +77,12 @@ class Receiver {
    * be written in
    */
   void setDir(const std::string &destDir);
+
+  /// Get the dir where receiver is transferring
+  const std::string &getDir();
+
+  /// Get the unique id of this receiver
+  const std::string &getReceiverId();
 
   /// @param receiverId   unique id of this receiver
   void setReceiverId(const std::string &receiverId);

@@ -176,6 +176,18 @@ class Sender {
   /// @param senderId   unique id of the sender
   void setSenderId(const std::string &senderId);
 
+  /// Get the sender id attached to the sender
+  const std::string &getSenderId() const;
+
+  /// Get the ports sender is operating on
+  const std::vector<int32_t> &getPorts() const;
+
+  /// Get the destination sender is sending to
+  const std::string &getDestination() const;
+
+  /// Get the source directory sender is reading from
+  const std::string &getSrcDir() const;
+
   /**
    * @param progressReportIntervalMillis_   interval(ms) between progress
    *                                        reports. A value of 0 indicates no

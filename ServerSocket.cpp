@@ -103,6 +103,17 @@ ErrorCode ServerSocket::listen() {
       listeningFd_ = -1;
       continue;
     }
+    if (port_ == 0) {
+      struct sockaddr_in sin;
+      socklen_t len = sizeof(sin);
+      if (getsockname(listeningFd_, (struct sockaddr *)&sin, &len) == -1) {
+        PLOG(ERROR) << ("getsockname");
+        continue;
+      } else {
+        VLOG(1) << "auto configuring port to " << ntohs(sin.sin_port);
+        port_ = ntohs(sin.sin_port);
+      }
+    }
     VLOG(1) << "Successful bind on " << listeningFd_;
     sa_ = *info;
     break;

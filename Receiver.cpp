@@ -106,12 +106,21 @@ Receiver::Receiver(int port, int numSockets) {
   isJoinable_ = false;
   transferFinished_ = true;
   const auto &options = WdtOptions::get();
+  if (port == 0) {
+    LOG(INFO) << "Auto configure mode. Selecting ephemeral ports";
+    for (int i = 0; i < numSockets; i++) {
+      ServerSocket socket(0, options.backlog);
+      WDT_CHECK(socket.listen() == OK);
+      threadServerSockets_.push_back(std::move(socket));
+    }
+    return;
+  }
   for (int i = 0; i < numSockets; i++) {
     threadServerSockets_.emplace_back(port + i, options.backlog);
   }
 }
 
-Receiver::Receiver(int port, int numSockets, std::string destDir)
+Receiver::Receiver(int port, int numSockets, const std::string &destDir)
     : Receiver(port, numSockets) {
   this->destDir_ = destDir;
 }
@@ -145,6 +154,14 @@ int32_t Receiver::registerPorts(bool stopOnFailure) {
 
 void Receiver::setDir(const std::string &destDir) {
   destDir_ = destDir;
+}
+
+const std::string &Receiver::getDir() {
+  return destDir_;
+}
+
+const std::string &Receiver::getReceiverId() {
+  return receiverId_;
 }
 
 void Receiver::setReceiverId(const std::string &receiverId) {
@@ -466,7 +483,6 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
 
   data.reset();
   socket.closeCurrentConnection();
-
   auto timeout = options.accept_timeout_millis;
   int acceptAttempts = 0;
   while (true) {

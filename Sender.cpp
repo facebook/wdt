@@ -169,6 +169,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir,
 
 Sender::~Sender() {
   if (!isTransferFinished()) {
+    LOG(WARNING) << "Sender being deleted. Forcefully aborting the transfer";
     abort();
     finish();
   }
@@ -203,6 +204,22 @@ void Sender::setSenderId(const std::string &senderId) {
   WDT_CHECK(senderId.length() <= Protocol::kMaxTransferIdLength);
   senderId_ = senderId;
   LOG(INFO) << "sender id " << senderId_;
+}
+
+const std::string &Sender::getSenderId() const {
+  return senderId_;
+}
+
+const std::vector<int32_t> &Sender::getPorts() const {
+  return ports_;
+}
+
+const std::string &Sender::getSrcDir() const {
+  return srcDir_;
+}
+
+const std::string &Sender::getDestination() const {
+  return destHost_;
 }
 
 void Sender::setProgressReporter(
