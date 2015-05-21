@@ -203,6 +203,7 @@ class Sender {
     SEND_SETTINGS,
     SEND_BLOCKS,
     SEND_DONE_CMD,
+    SEND_SIZE_CMD,
     CHECK_FOR_ABORT,
     READ_RECEIVER_CMD,
     PROCESS_DONE_CMD,
@@ -221,6 +222,7 @@ class Sender {
     std::unique_ptr<Throttler> throttler_;
     std::unique_ptr<ClientSocket> socket_;
     char buf_[Protocol::kMinBufLength];
+    bool totalSizeSent_{false};
     ThreadData(int threadIndex, DirectorySourceQueue &queue,
                TransferStats &threadStats,
                std::vector<ThreadTransferHistory> &transferHistories)
@@ -285,6 +287,13 @@ class Sender {
    *               READ_RECEIVER_CMD(success)
    */
   SenderState sendDoneCmd(ThreadData &data);
+  /**
+   * sends size cmd to the receiver
+   * Previous states : SEND_BLOCKS
+   * Next states : CHECK_FOR_ABORT(failure),
+   *               SEND_BLOCKS(success)
+   */
+  SenderState sendSizeCmd(ThreadData &data);
   /**
    * checks to see if the receiver has sent ABORT or not
    * Previous states : SEND_BLOCKS,

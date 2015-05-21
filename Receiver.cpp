@@ -26,6 +26,11 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
   return os;
 }
 
+template <typename T>
+double durationSeconds(T d) {
+  return std::chrono::duration_cast<std::chrono::duration<double>>(d).count();
+}
+
 size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
                    ssize_t len) {
   VLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
@@ -77,9 +82,9 @@ const Receiver::StateFunction Receiver::stateMap_[] = {
     &Receiver::acceptWithTimeout, &Receiver::sendLocalCheckpoint,
     &Receiver::readNextCmd, &Receiver::processFileCmd,
     &Receiver::processExitCmd, &Receiver::processSettingsCmd,
-    &Receiver::processDoneCmd, &Receiver::sendGlobalCheckpoint,
-    &Receiver::sendDoneCmd, &Receiver::sendAbortCmd,
-    &Receiver::waitForFinishOrNewCheckpoint,
+    &Receiver::processDoneCmd, &Receiver::processSizeCmd,
+    &Receiver::sendGlobalCheckpoint, &Receiver::sendDoneCmd,
+    &Receiver::sendAbortCmd, &Receiver::waitForFinishOrNewCheckpoint,
     &Receiver::waitForFinishWithThreadError};
 
 void Receiver::addCheckpoint(Checkpoint checkpoint) {
@@ -109,6 +114,11 @@ Receiver::Receiver(int port, int numSockets) {
 Receiver::Receiver(int port, int numSockets, std::string destDir)
     : Receiver(port, numSockets) {
   this->destDir_ = destDir;
+}
+
+void Receiver::setProgressReporter(
+    std::unique_ptr<ProgressReporter> &progressReporter) {
+  progressReporter_ = std::move(progressReporter);
 }
 
 int32_t Receiver::registerPorts(bool stopOnFailure) {
@@ -168,15 +178,15 @@ vector<int32_t> Receiver::getPorts() {
 }
 
 bool Receiver::hasPendingTransfer() {
-  std::unique_lock<std::mutex> lock(transferInstanceMutex_);
+  std::unique_lock<std::mutex> lock(mutex_);
   return !transferFinished_;
 }
 
 void Receiver::markTransferFinished(bool isFinished) {
-  std::unique_lock<std::mutex> lock(transferInstanceMutex_);
+  std::unique_lock<std::mutex> lock(mutex_);
   transferFinished_ = isFinished;
   if (isFinished) {
-    conditionRecvFinished_.notify_all();
+    conditionRecvFinished_.notify_one();
   }
 }
 
@@ -211,6 +221,12 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     report->setErrorCode(OK);
   }
 
+  if (progressReporter_ && totalSenderBytes_ >= 0) {
+    report->setTotalFileSize(totalSenderBytes_);
+    report->setTotalTime(durationSeconds(Clock::now() - startTime_));
+    progressReporter_->end(report);
+  }
+
   LOG(WARNING) << "WDT receiver's transfer has been finished";
   LOG(INFO) << *report;
   receiverThreads_.clear();
@@ -220,6 +236,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
 }
 
 ErrorCode Receiver::transferAsync() {
+  const auto &options = WdtOptions::get();
   if (hasPendingTransfer()) {
     // finish is the only method that should be able to
     // change the value of transferFinished_
@@ -228,6 +245,11 @@ ErrorCode Receiver::transferAsync() {
     return ERROR;
   }
   isJoinable_ = true;
+  int progressReportIntervalMillis = options.progress_report_interval_millis;
+  if (!progressReporter_ && progressReportIntervalMillis > 0) {
+    // if progress reporter has not been set, use the default one
+    progressReporter_ = folly::make_unique<ProgressReporter>();
+  }
   start();
   return OK;
 }
@@ -254,48 +276,51 @@ void Receiver::progressTracker() {
   const auto &options = WdtOptions::get();
   // Progress tracker will check for progress after the time specified
   // in milliseconds.
-  int progressTrackIntervalMillis = options.timeout_check_interval_millis;
-  // The number of failed progress checks after which the threads
-  // should be stopped
-  int numFailedProgressChecks = options.failed_timeout_checks;
-  if (progressTrackIntervalMillis <= 0 || !isJoinable_) {
+  int progressReportIntervalMillis = options.progress_report_interval_millis;
+  int throughputUpdateInterval = WdtOptions::get().throughput_update_interval;
+  if (progressReportIntervalMillis <= 0 || throughputUpdateInterval < 0 ||
+      !isJoinable_) {
     return;
   }
-  LOG(INFO) << "Progress tracker started. Will check every"
-            << " " << progressTrackIntervalMillis << " ms"
-            << " and fail after " << numFailedProgressChecks << " checks";
-  auto waitingTime = std::chrono::milliseconds(progressTrackIntervalMillis);
-  size_t totalBytes = 0;
-  int64_t zeroProgressCount = 0;
-  bool done = false;
+
+  int64_t lastEffectiveBytes = 0;
+  std::chrono::time_point<Clock> lastUpdateTime = Clock::now();
+  int intervalsSinceLastUpdate = 0;
+  double currentThroughput = 0;
+
+  LOG(INFO) << "Progress reporter tracking every "
+            << progressReportIntervalMillis << " ms";
+  auto waitingTime = std::chrono::milliseconds(progressReportIntervalMillis);
+  int64_t totalSenderBytes;
   while (true) {
     {
-      std::unique_lock<std::mutex> lock(transferInstanceMutex_);
+      std::unique_lock<std::mutex> lock(mutex_);
       conditionRecvFinished_.wait_for(lock, waitingTime);
-      done = transferFinished_;
+      if (transferFinished_) {
+        break;
+      }
+      if (totalSenderBytes_ == -1) {
+        continue;
+      }
+      totalSenderBytes = totalSenderBytes_;
     }
-    if (done) {
-      break;
+    double totalTime = durationSeconds(Clock::now() - startTime_);
+    auto transferReport = folly::make_unique<TransferReport>(
+        threadStats_, totalTime, totalSenderBytes);
+    intervalsSinceLastUpdate++;
+    if (intervalsSinceLastUpdate >= throughputUpdateInterval) {
+      auto curTime = Clock::now();
+      int64_t curEffectiveBytes =
+          transferReport->getSummary().getEffectiveDataBytes();
+      double time = durationSeconds(curTime - lastUpdateTime);
+      currentThroughput = (curEffectiveBytes - lastEffectiveBytes) / time;
+      lastEffectiveBytes = curEffectiveBytes;
+      lastUpdateTime = curTime;
+      intervalsSinceLastUpdate = 0;
     }
-    size_t currentTotalBytes = 0;
-    for (int i = 0; i < threadStats_.size(); i++) {
-      currentTotalBytes += threadStats_[i].getTotalBytes();
-    }
-    size_t deltaBytes = currentTotalBytes - totalBytes;
-    totalBytes = currentTotalBytes;
-    if (deltaBytes == 0) {
-      zeroProgressCount++;
-    } else {
-      zeroProgressCount = 0;
-    }
-    VLOG(2) << "Progress Tracker : Number of bytes received since last call "
-            << deltaBytes;
-    if (zeroProgressCount > numFailedProgressChecks) {
-      LOG(INFO) << "No progress for the last " << numFailedProgressChecks
-                << " checks. Shutting down the transfer";
-      cancelTransfer();
-      return;
-    }
+    transferReport->setCurrentThroughput(currentThroughput);
+
+    progressReporter_->progress(transferReport);
   }
 }
 
@@ -324,8 +349,13 @@ void Receiver::start() {
                                   std::ref(threadServerSockets_[i]), bufferSize,
                                   std::ref(threadStats_[i]));
   }
-  std::thread trackerThread(&Receiver::progressTracker, this);
-  progressTrackerThread_ = std::move(trackerThread);
+  if (isJoinable_) {
+    if (progressReporter_) {
+      progressReporter_->start();
+    }
+    std::thread trackerThread(&Receiver::progressTracker, this);
+    progressTrackerThread_ = std::move(trackerThread);
+  }
 }
 
 bool Receiver::areAllThreadsFinished(bool checkpointAdded) {
@@ -374,6 +404,7 @@ bool Receiver::hasNewSessionStarted(ThreadData &data) {
 void Receiver::startNewGlobalSession() {
   WDT_CHECK(transferStartedCount_ == transferFinishedCount_);
   transferStartedCount_++;
+  startTime_ = Clock::now();
   LOG(INFO) << "New transfer started " << transferStartedCount_;
 }
 
@@ -578,6 +609,9 @@ Receiver::ReceiverState Receiver::readNextCmd(ThreadData &data) {
   }
   if (cmd == Protocol::SETTINGS_CMD) {
     return PROCESS_SETTINGS_CMD;
+  }
+  if (cmd == Protocol::SIZE_CMD) {
+    return PROCESS_SIZE_CMD;
   }
   LOG(ERROR) << "received an unknown cmd";
   threadStats.setErrorCode(PROTOCOL_ERROR);
@@ -881,6 +915,27 @@ Receiver::ReceiverState Receiver::processDoneCmd(ThreadData &data) {
   std::unique_lock<std::mutex> lock(mutex_);
   numBlocksSend_ = numBlocksSend;
   return WAIT_FOR_FINISH_OR_NEW_CHECKPOINT;
+}
+
+Receiver::ReceiverState Receiver::processSizeCmd(ThreadData &data) {
+  VLOG(1) << "entered PROCESS_SIZE_CMD state " << data.threadIndex_;
+  auto &threadStats = data.threadStats_;
+  auto &numRead = data.numRead_;
+  auto &off = data.off_;
+  auto &oldOffset = data.oldOffset_;
+  char *buf = data.getBuf();
+  std::lock_guard<std::mutex> lock(mutex_);
+  bool success = Protocol::decodeSize(buf, off, oldOffset + Protocol::kMaxSize,
+                                      totalSenderBytes_);
+  if (!success) {
+    LOG(ERROR) << "Unable to decode size cmd";
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
+  }
+  VLOG(1) << "Number of bytes to receive " << totalSenderBytes_;
+  auto msgLen = off - oldOffset;
+  numRead -= msgLen;
+  return READ_NEXT_CMD;
 }
 
 Receiver::ReceiverState Receiver::sendGlobalCheckpoint(ThreadData &data) {

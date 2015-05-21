@@ -23,6 +23,7 @@ class Protocol {
     SETTINGS_CMD = 0x53,  // S)ettings
     ABORT_CMD = 0x41,     // A)bort
     EXIT_CMD = 0x65,      // e)xit
+    SIZE_CMD = 0x5A,      // Si(Z)e
   };
 
   /// Max size of sender or receiver id
@@ -35,6 +36,8 @@ class Protocol {
   static const size_t kMaxLocalCheckpoint = 10 + 2 * 10;
   /// max size of done command encoding
   static const size_t kMaxDone = 2 + 10;
+  /// max length of the size cmd encoding
+  static const size_t kMaxSize = 1 + 10;
   /// max size of settings command encoding
   static const size_t kMaxSettings = 1 + 4 * 10 + kMaxTransferIdLength;
 
@@ -92,6 +95,18 @@ class Protocol {
                              int64_t &readTimeoutMillis,
                              int64_t &writeTimeoutMillis,
                              std::string &senderId);
+
+  /// encodes totalNumBytes into dest+off
+  /// moves the off into dest pointer, not going past max
+  /// @return false if there isn't enough room to encode
+  static bool encodeSize(char *dest, size_t &off, size_t max,
+                         int64_t totalNumBytes);
+
+  /// decodes from src+off and consumes/moves off but not past max
+  /// sets totalNumBytes
+  /// @return false if there isn't enough data in src+off to src+max
+  static bool decodeSize(char *src, size_t &off, size_t max,
+                         int64_t &totalNumBytes);
 };
 }
 }  // namespace facebook::wdt

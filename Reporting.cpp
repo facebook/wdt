@@ -157,7 +157,6 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
     if (numOfDirToPrint < report.failedDirectories_.size()) {
       os << "more...(" << report.failedDirectories_.size() - numOfDirToPrint
          << " directories)";
-      ;
     }
   }
   return os;

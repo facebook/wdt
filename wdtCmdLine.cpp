@@ -48,7 +48,7 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
-  google::SetArgv(argc, const_cast<const char**>(argv));
+  google::SetArgv(argc, const_cast<const char **>(argv));
   google::SetVersionString(WDT_VERSION_STR);
   std::string usage("WDT Warp-speed Data Transfer. version ");
   usage.append(google::VersionString());

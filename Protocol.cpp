@@ -112,6 +112,30 @@ bool Protocol::decodeDone(char *src, size_t &off, size_t max,
   return true;
 }
 
+bool Protocol::encodeSize(char *dest, size_t &off, size_t max,
+                          int64_t totalNumBytes) {
+  off += folly::encodeVarint(totalNumBytes, (uint8_t *)dest + off);
+  WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
+  return true;
+}
+
+bool Protocol::decodeSize(char *src, size_t &off, size_t max,
+                          int64_t &totalNumBytes) {
+  folly::ByteRange br((uint8_t *)(src + off), max);
+  try {
+    totalNumBytes = folly::decodeVarint(br);
+  } catch (const std::exception &ex) {
+    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    return false;
+  }
+  off = br.start() - (uint8_t *)src;
+  if (off > max) {
+    LOG(ERROR) << "Read past the end:" << off << " " << max;
+    return false;
+  }
+  return true;
+}
+
 bool Protocol::encodeSettings(char *dest, size_t &off, size_t max,
                               int32_t protocolVersion,
                               int64_t readTimeoutMillis,

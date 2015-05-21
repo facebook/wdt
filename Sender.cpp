@@ -135,9 +135,9 @@ void ThreadTransferHistory::markSourceAsFailed(
 
 const Sender::StateFunction Sender::stateMap_[] = {
     &Sender::connect, &Sender::readLocalCheckPoint, &Sender::sendSettings,
-    &Sender::sendBlocks, &Sender::sendDoneCmd, &Sender::checkForAbort,
-    &Sender::readReceiverCmd, &Sender::processDoneCmd, &Sender::processWaitCmd,
-    &Sender::processErrCmd, &Sender::processAbortCmd};
+    &Sender::sendBlocks, &Sender::sendDoneCmd, &Sender::sendSizeCmd,
+    &Sender::checkForAbort, &Sender::readReceiverCmd, &Sender::processDoneCmd,
+    &Sender::processWaitCmd, &Sender::processErrCmd, &Sender::processAbortCmd};
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   destHost_ = destHost;
@@ -482,6 +482,9 @@ Sender::SenderState Sender::connect(ThreadData &data) {
     threadStats.setErrorCode(code);
     return END;
   }
+  // clearing the totalSizeSent_ flag. This way if anything breaks, we resendthe
+  // total size.
+  data.totalSizeSent_ = false;
   auto nextState =
       threadStats.getErrorCode() == OK ? SEND_SETTINGS : READ_LOCAL_CHECKPOINT;
   // clear the error code, as this is a new transfer
@@ -569,6 +572,11 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
   TransferStats &threadStats = data.threadStats_;
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
   DirectorySourceQueue &queue = data.queue_;
+  auto &totalSizeSent = data.totalSizeSent_;
+
+  if (!totalSizeSent && queue.fileDiscoveryFinished()) {
+    return SEND_SIZE_CMD;
+  }
 
   ErrorCode transferStatus;
   std::unique_ptr<ByteSource> source = queue.getNextSource(transferStatus);
@@ -594,6 +602,28 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
     queue.returnToQueue(source);
     return CHECK_FOR_ABORT;
   }
+  return SEND_BLOCKS;
+}
+
+Sender::SenderState Sender::sendSizeCmd(ThreadData &data) {
+  VLOG(1) << "entered SEND_SIZE_CMD state " << data.threadIndex_;
+  TransferStats &threadStats = data.threadStats_;
+  char *buf = data.buf_;
+  auto &socket = data.socket_;
+  auto &queue = data.queue_;
+  auto &totalSizeSent = data.totalSizeSent_;
+  size_t off = 0;
+  buf[off++] = Protocol::SIZE_CMD;
+
+  Protocol::encodeSize(buf, off, Protocol::kMaxSize, queue.getTotalSize());
+  ssize_t written = socket->write(buf, off);
+  if (written != off) {
+    LOG(ERROR) << "Socket write error " << off << " " << written;
+    threadStats.setErrorCode(SOCKET_WRITE_ERROR);
+    return CHECK_FOR_ABORT;
+  }
+  threadStats.addHeaderBytes(off);
+  totalSizeSent = true;
   return SEND_BLOCKS;
 }
 
@@ -973,8 +1003,6 @@ void Sender::reportProgress() {
   double currentThroughput = 0;
 
   auto waitingTime = std::chrono::milliseconds(progressReportIntervalMillis_);
-  bool done = false;
-  int numSockets = ports_.size();
   LOG(INFO) << "Progress reporter tracking every "
             << progressReportIntervalMillis_ << " ms";
   while (true) {

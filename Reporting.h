@@ -319,6 +319,12 @@ class TransferReport {
   void setErrorCode(ErrorCode errCode) {
     summary_.setErrorCode(errCode);
   }
+  void setTotalTime(double totalTime) {
+    totalTime_ = totalTime;
+  }
+  void setTotalFileSize(size_t totalFileSize) {
+    totalFileSize_ = totalFileSize;
+  }
   friend std::ostream &operator<<(std::ostream &os,
                                   const TransferReport &report);
 

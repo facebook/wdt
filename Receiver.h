@@ -27,9 +27,12 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+#include <chrono>
 
 namespace facebook {
 namespace wdt {
+
+typedef std::chrono::high_resolution_clock Clock;
 
 class Receiver {
  public:
@@ -100,6 +103,9 @@ class Receiver {
    */
   std::vector<int32_t> getPorts();
 
+  /// @param progressReporter     progress reporter to be used
+  void setProgressReporter(std::unique_ptr<ProgressReporter> &progressReporter);
+
  protected:
   /// receiver state
   enum ReceiverState {
@@ -112,6 +118,7 @@ class Receiver {
     PROCESS_EXIT_CMD,
     PROCESS_SETTINGS_CMD,
     PROCESS_DONE_CMD,
+    PROCESS_SIZE_CMD,
     SEND_GLOBAL_CHECKPOINTS,
     SEND_DONE_CMD,
     SEND_ABORT_CMD,
@@ -249,6 +256,7 @@ class Receiver {
    *               PROCESS_EXIT_CMD,
    *               PROCESS_DONE_CMD,
    *               PROCESS_SETTINGS_CMD,
+   *               PROCESS_SIZE_CMD,
    *               ACCEPT_WITH_TIMEOUT(in case of read failure),
    *               WAIT_FOR_FINISH_WITH_THREAD_ERROR(in case of protocol errors)
    */
@@ -284,6 +292,13 @@ class Receiver {
    *               SEND_GLOBAL_CHECKPOINTS(if there are global errors)
    */
   ReceiverState processDoneCmd(ThreadData &data);
+  /**
+   * processes size cmd. Sets the value of totalSenderBytes_
+   * Previous states : READ_NEXT_CMD,
+   * Next states : READ_NEXT_CMD(success),
+   *               WAIT_FOR_FINISH_WITH_THREAD_ERROR(protocol error)
+   */
+  ReceiverState processSizeCmd(ThreadData &data);
   /**
    * sends global checkpoints to sender
    * Previous states : PROCESS_DONE_CMD,
@@ -366,10 +381,8 @@ class Receiver {
                   TransferStats &threadStats);
 
   /**
-   * The background process that will keep on running and monitor the
-   * the progress made by all the threads. If there is no progress for
-   * a significant period of time (specified by parameters), then the
-   * the connection is broken off and threads finish
+   * Periodically calculates current transfer report and send it to progress
+   * reporter. This only works in the single transfer mode.
    */
   void progressTracker();
 
@@ -417,6 +430,8 @@ class Receiver {
 
   /// The thread that is responsible for calling running the progress tracker
   std::thread progressTrackerThread_;
+  /// Holds the instance of the progress reporter default or customized
+  std::unique_ptr<ProgressReporter> progressReporter_;
   /**
    * Flag set by the finish() method when the receiver threads are joined.
    * No transfer can be started as long as this flag is false.
@@ -440,9 +455,6 @@ class Receiver {
    * condition variable.
    */
   std::condition_variable conditionRecvFinished_;
-  /// The global thread for one instance of transfer. Only applicable
-  /// when the process is joinable
-  std::mutex transferInstanceMutex_;
   /**
    * The instance of the receiver threads are stored in this vector.
    * This will not be destroyed until this object is destroyed, hence
@@ -481,6 +493,12 @@ class Receiver {
 
   /// a counter incremented each time a new session ends
   uint64_t transferFinishedCount_{0};
+
+  /// total number of data bytes sender wants to transfer
+  int64_t totalSenderBytes_{-1};
+
+  /// start time of the session
+  std::chrono::time_point<Clock> startTime_;
 
   /// mutex to guard all the shared variables
   mutable std::mutex mutex_;

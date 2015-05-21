@@ -101,11 +101,6 @@ WDT_OPT(throttler_log_time_millis, int64,
 WDT_OPT(progress_report_interval_millis, int32,
         "Interval(ms) between progress reports. If the value is 0, no "
         "progress reporting is done");
-WDT_OPT(timeout_check_interval_millis, int32,
-        "Interval(ms) between timeout checks");
-WDT_OPT(failed_timeout_checks, int32,
-        "Number of failed timeout checks after which receiver "
-        "shall terminate");
 WDT_OPT(full_reporting, bool,
         "If true, transfer stats for successfully transferred files "
         "are included in the report");

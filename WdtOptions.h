@@ -138,16 +138,6 @@ class WdtOptions {
   int progress_report_interval_millis{20};
 
   /**
-   * Timeout checks will be done at this interval (milliseconds)
-   */
-  int timeout_check_interval_millis{1000};
-
-  /**
-   * Number of failed timeout checks after which receiver should terminate
-   */
-  int failed_timeout_checks{100};
-
-  /**
    * block size, it is used to break bigger files into smaller chunks
    * block_size of <= 0 disables block transfer
    */
