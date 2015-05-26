@@ -134,3 +134,5 @@ WDT_OPT(disk_sync_interval_mb, double,
 WDT_OPT(throughput_update_interval, int32,
         "Number of intervals after which"
         " progress reporter updates current throughput");
+WDT_OPT(enable_checksum, bool,
+        "If true, blocks are checksumed during transfer");

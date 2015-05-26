@@ -35,6 +35,7 @@ set(BUILD_SHARED_LIBS on CACHE Bool "build shared libs")
 # set(CMAKE_BUILD_TYPE Release CACHE String "build type")
 # So hardcoding for now:
 set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_FLAGS_RELEASE "-msse4.2")
 
 
 # Check that we have the Folly source tree
@@ -56,6 +57,7 @@ set (FOLLY_CPP_SRC
 ${FOLLY_SOURCE_DIR}/folly/Conv.cpp
 ${FOLLY_SOURCE_DIR}/folly/Demangle.cpp
 ${FOLLY_SOURCE_DIR}/folly/Malloc.cpp
+${FOLLY_SOURCE_DIR}/folly/Checksum.cpp
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
@@ -73,6 +75,7 @@ ServerSocket.cpp
 SocketUtils.cpp
 Throttler.cpp
 WdtOptions.cpp
+FileWriter.cpp
 )
 add_library(wdtlib
 WdtFlags.cpp
@@ -227,9 +230,5 @@ if (BUILD_TESTING)
   add_executable(protocol_test ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
   add_test(AllTestsInProtocolTest protocol_test)
-
-  add_executable(sender_test SenderTest.cpp)
-  target_link_libraries(sender_test wdt4tests)
-  add_test(AllTestsInSenderTest sender_test)
 
 endif(BUILD_TESTING)

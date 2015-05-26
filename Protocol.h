@@ -17,6 +17,16 @@ class Protocol {
   /// current protocol version
   static const int protocol_version;
 
+  // list of feature versions
+  /// version from which receiver side progress reporting is supported
+  static const int RECEIVER_PROGRESS_REPORT_VERSION;
+  /// version from which checksum is supported
+  static const int CHECKSUM_VERSION;
+
+  // list of encoding/decoding versions
+  /// version from which flags are sent with settings cmd
+  static const int SETTINGS_FLAG_VERSION;
+
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
     DONE_CMD = 0x44,      // D)one
@@ -27,6 +37,7 @@ class Protocol {
     ABORT_CMD = 0x41,     // A)bort
     EXIT_CMD = 0x65,      // e)xit
     SIZE_CMD = 0x5A,      // Si(Z)e
+    FOOTER_CMD = 0x46,    // F)ooter
   };
 
   /// Max size of sender or receiver id
@@ -37,12 +48,15 @@ class Protocol {
   static const size_t kMinBufLength = 256;
   /// max size of local checkpoint encoding
   static const size_t kMaxLocalCheckpoint = 10 + 2 * 10;
-  /// max size of done command encoding
+  /// max size of done command encoding(1 byte for cmd, 1 for status, 10 for
+  /// number of blocks)
   static const size_t kMaxDone = 2 + 10;
   /// max length of the size cmd encoding
   static const size_t kMaxSize = 1 + 10;
   /// max size of settings command encoding
-  static const size_t kMaxSettings = 1 + 4 * 10 + kMaxTransferIdLength;
+  static const size_t kMaxSettings = 1 + 4 * 10 + kMaxTransferIdLength + 1;
+  /// max length of the footer cmd encoding
+  static const size_t kMaxFooter = 1 + 10;
 
   /**
    * Decides whether the current running wdt version can support the request
@@ -94,22 +108,25 @@ class Protocol {
   static bool decodeDone(char *src, size_t &off, size_t max,
                          int64_t &numBlocks);
 
-  /// encodes protocol version, read and write timeout, sender-id into dest+off
+  /// encodes protocol version, read and write timeout, sender-id and
+  /// enable_checsum into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static bool encodeSettings(char *dest, size_t &off, size_t max,
-                             int32_t protocolVersion, int64_t readTimeoutMillis,
+  static bool encodeSettings(int senderProtocolVersion, char *dest, size_t &off,
+                             size_t max, int64_t readTimeoutMillis,
                              int64_t writeTimeoutMillis,
-                             const std::string &senderId);
+                             const std::string &senderId, bool enableChecksum);
 
   /// decodes from src+off and consumes/moves off but not past max
-  /// sets protocolVersion, readTimeoutMillis, writeTimeoutMillis and senderId
+  /// sets protocolVersion, readTimeoutMillis, writeTimeoutMillis, senderId and
+  /// enable_checksum
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeSettings(char *src, size_t &off, size_t max,
-                             int32_t &protocolVersion,
+  static bool decodeSettings(int receiverProtocolVersion, char *src,
+                             size_t &off, size_t max,
+                             int32_t &senderProtocolVersion,
                              int64_t &readTimeoutMillis,
-                             int64_t &writeTimeoutMillis,
-                             std::string &senderId);
+                             int64_t &writeTimeoutMillis, std::string &senderId,
+                             bool &enableChecksum);
 
   /// encodes totalNumBytes into dest+off
   /// moves the off into dest pointer, not going past max
@@ -123,15 +140,17 @@ class Protocol {
   static bool decodeSize(char *src, size_t &off, size_t max,
                          int64_t &totalNumBytes);
 
-  /**
-   * Determines whether receiver side progress reporting is supported based on
-   * protocol version
-   *
-   * @param protocolVersion   protocol-version
-   *
-   * @return                  If supported returns true, else returns false
-   */
-  static bool isReceiverProgressReportingSupported(int protocolVersion);
+  /// encodes checksum into dest+off
+  /// moves the off into dest pointer, not going past max
+  /// @return false if there isn't enough room to encode
+  static bool encodeFooter(char *dest, size_t &off, size_t max,
+                           uint32_t checksum);
+
+  /// decodes from src+off and consumes/moves off but not past max
+  /// sets checksum
+  /// @return false if there isn't enough data in src+off to src+max
+  static bool decodeFooter(char *src, size_t &off, size_t max,
+                           uint32_t &checksum);
 };
 }
 }  // namespace facebook::wdt

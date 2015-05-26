@@ -10,7 +10,12 @@
 
 using namespace facebook::wdt;
 
-const int Protocol::protocol_version = 11;
+const int Protocol::protocol_version = 12;
+
+const int Protocol::RECEIVER_PROGRESS_REPORT_VERSION = 11;
+const int Protocol::CHECKSUM_VERSION = 12;
+
+const int Protocol::SETTINGS_FLAG_VERSION = 12;
 
 int Protocol::negotiateProtocol(int requestedProtocolVersion) {
   if (requestedProtocolVersion < 10) {
@@ -147,35 +152,49 @@ bool Protocol::decodeSize(char *src, size_t &off, size_t max,
   return true;
 }
 
-bool Protocol::encodeSettings(char *dest, size_t &off, size_t max,
-                              int32_t protocolVersion,
+bool Protocol::encodeSettings(int senderProtocolVersion, char *dest,
+                              size_t &off, size_t max,
                               int64_t readTimeoutMillis,
                               int64_t writeTimeoutMillis,
-                              const std::string &senderId) {
-  off += folly::encodeVarint(protocolVersion, (uint8_t *)dest + off);
+                              const std::string &senderId,
+                              bool enableChecksum) {
+  off += folly::encodeVarint(senderProtocolVersion, (uint8_t *)dest + off);
   off += folly::encodeVarint(readTimeoutMillis, (uint8_t *)dest + off);
   off += folly::encodeVarint(writeTimeoutMillis, (uint8_t *)dest + off);
   size_t idLen = senderId.size();
   off += folly::encodeVarint(idLen, (uint8_t *)dest + off);
   memcpy(dest + off, senderId.data(), idLen);
   off += idLen;
+  if (senderProtocolVersion >= SETTINGS_FLAG_VERSION) {
+    uint8_t flags = 0;
+    if (enableChecksum) {
+      flags |= 1;
+    }
+    dest[off++] = flags;
+  }
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
   return true;
 }
 
-bool Protocol::decodeSettings(char *src, size_t &off, size_t max,
-                              int32_t &protocolVersion,
+bool Protocol::decodeSettings(int receiverProtocolVersion, char *src,
+                              size_t &off, size_t max,
+                              int32_t &senderProtocolVersion,
                               int64_t &readTimeoutMillis,
                               int64_t &writeTimeoutMillis,
-                              std::string &senderId) {
+                              std::string &senderId, bool &enableChecksum) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    protocolVersion = folly::decodeVarint(br);
+    senderProtocolVersion = folly::decodeVarint(br);
     readTimeoutMillis = folly::decodeVarint(br);
     writeTimeoutMillis = folly::decodeVarint(br);
     size_t idLen = folly::decodeVarint(br);
     senderId.assign((const char *)(br.start()), idLen);
     br.advance(idLen);
+    if (receiverProtocolVersion >= SETTINGS_FLAG_VERSION) {
+      uint8_t flags = br.front();
+      enableChecksum = flags & 1;
+      br.pop_front();
+    }
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
@@ -188,6 +207,26 @@ bool Protocol::decodeSettings(char *src, size_t &off, size_t max,
   return true;
 }
 
-bool Protocol::isReceiverProgressReportingSupported(int protocolVersion) {
-  return protocolVersion >= 11;
+bool Protocol::encodeFooter(char *dest, size_t &off, size_t max,
+                            uint32_t checksum) {
+  off += folly::encodeVarint(checksum, (uint8_t *)dest + off);
+  WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
+  return true;
+}
+
+bool Protocol::decodeFooter(char *src, size_t &off, size_t max,
+                            uint32_t &checksum) {
+  folly::ByteRange br((uint8_t *)(src + off), max);
+  try {
+    checksum = folly::decodeVarint(br);
+  } catch (const std::exception &ex) {
+    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    return false;
+  }
+  off = br.start() - (uint8_t *)src;
+  if (off > max) {
+    LOG(ERROR) << "Read past the end:" << off << " " << max;
+    return false;
+  }
+  return true;
 }

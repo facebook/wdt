@@ -188,6 +188,11 @@ class WdtOptions {
   int throughput_update_interval{50};
 
   /**
+   * Flag for turning on/off checksum
+   */
+  bool enable_checksum{true};
+
+  /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted
    */

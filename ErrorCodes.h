@@ -21,7 +21,8 @@ namespace wdt {
   X(MEMORY_ALLOCATION_ERROR) /** Memory allocation failure  */          \
   X(PROTOCOL_ERROR)          /** WDT protocol error  */                 \
   X(VERSION_MISMATCH)        /** Sender and Receiver version mimatch */ \
-  X(ID_MISMATCH)             /** Sender and Receiver id mismatch*/
+  X(ID_MISMATCH)             /** Sender and Receiver id mismatch*/      \
+  X(CHECKSUM_MISMATCH)       /** Checksums do not match */
 
 enum ErrorCode {
 #define X(A) A,

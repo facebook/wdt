@@ -10,7 +10,7 @@ if [ -z $TEST_COUNT ]; then
   TEST_COUNT=1
 fi
 
-WDTBIN_OPTS="-minloglevel=0 -num_ports=8"
+WDTBIN_OPTS="-minloglevel=0 -num_ports=8 -enable_checksum=false"
 if [ -z "$1" ]; then
   WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 else

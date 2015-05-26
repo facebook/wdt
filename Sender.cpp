@@ -10,6 +10,8 @@
 #include <folly/Bits.h>
 #include <folly/ScopeGuard.h>
 #include <sys/stat.h>
+#include <folly/Checksum.h>
+
 #include <thread>
 
 // Constants for different calculations
@@ -577,9 +579,9 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   size_t off = 0;
   buf[off++] = Protocol::SETTINGS_CMD;
 
-  bool success = Protocol::encodeSettings(buf, off, Protocol::kMaxSettings,
-                                          protocolVersion_, readTimeoutMillis,
-                                          writeTimeoutMillis, senderId_);
+  bool success = Protocol::encodeSettings(
+      protocolVersion_, buf, off, Protocol::kMaxSettings, readTimeoutMillis,
+      writeTimeoutMillis, senderId_, options.enable_checksum);
   WDT_CHECK(success);
   ssize_t written = socket->write(buf, off);
   if (written != off) {
@@ -598,7 +600,7 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
   DirectorySourceQueue &queue = data.queue_;
   auto &totalSizeSent = data.totalSizeSent_;
 
-  if (Protocol::isReceiverProgressReportingSupported(protocolVersion_) &&
+  if (protocolVersion_ >= Protocol::RECEIVER_PROGRESS_REPORT_VERSION &&
       !totalSizeSent && queue.fileDiscoveryFinished()) {
     return SEND_SIZE_CMD;
   }
@@ -918,6 +920,7 @@ TransferStats Sender::sendOneByteSource(
     const std::unique_ptr<ByteSource> &source, const size_t totalBytes,
     ErrorCode transferStatus) {
   TransferStats stats;
+  auto &options = WdtOptions::get();
   char headerBuf[Protocol::kMaxHeader];
   size_t off = 0;
   headerBuf[off++] = Protocol::FILE_CMD;
@@ -944,6 +947,7 @@ TransferStats Sender::sendOneByteSource(
   stats.addHeaderBytes(written);
   VLOG(3) << "Sent " << written << " on " << socket->getFd() << " : "
           << folly::humanify(std::string(headerBuf, off));
+  uint32_t checksum = 0;
   while (!source->finished()) {
     size_t size;
     char *buffer = source->read(size);
@@ -953,6 +957,10 @@ TransferStats Sender::sendOneByteSource(
       break;
     }
     WDT_CHECK(buffer && size > 0);
+    if (protocolVersion_ >= Protocol::CHECKSUM_VERSION &&
+        options.enable_checksum) {
+      checksum = folly::crc32c((const uint8_t *)buffer, size, checksum);
+    }
     written = 0;
     if (throttler) {
       /**
@@ -1010,6 +1018,22 @@ TransferStats Sender::sendOneByteSource(
     stats.setErrorCode(BYTE_SOURCE_READ_ERROR);
     stats.incrFailedAttempts();
     return stats;
+  }
+  if (protocolVersion_ >= Protocol::CHECKSUM_VERSION &&
+      options.enable_checksum) {
+    off = 0;
+    headerBuf[off++] = Protocol::FOOTER_CMD;
+    bool success =
+        Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum);
+    int toWrite = off;
+    written = socket->write(headerBuf, toWrite);
+    if (written != toWrite) {
+      LOG(ERROR) << "Write mismatch " << written << " " << toWrite;
+      stats.setErrorCode(SOCKET_WRITE_ERROR);
+      stats.incrFailedAttempts();
+      return stats;
+    }
+    stats.addHeaderBytes(toWrite);
   }
   stats.setErrorCode(OK);
   stats.incrNumBlocks();

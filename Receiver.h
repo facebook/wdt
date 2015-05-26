@@ -22,6 +22,7 @@
 #include "Reporting.h"
 #include "ServerSocket.h"
 #include "Protocol.h"
+#include "Writer.h"
 #include <memory>
 #include <string>
 #include <condition_variable>
@@ -172,6 +173,9 @@ class Receiver {
 
     /// write timeout for sender
     int64_t senderWriteTimeout_{-1};
+
+    /// whether checksum verification is enabled or not
+    bool enableChecksum_{false};
 
     /// whether SEND_DONE_CMD state has already failed for this session or not.
     /// This has to be separately handled, because session barrier is
@@ -363,26 +367,6 @@ class Receiver {
 
   /// mapping from receiver states to state functions
   static const StateFunction stateMap_[];
-
-  class DiskWriteSyncer {
-   public:
-    DiskWriteSyncer(int fd, uint64_t offset)
-        : fd_{fd}, nextSyncOffset_{offset} {
-    }
-
-    /**
-     * calls sync_file_range at disk_sync_interval_mb intervals.
-     *
-     * @param written     number of bytes last written
-     * @param forced      whether to force syncing or not
-     */
-    void syncFileRange(int64_t written, bool forced);
-
-   private:
-    int fd_;
-    uint64_t nextSyncOffset_;
-    uint64_t writtenSinceLastSync_{0};
-  };
 
   /**
    * Responsible for basic setup and starting threads

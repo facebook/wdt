@@ -1,11 +1,13 @@
 #include "Receiver.h"
 #include "ServerSocket.h"
+#include "FileWriter.h"
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/String.h>
 #include <folly/ScopeGuard.h>
 #include <folly/Bits.h>
+#include <folly/Checksum.h>
 
 #include <fcntl.h>
 #include <gflags/gflags.h>
@@ -668,19 +670,21 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   auto &senderReadTimeout = data.senderReadTimeout_;
   auto &senderWriteTimeout = data.senderWriteTimeout_;
   auto &threadStats = data.threadStats_;
-  int32_t protocolVersion;
+  auto &enableChecksum = data.enableChecksum_;
+  int32_t senderProtocolVersion;
   std::string senderId;
   bool success = Protocol::decodeSettings(
-      buf, off, oldOffset + Protocol::kMaxSettings, protocolVersion,
-      senderReadTimeout, senderWriteTimeout, senderId);
+      protocolVersion_, buf, off, oldOffset + Protocol::kMaxSettings,
+      senderProtocolVersion, senderReadTimeout, senderWriteTimeout, senderId,
+      enableChecksum);
   if (!success) {
     LOG(ERROR) << "Unable to decode settings cmd";
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
   }
-  if (protocolVersion != protocolVersion_) {
-    LOG(ERROR) << "Receiver and sender protocol version mismatch"
-               << protocolVersion << " " << protocolVersion_;
+  if (senderProtocolVersion != protocolVersion_) {
+    LOG(ERROR) << "Receiver and sender protocol version mismatch "
+               << senderProtocolVersion << " " << protocolVersion_;
     threadStats.setErrorCode(VERSION_MISMATCH);
     return SEND_ABORT_CMD;
   }
@@ -708,19 +712,15 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   auto bufferSize = data.bufferSize_;
   auto &checkpointIndex = data.checkpointIndex_;
   auto &pendingCheckpointIndex = data.pendingCheckpointIndex_;
+  auto &enableChecksum = data.enableChecksum_;
   auto &options = WdtOptions::get();
-  int dest = -1;
-  bool doActualWrites = !options.skip_writes;
   std::string id;
   uint64_t seqId;
-  int64_t sourceSize;
+  int64_t dataSize;
   int64_t offset;
   int64_t fileSize;
 
-  folly::ScopeGuard guard = folly::makeGuard([&socket, &dest, &threadStats] {
-    if (dest != -1) {
-      close(dest);
-    }
+  folly::ScopeGuard guard = folly::makeGuard([&socket, &threadStats] {
     if (threadStats.getErrorCode() != OK) {
       threadStats.incrFailedAttempts();
     }
@@ -748,7 +748,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   }
   off += sizeof(uint16_t);
   bool success = Protocol::decodeHeader(buf, off, numRead + oldOffset, id,
-                                        seqId, sourceSize, offset, fileSize);
+                                        seqId, dataSize, offset, fileSize);
   ssize_t headerBytes = off - oldOffset;
   // transferred header length must match decoded header length
   WDT_CHECK(headerLen == headerBytes);
@@ -763,79 +763,51 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
 
   // received a well formed file cmd, apply the pending checkpoint update
   checkpointIndex = pendingCheckpointIndex;
-  VLOG(1) << "Read id:" << id << " size:" << sourceSize << " ooff:" << oldOffset
+  VLOG(1) << "Read id:" << id << " size:" << dataSize << " ooff:" << oldOffset
           << " off: " << off << " numRead: " << numRead;
 
-  if (doActualWrites) {
-    if (fileSize == sourceSize) {
-      // single block file
-      WDT_CHECK(offset == 0);
-      dest = fileCreator_->openAndSetSize(id, fileSize);
-    } else {
-      // multi block file
-      dest = fileCreator_->openForBlocks(threadIndex, id, seqId, fileSize);
-      if (dest >= 0 && offset > 0 && lseek(dest, offset, SEEK_SET) < 0) {
-        PLOG(ERROR) << "Unable to seek " << id;
-        close(dest);
-        dest = -1;
-      }
-    }
-    if (dest == -1) {
-      LOG(ERROR) << "File open/seek failed for " << id;
-      threadStats.setErrorCode(FILE_WRITE_ERROR);
-      return SEND_ABORT_CMD;
-    }
+  FileWriter writer(threadIndex, id, seqId, fileSize, offset, dataSize,
+                    fileCreator_.get());
+
+  if (writer.open() != OK) {
+    threadStats.setErrorCode(FILE_WRITE_ERROR);
+    return SEND_ABORT_CMD;
   }
-  DiskWriteSyncer writeSyncer(dest, offset);
+  uint32_t checksum = 0;
   ssize_t remainingData = numRead + oldOffset - off;
   ssize_t toWrite = remainingData;
-  if (remainingData >= sourceSize) {
-    toWrite = sourceSize;
+  if (remainingData >= dataSize) {
+    toWrite = dataSize;
   }
   threadStats.addDataBytes(toWrite);
-  // write rest of stuff
-  int64_t wres = toWrite;
-  int64_t written;
-  if (dest >= 0) {
-    written = write(dest, buf + off, toWrite);
-    if (written != toWrite) {
-      PLOG(ERROR) << "Disk write error/mismatch for " << id << " " << written
-                  << " " << toWrite;
-      close(dest);
-      dest = -1;
-      threadStats.setErrorCode(FILE_WRITE_ERROR);
-      return SEND_ABORT_CMD;
-    } else {
-      VLOG(3) << "Wrote intial " << toWrite << " / " << sourceSize
-              << " off: " << off << " numRead: " << numRead << " on " << dest;
-      writeSyncer.syncFileRange(written, false);
-    }
+  if (enableChecksum) {
+    checksum = folly::crc32c((const uint8_t *)(buf + off), toWrite, checksum);
   }
-  off += wres;
-  remainingData -= wres;
+  ErrorCode code = writer.write(buf + off, toWrite);
+  if (code != OK) {
+    threadStats.setErrorCode(code);
+    return SEND_ABORT_CMD;
+  }
+  off += toWrite;
+  remainingData -= toWrite;
   // also means no leftOver so it's ok we use buf from start
-  while (wres < sourceSize) {
-    int64_t nres = readAtMost(socket, buf, bufferSize, sourceSize - wres);
+  while (writer.getTotalWritten() < dataSize) {
+    int64_t nres = readAtMost(socket, buf, bufferSize,
+                              dataSize - writer.getTotalWritten());
     if (nres <= 0) {
       break;
     }
     threadStats.addDataBytes(nres);
-    if (dest >= 0) {
-      written = write(dest, buf, nres);
-      if (written != nres) {
-        PLOG(ERROR) << "Disk write error/mismatch for " << id << " " << written
-                    << " " << nres;
-        close(dest);
-        dest = -1;
-        threadStats.setErrorCode(FILE_WRITE_ERROR);
-        return SEND_ABORT_CMD;
-      } else {
-        writeSyncer.syncFileRange(written, false);
-      }
+    if (enableChecksum) {
+      checksum = folly::crc32c((const uint8_t *)buf, nres, checksum);
     }
-    wres += nres;
+    code = writer.write(buf, nres);
+    if (code != OK) {
+      threadStats.setErrorCode(code);
+      return SEND_ABORT_CMD;
+    }
   }
-  if (wres != sourceSize) {
+  if (writer.getTotalWritten() != dataSize) {
     // This can only happen if there are transmission errors
     // Write errors to disk are already taken care of above
     LOG(ERROR) << "could not read entire content for " << id << " port "
@@ -843,12 +815,8 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
-  VLOG(2) << "completed " << id << " off: " << off << " numRead: " << numRead
-          << " on " << dest;
-  writeSyncer.syncFileRange(0, true);
+  VLOG(2) << "completed " << id << " off: " << off << " numRead: " << numRead;
   // Transfer of the file is complete here, mark the bytes effective
-  threadStats.addEffectiveBytes(headerBytes, sourceSize);
-  threadStats.incrNumBlocks();
   WDT_CHECK(remainingData >= 0) << "Negative remainingData " << remainingData;
   if (remainingData > 0) {
     // if we need to read more anyway, let's move the data
@@ -869,38 +837,43 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   } else {
     numRead = off = 0;
   }
-  return READ_NEXT_CMD;
-}
-
-void Receiver::DiskWriteSyncer::syncFileRange(int64_t written, bool forced) {
-#ifdef HAS_SYNC_FILE_RANGE
-  auto &options = WdtOptions::get();
-  int64_t syncIntervalBytes = options.disk_sync_interval_mb * 1024 * 1024;
-  if (fd_ < 0 || syncIntervalBytes < 0) {
-    return;
-  }
-  writtenSinceLastSync_ += written;
-  if (writtenSinceLastSync_ == 0) {
-    // no need to sync
-    VLOG(1) << "skipping syncFileRange " << written << "  " << forced;
-    return;
-  }
-  if (forced || writtenSinceLastSync_ > syncIntervalBytes) {
-    // sync_file_range with flag SYNC_FILE_RANGE_WRITE is an asynchronous
-    // operation. So, this is not that costly. Source :
-    // http://yoshinorimatsunobu.blogspot.com/2014/03/how-syncfilerange-really-works.html
-    auto status = sync_file_range(fd_, nextSyncOffset_, writtenSinceLastSync_,
-                                  SYNC_FILE_RANGE_WRITE);
-    if (status != 0) {
-      PLOG(ERROR) << "sync_file_range() failed for fd " << fd_;
-      return;
+  if (enableChecksum) {
+    // have to read footer cmd
+    oldOffset = off;
+    numRead = readAtLeast(socket, buf + off, bufferSize - off,
+                          Protocol::kMinBufLength, numRead);
+    if (numRead < Protocol::kMinBufLength) {
+      LOG(ERROR) << "socket read failure " << Protocol::kMinBufLength << " "
+                 << numRead;
+      threadStats.setErrorCode(SOCKET_READ_ERROR);
+      return ACCEPT_WITH_TIMEOUT;
     }
-    VLOG(1) << "file range synced " << nextSyncOffset_ << " "
-            << writtenSinceLastSync_;
-    nextSyncOffset_ += writtenSinceLastSync_;
-    writtenSinceLastSync_ = 0;
+    Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[off++];
+    if (cmd != Protocol::FOOTER_CMD) {
+      LOG(ERROR) << "Expecting footer cmd, but received " << cmd;
+      threadStats.setErrorCode(PROTOCOL_ERROR);
+      return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
+    }
+    uint32_t receivedChecksum;
+    bool success = Protocol::decodeFooter(
+        buf, off, oldOffset + Protocol::kMaxFooter, receivedChecksum);
+    if (!success) {
+      LOG(ERROR) << "Unable to decode footer cmd";
+      threadStats.setErrorCode(PROTOCOL_ERROR);
+      return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
+    }
+    if (checksum != receivedChecksum) {
+      LOG(ERROR) << "Checksum mismatch " << checksum << " " << receivedChecksum
+                 << " port " << socket.getPort() << " file " << id;
+      threadStats.setErrorCode(CHECKSUM_MISMATCH);
+      return ACCEPT_WITH_TIMEOUT;
+    }
+    size_t msgLen = off - oldOffset;
+    numRead -= msgLen;
   }
-#endif
+  threadStats.addEffectiveBytes(headerBytes, dataSize);
+  threadStats.incrNumBlocks();
+  return READ_NEXT_CMD;
 }
 
 Receiver::ReceiverState Receiver::processDoneCmd(ThreadData &data) {
