@@ -14,6 +14,9 @@ typedef std::pair<int32_t, int64_t> Checkpoint;
 
 class Protocol {
  public:
+  /// current protocol version
+  static const int protocol_version;
+
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
     DONE_CMD = 0x44,      // D)one
@@ -40,6 +43,18 @@ class Protocol {
   static const size_t kMaxSize = 1 + 10;
   /// max size of settings command encoding
   static const size_t kMaxSettings = 1 + 4 * 10 + kMaxTransferIdLength;
+
+  /**
+   * Decides whether the current running wdt version can support the request
+   * protocol version or not
+   *
+   * @param requestedProtocolVersion    protocol version requested
+   *
+   * @return    If current wdt supports the requested version or some lower
+   *            version, that version is returned. If it can not support the
+   *            requested version, 0 is returned
+   */
+  static int negotiateProtocol(int requestedProtocolVersion);
 
   /// encodes id, sequence-id, block-size, block-offset and file-size
   /// into dest+off
@@ -107,6 +122,16 @@ class Protocol {
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeSize(char *src, size_t &off, size_t max,
                          int64_t &totalNumBytes);
+
+  /**
+   * Determines whether receiver side progress reporting is supported based on
+   * protocol version
+   *
+   * @param protocolVersion   protocol-version
+   *
+   * @return                  If supported returns true, else returns false
+   */
+  static bool isReceiverProgressReportingSupported(int protocolVersion);
 };
 }
 }  // namespace facebook::wdt

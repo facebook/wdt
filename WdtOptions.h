@@ -187,8 +187,6 @@ class WdtOptions {
    */
   int throughput_update_interval{50};
 
-  const int64_t protocol_version = 10;
-
   /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted

@@ -6,8 +6,19 @@
 #include "folly/Range.h"
 #include "folly/String.h"  // exceptionStr
 #include "folly/Varint.h"
+#include <algorithm>
 
 using namespace facebook::wdt;
+
+const int Protocol::protocol_version = 11;
+
+int Protocol::negotiateProtocol(int requestedProtocolVersion) {
+  if (requestedProtocolVersion < 10) {
+    LOG(WARNING) << "Can not handle protocol " << requestedProtocolVersion;
+    return 0;
+  }
+  return std::min<int>(protocol_version, requestedProtocolVersion);
+}
 
 /* static */
 bool Protocol::encodeHeader(char *dest, size_t &off, size_t max, std::string id,
@@ -175,4 +186,8 @@ bool Protocol::decodeSettings(char *src, size_t &off, size_t max,
     return false;
   }
   return true;
+}
+
+bool Protocol::isReceiverProgressReportingSupported(int protocolVersion) {
+  return protocolVersion >= 11;
 }

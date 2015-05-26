@@ -170,6 +170,13 @@ void Receiver::setReceiverId(const std::string &receiverId) {
   LOG(INFO) << "receiver id " << receiverId_;
 }
 
+void Receiver::setProtocolVersion(int protocolVersion) {
+  WDT_CHECK(Protocol::negotiateProtocol(protocolVersion) == protocolVersion)
+      << "Can not support wdt version " << protocolVersion;
+  protocolVersion_ = protocolVersion;
+  LOG(INFO) << "using wdt protocol version " << protocolVersion_;
+}
+
 void Receiver::cancelTransfer() {
   LOG(WARNING) << "Cancelling the transfer";
   for (auto &socket : threadServerSockets_) {
@@ -661,7 +668,6 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   auto &senderReadTimeout = data.senderReadTimeout_;
   auto &senderWriteTimeout = data.senderWriteTimeout_;
   auto &threadStats = data.threadStats_;
-  auto &options = WdtOptions::get();
   int32_t protocolVersion;
   std::string senderId;
   bool success = Protocol::decodeSettings(
@@ -672,9 +678,9 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
   }
-  if (protocolVersion != options.protocol_version) {
+  if (protocolVersion != protocolVersion_) {
     LOG(ERROR) << "Receiver and sender protocol version mismatch"
-               << protocolVersion << " " << options.protocol_version;
+               << protocolVersion << " " << protocolVersion_;
     threadStats.setErrorCode(VERSION_MISMATCH);
     return SEND_ABORT_CMD;
   }
@@ -995,8 +1001,7 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
   auto &threadStats = data.threadStats_;
   char *buf = data.getBuf();
   auto &socket = data.socket_;
-  auto &options = WdtOptions::get();
-  int32_t protocolVersion = options.protocol_version;
+  int32_t protocolVersion = protocolVersion_;
   int offset = 0;
   buf[offset++] = Protocol::ABORT_CMD;
   folly::storeUnaligned<int32_t>(buf + offset,

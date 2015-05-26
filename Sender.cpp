@@ -206,6 +206,13 @@ void Sender::setSenderId(const std::string &senderId) {
   LOG(INFO) << "sender id " << senderId_;
 }
 
+void Sender::setProtocolVersion(int protocolVersion) {
+  WDT_CHECK(Protocol::negotiateProtocol(protocolVersion) == protocolVersion)
+      << "Can not support wdt version " << protocolVersion;
+  protocolVersion_ = protocolVersion;
+  LOG(INFO) << "using wdt protocol version " << protocolVersion_;
+}
+
 const std::string &Sender::getSenderId() const {
   return senderId_;
 }
@@ -570,9 +577,9 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   size_t off = 0;
   buf[off++] = Protocol::SETTINGS_CMD;
 
-  bool success = Protocol::encodeSettings(
-      buf, off, Protocol::kMaxSettings, options.protocol_version,
-      readTimeoutMillis, writeTimeoutMillis, senderId_);
+  bool success = Protocol::encodeSettings(buf, off, Protocol::kMaxSettings,
+                                          protocolVersion_, readTimeoutMillis,
+                                          writeTimeoutMillis, senderId_);
   WDT_CHECK(success);
   ssize_t written = socket->write(buf, off);
   if (written != off) {
@@ -591,7 +598,8 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
   DirectorySourceQueue &queue = data.queue_;
   auto &totalSizeSent = data.totalSizeSent_;
 
-  if (!totalSizeSent && queue.fileDiscoveryFinished()) {
+  if (Protocol::isReceiverProgressReportingSupported(protocolVersion_) &&
+      !totalSizeSent && queue.fileDiscoveryFinished()) {
     return SEND_SIZE_CMD;
   }
 

@@ -87,6 +87,9 @@ class Receiver {
   /// @param receiverId   unique id of this receiver
   void setReceiverId(const std::string &receiverId);
 
+  /// @param protocolVersion    protocol to use
+  void setProtocolVersion(int protocolVersion);
+
   /**
    * Destructor for the receiver should try to join threads.
    * Since the threads are part of the object. We can't destroy the
@@ -456,6 +459,9 @@ class Receiver {
   /// Unique id of this receiver object, this must match sender-id sent as part
   /// of settings
   std::string receiverId_;
+  /// protocol version to use, this is determined by negotiating protocol
+  /// version with the other side
+  int protocolVersion_{Protocol::protocol_version};
 
   /**
    * Progress tracker thread is a thread which has to be joined when the

@@ -36,6 +36,9 @@ DEFINE_string(
     "empty is server (destination) mode, non empty is destination host");
 
 DEFINE_string(transfer_id, "", "Transfer id (optional, should match");
+DEFINE_int32(
+    protocol_version, 0,
+    "Protocol version to use, this is used to simulate protocol negotiation");
 
 DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 
@@ -76,6 +79,9 @@ int main(int argc, char *argv[]) {
     // TODO: inconsistent! switch to option like sender...
     Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
     receiver.setReceiverId(FLAGS_transfer_id);
+    if (FLAGS_protocol_version > 0) {
+      receiver.setProtocolVersion(FLAGS_protocol_version);
+    }
     int numSuccess = receiver.registerPorts();
     if (numSuccess == 0) {
       LOG(ERROR) << "Couldn't bind on any port";
@@ -116,6 +122,9 @@ int main(int argc, char *argv[]) {
     }
     Sender sender(FLAGS_destination, FLAGS_directory, ports, fileInfo);
     sender.setSenderId(FLAGS_transfer_id);
+    if (FLAGS_protocol_version > 0) {
+      sender.setProtocolVersion(FLAGS_protocol_version);
+    }
     sender.setIncludeRegex(FLAGS_include_regex);
     sender.setExcludeRegex(FLAGS_exclude_regex);
     sender.setPruneDirRegex(FLAGS_prune_dir_regex);
