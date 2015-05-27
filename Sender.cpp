@@ -245,6 +245,11 @@ std::unique_ptr<TransferReport> Sender::getTransferReport() {
   return transferReport;
 }
 
+void Sender::setThrottler(std::shared_ptr<Throttler> throttler) {
+  VLOG(2) << "Setting an external throttler";
+  throttler_ = throttler;
+}
+
 bool Sender::isTransferFinished() {
   std::unique_lock<std::mutex> lock(mutex_);
   return transferFinished_;
@@ -254,41 +259,21 @@ Clock::time_point Sender::getEndTime() {
   return endTime_;
 }
 
-void Sender::fillThrottlerOptions(ThrottlerOptions &throttlerOptions) {
+void Sender::configureThrottler() {
+  WDT_CHECK(!throttler_);
   VLOG(1) << "Configuring throttler options";
   const auto &options = WdtOptions::get();
-  int numSockets = ports_.size();
   double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
   double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
   double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
-  double perThreadAvgRateBytesPerSec = avgRateBytesPerSec / numSockets;
-  double perThreadPeakRateBytesPerSec = peakRateBytesPerSec / numSockets;
-  double perThreadBucketLimit = bucketLimitBytes / numSockets;
-  if (avgRateBytesPerSec < 1.0 && avgRateBytesPerSec >= 0) {
-    LOG(FATAL) << "Realistic average rate should be greater than 1.0 bytes/sec";
+  throttler_ = Throttler::makeThrottler(avgRateBytesPerSec, peakRateBytesPerSec,
+                                        bucketLimitBytes,
+                                        options.throttler_log_time_millis);
+  if (throttler_) {
+    LOG(INFO) << "Enabling throttling " << *throttler_;
+  } else {
+    LOG(INFO) << "Throttling not enabled";
   }
-  if (perThreadPeakRateBytesPerSec < perThreadAvgRateBytesPerSec &&
-      perThreadPeakRateBytesPerSec >= 0) {
-    LOG(WARNING) << "Per thread peak rate should be greater "
-                 << "than per thread average rate. "
-                 << "Making peak rate 1.2 times the average rate";
-    perThreadPeakRateBytesPerSec =
-        kPeakMultiplier * perThreadAvgRateBytesPerSec;
-  }
-  if (perThreadBucketLimit <= 0 && perThreadPeakRateBytesPerSec > 0) {
-    perThreadBucketLimit =
-        kTimeMultiplier * kBucketMultiplier * perThreadPeakRateBytesPerSec;
-    LOG(INFO) << "Burst limit not specified but peak "
-              << "rate is configured. Auto configuring to "
-              << perThreadBucketLimit / kMbToB << " mbytes";
-  }
-  VLOG(1) << "Per thread (Avg Rate, Peak Rate) = "
-          << "(" << perThreadAvgRateBytesPerSec << ", "
-          << perThreadPeakRateBytesPerSec << ")";
-
-  throttlerOptions.avgRateBytes = perThreadAvgRateBytesPerSec;
-  throttlerOptions.maxRateBytes = perThreadPeakRateBytesPerSec;
-  throttlerOptions.bucketLimitBytes = perThreadBucketLimit;
 }
 
 std::unique_ptr<TransferReport> Sender::finish() {
@@ -387,7 +372,13 @@ ErrorCode Sender::start() {
   if (twoPhases) {
     dirThread_.join();
   }
-  fillThrottlerOptions(perThreadThrottlerOptions_);
+  if (throttler_) {
+    LOG(INFO) << "Skipping throttler setup. External throttler set."
+              << "Throttler details : " << *throttler_;
+  } else {
+    configureThrottler();
+  }
+
   // WARNING: Do not MERGE the follwing two loops. ThreadTransferHistory keeps a
   // reference of TransferStats. And, any emplace operation on a vector
   // invalidates all its references
@@ -611,9 +602,8 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
     return SEND_DONE_CMD;
   }
   WDT_CHECK(!source->hasError());
-  size_t totalBytes = threadStats.getTotalBytes(false);
-  TransferStats transferStats = sendOneByteSource(
-      data.socket_, data.throttler_, source, totalBytes, transferStatus);
+  TransferStats transferStats =
+      sendOneByteSource(data.socket_, source, transferStatus);
   threadStats += transferStats;
   source->addTransferStats(transferStats);
   source->close();
@@ -867,25 +857,14 @@ void Sender::sendOne(int threadIndex) {
       endTime_ = Clock::now();
       transferFinished_ = true;
     }
+    if (throttler_) {
+      throttler_->deRegisterTransfer();
+    }
   });
-  std::unique_ptr<Throttler> throttler;
-  double avgRateBytes = perThreadThrottlerOptions_.avgRateBytes;
-  double maxRateBytes = perThreadThrottlerOptions_.maxRateBytes;
-  double bucketLimitBytes = perThreadThrottlerOptions_.bucketLimitBytes;
-  const bool doThrottling = (avgRateBytes > 0 || maxRateBytes > 0);
-  if (doThrottling) {
-    throttler = folly::make_unique<Throttler>(
-        startTime, avgRateBytes, maxRateBytes, bucketLimitBytes,
-        options.throttler_log_time_millis);
-  } else {
-    VLOG(1) << "No throttling in effect";
+  if (throttler_) {
+    throttler_->registerTransfer();
   }
-
   ThreadData threadData(threadIndex, queue, threadStats, transferHistories);
-  if (doThrottling) {
-    threadData.throttler_ = std::move(throttler);
-  }
-
   SenderState state = CONNECT;
   while (state != END) {
     if (isAborted()) {
@@ -916,9 +895,7 @@ bool Sender::isAborted() {
 
 TransferStats Sender::sendOneByteSource(
     const std::unique_ptr<ClientSocket> &socket,
-    const std::unique_ptr<Throttler> &throttler,
-    const std::unique_ptr<ByteSource> &source, const size_t totalBytes,
-    ErrorCode transferStatus) {
+    const std::unique_ptr<ByteSource> &source, ErrorCode transferStatus) {
   TransferStats stats;
   auto &options = WdtOptions::get();
   char headerBuf[Protocol::kMaxHeader];
@@ -945,6 +922,9 @@ TransferStats Sender::sendOneByteSource(
     return stats;
   }
   stats.addHeaderBytes(written);
+  size_t byteSourceHeaderBytes = written;
+  size_t throttlerInstanceBytes = byteSourceHeaderBytes;
+  size_t totalThrottlerBytes = 0;
   VLOG(3) << "Sent " << written << " on " << socket->getFd() << " : "
           << folly::humanify(std::string(headerBuf, off));
   uint32_t checksum = 0;
@@ -962,17 +942,20 @@ TransferStats Sender::sendOneByteSource(
       checksum = folly::crc32c((const uint8_t *)buffer, size, checksum);
     }
     written = 0;
-    if (throttler) {
+    if (throttler_) {
       /**
-       * If throttling is enabled we call limit(totalBytes) which
+       * If throttling is enabled we call limit(deltaBytes) which
        * used both the methods of throttling peak and average.
-       * Always call it with totalBytes written till now, throttler
-       * will do the rest. Total bytes includes header and the data bytes.
-       * The throttler was constructed at the time when the header
-       * was being written and it is okay to start throttling with the
-       * next expected write.
+       * Always call it with bytes being written to the wire, throttler
+       * will do the rest.
+       * The first time throttle is called with the header bytes
+       * included. In the next iterations throttler is only called
+       * with the bytes being written.
        */
-      throttler->limit(totalBytes + stats.getTotalBytes() + size);
+      throttlerInstanceBytes += size;
+      throttler_->limit(throttlerInstanceBytes);
+      totalThrottlerBytes += throttlerInstanceBytes;
+      throttlerInstanceBytes = 0;
     }
     do {
       ssize_t w = socket->write(buffer + written, size - written);
@@ -1001,6 +984,9 @@ TransferStats Sender::sendOneByteSource(
       return stats;
     }
     actualSize += written;
+  }
+  if (throttler_) {
+    WDT_CHECK(totalThrottlerBytes == actualSize + byteSourceHeaderBytes);
   }
   if (actualSize != expectedSize) {
     // Can only happen if sender thread can not read complete source byte

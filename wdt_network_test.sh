@@ -24,7 +24,7 @@ TEST_COUNT=0
 
 WDTBIN_OPTS="-ipv4 -ipv6=false -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
--full_reporting -read_timeout_millis=500 -write_timeout_millis=500"
+-full_reporting -read_timeout_millis=500 -write_timeout_millis=500 -progress_report_interval_millis=-1"
 WDTBIN="_bin/wdt/wdt -num_ports=$threads $WDTBIN_OPTS"
 WDTBIN_MORE_THREADS="_bin/wdt/wdt -num_ports=$((threads + 1)) $WDTBIN_OPTS"
 WDTBIN_LESS_THREADS="_bin/wdt/wdt -num_ports=$((threads - 1)) $WDTBIN_OPTS"
@@ -43,6 +43,8 @@ do
   mkdir $DIR/src/dir${i}
   cp -R $DIR/src/dir1 $DIR/src/dir${i}
 done
+
+
 
 # Testing with different start ports
 echo "Testing with different start ports in sender and receiver"

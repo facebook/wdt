@@ -108,11 +108,6 @@ class ThreadTransferHistory {
   folly::SpinLock lock_;
 };
 
-struct ThrottlerOptions {
-  double avgRateBytes;
-  double maxRateBytes;
-  double bucketLimitBytes;
-};
 /**
  * The sender for the transfer. One instance of sender should only be
  * responsible for one transfer. For a second transfer you should make
@@ -210,6 +205,13 @@ class Sender {
   /// Makes the minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
 
+  /**
+   * Users of the wdt sender can set a throttler externally.
+   * This needs to be called before any call to tansfer or transferAsync
+   * are made.
+   */
+  void setThrottler(std::shared_ptr<Throttler> throttler);
+
  private:
   /// state machine states
   enum SenderState {
@@ -234,7 +236,6 @@ class Sender {
     DirectorySourceQueue &queue_;
     TransferStats &threadStats_;
     std::vector<ThreadTransferHistory> &transferHistories_;
-    std::unique_ptr<Throttler> throttler_;
     std::unique_ptr<ClientSocket> socket_;
     char buf_[Protocol::kMinBufLength];
     bool totalSizeSent_{false};
@@ -362,9 +363,7 @@ class Sender {
   /// Method responsible for sending one source to the destination
   virtual TransferStats sendOneByteSource(
       const std::unique_ptr<ClientSocket> &socket,
-      const std::unique_ptr<Throttler> &throttler,
-      const std::unique_ptr<ByteSource> &source, const size_t totalBytes,
-      ErrorCode transferStatus);
+      const std::unique_ptr<ByteSource> &source, ErrorCode transferStatus);
 
   /// Every sender thread executes this method to send the data
   void sendOne(int threadIndex);
@@ -405,11 +404,8 @@ class Sender {
    */
   void reportProgress();
 
-  /**
-   * Configures per thread throttler options such as avg rate
-   * and peak rate in bytes/sec and bucket limit for Tocken Bucket
-   */
-  void fillThrottlerOptions(ThrottlerOptions &throttlerOptions);
+  /// Configures the global throttler using the wdt options
+  void configureThrottler();
 
   /// Pointer to DirectorySourceQueue which reads the srcDir and the files
   std::unique_ptr<DirectorySourceQueue> dirQueue_;
@@ -454,8 +450,8 @@ class Sender {
   std::vector<ThreadTransferHistory> transferHistories_;
   /// flag representing whether transfer has been aborted or not
   bool transferAborted_{false};
-  /// Throttler options
-  ThrottlerOptions perThreadThrottlerOptions_;
+  /// The global throttler shared across all the threads
+  std::shared_ptr<Throttler> throttler_;
 };
 }
 }  // namespace facebook::wdt

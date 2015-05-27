@@ -261,6 +261,27 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   return report;
 }
 
+void Receiver::configureThrottler() {
+  WDT_CHECK(!throttler_);
+  VLOG(1) << "Configuring throttler options";
+  const auto &options = WdtOptions::get();
+  double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
+  double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
+  double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
+  throttler_ = Throttler::makeThrottler(avgRateBytesPerSec, peakRateBytesPerSec,
+                                        bucketLimitBytes,
+                                        options.throttler_log_time_millis);
+  if (throttler_) {
+    LOG(INFO) << "Enabling throttling " << *throttler_;
+  } else {
+    LOG(INFO) << "Throttling not enabled";
+  }
+}
+
+void Receiver::setThrottler(std::shared_ptr<Throttler> throttler) {
+  throttler_ = throttler;
+}
+
 ErrorCode Receiver::transferAsync() {
   const auto &options = WdtOptions::get();
   if (hasPendingTransfer()) {
@@ -370,6 +391,12 @@ void Receiver::start() {
   for (int i = 0; i < threadServerSockets_.size(); i++) {
     threadStats_.emplace_back(true);
   }
+  if (!throttler_) {
+    configureThrottler();
+  } else {
+    LOG(INFO) << "Throttler set externally. Throttler : " << *throttler_;
+  }
+
   for (int i = 0; i < threadServerSockets_.size(); i++) {
     receiverThreads_.emplace_back(&Receiver::receiveOne, this, i,
                                   std::ref(threadServerSockets_[i]), bufferSize,
@@ -402,6 +429,9 @@ void Receiver::endCurGlobalSession() {
   WDT_CHECK(transferFinishedCount_ + 1 == transferStartedCount_);
   LOG(INFO) << "Received done for all threads. Transfer session "
             << transferStartedCount_ << " finished";
+  if (throttler_) {
+    throttler_->deRegisterTransfer();
+  }
   transferFinishedCount_++;
   waitingThreadCount_ = 0;
   waitingWithErrorThreadCount_ = 0;
@@ -429,6 +459,13 @@ bool Receiver::hasNewSessionStarted(ThreadData &data) {
 
 void Receiver::startNewGlobalSession() {
   WDT_CHECK(transferStartedCount_ == transferFinishedCount_);
+  if (throttler_) {
+    // If throttler is configured/set then register this session
+    // in the throttler. This is guranteed to work in either of the
+    // modes long running or not. We will de register from the throttler
+    // when the current session ends
+    throttler_->registerTransfer();
+  }
   transferStartedCount_++;
   startTime_ = Clock::now();
   LOG(INFO) << "New transfer started " << transferStartedCount_;
@@ -783,6 +820,12 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   if (enableChecksum) {
     checksum = folly::crc32c((const uint8_t *)(buf + off), toWrite, checksum);
   }
+  if (throttler_) {
+    // We might be reading more than we require for this file but
+    // throttling should make sense for any additional bytes received
+    // on the network
+    throttler_->limit(toWrite + headerBytes);
+  }
   ErrorCode code = writer.write(buf + off, toWrite);
   if (code != OK) {
     threadStats.setErrorCode(code);
@@ -794,6 +837,11 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   while (writer.getTotalWritten() < dataSize) {
     int64_t nres = readAtMost(socket, buf, bufferSize,
                               dataSize - writer.getTotalWritten());
+    if (throttler_) {
+      // We only know how much we have read after we are done calling
+      // readAtMost. Call throttler with the bytes read off the wire.
+      throttler_->limit(nres);
+    }
     if (nres <= 0) {
       break;
     }

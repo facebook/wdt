@@ -23,6 +23,7 @@
 #include "ServerSocket.h"
 #include "Protocol.h"
 #include "Writer.h"
+#include "Throttler.h"
 #include <memory>
 #include <string>
 #include <condition_variable>
@@ -118,6 +119,9 @@ class Receiver {
 
   /// @param progressReporter     progress reporter to be used
   void setProgressReporter(std::unique_ptr<ProgressReporter> &progressReporter);
+
+  /// Set throttler externally. Should be set before any transfer calls
+  void setThrottler(std::shared_ptr<Throttler> throttler);
 
  protected:
   /// receiver state
@@ -419,6 +423,9 @@ class Receiver {
   /// ends current thread session
   void endCurThreadSession(ThreadData &data);
 
+  /// Auto configure the throttler if none set externally
+  void configureThrottler();
+
   /**
    * increments failed thread count, does not wait for transfer to finish
    */
@@ -504,6 +511,9 @@ class Receiver {
 
   /// condition variable to coordinate transfer finish
   mutable std::condition_variable conditionAllFinished_;
+
+  /// Global throttler across all threads
+  std::shared_ptr<Throttler> throttler_;
 };
 }
 }  // namespace facebook::wdt
