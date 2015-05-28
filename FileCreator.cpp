@@ -1,5 +1,6 @@
 #include "FileCreator.h"
 #include "ErrorCodes.h"
+#include "WdtConfig.h"
 
 #include <string.h>
 #include <sys/stat.h>
