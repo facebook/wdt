@@ -70,14 +70,22 @@ Throttler::Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
   throttlerLogTimeMillis_ = throttlerLogTimeMillis;
 }
 
-void Throttler::setThrottlerRates(double avgRateBytesPerSec,
-                                  double bucketRateBytesPerSec,
-                                  double bytesTokenBucketLimit) {
+void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
+                                  double& bucketRateBytesPerSec,
+                                  double& bytesTokenBucketLimit) {
   // configureThrottlerOptions will change the rates in case they don't make
   // sense
   configureOptions(avgRateBytesPerSec, bucketRateBytesPerSec,
                    bytesTokenBucketLimit);
   folly::SpinLockGuard lock(throttlerMutex_);
+  if (refCount_ > 0 && avgRateBytesPerSec < avgRateBytesPerSec_) {
+    LOG(INFO) << "new avg rate : " << avgRateBytesPerSec
+              << " curr avg rate : " << avgRateBytesPerSec_
+              << " Average throttler rate can't be "
+              << "lowered mid transfer. Ignoring the new value";
+    avgRateBytesPerSec = avgRateBytesPerSec_;
+  }
+
   LOG(INFO) << "Updating the rates avgRateBytesPerSec : " << avgRateBytesPerSec
             << " bucketRateBytesPerSec : " << bucketRateBytesPerSec
             << " bytesTokenBucketLimit : " << bytesTokenBucketLimit;

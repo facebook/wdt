@@ -70,10 +70,11 @@ class Throttler {
                                 const Clock::time_point& now);
 
   /// Provides anyone using this throttler instance to update the throttler
-  /// rates
-  void setThrottlerRates(double avgRateBytesPerSec,
-                         double bucketRateBytesPerSec,
-                         double bytesTokenBucketLimit);
+  /// rates. The rates might be configured to different values than what
+  /// were passed.
+  virtual void setThrottlerRates(double& avgRateBytesPerSec,
+                                 double& bucketRateBytesPerSec,
+                                 double& bytesTokenBucketLimit);
 
   virtual ~Throttler() {
   }
@@ -136,6 +137,8 @@ class Throttler {
   double bytesProgress_;
   /// Last time the token bucket was filled
   std::chrono::time_point<std::chrono::high_resolution_clock> lastFillTime_;
+
+ protected:
   /// Number of tokens in the bucket
   int64_t bytesTokenBucket_;
   /// Controls the access across threads
