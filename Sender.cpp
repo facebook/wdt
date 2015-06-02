@@ -985,9 +985,6 @@ TransferStats Sender::sendOneByteSource(
     }
     actualSize += written;
   }
-  if (throttler_) {
-    WDT_CHECK(totalThrottlerBytes == actualSize + byteSourceHeaderBytes);
-  }
   if (actualSize != expectedSize) {
     // Can only happen if sender thread can not read complete source byte
     // stream
@@ -1004,6 +1001,10 @@ TransferStats Sender::sendOneByteSource(
     stats.setErrorCode(BYTE_SOURCE_READ_ERROR);
     stats.incrFailedAttempts();
     return stats;
+  }
+  if (throttler_ && actualSize > 0) {
+    WDT_CHECK(totalThrottlerBytes == actualSize + byteSourceHeaderBytes)
+        << totalThrottlerBytes << " " << (actualSize + totalThrottlerBytes);
   }
   if (protocolVersion_ >= Protocol::CHECKSUM_VERSION &&
       options.enable_checksum) {

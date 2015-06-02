@@ -57,7 +57,8 @@ REALPATH=/mnt/vol/engshare/svnroot/tfb/trunk/www/scripts/bin/realpath
 # Fastest:
 BS=`expr 256 \* 1024`
 threads=8
-avg_rate=-1
+# set a default value for avg rate to test throttler
+avg_rate=3000
 max_rate=-1
 keeplog=0
 delay=0
