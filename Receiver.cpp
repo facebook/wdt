@@ -168,18 +168,11 @@ void Receiver::setProtocolVersion(int protocolVersion) {
   LOG(INFO) << "using wdt protocol version " << protocolVersion_;
 }
 
-void Receiver::cancelTransfer() {
-  LOG(WARNING) << "Cancelling the transfer";
-  for (auto &socket : threadServerSockets_) {
-    socket.closeAll();
-  }
-}
-
 Receiver::~Receiver() {
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an ongoing transfer and the destructor"
                  << " is being called. Trying to finish the transfer";
-    cancelTransfer();
+    abort();
     finish();
   }
 }
@@ -203,6 +196,17 @@ void Receiver::markTransferFinished(bool isFinished) {
   if (isFinished) {
     conditionRecvFinished_.notify_one();
   }
+}
+
+void Receiver::abort() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  LOG(WARNING) << "Setting the abort flag to make receiver threads abort";
+  transferAborted_ = true;
+}
+
+bool Receiver::isAborted() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return transferAborted_;
 }
 
 std::unique_ptr<TransferReport> Receiver::finish() {
@@ -340,7 +344,7 @@ void Receiver::progressTracker() {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       conditionRecvFinished_.wait_for(lock, waitingTime);
-      if (transferFinished_) {
+      if (transferFinished_ || transferAborted_) {
         break;
       }
       if (totalSenderBytes_ == -1) {
@@ -543,6 +547,16 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
       incrFailedThreadCountAndCheckForSessionEnd(data);
       return FAILED;
     }
+
+    if (isAborted()) {
+      LOG(ERROR) << "Thread marked to abort while trying to accept first"
+                 << " connection. Num attempts " << acceptAttempts;
+      // Even though there is a transition FAILED here
+      // isAborted() is going to be checked again in the receiveOne. So this
+      // is pretty much irrelavant
+      return FAILED;
+    }
+
     ErrorCode code = socket.acceptNextConnection(timeout);
     if (code == OK) {
       break;
@@ -833,6 +847,11 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   remainingData -= toWrite;
   // also means no leftOver so it's ok we use buf from start
   while (writer.getTotalWritten() < dataSize) {
+    if (isAborted()) {
+      LOG(ERROR) << "Thread marked for abort while processing a file."
+                 << " port : " << socket.getPort();
+      return FAILED;
+    }
     int64_t nres = readAtMost(socket, buf, bufferSize,
                               dataSize - writer.getTotalWritten());
     if (throttler_) {
@@ -1192,6 +1211,11 @@ void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
   }
   ReceiverState state = LISTEN;
   while (true) {
+    if (isAborted()) {
+      LOG(ERROR) << "Transfer aborted " << socket.getPort();
+      threadStats.setErrorCode(ABORT);
+      break;
+    }
     if (state == FAILED) {
       return;
     }

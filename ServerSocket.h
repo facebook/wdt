@@ -31,6 +31,7 @@ class ServerSocket {
   int32_t getPort() const;
   int getBackLog() const;
   /// Destroy the active connection and the listening fd
+  /// if done by the same thread who owned the socket
   void closeAll();
 
  private:

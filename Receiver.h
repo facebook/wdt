@@ -47,9 +47,11 @@ class Receiver {
   /// provided in the constructor
   int32_t registerPorts(bool stopOnFailure = false);
 
-  /// Cancel the transfer by closing the connections on each socket
-  /// This makes the threads exit from any network call they might be doing
-  void cancelTransfer();
+  /// Transfer can be marked to abort and receiver threads will eventually
+  /// get aborted after this method has been called based on
+  /// whether they are doing read() on the socket and the timeout for the
+  /// socket read
+  void abort();
 
   /**
    * Joins on the threads spawned by start. This method
@@ -103,6 +105,10 @@ class Receiver {
    * whether the existing transfer has been finished
    */
   bool hasPendingTransfer();
+
+  /// Receiver threads can call this method to find out
+  /// whether transfer has been marked to abort from outside the receiver
+  bool isAborted() const;
 
   /**
    * @param isFinished         Mark transfer active/inactive
@@ -515,6 +521,9 @@ class Receiver {
 
   /// Global throttler across all threads
   std::shared_ptr<Throttler> throttler_;
+
+  /// Transfer marked to be aborted
+  bool transferAborted_{false};
 };
 }
 }  // namespace facebook::wdt

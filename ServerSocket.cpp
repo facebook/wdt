@@ -38,6 +38,9 @@ ServerSocket::ServerSocket(ServerSocket &&that) noexcept
   // destructed and "this" object will remain intact
   that.listeningFd_ = -1;
   that.fd_ = -1;
+  // It is important that we change the port as well. So that the
+  // socket that has been moved can't even attempt to listen on its port again
+  that.port_ = -1;
 }
 
 ServerSocket &ServerSocket::operator=(ServerSocket &&that) {
@@ -51,13 +54,22 @@ ServerSocket &ServerSocket::operator=(ServerSocket &&that) {
 void ServerSocket::closeAll() {
   VLOG(1) << "Destroying server socket (port, listen fd, fd)" << port_ << ", "
           << listeningFd_ << ", " << fd_;
-  if (listeningFd_ >= 0) {
-    ::close(listeningFd_);
-    listeningFd_ = -1;
-  }
   if (fd_ >= 0) {
-    ::close(fd_);  // this probably fails because it's already closed by client
+    int ret = ::close(fd_);
+    if (ret != 0) {
+      PLOG(ERROR) << "Error closing fd for server socket. fd: " << fd_
+                  << " port: " << port_;
+    }
     fd_ = -1;
+  }
+  if (listeningFd_ >= 0) {
+    int ret = ::close(listeningFd_);
+    if (ret != 0) {
+      PLOG(ERROR)
+          << "Error closing listening fd for server socket. listeningFd: "
+          << listeningFd_ << " port: " << port_;
+    }
+    listeningFd_ = -1;
   }
 }
 
@@ -154,7 +166,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
           continue;
         }
         if (retValue == 0) {
-          VLOG(1) << "poll() timed out" << port_ << " " << listeningFd_;
+          VLOG(1) << "poll() timed out " << port_ << " " << listeningFd_;
         } else {
           PLOG(ERROR) << "poll() failed " << port_ << " " << listeningFd_;
         }
