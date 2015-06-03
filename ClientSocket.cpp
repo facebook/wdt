@@ -1,22 +1,15 @@
 #include "ClientSocket.h"
 #include "SocketUtils.h"
 #include "WdtOptions.h"
+#include "Reporting.h"
 #include <folly/ScopeGuard.h>
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <poll.h>
 #include <fcntl.h>
-#include <chrono>
 
 namespace facebook {
 namespace wdt {
-
-typedef std::chrono::high_resolution_clock Clock;
-
-template <typename T>
-int durationMillis(T d) {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(d).count();
-}
 
 using std::string;
 
@@ -167,11 +160,17 @@ std::string ClientSocket::getPort() const {
 }
 
 int ClientSocket::read(char *buf, int nbyte) const {
-  return ::read(fd_, buf, nbyte);
+  START_PERF_TIMER
+  auto numRead = ::read(fd_, buf, nbyte);
+  RECORD_PERF_RESULT(PerfStatReport::SOCKET_READ)
+  return numRead;
 }
 
 int ClientSocket::write(char *buf, int nbyte) const {
-  return ::write(fd_, buf, nbyte);
+  START_PERF_TIMER
+  auto written = ::write(fd_, buf, nbyte);
+  RECORD_PERF_RESULT(PerfStatReport::SOCKET_WRITE)
+  return written;
 }
 
 void ClientSocket::close() {

@@ -103,8 +103,10 @@ void Throttler::limit(double deltaProgress) {
   }
   if (sleepTimeSeconds > 0) {
     /* sleep override */
+    START_PERF_TIMER
     std::this_thread::sleep_for(
         std::chrono::duration<double>(sleepTimeSeconds));
+    RECORD_PERF_RESULT(PerfStatReport::THROTTLER_SLEEP)
   }
 }
 

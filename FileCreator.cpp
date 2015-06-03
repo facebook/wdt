@@ -1,6 +1,7 @@
 #include "FileCreator.h"
 #include "ErrorCodes.h"
 #include "WdtConfig.h"
+#include "Reporting.h"
 
 #include <string.h>
 #include <sys/stat.h>
@@ -135,6 +136,7 @@ int FileCreator::createFile(const string &relPathStr) {
     }
   }
   int openFlags = O_CREAT | O_WRONLY;
+  START_PERF_TIMER
   int res = open(path.c_str(), openFlags, 0644);
   if (res < 0) {
     if (dir.empty()) {
@@ -147,11 +149,15 @@ int FileCreator::createFile(const string &relPathStr) {
       LOG(ERROR) << "failed to create dir " << dir << " recursively";
       return -1;
     }
+    START_PERF_TIMER
     res = open(path.c_str(), openFlags, 0644);
     if (res < 0) {
       PLOG(ERROR) << "failed creating file " << path;
       return -1;
     }
+    RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
+  } else {
+    RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
   }
   VLOG(1) << "successfully created file " << path;
   return res;

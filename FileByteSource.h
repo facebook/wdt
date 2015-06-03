@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include "ByteSource.h"
+#include "Reporting.h"
 #include "folly/ThreadLocal.h"
 
 namespace facebook {
@@ -144,7 +145,9 @@ class FileByteSource : public ByteSource {
   /// close the source for reading
   virtual void close() override {
     if (fd_ >= 0) {
+      START_PERF_TIMER
       ::close(fd_);
+      RECORD_PERF_RESULT(PerfStatReport::FILE_CLOSE)
       fd_ = -1;
     }
   }

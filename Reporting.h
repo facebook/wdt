@@ -1,19 +1,48 @@
 #pragma once
 
 #include "ErrorCodes.h"
+#include "WdtOptions.h"
 
 #include <vector>
 #include <string>
+#include <chrono>
+#include <iterator>
+#include <unordered_map>
 
 #include <folly/RWSpinLock.h>
+#include <folly/SpinLock.h>
 #include <folly/Memory.h>
+#include <folly/ThreadLocal.h>
 
 namespace facebook {
 namespace wdt {
 
 const double kMbToB = 1024 * 1024;
+const double kMicroToMilli = 1000;
 
-// TODO: make those non copyable (or at least not copied by accident)
+typedef std::chrono::high_resolution_clock Clock;
+
+template <typename T>
+int64_t durationMicros(T d) {
+  return std::chrono::duration_cast<std::chrono::microseconds>(d).count();
+}
+
+template <typename T>
+int durationMillis(T d) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(d).count();
+}
+
+template <typename T>
+double durationSeconds(T d) {
+  return std::chrono::duration_cast<std::chrono::duration<double>>(d).count();
+}
+
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
+  std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
+  return os;
+}
+
 /// class representing statistics related to file transfer
 class TransferStats {
  private:
@@ -386,5 +415,61 @@ class ProgressReporter {
   void displayProgress(int progress, double averageThroughput,
                        double currentThroughput);
 };
+
+#define INIT_PERF_STAT_REPORT perfStatReport.reset(new PerfStatReport);
+
+#define START_PERF_TIMER                               \
+  Clock::time_point startTimePERF;                     \
+  if (WdtOptions::get().enable_perf_stat_collection) { \
+    startTimePERF = Clock::now();                      \
+  }
+
+#define RECORD_PERF_RESULT(statType)                                 \
+  if (WdtOptions::get().enable_perf_stat_collection) {               \
+    int64_t duration = durationMicros(Clock::now() - startTimePERF); \
+    perfStatReport->addPerfStat(statType, duration);                 \
+  }
+
+/// class representing perf stat collection
+class PerfStatReport {
+ public:
+  enum StatType {
+    SOCKET_READ,
+    SOCKET_WRITE,
+    FILE_OPEN,
+    FILE_CLOSE,
+    FILE_READ,
+    FILE_WRITE,
+    SYNC_FILE_RANGE,
+    FILE_SEEK,
+    THROTTLER_SLEEP,
+  };
+
+  /**
+   * @param statType      stat-type
+   * @param timeInMicros  time taken by the operatin in microseconds
+   */
+  void addPerfStat(StatType statType, int64_t timeInMicros);
+
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const PerfStatReport &statReport);
+  PerfStatReport &operator+=(const PerfStatReport &statReport);
+
+ private:
+  const static int kNumTypes_ = 9;
+  const static std::string statTypeDescription_[kNumTypes_];
+  /// mapping from time to number of entries
+  std::unordered_map<int64_t, int64_t> perfStats_[kNumTypes_];
+  /// max time for different stat types
+  int64_t maxValueMillis_[kNumTypes_] = {0};
+  /// min time for different stat types
+  int64_t minValueMillis_[kNumTypes_] = {0};
+  /// number of records for different stat types
+  int64_t count_[kNumTypes_] = {0};
+  /// sum of all records for different stat types
+  int64_t sumMicros_[kNumTypes_] = {0};
+};
+
+extern folly::ThreadLocalPtr<PerfStatReport> perfStatReport;
 }
 }

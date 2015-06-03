@@ -1,23 +1,16 @@
 #include "ServerSocket.h"
 #include "SocketUtils.h"
 #include "WdtOptions.h"
+#include "Reporting.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <poll.h>
 #include <folly/Conv.h>
 #include <fcntl.h>
-#include <chrono>
 #include <algorithm>
 namespace facebook {
 namespace wdt {
 using std::swap;
-typedef std::chrono::high_resolution_clock Clock;
-
-template <typename T>
-int durationMillis(T d) {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(d).count();
-}
-
 using std::string;
 
 ServerSocket::ServerSocket(int32_t port, int backlog)
@@ -187,17 +180,22 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
 
 int ServerSocket::read(char *buf, int nbyte) const {
   while (true) {
+    START_PERF_TIMER
     int retValue = ::read(fd_, buf, nbyte);
     if (retValue < 0 && errno == EINTR) {
       VLOG(2) << "received EINTR. continuing...";
       continue;
     }
+    RECORD_PERF_RESULT(PerfStatReport::SOCKET_READ)
     return retValue;
   }
 }
 
 int ServerSocket::write(char *buf, int nbyte) const {
-  return ::write(fd_, buf, nbyte);
+  START_PERF_TIMER
+  auto written = ::write(fd_, buf, nbyte);
+  RECORD_PERF_RESULT(PerfStatReport::SOCKET_WRITE)
+  return written;
 }
 
 int ServerSocket::closeCurrentConnection() {

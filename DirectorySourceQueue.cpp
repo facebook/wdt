@@ -4,19 +4,11 @@
 #include <unistd.h>
 #include <set>
 #include <utility>
-#include <chrono>
 
 #include <folly/Memory.h>
 #include <regex>
-namespace {
-template <typename T>
-double durationSeconds(T d) {
-  return std::chrono::duration_cast<std::chrono::duration<double>>(d).count();
-}
-}
 namespace facebook {
 namespace wdt {
-typedef std::chrono::high_resolution_clock Clock;
 DirectorySourceQueue::DirectorySourceQueue(const std::string &rootDir)
     : rootDir_(rootDir), options_(WdtOptions::get()) {
   CHECK(!rootDir_.empty());

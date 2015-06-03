@@ -1,9 +1,13 @@
 #include "Reporting.h"
+#include "WdtOptions.h"
 #include <folly/String.h>
+#include <folly/stats/Histogram.h>
+#include <folly/stats/Histogram-defs.h>
 
 #include <iostream>
 #include <iomanip>
 #include <set>
+#include <algorithm>
 
 namespace facebook {
 namespace wdt {
@@ -201,6 +205,90 @@ void ProgressReporter::displayProgress(int progress, double averageThroughput,
     std::cout << " Mbytes/s          ";
   }
   std::cout.flush();
+}
+
+folly::ThreadLocalPtr<PerfStatReport> perfStatReport;
+
+const std::string PerfStatReport::statTypeDescription_[] = {
+    "Socket Read",     "Socket Write", "File Open",
+    "File Close",      "File Read",    "File Write",
+    "Sync File Range", "File Seek",    "Throttler Sleep"};
+
+void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
+  int64_t timeInMillis = timeInMicros / kMicroToMilli;
+  perfStats_[statType][timeInMillis]++;
+  maxValueMillis_[statType] =
+      std::max<int64_t>(maxValueMillis_[statType], timeInMillis);
+  minValueMillis_[statType] =
+      std::min<int64_t>(minValueMillis_[statType], timeInMillis);
+  count_[statType]++;
+  sumMicros_[statType] += timeInMicros;
+}
+
+PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
+  for (int i = 0; i < kNumTypes_; i++) {
+    for (const auto& pair : statReport.perfStats_[i]) {
+      int64_t key = pair.first;
+      int64_t value = pair.second;
+      perfStats_[i][key] += value;
+    }
+    maxValueMillis_[i] =
+        std::max<int64_t>(maxValueMillis_[i], statReport.maxValueMillis_[i]);
+    minValueMillis_[i] =
+        std::min<int64_t>(minValueMillis_[i], statReport.minValueMillis_[i]);
+    count_[i] += statReport.count_[i];
+    sumMicros_[i] += statReport.sumMicros_[i];
+  }
+  return *this;
+}
+
+std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
+  const auto& options = WdtOptions::get();
+  const int numBuckets = options.perf_stat_num_buckets;
+  WDT_CHECK(numBuckets > 0) << "Number of buckets must be greater than zero";
+  os << "\n***** PERF STATS *****\n";
+  for (int i = 0; i < PerfStatReport::kNumTypes_; i++) {
+    if (statReport.count_[i] == 0) {
+      continue;
+    }
+    const auto& perfStatMap = statReport.perfStats_[i];
+    os << statReport.statTypeDescription_[i] << '\n';
+    os << "Number of calls " << statReport.count_[i] << '\n';
+    os << "Total time spent per thread "
+       << (statReport.sumMicros_[i] / kMicroToMilli / options.num_ports)
+       << " ms\n";
+    os << "Avg " << (((double)statReport.sumMicros_[i]) / statReport.count_[i] /
+                     kMicroToMilli) << " ms\n";
+    int64_t max = statReport.maxValueMillis_[i];
+    int64_t min = statReport.minValueMillis_[i];
+    if (min == max) {
+      // only one value
+      auto it = perfStatMap.find(max);
+      WDT_CHECK(it != perfStatMap.end());
+      os << "[" << min << ", " << max << "] ==> " << it->second << "\n";
+      continue;
+    }
+    int64_t range = max - min + 1;
+    if (range % numBuckets != 0) {
+      range = (range / numBuckets + 1) * numBuckets;
+    }
+    int64_t bucketSize = range / numBuckets;
+    folly::Histogram<int64_t> hist(bucketSize, min, max + 1);
+    for (const auto& pair : perfStatMap) {
+      hist.addRepeatedValue(pair.first, pair.second);
+    }
+    os << "p99 time " << hist.getPercentileEstimate(0.99) << " ms\n";
+    for (int bucketId = 0; bucketId < hist.getNumBuckets(); bucketId++) {
+      int64_t numSamplesInBucket = hist.getBucketByIndex(bucketId).count;
+      if (numSamplesInBucket == 0) {
+        continue;
+      }
+      os << "(" << hist.getBucketMin(bucketId) << ", "
+         << hist.getBucketMax(bucketId) << "] --> " << numSamplesInBucket
+         << "\n";
+    }
+  }
+  return os;
 }
 }
 }

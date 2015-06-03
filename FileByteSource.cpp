@@ -1,4 +1,5 @@
 #include "FileByteSource.h"
+#include "WdtOptions.h"
 
 #include <algorithm>
 #include <fcntl.h>
@@ -30,13 +31,22 @@ ErrorCode FileByteSource::open() {
     buffer_.reset(new Buffer(bufferSize_));
   }
   const std::string &fullPath = fileData_->getFullPath();
+  START_PERF_TIMER
   fd_ = ::open(fullPath.c_str(), O_RDONLY);
   if (fd_ < 0) {
     errCode = BYTE_SOURCE_READ_ERROR;
     PLOG(ERROR) << "error opening file " << fullPath;
-  } else if (offset_ > 0 && lseek(fd_, offset_, SEEK_SET) < 0) {
-    errCode = BYTE_SOURCE_READ_ERROR;
-    PLOG(ERROR) << "error seeking file " << fullPath;
+  } else {
+    RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
+    if (offset_ > 0) {
+      START_PERF_TIMER
+      if (lseek(fd_, offset_, SEEK_SET) < 0) {
+        errCode = BYTE_SOURCE_READ_ERROR;
+        PLOG(ERROR) << "error seeking file " << fullPath;
+      } else {
+        RECORD_PERF_RESULT(PerfStatReport::FILE_SEEK)
+      }
+    }
   }
   transferStats_.setErrorCode(errCode);
   return errCode;
@@ -47,6 +57,7 @@ char *FileByteSource::read(size_t &size) {
   if (hasError() || finished()) {
     return nullptr;
   }
+  START_PERF_TIMER
   size_t toRead =
       (size_t)std::min<uint64_t>(buffer_->size_, size_ - bytesRead_);
   ssize_t numRead = ::read(fd_, buffer_->data_, toRead);
@@ -60,6 +71,7 @@ char *FileByteSource::read(size_t &size) {
     this->close();
     return nullptr;
   }
+  RECORD_PERF_RESULT(PerfStatReport::FILE_READ)
   bytesRead_ += numRead;
   size = numRead;
   return buffer_->data_;

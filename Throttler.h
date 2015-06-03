@@ -1,11 +1,11 @@
 #pragma once
+#include "Reporting.h"
 #include <folly/Synchronized.h>
 #include <thread>
 #include <glog/logging.h>
 #include <folly/SpinLock.h>
 namespace facebook {
 namespace wdt {
-typedef std::chrono::high_resolution_clock Clock;
 /**
  * Attempts to limit the rate in two ways.
  * 1. Limit average rate by calling averageThrottler()
@@ -130,7 +130,7 @@ class Throttler {
    * periodically (check FLAGS_peak_log_time_ms). lastLogTime_ is
    * the last time this log was written
    */
-  std::chrono::time_point<std::chrono::high_resolution_clock> lastLogTime_;
+  Clock::time_point lastLogTime_;
   /// Instant progress in the time stats were logged last time
   double instantProgress_;
   // Records the total progress in bytes till now

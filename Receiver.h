@@ -34,8 +34,6 @@
 namespace facebook {
 namespace wdt {
 
-typedef std::chrono::high_resolution_clock Clock;
-
 class Receiver {
  public:
   /// Constructor that only needs start port and number of ports
@@ -478,6 +476,9 @@ class Receiver {
   /// Bunch of stats objects given to each thread by the root thread
   /// so that finish() can summarize the result at the end of joining.
   std::vector<TransferStats> threadStats_;
+
+  /// per thread perf report
+  std::vector<PerfStatReport> perfReports_;
 
   /// number of blocks send by the sender
   int64_t numBlocksSend_{-1};

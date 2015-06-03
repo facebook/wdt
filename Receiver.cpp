@@ -22,17 +22,6 @@ namespace wdt {
 const static int kTimeoutBufferMillis = 1000;
 const static int kWaitTinmeoutFactor = 5;
 
-template <typename T>
-std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
-  std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
-  return os;
-}
-
-template <typename T>
-double durationSeconds(T d) {
-  return std::chrono::duration_cast<std::chrono::duration<double>>(d).count();
-}
-
 size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
                    ssize_t len) {
   VLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
@@ -217,6 +206,7 @@ void Receiver::markTransferFinished(bool isFinished) {
 }
 
 std::unique_ptr<TransferReport> Receiver::finish() {
+  const auto &options = WdtOptions::get();
   if (!isJoinable_) {
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
                  << " finish and this method will never return";
@@ -251,6 +241,13 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     report->setTotalFileSize(totalSenderBytes_);
     report->setTotalTime(durationSeconds(Clock::now() - startTime_));
     progressReporter_->end(report);
+  }
+  if (options.enable_perf_stat_collection) {
+    PerfStatReport report;
+    for (auto &perfReport : perfReports_) {
+      report += perfReport;
+    }
+    LOG(INFO) << report;
   }
 
   LOG(WARNING) << "WDT receiver's transfer has been finished";
@@ -335,7 +332,7 @@ void Receiver::progressTracker() {
   int intervalsSinceLastUpdate = 0;
   double currentThroughput = 0;
 
-  LOG(INFO) << "Progress reporter tracking every "
+  LOG(INFO) << "Progress reporter updating every "
             << progressReportIntervalMillis << " ms";
   auto waitingTime = std::chrono::milliseconds(progressReportIntervalMillis);
   int64_t totalSenderBytes;
@@ -388,6 +385,7 @@ void Receiver::start() {
               << bufferSize << " instead";
   }
   fileCreator_.reset(new FileCreator(destDir_, threadServerSockets_.size()));
+  perfReports_.resize(threadServerSockets_.size());
   for (int i = 0; i < threadServerSockets_.size(); i++) {
     threadStats_.emplace_back(true);
   }
@@ -1183,6 +1181,9 @@ Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
 
 void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
                           size_t bufferSize, TransferStats &threadStats) {
+  INIT_PERF_STAT_REPORT
+  folly::ScopeGuard guard =
+      folly::makeGuard([&] { perfReports_[threadIndex] = *perfStatReport; });
   ThreadData data(threadIndex, socket, threadStats, bufferSize);
   if (!data.getBuf()) {
     LOG(ERROR) << "error allocating " << bufferSize;

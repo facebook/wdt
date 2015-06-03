@@ -14,6 +14,9 @@
 
 #include <thread>
 
+namespace facebook {
+namespace wdt {
+
 // Constants for different calculations
 /*
  * If you change any of the multipliers be
@@ -22,24 +25,6 @@
 const double kPeakMultiplier = 1.2;
 const int kBucketMultiplier = 2;
 const double kTimeMultiplier = 0.25;
-
-namespace {
-
-template <typename T>
-double durationSeconds(T d) {
-  return std::chrono::duration_cast<std::chrono::duration<double>>(d).count();
-}
-
-}  // anonymous namespace
-
-namespace facebook {
-namespace wdt {
-
-template <typename T>
-std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
-  std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
-  return os;
-}
 
 ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue &queue,
                                              TransferStats &threadStats)
@@ -339,6 +324,13 @@ std::unique_ptr<TransferReport> Sender::finish() {
   if (progressReportEnabled) {
     progressReporter_->end(transferReport);
   }
+  if (options.enable_perf_stat_collection) {
+    PerfStatReport report;
+    for (auto &perfReport : perfReports_) {
+      report += perfReport;
+    }
+    LOG(INFO) << report;
+  }
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
             << directoryTime << " dirTime)"
             << ". Transfer summary : " << *transferReport
@@ -388,6 +380,7 @@ ErrorCode Sender::start() {
   for (int i = 0; i < ports_.size(); i++) {
     transferHistories_.emplace_back(*dirQueue_, globalThreadStats_[i]);
   }
+  perfReports_.resize(ports_.size());
   numActiveThreads_ = ports_.size();
   transferFinished_ = false;
   for (int i = 0; i < ports_.size(); i++) {
@@ -842,6 +835,7 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
 }
 
 void Sender::sendOne(int threadIndex) {
+  INIT_PERF_STAT_REPORT
   std::vector<ThreadTransferHistory> &transferHistories = transferHistories_;
   TransferStats &threadStats = globalThreadStats_[threadIndex];
   DirectorySourceQueue &queue(*dirQueue_);
@@ -880,6 +874,7 @@ void Sender::sendOne(int threadIndex) {
             << "Transfer stat : " << threadStats << " Total throughput = "
             << threadStats.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
+  perfReports_[threadIndex] = *perfStatReport;
   return;
 }
 

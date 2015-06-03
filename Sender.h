@@ -37,8 +37,6 @@ namespace wdt {
 
 class DirectorySourceQueue;
 
-typedef std::chrono::high_resolution_clock Clock;
-
 /// transfer history of a sender thread
 class ThreadTransferHistory {
  public:
@@ -435,6 +433,8 @@ class Sender {
   std::thread progressReporterThread_;
   /// Vector of per thread stats, this same instance is used in reporting
   std::vector<TransferStats> globalThreadStats_;
+  /// per thread perf report
+  std::vector<PerfStatReport> perfReports_;
   /// This condition is notified when the transfer is finished
   std::condition_variable conditionFinished_;
   /// Mutex which is shared between the parent thread, sender thread and

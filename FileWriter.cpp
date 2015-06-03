@@ -1,5 +1,6 @@
 #include "FileWriter.h"
 #include "WdtOptions.h"
+#include "Reporting.h"
 
 #include <fcntl.h>
 #include <gflags/gflags.h>
@@ -23,9 +24,14 @@ ErrorCode FileWriter::open() {
     // multi block file
     fd_ =
         fileCreator_->openForBlocks(threadIndex_, fileName_, seqId_, fileSize_);
-    if (fd_ >= 0 && offset_ > 0 && lseek(fd_, offset_, SEEK_SET) < 0) {
-      PLOG(ERROR) << "Unable to seek " << fileName_;
-      close();
+    if (fd_ >= 0 && offset_ > 0) {
+      START_PERF_TIMER
+      if (lseek(fd_, offset_, SEEK_SET) < 0) {
+        PLOG(ERROR) << "Unable to seek " << fileName_;
+        close();
+      } else {
+        RECORD_PERF_RESULT(PerfStatReport::FILE_SEEK)
+      }
     }
   }
   if (fd_ == -1) {
@@ -37,9 +43,11 @@ ErrorCode FileWriter::open() {
 
 void FileWriter::close() {
   if (fd_ >= 0) {
+    START_PERF_TIMER
     if (::close(fd_) != 0) {
       PLOG(ERROR) << "Unable to close fd " << fd_;
     }
+    RECORD_PERF_RESULT(PerfStatReport::FILE_CLOSE)
     fd_ = -1;
   }
 }
@@ -49,6 +57,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
   if (!options.skip_writes) {
     ssize_t count = 0;
     while (count < size) {
+      START_PERF_TIMER
       ssize_t written = ::write(fd_, buf + count, size - count);
       if (written == -1) {
         if (errno == EINTR) {
@@ -59,6 +68,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
                     << count << " " << size;
         return FILE_WRITE_ERROR;
       }
+      RECORD_PERF_RESULT(PerfStatReport::FILE_WRITE)
       count += written;
     }
     VLOG(1) << "Successfully written " << count << " bytes to fd " << fd_;
@@ -86,12 +96,14 @@ void FileWriter::syncFileRange(uint64_t written, bool forced) {
     // sync_file_range with flag SYNC_FILE_RANGE_WRITE is an asynchronous
     // operation. So, this is not that costly. Source :
     // http://yoshinorimatsunobu.blogspot.com/2014/03/how-syncfilerange-really-works.html
+    START_PERF_TIMER
     auto status = sync_file_range(fd_, nextSyncOffset_, writtenSinceLastSync_,
                                   SYNC_FILE_RANGE_WRITE);
     if (status != 0) {
       PLOG(ERROR) << "sync_file_range() failed for fd " << fd_;
       return;
     }
+    RECORD_PERF_RESULT(PerfStatReport::SYNC_FILE_RANGE)
     VLOG(1) << "file range synced " << nextSyncOffset_ << " "
             << writtenSinceLastSync_;
     nextSyncOffset_ += writtenSinceLastSync_;
