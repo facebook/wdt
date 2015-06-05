@@ -173,8 +173,8 @@ Receiver::~Receiver() {
     LOG(WARNING) << "There is an ongoing transfer and the destructor"
                  << " is being called. Trying to finish the transfer";
     abort();
-    finish();
   }
+  finish();
 }
 
 vector<int32_t> Receiver::getPorts() {
@@ -210,6 +210,12 @@ bool Receiver::isAborted() const {
 }
 
 std::unique_ptr<TransferReport> Receiver::finish() {
+  std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
+  if (areThreadsJoined_) {
+    LOG(INFO) << "Threads have already been joined. Returning the "
+              << "transfer report";
+    return getTransferReport();
+  }
   const auto &options = WdtOptions::get();
   if (!isJoinable_) {
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
@@ -229,17 +235,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     progressTrackerThread_.join();
   }
 
-  std::unique_ptr<TransferReport> report =
-      folly::make_unique<TransferReport>(threadStats_);
-  const TransferStats &summary = report->getSummary();
-
-  if (numBlocksSend_ == -1 || numBlocksSend_ != summary.getNumBlocks()) {
-    // either none of the threads finished properly or not all of the blocks
-    // were transferred
-    report->setErrorCode(ERROR);
-  } else {
-    report->setErrorCode(OK);
-  }
+  std::unique_ptr<TransferReport> report = getTransferReport();
 
   if (progressReporter_ && totalSenderBytes_ >= 0) {
     report->setTotalFileSize(totalSenderBytes_);
@@ -259,6 +255,22 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   receiverThreads_.clear();
   threadServerSockets_.clear();
   threadStats_.clear();
+  areThreadsJoined_ = true;
+  return report;
+}
+
+std::unique_ptr<TransferReport> Receiver::getTransferReport() {
+  std::unique_ptr<TransferReport> report =
+      folly::make_unique<TransferReport>(threadStats_);
+  const TransferStats &summary = report->getSummary();
+
+  if (numBlocksSend_ == -1 || numBlocksSend_ != summary.getNumBlocks()) {
+    // either none of the threads finished properly or not all of the blocks
+    // were transferred
+    report->setErrorCode(ERROR);
+  } else {
+    report->setErrorCode(OK);
+  }
   return report;
 }
 
@@ -376,6 +388,8 @@ void Receiver::start() {
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an existing transfer in progress on this object";
   }
+  areThreadsJoined_ = false;
+  numActiveThreads_ = threadServerSockets_.size();
   LOG(INFO) << "Starting (receiving) server on ports [ " << getPorts()
             << "] Target dir : " << destDir_;
   markTransferFinished(false);
@@ -1200,6 +1214,15 @@ Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
 
 void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
                           size_t bufferSize, TransferStats &threadStats) {
+  folly::ScopeGuard completionGuard = folly::makeGuard([&] {
+    std::unique_lock<std::mutex> lock(mutex_);
+    numActiveThreads_--;
+    if (numActiveThreads_ == 0) {
+      LOG(WARNING) << "Last thread finished "
+                   << durationSeconds(Clock::now() - startTime_);
+      transferFinished_ = true;
+    }
+  });
   INIT_PERF_STAT_REPORT
   folly::ScopeGuard guard =
       folly::makeGuard([&] { perfReports_[threadIndex] = *perfStatReport; });

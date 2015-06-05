@@ -89,7 +89,6 @@ int main(int argc, char *argv[]) {
     }
     // TODO fix this
     if (!FLAGS_run_as_daemon) {
-      LOG(WARNING) << "Initiating transfer";
       receiver.transferAsync();
       std::unique_ptr<TransferReport> report = receiver.finish();
       retCode = report->getSummary().getErrorCode();

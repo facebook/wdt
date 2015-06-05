@@ -158,8 +158,8 @@ Sender::~Sender() {
   if (!isTransferFinished()) {
     LOG(WARNING) << "Sender being deleted. Forcefully aborting the transfer";
     abort();
-    finish();
   }
+  finish();
 }
 
 void Sender::setIncludeRegex(const std::string &includeRegex) {
@@ -262,6 +262,12 @@ void Sender::configureThrottler() {
 }
 
 std::unique_ptr<TransferReport> Sender::finish() {
+  std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
+  if (areThreadsJoined_) {
+    LOG(INFO) << "Threads have already been joined. Returning the "
+              << "minimal transfer report";
+    return getTransferReport();
+  }
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
   bool progressReportEnabled =
@@ -321,6 +327,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
           transferredSourceStats, dirQueue_->getFailedSourceStats(),
           globalThreadStats_, dirQueue_->getFailedDirectories(), totalTime,
           totalFileSize, dirQueue_->getCount());
+
   if (progressReportEnabled) {
     progressReporter_->end(transferReport);
   }
@@ -339,6 +346,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
             << transferReport->getSummary().getEffectiveTotalBytes() /
                    (totalTime - directoryTime) / kMbToB
             << " Mbytes/sec pure transf rate)";
+  areThreadsJoined_ = true;
   return transferReport;
 }
 
@@ -352,6 +360,7 @@ std::unique_ptr<TransferReport> Sender::transfer() {
 }
 
 ErrorCode Sender::start() {
+  areThreadsJoined_ = false;
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
   const size_t bufferSize = options.buffer_size;

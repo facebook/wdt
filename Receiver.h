@@ -435,6 +435,10 @@ class Receiver {
    */
   void incrFailedThreadCountAndCheckForSessionEnd(ThreadData &data);
 
+  /// Get transfer report, meant to be called after threads have been finished
+  /// Method is not thread safe
+  std::unique_ptr<TransferReport> getTransferReport();
+
   /// The thread that is responsible for calling running the progress tracker
   std::thread progressTrackerThread_;
   /// Holds the instance of the progress reporter default or customized
@@ -524,6 +528,16 @@ class Receiver {
 
   /// Transfer marked to be aborted
   bool transferAborted_{false};
+
+  /// Have threads been joined
+  bool areThreadsJoined_{false};
+
+  /// Number of active threads, decremented everytime a thread is finished
+  uint32_t numActiveThreads_;
+
+  /// Mutex for the management of this instance, specifically to keep the
+  /// instance sane for multi threaded public API calls
+  std::mutex instanceManagementMutex_;
 };
 }
 }  // namespace facebook::wdt

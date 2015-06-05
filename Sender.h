@@ -450,8 +450,13 @@ class Sender {
   std::vector<ThreadTransferHistory> transferHistories_;
   /// flag representing whether transfer has been aborted or not
   bool transferAborted_{false};
+  /// Has finished been called and threads joined
+  bool areThreadsJoined_{true};
   /// The global throttler shared across all the threads
   std::shared_ptr<Throttler> throttler_;
+  /// Mutex for the management of this instance, specifically to keep the
+  /// instance sane for multi threaded public API calls
+  std::mutex instanceManagementMutex_;
 };
 }
 }  // namespace facebook::wdt
