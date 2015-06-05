@@ -16,11 +16,14 @@
 
 #include "Sender.h"
 #include "Receiver.h"
+#include <chrono>
+#include <future>
 #include <folly/String.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
 #include <signal.h>
+#include <thread>
 #define STANDALONE_APP
 #include "WdtFlags.h"
 #include "WdtFlags.cpp.inc"
@@ -42,12 +45,63 @@ DEFINE_int32(
 
 DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 
+DEFINE_int32(abort_after_seconds, 0,
+             "Abort transfer after given seconds. 0 means don't abort.");
+
 using namespace facebook::wdt;
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
   return os;
 }
+
+// Example of use of a std::atomic for abort even though in this
+// case we could check the time directly (but this is cheaper if more code)
+class AbortChecker : public WdtBase::IAbortChecker {
+ public:
+  explicit AbortChecker(const std::atomic<bool> &abortTrigger)
+      : abortTriggerPtr_(&abortTrigger) {
+  }
+  bool shouldAbort() const {
+    return abortTriggerPtr_->load();
+  }
+
+ private:
+  std::atomic<bool> const *abortTriggerPtr_;
+};
+
+std::mutex abortMutex;
+std::condition_variable abortCondVar;
+
+void setUpAbort(WdtBase &senderOrReceiver) {
+  int abortSeconds = FLAGS_abort_after_seconds;
+  LOG(INFO) << "Setting up abort " << abortSeconds << " seconds.";
+  if (abortSeconds <= 0) {
+    return;
+  }
+  static std::atomic<bool> abortTrigger{false};
+  static AbortChecker chkr(abortTrigger);
+  senderOrReceiver.setAbortChecker(&chkr);
+  auto lambda = [=] {
+    LOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
+    std::unique_lock<std::mutex> lk(abortMutex);
+    if (abortCondVar.wait_for(lk, std::chrono::seconds(abortSeconds)) ==
+        std::cv_status::no_timeout) {
+      LOG(INFO) << "Already finished normally, no abort.";
+    } else {
+      LOG(INFO) << "Requesting abort.";
+      abortTrigger.store(true);
+    }
+  };
+  // we want to run in bg, not block
+  static std::future<void> abortThread = std::async(std::launch::async, lambda);
+}
+
+void cancelAbort() {
+  std::unique_lock<std::mutex> lk(abortMutex);
+  abortCondVar.notify_one();
+}
+
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
@@ -87,6 +141,7 @@ int main(int argc, char *argv[]) {
       LOG(ERROR) << "Couldn't bind on any port";
       return 0;
     }
+    setUpAbort(receiver);
     // TODO fix this
     if (!FLAGS_run_as_daemon) {
       receiver.transferAsync();
@@ -96,7 +151,6 @@ int main(int argc, char *argv[]) {
       receiver.runForever();
       retCode = OK;
     }
-    return retCode;
   } else {
     std::vector<FileInfo> fileInfo;
     if (FLAGS_files) {
@@ -120,6 +174,7 @@ int main(int argc, char *argv[]) {
       ports.push_back(options.start_port + i);
     }
     Sender sender(FLAGS_destination, FLAGS_directory, ports, fileInfo);
+    setUpAbort(sender);
     sender.setSenderId(FLAGS_transfer_id);
     if (FLAGS_protocol_version > 0) {
       sender.setProtocolVersion(FLAGS_protocol_version);
@@ -131,5 +186,6 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<TransferReport> report = sender.transfer();
     retCode = report->getSummary().getErrorCode();
   }
+  cancelAbort();
   return retCode;
 }

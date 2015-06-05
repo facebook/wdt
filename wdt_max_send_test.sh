@@ -1,6 +1,10 @@
 #! /bin/bash
 
 # This is to regress/test the max ~22000Mbytes/sec transfer rate
+# to get the highest (> 20G) rates you need:
+# a) /dev/shm to be almost empty
+# b) nothing else much running on your dev server
+# c) run this a couple times
 
 # modified from wdt_e2e_test.sh and fbonly/wdt_prof.sh
 
@@ -34,7 +38,7 @@ SKIP_WRITES="true"
 #WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_sockets 13"
 # With, still gets almost same max (21G) with throttling set high enough
 WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_ports 13
---avg_mbytes_per_sec=26000 --max_mbytes_per_sec=26001 -enable_checksum=false"
+--avg_mbytes_per_sec=26000 --max_mbytes_per_sec=26001 --enable_checksum=false"
 CLIENT_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
 %Mmax)k\n%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps\nCLIENT_PROFILE %U \
 %S %e"

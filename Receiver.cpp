@@ -116,11 +116,6 @@ Receiver::Receiver(int port, int numSockets, const std::string &destDir)
   this->destDir_ = destDir;
 }
 
-void Receiver::setProgressReporter(
-    std::unique_ptr<ProgressReporter> &progressReporter) {
-  progressReporter_ = std::move(progressReporter);
-}
-
 int32_t Receiver::registerPorts(bool stopOnFailure) {
   const auto &options = WdtOptions::get();
   int32_t numSuccess = 0;
@@ -196,17 +191,6 @@ void Receiver::markTransferFinished(bool isFinished) {
   if (isFinished) {
     conditionRecvFinished_.notify_one();
   }
-}
-
-void Receiver::abort() {
-  std::unique_lock<std::mutex> lock(mutex_);
-  LOG(WARNING) << "Setting the abort flag to make receiver threads abort";
-  transferAborted_ = true;
-}
-
-bool Receiver::isAborted() const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return transferAborted_;
 }
 
 std::unique_ptr<TransferReport> Receiver::finish() {
@@ -291,10 +275,6 @@ void Receiver::configureThrottler() {
   }
 }
 
-void Receiver::setThrottler(std::shared_ptr<Throttler> throttler) {
-  throttler_ = throttler;
-}
-
 ErrorCode Receiver::transferAsync() {
   const auto &options = WdtOptions::get();
   if (hasPendingTransfer()) {
@@ -356,7 +336,7 @@ void Receiver::progressTracker() {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       conditionRecvFinished_.wait_for(lock, waitingTime);
-      if (transferFinished_ || transferAborted_) {
+      if (transferFinished_ || wasAbortRequested()) {
         break;
       }
       if (totalSenderBytes_ == -1) {
@@ -562,12 +542,12 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
       return FAILED;
     }
 
-    if (isAborted()) {
+    if (wasAbortRequested()) {
       LOG(ERROR) << "Thread marked to abort while trying to accept first"
                  << " connection. Num attempts " << acceptAttempts;
       // Even though there is a transition FAILED here
-      // isAborted() is going to be checked again in the receiveOne. So this
-      // is pretty much irrelavant
+      // wasAbortRequested() is going to be checked again in the receiveOne.
+      // So this is pretty much irrelavant
       return FAILED;
     }
 
@@ -861,7 +841,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   remainingData -= toWrite;
   // also means no leftOver so it's ok we use buf from start
   while (writer.getTotalWritten() < dataSize) {
-    if (isAborted()) {
+    if (wasAbortRequested()) {
       LOG(ERROR) << "Thread marked for abort while processing a file."
                  << " port : " << socket.getPort();
       return FAILED;
@@ -1234,7 +1214,7 @@ void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
   }
   ReceiverState state = LISTEN;
   while (true) {
-    if (isAborted()) {
+    if (wasAbortRequested()) {
       LOG(ERROR) << "Transfer aborted " << socket.getPort();
       threadStats.setErrorCode(ABORT);
       break;

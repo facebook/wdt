@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "WdtBase.h"
 #include "FileCreator.h"
 #include "ErrorCodes.h"
 #include "WdtOptions.h"
@@ -34,7 +35,7 @@
 namespace facebook {
 namespace wdt {
 
-class Receiver {
+class Receiver : public WdtBase {
  public:
   /// Constructor that only needs start port and number of ports
   Receiver(int startPort, int numPorts);
@@ -47,18 +48,12 @@ class Receiver {
   /// provided in the constructor
   int32_t registerPorts(bool stopOnFailure = false);
 
-  /// Transfer can be marked to abort and receiver threads will eventually
-  /// get aborted after this method has been called based on
-  /// whether they are doing read() on the socket and the timeout for the
-  /// socket read
-  void abort();
-
   /**
    * Joins on the threads spawned by start. This method
    * is called by default when the wdt receiver is expected
    * to run as forever running process. However this has to
    * be explicitly called when the caller expects to conclude
-   * a transfer.
+   * a transfer. TODO: move to base?
    */
   std::unique_ptr<TransferReport> finish();
 
@@ -106,10 +101,6 @@ class Receiver {
    */
   bool hasPendingTransfer();
 
-  /// Receiver threads can call this method to find out
-  /// whether transfer has been marked to abort from outside the receiver
-  bool isAborted() const;
-
   /**
    * @param isFinished         Mark transfer active/inactive
    *
@@ -120,12 +111,6 @@ class Receiver {
    * Use the method to get a list of ports
    */
   std::vector<int32_t> getPorts();
-
-  /// @param progressReporter     progress reporter to be used
-  void setProgressReporter(std::unique_ptr<ProgressReporter> &progressReporter);
-
-  /// Set throttler externally. Should be set before any transfer calls
-  void setThrottler(std::shared_ptr<Throttler> throttler);
 
  protected:
   /// receiver state
@@ -441,8 +426,6 @@ class Receiver {
 
   /// The thread that is responsible for calling running the progress tracker
   std::thread progressTrackerThread_;
-  /// Holds the instance of the progress reporter default or customized
-  std::unique_ptr<ProgressReporter> progressReporter_;
   /**
    * Flag set by the finish() method when the receiver threads are joined.
    * No transfer can be started as long as this flag is false.
@@ -522,12 +505,6 @@ class Receiver {
 
   /// condition variable to coordinate transfer finish
   mutable std::condition_variable conditionAllFinished_;
-
-  /// Global throttler across all threads
-  std::shared_ptr<Throttler> throttler_;
-
-  /// Transfer marked to be aborted
-  bool transferAborted_{false};
 
   /// Have threads been joined
   bool areThreadsJoined_{false};

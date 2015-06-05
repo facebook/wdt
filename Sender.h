@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "WdtBase.h"
 #include "DirectorySourceQueue.h"
 #include "ErrorCodes.h"
 #include "Throttler.h"
@@ -113,7 +114,7 @@ class ThreadTransferHistory {
  * The object will not be destroyed till the transfer finishes. This
  * class is not thread safe.
  */
-class Sender {
+class Sender : public WdtBase {
  public:
   Sender(const std::string &destHost, const std::string &srcDir);
 
@@ -133,11 +134,9 @@ class Sender {
   /**
    * This method should only be called when an async transfer was
    * initiated using the API transferAsync
+   * TODO: move to base
    */
   std::unique_ptr<TransferReport> finish();
-
-  /// aborts current transfer
-  void abort();
 
   /**
    * A blocking call which will initiate a transfer based on
@@ -145,7 +144,7 @@ class Sender {
    */
   std::unique_ptr<TransferReport> transfer();
 
-  /// Returns whether transfer is finished
+  /// Returns whether transfer is finished TODO: move to base
   bool isTransferFinished();
 
   /// End time of the transfer
@@ -188,27 +187,12 @@ class Sender {
    * @param progressReportIntervalMillis_   interval(ms) between progress
    *                                        reports. A value of 0 indicates no
    *                                        progress reporting
+   * TODO: move to base
    */
   void setProgressReportIntervalMillis(const int progressReportIntervalMillis);
 
-  /**
-   * @param progressReporter    progress reporter to be used. By default, wdt
-   *                            uses a progress reporter which shows progress
-   *                            percentage and current throughput. It also
-   *                            visually shows progress. Sample report:
-   *                            [=====>               ] 30% 2500.00 Mbytes/sec
-   */
-  void setProgressReporter(std::unique_ptr<ProgressReporter> &progressReporter);
-
   /// Makes the minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
-
-  /**
-   * Users of the wdt sender can set a throttler externally.
-   * This needs to be called before any call to tansfer or transferAsync
-   * are made.
-   */
-  void setThrottler(std::shared_ptr<Throttler> throttler);
 
  private:
   /// state machine states
@@ -380,9 +364,6 @@ class Sender {
    */
   ErrorCode start();
 
-  /// @return   whether the transfer is aborted or not
-  bool isAborted();
-
   /**
    * @param transferredSourceStats      Stats for the successfully transmitted
    *                                    sources
@@ -423,8 +404,6 @@ class Sender {
   std::string destHost_;
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
-  /// Holds the instance of the progress reporter default or customized
-  std::unique_ptr<ProgressReporter> progressReporter_;
   /// Thread that is running the discovery of files using the dirQueue_
   std::thread dirThread_;
   /// Threads which are responsible for transfer of the sources
@@ -448,12 +427,8 @@ class Sender {
   std::chrono::time_point<Clock> endTime_;
   /// Per thread transfer history
   std::vector<ThreadTransferHistory> transferHistories_;
-  /// flag representing whether transfer has been aborted or not
-  bool transferAborted_{false};
   /// Has finished been called and threads joined
   bool areThreadsJoined_{true};
-  /// The global throttler shared across all the threads
-  std::shared_ptr<Throttler> throttler_;
   /// Mutex for the management of this instance, specifically to keep the
   /// instance sane for multi threaded public API calls
   std::mutex instanceManagementMutex_;

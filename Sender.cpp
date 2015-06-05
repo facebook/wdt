@@ -216,11 +216,6 @@ const std::string &Sender::getDestination() const {
   return destHost_;
 }
 
-void Sender::setProgressReporter(
-    std::unique_ptr<ProgressReporter> &progressReporter) {
-  progressReporter_ = std::move(progressReporter);
-}
-
 std::unique_ptr<TransferReport> Sender::getTransferReport() {
   size_t totalFileSize = dirQueue_->getTotalSize();
   double totalTime = durationSeconds(Clock::now() - startTime_);
@@ -228,11 +223,6 @@ std::unique_ptr<TransferReport> Sender::getTransferReport() {
       folly::make_unique<TransferReport>(globalThreadStats_, totalTime,
                                          totalFileSize);
   return transferReport;
-}
-
-void Sender::setThrottler(std::shared_ptr<Throttler> throttler) {
-  VLOG(2) << "Setting an external throttler";
-  throttler_ = throttler;
 }
 
 bool Sender::isTransferFinished() {
@@ -870,7 +860,7 @@ void Sender::sendOne(int threadIndex) {
   ThreadData threadData(threadIndex, queue, threadStats, transferHistories);
   SenderState state = CONNECT;
   while (state != END) {
-    if (isAborted()) {
+    if (wasAbortRequested()) {
       LOG(ERROR) << "Transfer aborted " << port;
       threadStats.setErrorCode(ABORT);
       break;
@@ -885,16 +875,6 @@ void Sender::sendOne(int threadIndex) {
             << " Mbytes/sec";
   perfReports_[threadIndex] = *perfStatReport;
   return;
-}
-
-void Sender::abort() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  transferAborted_ = true;
-}
-
-bool Sender::isAborted() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return transferAborted_;
 }
 
 TransferStats Sender::sendOneByteSource(
