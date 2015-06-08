@@ -177,6 +177,11 @@ class WdtOptions {
   int32_t connect_timeout_millis{2000};
 
   /**
+   * interval in ms between abort checks
+   */
+  int abort_check_interval_millis{200};
+
+  /**
   * Disk sync interval in mb. A negative value disables syncing
   */
   double disk_sync_interval_mb{0.5};

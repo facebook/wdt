@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ErrorCodes.h"
+#include "WdtBase.h"
 
 #include <string>
 #include <sys/types.h>
@@ -13,7 +14,8 @@ class ServerSocket {
  public:
   ServerSocket(ServerSocket &&that) noexcept;
   ServerSocket(const ServerSocket &that) = delete;
-  ServerSocket(int32_t port, int backlog);
+  ServerSocket(int32_t port, int backlog,
+               WdtBase::IAbortChecker const *abortChecker);
   ServerSocket &operator=(const ServerSocket &that) = delete;
   ServerSocket &operator=(ServerSocket &&that);
   virtual ~ServerSocket();
@@ -22,8 +24,10 @@ class ServerSocket {
   ErrorCode listen();
   /// will accept next (/only) incoming connection
   ErrorCode acceptNextConnection(int timeoutMillis);
-  int read(char *buf, int nbyte) const;
-  int write(char *buf, int nbyte) const;
+  /// tries to read nbyte data and periodically checks for abort
+  int read(char *buf, int nbyte, bool tryFull = true) const;
+  /// tries to write nbyte data and periodically checks for abort
+  int write(const char *buf, int nbyte, bool tryFull = true) const;
   int getFd() const;
   int getListenFd() const;
   int closeCurrentConnection();
@@ -40,6 +44,7 @@ class ServerSocket {
   int listeningFd_;
   int fd_;
   struct addrinfo sa_;
+  WdtBase::IAbortChecker const *abortChecker_;
 };
 }
 }  // namespace facebook::wdt

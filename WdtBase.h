@@ -42,10 +42,10 @@ class WdtBase {
   };
 
   /// Constructor
-  WdtBase() {
+  WdtBase() : abortCheckerCallback_(this) {
   }
   /// Destructor
-  virtual ~WdtBase(){
+  virtual ~WdtBase() {
     abortChecker_ = nullptr;
   }
 
@@ -103,6 +103,23 @@ class WdtBase {
 
   /// Holds the instance of the progress reporter default or customized
   std::unique_ptr<ProgressReporter> progressReporter_;
+
+  /// abort checker class passed to socket functions
+  class AbortChecker : public IAbortChecker {
+   public:
+    explicit AbortChecker(WdtBase *wdtBase) : wdtBase_(wdtBase) {
+    }
+
+    bool shouldAbort() const {
+      return wdtBase_->wasAbortRequested();
+    }
+
+   private:
+    WdtBase *wdtBase_;
+  };
+
+  /// abort checker passed to socket functions
+  AbortChecker abortCheckerCallback_;
 
  private:
   /// Internal and default abort transfer flag

@@ -1,7 +1,6 @@
 #include "ClientSocket.h"
 #include "SocketUtils.h"
 #include "WdtOptions.h"
-#include "Reporting.h"
 #include <folly/ScopeGuard.h>
 #include <glog/logging.h>
 #include <sys/socket.h>
@@ -13,8 +12,9 @@ namespace wdt {
 
 using std::string;
 
-ClientSocket::ClientSocket(string dest, string port)
-    : dest_(dest), port_(port), fd_(-1) {
+ClientSocket::ClientSocket(const string &dest, const string &port,
+                           WdtBase::IAbortChecker const *abortChecker)
+    : dest_(dest), port_(port), fd_(-1), abortChecker_(abortChecker) {
   memset(&sa_, 0, sizeof(sa_));
   const auto &options = WdtOptions::get();
   if (options.ipv6) {
@@ -133,7 +133,6 @@ ErrorCode ClientSocket::connect() {
       this->close();
       continue;
     }
-
     VLOG(1) << "Successful connect on " << fd_;
     sa_ = *info;
     break;
@@ -159,18 +158,14 @@ std::string ClientSocket::getPort() const {
   return port_;
 }
 
-int ClientSocket::read(char *buf, int nbyte) const {
-  START_PERF_TIMER
-  auto numRead = ::read(fd_, buf, nbyte);
-  RECORD_PERF_RESULT(PerfStatReport::SOCKET_READ)
-  return numRead;
+int ClientSocket::read(char *buf, int nbyte, bool tryFull) const {
+  return SocketUtils::readWithAbortCheck(fd_, buf, nbyte, abortChecker_,
+                                         tryFull);
 }
 
-int ClientSocket::write(char *buf, int nbyte) const {
-  START_PERF_TIMER
-  auto written = ::write(fd_, buf, nbyte);
-  RECORD_PERF_RESULT(PerfStatReport::SOCKET_WRITE)
-  return written;
+int ClientSocket::write(const char *buf, int nbyte, bool tryFull) const {
+  return SocketUtils::writeWithAbortCheck(fd_, buf, nbyte, abortChecker_,
+                                          tryFull);
 }
 
 void ClientSocket::close() {

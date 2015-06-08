@@ -30,7 +30,9 @@ size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
   CHECK(atLeast >= 0) << "negative atLeast " << atLeast;
   int count = 0;
   while (len < atLeast) {
-    ssize_t n = s.read(buf + len, max - len);
+    // because we want to process data as soon as it arrives, tryFull option for
+    // read is false
+    ssize_t n = s.read(buf + len, max - len, false);
     if (n < 0) {
       PLOG(ERROR) << "Read error on " << s.getPort() << " after " << count;
       if (len) {
@@ -55,7 +57,9 @@ size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
 size_t readAtMost(ServerSocket &s, char *buf, size_t max, size_t atMost) {
   const int64_t target = atMost < max ? atMost : max;
   VLOG(3) << "readAtMost target " << target;
-  ssize_t n = s.read(buf, target);
+  // because we want to process data as soon as it arrives, tryFull option for
+  // read is false
+  ssize_t n = s.read(buf, target, false);
   if (n < 0) {
     PLOG(ERROR) << "Read error on " << s.getPort() << " with target " << target;
     return n;
@@ -100,14 +104,15 @@ Receiver::Receiver(int port, int numSockets) {
   if (port == 0) {
     LOG(INFO) << "Auto configure mode. Selecting ephemeral ports";
     for (int i = 0; i < numSockets; i++) {
-      ServerSocket socket(0, options.backlog);
+      ServerSocket socket(0, options.backlog, &abortCheckerCallback_);
       WDT_CHECK(socket.listen() == OK);
       threadServerSockets_.push_back(std::move(socket));
     }
     return;
   }
   for (int i = 0; i < numSockets; i++) {
-    threadServerSockets_.emplace_back(port + i, options.backlog);
+    threadServerSockets_.emplace_back(port + i, options.backlog,
+                                      &abortCheckerCallback_);
   }
 }
 
@@ -1217,6 +1222,7 @@ void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
     if (wasAbortRequested()) {
       LOG(ERROR) << "Transfer aborted " << socket.getPort();
       threadStats.setErrorCode(ABORT);
+      incrFailedThreadCountAndCheckForSessionEnd(data);
       break;
     }
     if (state == FAILED) {

@@ -1,7 +1,6 @@
 #include "ServerSocket.h"
 #include "SocketUtils.h"
 #include "WdtOptions.h"
-#include "Reporting.h"
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <poll.h>
@@ -13,8 +12,13 @@ namespace wdt {
 using std::swap;
 using std::string;
 
-ServerSocket::ServerSocket(int32_t port, int backlog)
-    : port_(port), backlog_(backlog), listeningFd_(-1), fd_(-1) {
+ServerSocket::ServerSocket(int32_t port, int backlog,
+                           WdtBase::IAbortChecker const *abortChecker)
+    : port_(port),
+      backlog_(backlog),
+      listeningFd_(-1),
+      fd_(-1),
+      abortChecker_(abortChecker) {
   memset(&sa_, 0, sizeof(sa_));
   const auto &options = WdtOptions::get();
   if (options.ipv6) {
@@ -33,6 +37,7 @@ ServerSocket::ServerSocket(ServerSocket &&that) noexcept
   sa_ = that.sa_;
   listeningFd_ = that.listeningFd_;
   fd_ = that.fd_;
+  abortChecker_ = that.abortChecker_;
   // A temporary ServerSocket should be changed such that
   // the fd doesn't get closed when it (temp obj) is getting
   // destructed and "this" object will remain intact
@@ -48,6 +53,7 @@ ServerSocket &ServerSocket::operator=(ServerSocket &&that) {
   swap(sa_, that.sa_);
   swap(listeningFd_, that.listeningFd_);
   swap(fd_, that.fd_);
+  swap(abortChecker_, that.abortChecker_);
   return *this;
 }
 
@@ -190,24 +196,14 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
   return OK;
 }
 
-int ServerSocket::read(char *buf, int nbyte) const {
-  while (true) {
-    START_PERF_TIMER
-    int retValue = ::read(fd_, buf, nbyte);
-    if (retValue < 0 && errno == EINTR) {
-      VLOG(2) << "received EINTR. continuing...";
-      continue;
-    }
-    RECORD_PERF_RESULT(PerfStatReport::SOCKET_READ)
-    return retValue;
-  }
+int ServerSocket::read(char *buf, int nbyte, bool tryFull) const {
+  return SocketUtils::readWithAbortCheck(fd_, buf, nbyte, abortChecker_,
+                                         tryFull);
 }
 
-int ServerSocket::write(char *buf, int nbyte) const {
-  START_PERF_TIMER
-  auto written = ::write(fd_, buf, nbyte);
-  RECORD_PERF_RESULT(PerfStatReport::SOCKET_WRITE)
-  return written;
+int ServerSocket::write(const char *buf, int nbyte, bool tryFull) const {
+  return SocketUtils::writeWithAbortCheck(fd_, buf, nbyte, abortChecker_,
+                                          tryFull);
 }
 
 int ServerSocket::closeCurrentConnection() {

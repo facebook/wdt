@@ -129,6 +129,9 @@ WDT_OPT(read_timeout_millis, int32, "socket read timeout in milliseconds");
 WDT_OPT(write_timeout_millis, int32, "socket write timeout in milliseconds");
 WDT_OPT(connect_timeout_millis, int32,
         "socket connect timeout in milliseconds");
+WDT_OPT(abort_check_interval_millis, int32,
+        "Interval in ms between checking for abort during network i/o, a "
+        "negative value or 0 disables abort check");
 WDT_OPT(disk_sync_interval_mb, double,
         "Disk sync interval in mb. A negative value disables syncing");
 WDT_OPT(throughput_update_interval, int32,

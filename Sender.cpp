@@ -435,8 +435,8 @@ void Sender::validateTransferStats(
 
 std::unique_ptr<ClientSocket> Sender::makeSocket(const std::string &destHost,
                                                  int port) {
-  return folly::make_unique<ClientSocket>(destHost,
-                                          folly::to<std::string>(port));
+  return folly::make_unique<ClientSocket>(
+      destHost, folly::to<std::string>(port), &abortCheckerCallback_);
 }
 
 std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
@@ -959,6 +959,13 @@ TransferStats Sender::sendOneByteSource(
                 << socket->getFd() << " out of " << size;
       } else {
         VLOG(3) << "Wrote all of " << size << " on " << socket->getFd();
+      }
+      if (wasAbortRequested()) {
+        LOG(ERROR) << "Transfer aborted during block transfer "
+                   << socket->getPort() << " " << source->getIdentifier();
+        stats.setErrorCode(ABORT);
+        stats.incrFailedAttempts();
+        return stats;
       }
     } while (written < size);
     if (written > size) {
