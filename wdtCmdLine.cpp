@@ -27,6 +27,8 @@
 #define STANDALONE_APP
 #include "WdtFlags.h"
 #include "WdtFlags.cpp.inc"
+
+// Flags not already in WdtOptions.h/WdtFlags.cpp.inc
 DEFINE_bool(run_as_daemon, true,
             "If true, run the receiver as never ending process");
 
@@ -127,7 +129,6 @@ int main(int argc, char *argv[]) {
             << " and destination = " << FLAGS_destination
             << " num sockets = " << FLAGS_num_ports
             << " from port = " << FLAGS_start_port;
-  const auto &options = WdtOptions::getMutable();
   ErrorCode retCode = OK;
   if (FLAGS_destination.empty()) {
     // TODO: inconsistent! switch to option like sender...

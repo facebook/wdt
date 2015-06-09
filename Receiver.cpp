@@ -122,10 +122,8 @@ Receiver::Receiver(int port, int numSockets, const std::string &destDir)
 }
 
 int32_t Receiver::registerPorts(bool stopOnFailure) {
-  const auto &options = WdtOptions::get();
   int32_t numSuccess = 0;
   for (ServerSocket &socket : threadServerSockets_) {
-    ErrorCode code = ERROR;
     int max_retries = WdtOptions::get().max_retries;
     for (int retries = 0; retries < max_retries; retries++) {
       if (socket.listen() == OK) {
@@ -694,7 +692,6 @@ Receiver::ReceiverState Receiver::readNextCmd(ThreadData &data) {
 /***PROCESS_EXIT_CMD STATE***/
 Receiver::ReceiverState Receiver::processExitCmd(ThreadData &data) {
   LOG(INFO) << "entered PROCESS_EXIT_CMD state " << data.threadIndex_;
-  auto &numRead = data.numRead_;
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
 
@@ -761,14 +758,13 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   auto &checkpointIndex = data.checkpointIndex_;
   auto &pendingCheckpointIndex = data.pendingCheckpointIndex_;
   auto &enableChecksum = data.enableChecksum_;
-  auto &options = WdtOptions::get();
   std::string id;
   uint64_t seqId;
   int64_t dataSize;
   int64_t offset;
   int64_t fileSize;
 
-  folly::ScopeGuard guard = folly::makeGuard([&socket, &threadStats] {
+  auto guard = folly::makeGuard([&socket, &threadStats] {
     if (threadStats.getErrorCode() != OK) {
       threadStats.incrFailedAttempts();
     }
@@ -948,7 +944,6 @@ Receiver::ReceiverState Receiver::processDoneCmd(ThreadData &data) {
   auto &pendingCheckpointIndex = data.pendingCheckpointIndex_;
   auto &off = data.off_;
   auto &oldOffset = data.oldOffset_;
-  auto &newCheckpoints = data.newCheckpoints_;
   char *buf = data.getBuf();
 
   if (numRead != Protocol::kMinBufLength) {
@@ -1201,7 +1196,9 @@ Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
 
 void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
                           size_t bufferSize, TransferStats &threadStats) {
-  folly::ScopeGuard completionGuard = folly::makeGuard([&] {
+  INIT_PERF_STAT_REPORT
+  auto guard = folly::makeGuard([&] {
+    perfReports_[threadIndex] = *perfStatReport;  // copy when done
     std::unique_lock<std::mutex> lock(mutex_);
     numActiveThreads_--;
     if (numActiveThreads_ == 0) {
@@ -1210,9 +1207,6 @@ void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
       transferFinished_ = true;
     }
   });
-  INIT_PERF_STAT_REPORT
-  folly::ScopeGuard guard =
-      folly::makeGuard([&] { perfReports_[threadIndex] = *perfStatReport; });
   ThreadData data(threadIndex, socket, threadStats, bufferSize);
   if (!data.getBuf()) {
     LOG(ERROR) << "error allocating " << bufferSize;

@@ -2,12 +2,12 @@
 using std::string;
 namespace facebook {
 namespace wdt {
-WdtOptions* WdtOptions::instance_ = new WdtOptions();
 const WdtOptions& WdtOptions::get() {
-  return *instance_;
+  return getMutable();
 }
 WdtOptions& WdtOptions::getMutable() {
-  return *instance_;
+  static WdtOptions* instance = new WdtOptions();
+  return *instance;
 }
 }
 }

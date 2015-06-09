@@ -32,7 +32,7 @@ ErrorCode ClientSocket::connect() {
   }
   // Lookup
   struct addrinfo *infoList = nullptr;
-  folly::ScopeGuard guard = folly::makeGuard([&] {
+  auto guard = folly::makeGuard([&] {
     if (infoList) {
       freeaddrinfo(infoList);
     }
@@ -80,7 +80,7 @@ ErrorCode ClientSocket::connect() {
       while (true) {
         // we need this loop because poll() can return before any file handles
         // have changes or before timing out. In that case, we check whether it
-        // is becuse of EINTR or not. If true, we have to try poll with
+        // is because of EINTR or not. If true, we have to try poll with
         // reduced timeout
         int timeElapsed = durationMillis(Clock::now() - startTime);
         if (timeElapsed >= connectTimeout) {

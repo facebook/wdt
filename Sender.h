@@ -96,7 +96,7 @@ class ThreadTransferHistory {
 
   /// reference to global queue
   DirectorySourceQueue &queue_;
-  /// refernce to thread stats
+  /// reference to thread stats
   TransferStats &threadStats_;
   /// history of the thread
   std::vector<std::unique_ptr<ByteSource>> history_;
@@ -368,7 +368,7 @@ class Sender : public WdtBase {
    * @param transferredSourceStats      Stats for the successfully transmitted
    *                                    sources
    * @param failedSourceStats           Stats for the failed sources
-   * @param threadStats                 Stats calcaulted by each sender thread
+   * @param threadStats                 Stats calculated by each sender thread
    */
   void validateTransferStats(
       const std::vector<TransferStats> &transferredSourceStats,
@@ -396,8 +396,8 @@ class Sender : public WdtBase {
   int protocolVersion_{Protocol::protocol_version};
   /// List of ports where the receiver threads are running on the destination
   std::vector<int32_t> ports_;
-  /// Number of active threads, decremented everytime a thread is finished
-  uint32_t numActiveThreads_;
+  /// Number of active threads, decremented every time a thread is finished
+  uint32_t numActiveThreads_{0};
   /// The directory from where the files are read
   std::string srcDir_;
   /// Address of the destination host where the files are sent

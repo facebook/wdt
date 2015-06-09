@@ -2,14 +2,16 @@
 #include "ErrorCodes.h"
 #include "WdtOptions.h"
 #include <cmath>
-const int64_t kMillisecsPerSec = 1000;
-const double kMbToB = 1024 * 1024;
+
 namespace facebook {
 namespace wdt {
+
 // Constants for different calculations
+const int64_t kMillisecsPerSec = 1000;
 const double kPeakMultiplier = 1.2;
 const int kBucketMultiplier = 2;
 const double kTimeMultiplier = 0.25;
+
 std::shared_ptr<Throttler> Throttler::makeThrottler(
     double avgRateBytesPerSec, double peakRateBytesPerSec,
     double bucketLimitBytes, int64_t throttlerLogTimeMillis) {
@@ -42,7 +44,7 @@ void Throttler::configureOptions(double& avgRateBytesPerSec,
 
 Throttler::Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
                      double bucketLimitBytes, int64_t throttlerLogTimeMillis)
-    : bytesProgress_(0), avgRateBytesPerSec_(avgRateBytesPerSec) {
+    : avgRateBytesPerSec_(avgRateBytesPerSec) {
   bucketRateBytesPerSec_ = peakRateBytesPerSec;
   bytesTokenBucketLimit_ = 2 * bucketRateBytesPerSec_ * 0.25;
   /* We keep the number of tokens generated as zero initially

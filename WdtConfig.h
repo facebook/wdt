@@ -5,8 +5,8 @@
 // TODO: use for protocol negotiation/check
 #define WDT_VERSION_MAJOR 0
 #define WDT_VERSION_MINOR 2
-#define WDT_VERSION_BUILD 1505160
-#define WDT_VERSION_STR "0.2.1505160"
+#define WDT_VERSION_BUILD 1506080
+#define WDT_VERSION_STR "0.2.1506080-fbcode"
 
 #define HAS_POSIX_FALLOCATE 1
 #define HAS_SYNC_FILE_RANGE 1

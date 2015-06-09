@@ -1,5 +1,7 @@
 #pragma once
 
+#include <wdt/WdtConfig.h>
+
 #include <glog/logging.h>
 #include <mutex>
 #include <string>
@@ -12,7 +14,7 @@ namespace facebook {
 namespace wdt {
 
 /**
- * Utitliy class for creating/opening files for writing while
+ * Utility class for creating/opening files for writing while
  * creating subdirs automatically and only once in case multiple
  * files are created relative to the rootDir directory.
  *
@@ -98,7 +100,7 @@ class FileCreator {
   int createFile(const std::string &relPath);
 
   /**
-   * sets the size of the file. If the current size is greater than quired size,
+   * sets the size of the file. If the size is greater then the
    * file is truncated using ftruncate. Space is allocated using fallocate.
    *
    * @param fd        file descriptor

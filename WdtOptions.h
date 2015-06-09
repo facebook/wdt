@@ -1,5 +1,5 @@
 #pragma once
-#include "WdtConfig.h"
+#include <wdt/WdtConfig.h>
 #include <folly/String.h>
 #include <memory>
 #include <thread>
@@ -55,10 +55,10 @@ class WdtOptions {
 
   /**
    * Starting start_port for wdt. Number of ports allocated
-   * are contigous sequence starting of numSockets
+   * are contiguous sequence starting of numSockets
    * starting from this start_port
    */
-  int32_t start_port{22356};
+  int32_t start_port{22356};  // W (D) T = 0x5754
   int32_t num_ports{8};
   /**
    * Maximum buffer size for the write on the sender
@@ -150,7 +150,7 @@ class WdtOptions {
 
   /**
    * maximum number of retries for accept call in joinable mode. we try to
-   * accept with timeout of accept_timeout_millis. fisr connection from sender
+   * accept with timeout of accept_timeout_millis. first connection from sender
    * must come before max_accept_retries.
    */
   int32_t max_accept_retries{500};
@@ -203,16 +203,13 @@ class WdtOptions {
   bool enable_perf_stat_collection{false};
 
   /**
-   * Since this is a singelton copy constructor
+   * Since this is a singleton copy constructor
    * and assignment operator are deleted
    */
   WdtOptions(const WdtOptions&) = delete;
   WdtOptions& operator=(const WdtOptions&) = delete;
   WdtOptions() {
   }
-
- private:
-  static WdtOptions* instance_;
 };
 }
 }

@@ -9,7 +9,7 @@
 # make -j
 # )
 #
-#  Copywright (c) 2014, Facebook, Inc.
+#  Copyright (c) 2014, Facebook, Inc.
 #  All rights reserved.
 #
 #  This source code is licensed under the BSD-style license found in the
@@ -17,11 +17,11 @@
 #  of patent rights can be found in the PATENTS file in the same directory.
 #
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.2)
 
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
-project("WDT" LANGUAGES C CXX VERSION 0.2.1505160)
+project("WDT" LANGUAGES C CXX VERSION 0.2.1506080)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -34,9 +34,10 @@ set(BUILD_SHARED_LIBS on CACHE Bool "build shared libs")
 # TODO: This doesn't seem to work / sets default to "" instead of Release...
 # set(CMAKE_BUILD_TYPE Release CACHE String "build type")
 # So hardcoding for now:
+#set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_CXX_FLAGS_RELEASE "-msse4.2")
-
+set(CMAKE_CXX_FLAGS "-msse4.2")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/")
 
 # Check that we have the Folly source tree
 set(FOLLY_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/folly CACHE path
@@ -97,7 +98,7 @@ find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h)
 find_library(GFLAGS_LIBRARY gflags)
 
 # You can also add jemalloc to the list if you have it/want it
-target_link_libraries(wdtlib
+target_link_libraries(wdtlib_min
   folly4wdt
   ${GLOG_LIBRARY}
   ${GFLAGS_LIBRARY}
@@ -141,7 +142,7 @@ check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
 # Folly's:
 configure_file(folly-config.h.in folly/folly-config.h)
 # Wdt's config/version
-configure_file(WdtConfig.h.in WdtConfig.h)
+configure_file(WdtConfig.h.in wdt/WdtConfig.h)
 
 # Malloc stuff  tied to not supporting weaksympbols
 if (NOT FOLLY_HAVE_WEAK_SYMBOLS)
@@ -165,7 +166,7 @@ include_directories(${GFLAGS_INCLUDE_DIR})
 
 add_executable(wdt wdtCmdLine.cpp)
 
-target_link_libraries(wdt wdtlib)
+target_link_libraries(wdt wdtlib_min)
 
 ### Install rules
 
@@ -184,12 +185,11 @@ if (BUILD_TESTING)
 
   enable_testing()
 
-  # Extra code hat we use in tests
+  # Extra code that we use in tests
   add_library(wdt4tests
     ${FOLLY_SOURCE_DIR}/folly/FileUtil.cpp # used by Random used by tests
     ${FOLLY_SOURCE_DIR}/folly/Random.cpp # used indirectly by tests
   )
-
 
   include(ExternalProject)
 

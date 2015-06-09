@@ -87,21 +87,21 @@ class DirectorySourceQueue : public SourceQueue {
   std::pair<int64_t, ErrorCode> getNumBlocksAndStatus() const;
 
   /**
-   * Sets regex represnting files to include for transfer
+   * Sets regex representing files to include for transfer
    *
    * @param includePattern          file inclusion regex
    */
   void setIncludePattern(const std::string &includePattern);
 
   /**
-   * Sets regex represnting files to exclude for transfer
+   * Sets regex representing files to exclude for transfer
    *
    * @param excludePattern          file exclusion regex
    */
   void setExcludePattern(const std::string &excludePattern);
 
   /**
-   * Sets regex represnting directories to exclude for transfer
+   * Sets regex representing directories to exclude for transfer
    *
    * @param pruneDirPattern         directory exclusion regex
    */
@@ -146,9 +146,9 @@ class DirectorySourceQueue : public SourceQueue {
   void returnToQueue(std::unique_ptr<ByteSource> &source);
 
   /**
-   * Returns list of files which were not transfereed. It empties the queue and
+   * Returns list of files which were not transferred. It empties the queue and
    * adds queue entries to the failed file list. This function should be called
-   * after all the sending threads have finished execurtion
+   * after all the sending threads have finished execution
    *
    * @return                      stats for failed sources
    */
@@ -196,7 +196,7 @@ class DirectorySourceQueue : public SourceQueue {
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple
-   * times or notify_all once. depening on number of added sources, this
+   * times or notify_all once. depending on number of added sources, this
    * function uses either notify_one or notify_all
    *
    * @param addedSource     number of sources added
@@ -206,7 +206,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// root directory to recurse on if fileInfo_ is empty
   std::string rootDir_;
 
-  /// regex represnting directories to prune
+  /// regex representing directories to prune
   std::string pruneDirPattern_;
 
   /// regex representing files to include
@@ -293,7 +293,7 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// Stores the time difference between the start and the end of the
   /// traversal of directory
-  double directoryTime_;
+  double directoryTime_{0};
 };
 }
 }

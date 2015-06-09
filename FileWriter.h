@@ -1,5 +1,6 @@
 #pragma once
 
+#include <wdt/WdtConfig.h>
 #include "Writer.h"
 #include "FileCreator.h"
 
@@ -16,7 +17,9 @@ class FileWriter : public Writer {
         fileSize_(fileSize),
         offset_(offset),
         dataSize_(dataSize),
+#ifdef HAS_SYNC_FILE_RANGE
         nextSyncOffset_(offset),
+#endif
         fileCreator_(fileCreator) {
   }
 
@@ -66,10 +69,12 @@ class FileWriter : public Writer {
   /// number of bytes written
   uint64_t totalWritten_{0};
 
+#ifdef HAS_SYNC_FILE_RANGE
   /// offset to use for next sync
   uint64_t nextSyncOffset_;
   /// number of bytes written since last sync
   uint64_t writtenSinceLastSync_{0};
+#endif
   /// reference to file creator
   FileCreator *fileCreator_;
 };

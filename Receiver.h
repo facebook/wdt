@@ -479,7 +479,7 @@ class Receiver : public WdtBase {
   /// global list of checkpoints
   std::vector<Checkpoint> checkpoints_;
 
-  /// number of threads which finsihed transfer
+  /// number of threads which finished transfer
   int failedThreadCount_{0};
 
   /// number of threads which are waiting for finish or new checkpoint
@@ -509,8 +509,8 @@ class Receiver : public WdtBase {
   /// Have threads been joined
   bool areThreadsJoined_{false};
 
-  /// Number of active threads, decremented everytime a thread is finished
-  uint32_t numActiveThreads_;
+  /// Number of active threads, decremented every time a thread is finished
+  uint32_t numActiveThreads_{0};
 
   /// Mutex for the management of this instance, specifically to keep the
   /// instance sane for multi threaded public API calls

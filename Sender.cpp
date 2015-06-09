@@ -22,9 +22,6 @@ namespace wdt {
  * If you change any of the multipliers be
  * sure to replace them in the description above.
  */
-const double kPeakMultiplier = 1.2;
-const int kBucketMultiplier = 2;
-const double kTimeMultiplier = 0.25;
 
 ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue &queue,
                                              TransferStats &threadStats)
@@ -353,7 +350,6 @@ ErrorCode Sender::start() {
   areThreadsJoined_ = false;
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
-  const size_t bufferSize = options.buffer_size;
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
             << ports_ << "]";
   startTime_ = Clock::now();
@@ -446,7 +442,12 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket = makeSocket(destHost_, port);
   double retryInterval = options.sleep_millis;
-  for (int i = 1; i <= options.max_retries; ++i) {
+  int maxRetries = options.max_retries;
+  if (maxRetries < 1) {
+    LOG(ERROR) << "Invalid max_retries " << maxRetries << " using 1 instead";
+    maxRetries = 1;
+  }
+  for (int i = 1; i <= maxRetries; ++i) {
     ++connectAttempts;
     errCode = socket->connect();
     if (errCode == OK) {
@@ -454,7 +455,7 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
     } else if (errCode == CONN_ERROR) {
       return nullptr;
     }
-    if (i != options.max_retries) {
+    if (i != maxRetries) {
       // sleep between attempts but not after the last
       VLOG(1) << "Sleeping after failed attempt " << i;
       usleep(retryInterval * 1000);
@@ -479,7 +480,6 @@ Sender::SenderState Sender::connect(ThreadData &data) {
   int port = ports_[data.threadIndex_];
   TransferStats &threadStats = data.threadStats_;
   auto &socket = data.socket_;
-  ThreadTransferHistory &transferHistory = data.getTransferHistory();
 
   if (socket) {
     socket->close();
@@ -719,7 +719,6 @@ Sender::SenderState Sender::processDoneCmd(ThreadData &data) {
   int port = ports_[data.threadIndex_];
   char *buf = data.buf_;
   auto &socket = data.socket_;
-  TransferStats &threadStats = data.threadStats_;
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
   transferHistory.markAllAcknowledged();
 
@@ -747,8 +746,9 @@ Sender::SenderState Sender::processWaitCmd(ThreadData &data) {
 }
 
 Sender::SenderState Sender::processErrCmd(ThreadData &data) {
-  LOG(INFO) << "entered PROCESS_ERR_CMD state " << data.threadIndex_;
   int port = ports_[data.threadIndex_];
+  LOG(INFO) << "entered PROCESS_ERR_CMD state " << data.threadIndex_ << " port "
+            << port;
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
   TransferStats &threadStats = data.threadStats_;
   auto &transferHistories = data.transferHistories_;
@@ -839,9 +839,8 @@ void Sender::sendOne(int threadIndex) {
   TransferStats &threadStats = globalThreadStats_[threadIndex];
   DirectorySourceQueue &queue(*dirQueue_);
   Clock::time_point startTime = Clock::now();
-  const auto &options = WdtOptions::get();
   int port = ports_[threadIndex];
-  folly::ScopeGuard completionGuard = folly::makeGuard([&] {
+  auto completionGuard = folly::makeGuard([&] {
     std::unique_lock<std::mutex> lock(mutex_);
     numActiveThreads_--;
     if (numActiveThreads_ == 0) {
@@ -1003,6 +1002,7 @@ TransferStats Sender::sendOneByteSource(
     headerBuf[off++] = Protocol::FOOTER_CMD;
     bool success =
         Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum);
+    WDT_CHECK(success) << "Failed to encode footer";
     int toWrite = off;
     written = socket->write(headerBuf, toWrite);
     if (written != toWrite) {

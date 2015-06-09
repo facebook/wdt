@@ -62,7 +62,7 @@ class Throttler {
    * This is thread safe implementation of token bucket
    * algorithm. Bucket is filled at the rate of bucketRateBytesPerSec_
    * till the limit of bytesTokenBucketLimit_
-   * There is no sleep, we just calcaulte how much to sleep.
+   * There is no sleep, we just calculate how much to sleep.
    * This method also calls the averageThrottler inside
    * @param deltaProgress         Progress since the last limit call
    */
@@ -83,7 +83,7 @@ class Throttler {
   /// the refCount_ and startTime_ correctly
   void registerTransfer();
 
-  /// Method to de-register the transfer and decremenet the refCount_
+  /// Method to de-register the transfer and decrement the refCount_
   void deRegisterTransfer();
 
   /// Get the average rate in bytes per sec
@@ -132,9 +132,9 @@ class Throttler {
    */
   Clock::time_point lastLogTime_;
   /// Instant progress in the time stats were logged last time
-  double instantProgress_;
+  double instantProgress_{0};
   // Records the total progress in bytes till now
-  double bytesProgress_;
+  double bytesProgress_{0};
   /// Last time the token bucket was filled
   std::chrono::time_point<std::chrono::high_resolution_clock> lastFillTime_;
 
@@ -144,7 +144,7 @@ class Throttler {
   /// Controls the access across threads
   folly::SpinLock throttlerMutex_;
   /// Number of users of this throttler
-  int64_t refCount_;
+  int64_t refCount_{0};
   /// The average rate expected in bytes
   double avgRateBytesPerSec_;
   /// Limit on the max number of tokens

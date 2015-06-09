@@ -25,7 +25,7 @@ class SocketUtils {
 
  private:
   /**
-   * tries to read/write numBytes amount of data from fd. Also, checks for abort
+   * Tries to read/write numBytes amount of data from fd. Also, checks for abort
    * after every read/write call. Also, retries till the input timeout.
    * Optionally, returns after first successful read/write call.
    *
@@ -36,11 +36,11 @@ class SocketUtils {
    * @param abortChecker  abort checker callback
    * @param timeoutMs     timeout in milliseconds
    * @param tryFull       if true, this function tries to read complete data.
-   *                      Otherwise, this function returns after thefirst
+   *                      Otherwise, this function returns after the first
    *                      successful read/write. This is set to false for
    *                      receiver pipelining.
    *
-   * @return              in case of successnumber of bytes read/written, else
+   * @return              in case of success number of bytes read/written, else
    *                      returns -1
    */
   template <typename F, typename T>
@@ -50,7 +50,7 @@ class SocketUtils {
                                   int timeoutMs, bool tryFull);
 
   /**
-   * depending on the network timeout and abort interval, returns the timeout to
+   * Depending on the network timeout and abort interval, returns the timeout to
    * set for socket operations
    *
    * @param networkTimeout  network timeout
