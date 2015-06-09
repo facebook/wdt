@@ -48,6 +48,16 @@ class SocketUtils {
                                   size_t numBytes,
                                   WdtBase::IAbortChecker const *abortChecker,
                                   int timeoutMs, bool tryFull);
+
+  /**
+   * depending on the network timeout and abort interval, returns the timeout to
+   * set for socket operations
+   *
+   * @param networkTimeout  network timeout
+   *
+   * @return                timeout for socket operations
+   */
+  static int getTimeout(int networkTimeout);
 };
 }
 }  // namespace facebook::wdt

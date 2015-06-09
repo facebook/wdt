@@ -1157,7 +1157,9 @@ Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
     WDT_CHECK(senderReadTimeout > 0);  // must have received settings
     int timeoutMillis = senderReadTimeout / kWaitTinmeoutFactor;
     auto waitingTime = std::chrono::milliseconds(timeoutMillis);
+    START_PERF_TIMER
     conditionAllFinished_.wait_for(lock, waitingTime);
+    RECORD_PERF_RESULT(PerfStatReport::RECEIVER_WAIT_SLEEP)
 
     // check if transfer finished or not
     if (hasCurSessionFinished(data)) {

@@ -203,11 +203,6 @@ class WdtOptions {
   bool enable_perf_stat_collection{false};
 
   /**
-   * Number of buckets to use when reporting perf stat distribution
-   */
-  int perf_stat_num_buckets{20};
-
-  /**
    * Since this is a singelton copy constructor
    * and assignment operator are deleted
    */

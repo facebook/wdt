@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <chrono>
+#include <limits>
 #include <iterator>
 #include <unordered_map>
 
@@ -443,7 +444,13 @@ class PerfStatReport {
     SYNC_FILE_RANGE,
     FILE_SEEK,
     THROTTLER_SLEEP,
+    RECEIVER_WAIT_SLEEP,  // receiver sleep duration between sending wait cmd to
+                          // sender. A high sum for this suggestes threads
+                          // were not properly load balanced
+    END
   };
+
+  explicit PerfStatReport();
 
   /**
    * @param statType      stat-type
@@ -456,18 +463,21 @@ class PerfStatReport {
   PerfStatReport &operator+=(const PerfStatReport &statReport);
 
  private:
-  const static int kNumTypes_ = 9;
-  const static std::string statTypeDescription_[kNumTypes_];
+  const static int kNumTypes_ = PerfStatReport::END;
+  const static std::string statTypeDescription_[];
+  const static int32_t kHistogramBuckets[];
   /// mapping from time to number of entries
   std::unordered_map<int64_t, int64_t> perfStats_[kNumTypes_];
   /// max time for different stat types
-  int64_t maxValueMillis_[kNumTypes_] = {0};
+  int64_t maxValueMicros_[kNumTypes_] = {0};
   /// min time for different stat types
-  int64_t minValueMillis_[kNumTypes_] = {0};
+  int64_t minValueMicros_[kNumTypes_] = {std::numeric_limits<int64_t>::max()};
   /// number of records for different stat types
   int64_t count_[kNumTypes_] = {0};
   /// sum of all records for different stat types
   int64_t sumMicros_[kNumTypes_] = {0};
+  /// network timeout in milliseconds
+  int networkTimeoutMillis_;
 };
 
 extern folly::ThreadLocalPtr<PerfStatReport> perfStatReport;

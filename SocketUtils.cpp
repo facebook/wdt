@@ -7,6 +7,7 @@
 #include <folly/Conv.h>
 #include <sys/types.h>
 #include <netdb.h>
+#include <algorithm>
 
 namespace facebook {
 namespace wdt {
@@ -34,10 +35,7 @@ std::string SocketUtils::getNameInfo(const struct sockaddr *sa,
 /* static */
 void SocketUtils::setReadTimeout(int fd) {
   const auto &options = WdtOptions::get();
-  int timeout = options.read_timeout_millis;
-  if (options.abort_check_interval_millis > 0) {
-    timeout = options.abort_check_interval_millis;
-  }
+  int timeout = getTimeout(options.read_timeout_millis);
   if (timeout > 0) {
     struct timeval tv;
     tv.tv_sec = timeout / 1000;            // milli to sec
@@ -47,13 +45,10 @@ void SocketUtils::setReadTimeout(int fd) {
   }
 }
 
-/* statis */
+/* static */
 void SocketUtils::setWriteTimeout(int fd) {
   const auto &options = WdtOptions::get();
-  int timeout = options.write_timeout_millis;
-  if (options.abort_check_interval_millis > 0) {
-    timeout = options.abort_check_interval_millis;
-  }
+  int timeout = getTimeout(options.write_timeout_millis);
   if (timeout > 0) {
     struct timeval tv;
     tv.tv_sec = timeout / 1000;            // milli to sec
@@ -61,6 +56,19 @@ void SocketUtils::setWriteTimeout(int fd) {
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv,
                sizeof(struct timeval));
   }
+}
+
+/* static */
+int SocketUtils::getTimeout(int networkTimeout) {
+  const auto &options = WdtOptions::get();
+  int abortInterval = options.abort_check_interval_millis;
+  if (abortInterval <= 0) {
+    return networkTimeout;
+  }
+  if (networkTimeout <= 0) {
+    return abortInterval;
+  }
+  return std::min(networkTimeout, abortInterval);
 }
 
 ssize_t SocketUtils::readWithAbortCheck(

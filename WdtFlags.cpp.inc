@@ -142,5 +142,3 @@ WDT_OPT(enable_checksum, bool,
 WDT_OPT(
     enable_perf_stat_collection, bool,
     "If true, perf stats are collected and reported at the end of transfer");
-WDT_OPT(perf_stat_num_buckets, int32,
-        "Number of buckets to use when reporting perf stat distribution");

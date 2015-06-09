@@ -1,8 +1,6 @@
 #include "Reporting.h"
 #include "WdtOptions.h"
 #include <folly/String.h>
-#include <folly/stats/Histogram.h>
-#include <folly/stats/Histogram-defs.h>
 
 #include <iostream>
 #include <iomanip>
@@ -210,17 +208,52 @@ void ProgressReporter::displayProgress(int progress, double averageThroughput,
 folly::ThreadLocalPtr<PerfStatReport> perfStatReport;
 
 const std::string PerfStatReport::statTypeDescription_[] = {
-    "Socket Read",     "Socket Write", "File Open",
-    "File Close",      "File Read",    "File Write",
-    "Sync File Range", "File Seek",    "Throttler Sleep"};
+    "Socket Read",     "Socket Write",       "File Open",       "File Close",
+    "File Read",       "File Write",         "Sync File Range", "File Seek",
+    "Throttler Sleep", "Receiver Wait Sleep"};
+
+PerfStatReport::PerfStatReport() {
+  static_assert(
+      sizeof(statTypeDescription_) / sizeof(statTypeDescription_[0]) ==
+          PerfStatReport::END,
+      "Mismatch between number of stat types and number of descriptions");
+  const auto& options = WdtOptions::get();
+  networkTimeoutMillis_ =
+      std::min<int>(options.read_timeout_millis, options.write_timeout_millis);
+}
+
+/**
+ *  Semi log bucket definitions covering 5 order of magnitude (more
+ *  could be added) with high resolution in small numbers and relatively
+ *  small number of total buckets
+ *  For efficiency a look up table is created so the last value shouldn't
+ *  be too large (or will incur large memory overhead)
+ *  value between   [ bucket(i-1), bucket(i) [ go in slot i
+ *  plus every value > bucket(last) in last bucket
+ */
+const int32_t PerfStatReport::kHistogramBuckets[] = {
+    1,     2,     3,     4,     5,     6,
+    7,     8,     9,     10,    11,          // by 1
+    12,    14,    16,    18,    20,          // by 2
+    25,    30,    35,    40,    45,    50,   // by 5
+    60,    70,    80,    90,    100,         // by 10
+    120,   140,   160,   180,   200,         // line2 *10
+    250,   300,   350,   400,   450,   500,  // line3 *10
+    600,   700,   800,   900,   1000,        // line4 *10
+    2000,  3000,  4000,  5000,  7500,  10000,
+    20000, 30000, 40000, 50000, 75000, 100000};
 
 void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
   int64_t timeInMillis = timeInMicros / kMicroToMilli;
+  if (timeInMicros >= networkTimeoutMillis_ * 750) {
+    LOG(WARNING) << statTypeDescription_[statType] << " system call took "
+                 << timeInMillis << " ms";
+  }
   perfStats_[statType][timeInMillis]++;
-  maxValueMillis_[statType] =
-      std::max<int64_t>(maxValueMillis_[statType], timeInMillis);
-  minValueMillis_[statType] =
-      std::min<int64_t>(minValueMillis_[statType], timeInMillis);
+  maxValueMicros_[statType] =
+      std::max<int64_t>(maxValueMicros_[statType], timeInMicros);
+  minValueMicros_[statType] =
+      std::min<int64_t>(minValueMicros_[statType], timeInMicros);
   count_[statType]++;
   sumMicros_[statType] += timeInMicros;
 }
@@ -232,10 +265,10 @@ PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
       int64_t value = pair.second;
       perfStats_[i][key] += value;
     }
-    maxValueMillis_[i] =
-        std::max<int64_t>(maxValueMillis_[i], statReport.maxValueMillis_[i]);
-    minValueMillis_[i] =
-        std::min<int64_t>(minValueMillis_[i], statReport.minValueMillis_[i]);
+    maxValueMicros_[i] =
+        std::max<int64_t>(maxValueMicros_[i], statReport.maxValueMicros_[i]);
+    minValueMicros_[i] =
+        std::min<int64_t>(minValueMicros_[i], statReport.minValueMicros_[i]);
     count_[i] += statReport.count_[i];
     sumMicros_[i] += statReport.sumMicros_[i];
   }
@@ -244,48 +277,76 @@ PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
 
 std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
   const auto& options = WdtOptions::get();
-  const int numBuckets = options.perf_stat_num_buckets;
-  WDT_CHECK(numBuckets > 0) << "Number of buckets must be greater than zero";
   os << "\n***** PERF STATS *****\n";
   for (int i = 0; i < PerfStatReport::kNumTypes_; i++) {
     if (statReport.count_[i] == 0) {
       continue;
     }
-    const auto& perfStatMap = statReport.perfStats_[i];
-    os << statReport.statTypeDescription_[i] << '\n';
-    os << "Number of calls " << statReport.count_[i] << '\n';
-    os << "Total time spent per thread "
-       << (statReport.sumMicros_[i] / kMicroToMilli / options.num_ports)
-       << " ms\n";
-    os << "Avg " << (((double)statReport.sumMicros_[i]) / statReport.count_[i] /
-                     kMicroToMilli) << " ms\n";
-    int64_t max = statReport.maxValueMillis_[i];
-    int64_t min = statReport.minValueMillis_[i];
-    if (min == max) {
-      // only one value
-      auto it = perfStatMap.find(max);
-      WDT_CHECK(it != perfStatMap.end());
-      os << "[" << min << ", " << max << "] ==> " << it->second << "\n";
-      continue;
-    }
-    int64_t range = max - min + 1;
-    if (range % numBuckets != 0) {
-      range = (range / numBuckets + 1) * numBuckets;
-    }
-    int64_t bucketSize = range / numBuckets;
-    folly::Histogram<int64_t> hist(bucketSize, min, max + 1);
+    double max = statReport.maxValueMicros_[i] / kMicroToMilli;
+    double min = statReport.minValueMicros_[i] / kMicroToMilli;
+    double sumPerThread =
+        (statReport.sumMicros_[i] / kMicroToMilli / options.num_ports);
+    double avg = (((double)statReport.sumMicros_[i]) / statReport.count_[i] /
+                  kMicroToMilli);
+
+    os << std::fixed << std::setprecision(2);
+    os << statReport.statTypeDescription_[i] << " : ";
+    os << "Ncalls " << statReport.count_[i] << " Stats in ms : SumPerThread "
+       << sumPerThread << " Min " << min << " Max " << max << " Avg " << avg
+       << " ";
+
+    // One extra bucket for values extending beyond last bucket
+    int numBuckets = 1 +
+                     sizeof(PerfStatReport::kHistogramBuckets) /
+                         sizeof(PerfStatReport::kHistogramBuckets[0]);
+    std::vector<int64_t> buckets(numBuckets);
+
+    auto& perfStatMap = statReport.perfStats_[i];
+    std::vector<int64_t> timesInMillis;
     for (const auto& pair : perfStatMap) {
-      hist.addRepeatedValue(pair.first, pair.second);
+      timesInMillis.emplace_back(pair.first);
     }
-    os << "p99 time " << hist.getPercentileEstimate(0.99) << " ms\n";
-    for (int bucketId = 0; bucketId < hist.getNumBuckets(); bucketId++) {
-      int64_t numSamplesInBucket = hist.getBucketByIndex(bucketId).count;
-      if (numSamplesInBucket == 0) {
+    std::sort(timesInMillis.begin(), timesInMillis.end());
+    int currentBucketIndex = 0;
+
+    int64_t runningCount = 0;
+    int64_t p50Count = statReport.count_[i] * 0.50;
+    int64_t p95Count = statReport.count_[i] * 0.95;
+    int64_t p99Count = statReport.count_[i] * 0.99;
+
+    for (auto time : timesInMillis) {
+      WDT_CHECK(time >= 0) << time;
+      int64_t count = perfStatMap.find(time)->second;
+
+      if (p50Count > runningCount && p50Count <= runningCount + count) {
+        os << "p50 " << time << " ";
+      }
+      if (p95Count > runningCount && p95Count <= runningCount + count) {
+        os << "p95 " << time << " ";
+      }
+      if (p99Count > runningCount && p99Count <= runningCount + count) {
+        os << "p99 " << time << "\n";
+      }
+      runningCount += count;
+
+      while (currentBucketIndex < numBuckets - 1 &&
+             time >= PerfStatReport::kHistogramBuckets[currentBucketIndex]) {
+        currentBucketIndex++;
+      }
+      buckets[currentBucketIndex] += count;
+    }
+
+    for (int i = 0; i < numBuckets; i++) {
+      if (buckets[i] == 0) {
         continue;
       }
-      os << "(" << hist.getBucketMin(bucketId) << ", "
-         << hist.getBucketMax(bucketId) << "] --> " << numSamplesInBucket
-         << "\n";
+      int64_t bucketStart =
+          (i == 0 ? 0 : PerfStatReport::kHistogramBuckets[i - 1]);
+      int64_t bucketEnd =
+          (i < numBuckets - 1 ? PerfStatReport::kHistogramBuckets[i]
+                              : std::numeric_limits<int64_t>::max());
+      os << "[" << bucketStart << ", " << bucketEnd << ") --> " << buckets[i]
+         << '\n';
     }
   }
   return os;
