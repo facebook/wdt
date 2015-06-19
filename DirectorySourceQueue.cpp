@@ -1,8 +1,11 @@
 #include "DirectorySourceQueue.h"
+
+#include "Protocol.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <set>
+#include <algorithm>
 #include <utility>
 
 #include <folly/Memory.h>
@@ -45,6 +48,22 @@ void DirectorySourceQueue::setFileInfo(const std::vector<FileInfo> &fileInfo) {
 
 void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   followSymlinks_ = followSymlinks;
+}
+
+void DirectorySourceQueue::setPreviouslyReceivedChunks(
+    std::vector<FileChunksInfo> &previouslyTransferredChunks) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  for (auto &chunkInfo : previouslyTransferredChunks) {
+    nextSeqId_ = std::max(nextSeqId_, chunkInfo.getSeqId() + 1);
+    previouslyTransferredChunks_.insert(
+        std::make_pair(chunkInfo.getFileName(), std::move(chunkInfo)));
+  }
+}
+
+DirectorySourceQueue::~DirectorySourceQueue() {
+  for (SourceMetaData *fileData : sharedFileData_) {
+    delete fileData;
+  }
 }
 
 std::thread DirectorySourceQueue::buildQueueAsynchronously() {
@@ -297,29 +316,69 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   if (!enableBlockTransfer) {
     VLOG(2) << "Block transfer disabled for this transfer";
   }
-  int blockCount = 0;
   // if block transfer is disabled, treating fileSize as block size. This
   // ensures that we create a single block
   auto blockSize = enableBlockTransfer ? blockSizeBytes : fileSize;
+  int blockCount = 0;
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    FileMetaData *fileData =
-        new FileMetaData(fullPath, relPath, numEntries_, fileSize);
-    sharedFileData_.emplace_back(fileData);
-    size_t offset = 0;
-    size_t remainingBytes = fileSize;
-    do {
-      size_t size = std::min<size_t>(remainingBytes, blockSize);
-      std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
-          fileData, size, offset, fileSourceBufferSize_);
-      sourceQueue_.push(std::move(source));
-      remainingBytes -= size;
-      offset += size;
-      blockCount++;
-    } while (remainingBytes > 0);
+
+    std::vector<Interval> remainingChunks;
+    int64_t seqId;
+    FileAllocationStatus allocationStatus;
+    int64_t prevSeqId = 0;
+    auto it = previouslyTransferredChunks_.find(relPath);
+    if (it == previouslyTransferredChunks_.end()) {
+      // No previously transferred chunks
+      remainingChunks.emplace_back(0, fileSize);
+      seqId = nextSeqId_++;
+      allocationStatus = NOT_EXISTS;
+    } else if (it->second.getFileSize() != fileSize) {
+      // file size is greater on the receiver side
+      remainingChunks.emplace_back(0, fileSize);
+      seqId = nextSeqId_++;
+      LOG(INFO) << "File size is different in the receiver side " << relPath
+                << " " << fileSize << " " << it->second.getFileSize();
+      allocationStatus = it->second.getFileSize() > fileSize ? EXISTS_TOO_LARGE
+                                                             : EXISTS_TOO_SMALL;
+      prevSeqId = it->second.getSeqId();
+    } else {
+      auto &fileChunksInfo = it->second;
+      remainingChunks = fileChunksInfo.getRemainingChunks();
+      if (remainingChunks.empty()) {
+        LOG(INFO) << relPath << " completely sent in previous transfer";
+        return;
+      }
+      seqId = fileChunksInfo.getSeqId();
+      allocationStatus = EXISTS_CORRECT_SIZE;
+    }
+
+    SourceMetaData *metadata = new SourceMetaData();
+    metadata->fullPath = fullPath;
+    metadata->relPath = relPath;
+    metadata->seqId = seqId;
+    metadata->size = fileSize;
+    metadata->allocationStatus = allocationStatus;
+    metadata->prevSeqId = prevSeqId;
+
+    sharedFileData_.emplace_back(metadata);
+
+    for (const auto &chunk : remainingChunks) {
+      size_t offset = chunk.start_;
+      size_t remainingBytes = chunk.size();
+      do {
+        size_t size = std::min<size_t>(remainingBytes, blockSize);
+        std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
+            metadata, size, offset, fileSourceBufferSize_);
+        sourceQueue_.push(std::move(source));
+        remainingBytes -= size;
+        offset += size;
+        blockCount++;
+      } while (remainingBytes > 0);
+      totalFileSize_ += chunk.size();
+    }
     numEntries_++;
     numBlocks_ += blockCount;
-    totalFileSize_ += fileSize;
   }
   smartNotify(blockCount);
 }

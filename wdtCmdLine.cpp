@@ -39,6 +39,8 @@ DEFINE_bool(files, false,
 DEFINE_string(
     destination, "",
     "empty is server (destination) mode, non empty is destination host");
+DEFINE_bool(parse_transfer_log, false,
+            "If true, transfer log is parsed and fixed");
 
 DEFINE_string(transfer_id, "", "Transfer id (optional, should match");
 DEFINE_int32(
@@ -130,8 +132,14 @@ int main(int argc, char *argv[]) {
             << " num sockets = " << FLAGS_num_ports
             << " from port = " << FLAGS_start_port;
   ErrorCode retCode = OK;
-  if (FLAGS_destination.empty()) {
-    // TODO: inconsistent! switch to option like sender...
+  if (FLAGS_parse_transfer_log) {
+    TransferLogManager transferLogManager;
+    transferLogManager.setRootDir(FLAGS_directory);
+    if (!transferLogManager.parseAndPrint()) {
+      LOG(ERROR) << "Transfer log parsing failed";
+      retCode = ERROR;
+    }
+  } else if (FLAGS_destination.empty()) {
     Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
     receiver.setReceiverId(FLAGS_transfer_id);
     if (FLAGS_protocol_version > 0) {

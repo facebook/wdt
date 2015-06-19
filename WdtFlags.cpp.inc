@@ -142,3 +142,11 @@ WDT_OPT(enable_checksum, bool,
 WDT_OPT(
     enable_perf_stat_collection, bool,
     "If true, perf stats are collected and reported at the end of transfer");
+WDT_OPT(transfer_log_write_interval_ms, int32,
+        "Interval in milliseconds after which transfer log is written to disk."
+        " written to disk");
+WDT_OPT(enable_download_resumption, bool,
+        "If true, wdt supports download resumption for immutable files");
+WDT_OPT(keep_transfer_log, bool,
+        "If true, transfer logs are not deleted at "
+        "the end of the transfer");

@@ -12,82 +12,140 @@ namespace wdt {
 
 using std::string;
 
-void testProtocol() {
-  string id("abcdef");
-  uint64_t seqId = 3;
-  int64_t size = 3;
+void testHeader() {
+  BlockDetails bd;
+  bd.fileName = "abcdef";
+  bd.seqId = 3;
+  bd.dataSize = 3;
+  bd.offset = 4;
+  bd.fileSize = 10;
+  bd.allocationStatus = EXISTS_CORRECT_SIZE;
 
   char buf[128];
   size_t off = 0;
-  int64_t blockOffset = 4;
-  int64_t fileSize = 10;
-  bool success = Protocol::encodeHeader(buf, off, sizeof(buf), id, seqId, size,
-                                        blockOffset, fileSize);
-  EXPECT_TRUE(success);
+  Protocol::encodeHeader(Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf,
+                         off, sizeof(buf), bd);
   EXPECT_EQ(off,
-            id.size() + 1 + 1 + 1 + 1 +
+            bd.fileName.size() + 1 + 1 + 1 + 1 + 1 +
                 1);  // 1 byte varint for seqId, len, size, offset and filesize
-  string nid;
-  uint64_t nseqId;
-  int64_t nsize;
+  BlockDetails nbd;
   size_t noff = 0;
-  int64_t nblockOffset = 0;
-  int64_t nfileSize = 0;
-  success = Protocol::decodeHeader(buf, noff, sizeof(buf), nid, nseqId, nsize,
-                                   nblockOffset, nfileSize);
+  bool success =
+      Protocol::decodeHeader(Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf,
+                             noff, sizeof(buf), nbd);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
-  EXPECT_EQ(nid, id);
-  EXPECT_EQ(nseqId, seqId);
-  EXPECT_EQ(nsize, size);
-  EXPECT_EQ(nblockOffset, blockOffset);
-  EXPECT_EQ(nfileSize, fileSize);
+  EXPECT_EQ(nbd.fileName, bd.fileName);
+  EXPECT_EQ(nbd.seqId, bd.seqId);
+  EXPECT_EQ(nbd.fileSize, bd.fileSize);
+  EXPECT_EQ(nbd.offset, bd.offset);
+  EXPECT_EQ(nbd.dataSize, nbd.dataSize);
+  EXPECT_EQ(nbd.allocationStatus, bd.allocationStatus);
   noff = 0;
   // exact size:
-  success = Protocol::decodeHeader(buf, noff, off, nid, nseqId, nsize,
-                                   nblockOffset, nfileSize);
+  success = Protocol::decodeHeader(
+      Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf, noff, off, nbd);
   EXPECT_TRUE(success);
 
   LOG(INFO) << "error tests, expect errors";
   // too short
   noff = 0;
-  success = Protocol::decodeHeader(buf, noff, off - 1, nid, nseqId, nsize,
-                                   nblockOffset, nfileSize);
+  success = Protocol::decodeHeader(
+      Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf, noff, off - 1, nbd);
   EXPECT_FALSE(success);
 
   // Long size:
-  size = (int64_t)100 * 1024 * 1024 * 1024;  // 100Gb
-  id.assign("different");
-  seqId = 5;
+  bd.dataSize = (int64_t)100 * 1024 * 1024 * 1024;  // 100Gb
+  bd.fileName.assign("different");
+  bd.seqId = 5;
+  bd.offset = 3;
+  bd.fileSize = 128;
+  bd.allocationStatus = EXISTS_TOO_SMALL;
+  bd.prevSeqId = 10;
+
   off = 0;
-  blockOffset = 3;
-  fileSize = 128;
-  success = Protocol::encodeHeader(buf, off, sizeof(buf), id, seqId, size,
-                                   blockOffset, fileSize);
-  EXPECT_TRUE(success);
-  EXPECT_EQ(
-      off,
-      id.size() + 1 + 1 + 6 + 1 + 2);  // 1 byte varint for id len and size
+  Protocol::encodeHeader(Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf,
+                         off, sizeof(buf), bd);
+  EXPECT_EQ(off,
+            bd.fileName.size() + 1 + 1 + 6 + 1 + 2 + 1 +
+                1);  // 1 byte varint for id len and size
   noff = 0;
-  success = Protocol::decodeHeader(buf, noff, sizeof(buf), nid, nseqId, nsize,
-                                   nblockOffset, nfileSize);
+  success =
+      Protocol::decodeHeader(Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf,
+                             noff, sizeof(buf), nbd);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
-  EXPECT_EQ(nid, id);
-  EXPECT_EQ(nseqId, seqId);
-  EXPECT_EQ(nsize, size);
-  EXPECT_EQ(nblockOffset, blockOffset);
-  EXPECT_EQ(nfileSize, fileSize);
-  LOG(INFO) << "got size of " << nsize;
+  EXPECT_EQ(nbd.fileName, bd.fileName);
+  EXPECT_EQ(nbd.seqId, bd.seqId);
+  EXPECT_EQ(nbd.fileSize, bd.fileSize);
+  EXPECT_EQ(nbd.offset, bd.offset);
+  EXPECT_EQ(nbd.dataSize, nbd.dataSize);
+  EXPECT_EQ(nbd.allocationStatus, bd.allocationStatus);
+  EXPECT_EQ(nbd.prevSeqId, bd.prevSeqId);
+  LOG(INFO) << "got size of " << nbd.dataSize;
   // too short for size encoding:
   noff = 0;
-  success = Protocol::decodeHeader(buf, noff, off - 2, nid, nseqId, nsize,
-                                   nblockOffset, nfileSize);
+  success = Protocol::decodeHeader(
+      Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf, noff, off - 2, nbd);
   EXPECT_FALSE(success);
 }
 
+void testFileChunksInfo() {
+  FileChunksInfo fileChunksInfo;
+  fileChunksInfo.setSeqId(10);
+  fileChunksInfo.setFileName("abc");
+  fileChunksInfo.setFileSize(128);
+  fileChunksInfo.addChunk(Interval(1, 10));
+  fileChunksInfo.addChunk(Interval(20, 30));
+
+  char buf[128];
+  size_t off = 0;
+  Protocol::encodeFileChunksInfo(buf, off, sizeof(buf), fileChunksInfo);
+  FileChunksInfo nFileChunksInfo;
+  folly::ByteRange br((uint8_t *)buf, sizeof(buf));
+  bool success = Protocol::decodeFileChunksInfo(br, buf, off, nFileChunksInfo);
+  EXPECT_TRUE(success);
+  size_t noff = br.start() - (uint8_t *)buf;
+  EXPECT_EQ(noff, off);
+  EXPECT_EQ(nFileChunksInfo, fileChunksInfo);
+
+  // test with smaller buffer
+  br.reset((uint8_t *)buf, sizeof(buf));
+  success = Protocol::decodeFileChunksInfo(br, buf, off - 2, nFileChunksInfo);
+  EXPECT_FALSE(success);
+}
+
+void testSettings() {
+  Settings settings;
+  settings.senderProtocolVersion = Protocol::SETTINGS_FLAG_VERSION;
+  settings.readTimeoutMillis = 500;
+  settings.writeTimeoutMillis = 500;
+  settings.transferId = "abc";
+  settings.enableChecksum = true;
+  settings.sendFileChunks = true;
+
+  char buf[128];
+  size_t off = 0;
+  Protocol::encodeSettings(buf, off, sizeof(buf), settings);
+
+  Settings nsettings;
+  size_t noff = 0;
+  bool success = Protocol::decodeSettings(Protocol::SETTINGS_FLAG_VERSION, buf,
+                                          noff, off, nsettings);
+  EXPECT_TRUE(success);
+  EXPECT_EQ(noff, off);
+  EXPECT_EQ(nsettings.senderProtocolVersion, settings.senderProtocolVersion);
+  EXPECT_EQ(nsettings.readTimeoutMillis, settings.readTimeoutMillis);
+  EXPECT_EQ(nsettings.writeTimeoutMillis, settings.writeTimeoutMillis);
+  EXPECT_EQ(nsettings.transferId, settings.transferId);
+  EXPECT_EQ(nsettings.enableChecksum, settings.enableChecksum);
+  EXPECT_EQ(nsettings.sendFileChunks, settings.sendFileChunks);
+}
+
 TEST(Protocol, Simple) {
-  testProtocol();
+  testHeader();
+  testSettings();
+  testFileChunksInfo();
 }
 }
 }  // namespaces

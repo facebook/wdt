@@ -12,9 +12,9 @@ namespace wdt {
 
 folly::ThreadLocalPtr<FileByteSource::Buffer> FileByteSource::buffer_;
 
-FileByteSource::FileByteSource(FileMetaData *fileData, uint64_t size,
+FileByteSource::FileByteSource(SourceMetaData *metadata, uint64_t size,
                                uint64_t offset, size_t bufferSize)
-    : fileData_(fileData),
+    : metadata_(metadata),
       size_(size),
       offset_(offset),
       bytesRead_(0),
@@ -30,7 +30,7 @@ ErrorCode FileByteSource::open() {
   if (!buffer_ || bufferSize_ > buffer_->size_) {
     buffer_.reset(new Buffer(bufferSize_));
   }
-  const std::string &fullPath = fileData_->getFullPath();
+  const std::string &fullPath = metadata_->fullPath;
   START_PERF_TIMER
   fd_ = ::open(fullPath.c_str(), O_RDONLY);
   if (fd_ < 0) {
@@ -62,7 +62,7 @@ char *FileByteSource::read(size_t &size) {
       (size_t)std::min<uint64_t>(buffer_->size_, size_ - bytesRead_);
   ssize_t numRead = ::read(fd_, buffer_->data_, toRead);
   if (numRead < 0) {
-    PLOG(ERROR) << "failure while reading file " << fileData_->getFullPath();
+    PLOG(ERROR) << "failure while reading file " << metadata_->fullPath;
     this->close();
     transferStats_.setErrorCode(BYTE_SOURCE_READ_ERROR);
     return nullptr;

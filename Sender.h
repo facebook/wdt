@@ -204,6 +204,7 @@ class Sender : public WdtBase {
     SEND_DONE_CMD,
     SEND_SIZE_CMD,
     CHECK_FOR_ABORT,
+    READ_FILE_CHUNKS,
     READ_RECEIVER_CMD,
     PROCESS_DONE_CMD,
     PROCESS_WAIT_CMD,
@@ -301,6 +302,18 @@ class Sender : public WdtBase {
    *               PROCESS_ABORT_CMD(read ABORT cmd)
    */
   SenderState checkForAbort(ThreadData &data);
+  /**
+   * reads previously transferred file chunks list. If it receives an ACK cmd,
+   * then it moves on. If wait cmd is received, it waits. Otherwise reads the
+   * file chunks and when done starts directory queue thread.
+   * Previous states : SEND_SETTINGS,
+   * Next states: READ_FILE_CHUNKS(if wait cmd is received),
+   *              CHECK_FOR_ABORT(network error),
+   *              END(protocol error),
+   *              SEND_BLOCKS(success)
+   *
+   */
+  SenderState readFileChunks(ThreadData &data);
   /**
    * reads receiver cmd
    * Previous states : SEND_DONE_CMD
@@ -404,6 +417,12 @@ class Sender : public WdtBase {
   std::string destHost_;
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
+  /// Holds the instance of the progress reporter default or customized
+  std::unique_ptr<ProgressReporter> progressReporter_;
+  /// Whether download resumption is enabled or not
+  bool downloadResumptionEnabled_{false};
+  /// Flags representing whether file chunks have been received or not
+  bool fileChunksReceived_{false};
   /// Thread that is running the discovery of files using the dirQueue_
   std::thread dirThread_;
   /// Threads which are responsible for transfer of the sources

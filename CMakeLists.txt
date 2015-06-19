@@ -77,6 +77,8 @@ SocketUtils.cpp
 Throttler.cpp
 WdtOptions.cpp
 FileWriter.cpp
+TransferLogManager.cpp
+SerializationUtil.cpp
 )
 add_library(wdtlib
 WdtFlags.cpp

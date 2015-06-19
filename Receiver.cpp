@@ -10,6 +10,7 @@
 #include <folly/Checksum.h>
 
 #include <fcntl.h>
+#include <unistd.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <sys/stat.h>
@@ -20,7 +21,7 @@ namespace facebook {
 namespace wdt {
 
 const static int kTimeoutBufferMillis = 1000;
-const static int kWaitTinmeoutFactor = 5;
+const static int kWaitTimeoutFactor = 5;
 
 size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
                    ssize_t len) {
@@ -78,8 +79,9 @@ const Receiver::StateFunction Receiver::stateMap_[] = {
     &Receiver::readNextCmd, &Receiver::processFileCmd,
     &Receiver::processExitCmd, &Receiver::processSettingsCmd,
     &Receiver::processDoneCmd, &Receiver::processSizeCmd,
-    &Receiver::sendGlobalCheckpoint, &Receiver::sendDoneCmd,
-    &Receiver::sendAbortCmd, &Receiver::waitForFinishOrNewCheckpoint,
+    &Receiver::sendFileChunks, &Receiver::sendGlobalCheckpoint,
+    &Receiver::sendDoneCmd, &Receiver::sendAbortCmd,
+    &Receiver::waitForFinishOrNewCheckpoint,
     &Receiver::waitForFinishWithThreadError};
 
 void Receiver::addCheckpoint(Checkpoint checkpoint) {
@@ -98,8 +100,6 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
 }
 
 Receiver::Receiver(int port, int numSockets) {
-  isJoinable_ = false;
-  transferFinished_ = true;
   const auto &options = WdtOptions::get();
   if (port == 0) {
     LOG(INFO) << "Auto configure mode. Selecting ephemeral ports";
@@ -118,7 +118,7 @@ Receiver::Receiver(int port, int numSockets) {
 
 Receiver::Receiver(int port, int numSockets, const std::string &destDir)
     : Receiver(port, numSockets) {
-  this->destDir_ = destDir;
+  setDir(destDir);
 }
 
 int32_t Receiver::registerPorts(bool stopOnFailure) {
@@ -143,6 +143,7 @@ int32_t Receiver::registerPorts(bool stopOnFailure) {
 
 void Receiver::setDir(const std::string &destDir) {
   destDir_ = destDir;
+  transferLogManager_.setRootDir(destDir_);
 }
 
 const std::string &Receiver::getDir() {
@@ -157,6 +158,11 @@ void Receiver::setReceiverId(const std::string &receiverId) {
   WDT_CHECK(receiverId.length() <= Protocol::kMaxTransferIdLength);
   receiverId_ = receiverId;
   LOG(INFO) << "receiver id " << receiverId_;
+}
+
+void Receiver::setRecoveryId(const std::string &recoveryId) {
+  recoveryId_ = recoveryId;
+  LOG(INFO) << "recovery id " << recoveryId_;
 }
 
 void Receiver::setProtocolVersion(int protocolVersion) {
@@ -221,6 +227,9 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     // Make sure to join the progress thread.
     progressTrackerThread_.join();
   }
+  if (options.enable_download_resumption) {
+    transferLogManager_.closeAndStopWriter();
+  }
 
   std::unique_ptr<TransferReport> report = getTransferReport();
 
@@ -247,6 +256,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
 }
 
 std::unique_ptr<TransferReport> Receiver::getTransferReport() {
+  const auto &options = WdtOptions::get();
   std::unique_ptr<TransferReport> report =
       folly::make_unique<TransferReport>(threadStats_);
   const TransferStats &summary = report->getSummary();
@@ -257,6 +267,9 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
     report->setErrorCode(ERROR);
   } else {
     report->setErrorCode(OK);
+    if (options.enable_download_resumption && !options.keep_transfer_log) {
+      transferLogManager_.unlink();
+    }
   }
   return report;
 }
@@ -293,6 +306,11 @@ ErrorCode Receiver::transferAsync() {
     // if progress reporter has not been set, use the default one
     progressReporter_ = folly::make_unique<ProgressReporter>();
   }
+  if (options.enable_download_resumption) {
+    WDT_CHECK(!options.skip_writes)
+        << "Can not skip transfers with download resumption turned on";
+    parsedFileChunksInfo_ = transferLogManager_.parseAndMatch(recoveryId_);
+  }
   start();
   return OK;
 }
@@ -305,6 +323,10 @@ ErrorCode Receiver::runForever() {
                << "instance of receiver";
     return ERROR;
   }
+
+  const auto &options = WdtOptions::get();
+  WDT_CHECK(!options.enable_download_resumption)
+      << "Transfer resumption not supported in long running mode";
 
   // Enforce the full reporting to be false in the daemon mode.
   // These statistics are expensive, and useless as they will never
@@ -385,7 +407,8 @@ void Receiver::start() {
               << " smaller than " << Protocol::kMaxHeader << " using "
               << bufferSize << " instead";
   }
-  fileCreator_.reset(new FileCreator(destDir_, threadServerSockets_.size()));
+  fileCreator_.reset(new FileCreator(destDir_, threadServerSockets_.size(),
+                                     transferLogManager_));
   perfReports_.resize(threadServerSockets_.size());
   for (int i = 0; i < threadServerSockets_.size(); i++) {
     threadStats_.emplace_back(true);
@@ -407,6 +430,9 @@ void Receiver::start() {
     }
     std::thread trackerThread(&Receiver::progressTracker, this);
     progressTrackerThread_ = std::move(trackerThread);
+  }
+  if (options.enable_download_resumption) {
+    transferLogManager_.openAndStartWriter();
   }
 }
 
@@ -631,9 +657,8 @@ Receiver::ReceiverState Receiver::sendLocalCheckpoint(ThreadData &data) {
   checkpoints.emplace_back(threadServerSockets_[data.threadIndex_].getPort(),
                            checkpoint);
   size_t off = 0;
-  bool success = Protocol::encodeCheckpoints(
-      buf, off, Protocol::kMaxLocalCheckpoint, checkpoints);
-  WDT_CHECK(success);
+  Protocol::encodeCheckpoints(buf, off, Protocol::kMaxLocalCheckpoint,
+                              checkpoints);
   auto written = socket.write(buf, Protocol::kMaxLocalCheckpoint);
   if (written != Protocol::kMaxLocalCheckpoint) {
     LOG(ERROR) << "unable to write local checkpoint. write mismatch "
@@ -716,28 +741,34 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   auto &senderWriteTimeout = data.senderWriteTimeout_;
   auto &threadStats = data.threadStats_;
   auto &enableChecksum = data.enableChecksum_;
-  int32_t senderProtocolVersion;
-  std::string senderId;
+  Settings settings;
   bool success = Protocol::decodeSettings(
-      protocolVersion_, buf, off, oldOffset + Protocol::kMaxSettings,
-      senderProtocolVersion, senderReadTimeout, senderWriteTimeout, senderId,
-      enableChecksum);
+      protocolVersion_, buf, off, oldOffset + Protocol::kMaxSettings, settings);
   if (!success) {
     LOG(ERROR) << "Unable to decode settings cmd";
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
   }
-  if (senderProtocolVersion != protocolVersion_) {
+  senderReadTimeout = settings.readTimeoutMillis;
+  senderWriteTimeout = settings.writeTimeoutMillis;
+  enableChecksum = settings.enableChecksum;
+  if (settings.senderProtocolVersion != protocolVersion_) {
     LOG(ERROR) << "Receiver and sender protocol version mismatch "
-               << senderProtocolVersion << " " << protocolVersion_;
+               << settings.senderProtocolVersion << " " << protocolVersion_;
     threadStats.setErrorCode(VERSION_MISMATCH);
     return SEND_ABORT_CMD;
   }
-  if (receiverId_ != senderId) {
-    LOG(ERROR) << "Receiver and sender id mismatch " << senderId << " "
-               << receiverId_;
+  if (receiverId_ != settings.transferId) {
+    LOG(ERROR) << "Receiver and sender id mismatch " << settings.transferId
+               << " " << receiverId_;
     threadStats.setErrorCode(ID_MISMATCH);
     return SEND_ABORT_CMD;
+  }
+  if (settings.sendFileChunks) {
+    // We only move to SEND_FILE_CHUNKS state, if download resumption is enabled
+    // in the sender side
+    numRead = off = 0;
+    return SEND_FILE_CHUNKS;
   }
   auto msgLen = off - oldOffset;
   numRead -= msgLen;
@@ -747,6 +778,7 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
 /***PROCESS_FILE_CMD***/
 Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   VLOG(1) << "entered PROCESS_FILE_CMD state " << data.threadIndex_;
+  const auto &options = WdtOptions::get();
   auto &socket = data.socket_;
   auto &threadIndex = data.threadIndex_;
   auto &threadStats = data.threadStats_;
@@ -758,11 +790,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   auto &checkpointIndex = data.checkpointIndex_;
   auto &pendingCheckpointIndex = data.pendingCheckpointIndex_;
   auto &enableChecksum = data.enableChecksum_;
-  std::string id;
-  uint64_t seqId;
-  int64_t dataSize;
-  int64_t offset;
-  int64_t fileSize;
+  BlockDetails blockDetails;
 
   auto guard = folly::makeGuard([&socket, &threadStats] {
     if (threadStats.getErrorCode() != OK) {
@@ -791,8 +819,8 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     return ACCEPT_WITH_TIMEOUT;
   }
   off += sizeof(uint16_t);
-  bool success = Protocol::decodeHeader(buf, off, numRead + oldOffset, id,
-                                        seqId, dataSize, offset, fileSize);
+  bool success = Protocol::decodeHeader(protocolVersion_, buf, off,
+                                        numRead + oldOffset, blockDetails);
   ssize_t headerBytes = off - oldOffset;
   // transferred header length must match decoded header length
   WDT_CHECK(headerLen == headerBytes);
@@ -807,11 +835,11 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
 
   // received a well formed file cmd, apply the pending checkpoint update
   checkpointIndex = pendingCheckpointIndex;
-  VLOG(1) << "Read id:" << id << " size:" << dataSize << " ooff:" << oldOffset
+  VLOG(1) << "Read id:" << blockDetails.fileName
+          << " size:" << blockDetails.dataSize << " ooff:" << oldOffset
           << " off: " << off << " numRead: " << numRead;
 
-  FileWriter writer(threadIndex, id, seqId, fileSize, offset, dataSize,
-                    fileCreator_.get());
+  FileWriter writer(threadIndex, &blockDetails, fileCreator_.get());
 
   if (writer.open() != OK) {
     threadStats.setErrorCode(FILE_WRITE_ERROR);
@@ -820,8 +848,8 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   uint32_t checksum = 0;
   ssize_t remainingData = numRead + oldOffset - off;
   ssize_t toWrite = remainingData;
-  if (remainingData >= dataSize) {
-    toWrite = dataSize;
+  if (remainingData >= blockDetails.dataSize) {
+    toWrite = blockDetails.dataSize;
   }
   threadStats.addDataBytes(toWrite);
   if (enableChecksum) {
@@ -841,21 +869,21 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   off += toWrite;
   remainingData -= toWrite;
   // also means no leftOver so it's ok we use buf from start
-  while (writer.getTotalWritten() < dataSize) {
+  while (writer.getTotalWritten() < blockDetails.dataSize) {
     if (wasAbortRequested()) {
       LOG(ERROR) << "Thread marked for abort while processing a file."
                  << " port : " << socket.getPort();
       return FAILED;
     }
     int64_t nres = readAtMost(socket, buf, bufferSize,
-                              dataSize - writer.getTotalWritten());
+                              blockDetails.dataSize - writer.getTotalWritten());
+    if (nres <= 0) {
+      break;
+    }
     if (throttler_) {
       // We only know how much we have read after we are done calling
       // readAtMost. Call throttler with the bytes read off the wire.
       throttler_->limit(nres);
-    }
-    if (nres <= 0) {
-      break;
     }
     threadStats.addDataBytes(nres);
     if (enableChecksum) {
@@ -867,15 +895,16 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
       return SEND_ABORT_CMD;
     }
   }
-  if (writer.getTotalWritten() != dataSize) {
+  if (writer.getTotalWritten() != blockDetails.dataSize) {
     // This can only happen if there are transmission errors
     // Write errors to disk are already taken care of above
-    LOG(ERROR) << "could not read entire content for " << id << " port "
-               << socket.getPort();
+    LOG(ERROR) << "could not read entire content for " << blockDetails.fileName
+               << " port " << socket.getPort();
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
-  VLOG(2) << "completed " << id << " off: " << off << " numRead: " << numRead;
+  VLOG(2) << "completed " << blockDetails.fileName << " off: " << off
+          << " numRead: " << numRead;
   // Transfer of the file is complete here, mark the bytes effective
   WDT_CHECK(remainingData >= 0) << "Negative remainingData " << remainingData;
   if (remainingData > 0) {
@@ -924,14 +953,19 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     }
     if (checksum != receivedChecksum) {
       LOG(ERROR) << "Checksum mismatch " << checksum << " " << receivedChecksum
-                 << " port " << socket.getPort() << " file " << id;
+                 << " port " << socket.getPort() << " file "
+                 << blockDetails.fileName;
       threadStats.setErrorCode(CHECKSUM_MISMATCH);
       return ACCEPT_WITH_TIMEOUT;
     }
     size_t msgLen = off - oldOffset;
     numRead -= msgLen;
   }
-  threadStats.addEffectiveBytes(headerBytes, dataSize);
+  if (options.enable_download_resumption) {
+    transferLogManager_.addBlockWriteEntry(
+        blockDetails.seqId, blockDetails.offset, blockDetails.dataSize);
+  }
+  threadStats.addEffectiveBytes(headerBytes, blockDetails.dataSize);
   threadStats.incrNumBlocks();
   return READ_NEXT_CMD;
 }
@@ -992,6 +1026,122 @@ Receiver::ReceiverState Receiver::processSizeCmd(ThreadData &data) {
   return READ_NEXT_CMD;
 }
 
+Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
+  LOG(INFO) << "entered SEND_FILE_CHUNKS state " << data.threadIndex_;
+  char *buf = data.getBuf();
+  auto bufferSize = data.bufferSize_;
+  auto &socket = data.socket_;
+  auto &threadStats = data.threadStats_;
+  auto &senderReadTimeout = data.senderReadTimeout_;
+  size_t toWrite;
+  ssize_t written;
+  std::unique_lock<std::mutex> lock(mutex_);
+  while (true) {
+    switch (sendChunksStatus_) {
+      case SENT: {
+        lock.unlock();
+        buf[0] = Protocol::ACK_CMD;
+        toWrite = 1;
+        written = socket.write(buf, toWrite);
+        if (written != toWrite) {
+          LOG(ERROR) << "Socket write error " << toWrite << " " << written;
+          threadStats.setErrorCode(SOCKET_READ_ERROR);
+          return ACCEPT_WITH_TIMEOUT;
+        }
+        threadStats.addHeaderBytes(toWrite);
+        return READ_NEXT_CMD;
+      }
+      case IN_PROGRESS: {
+        lock.unlock();
+        buf[0] = Protocol::WAIT_CMD;
+        toWrite = 1;
+        written = socket.write(buf, toWrite);
+        if (written != toWrite) {
+          LOG(ERROR) << "Socket write error " << toWrite << " " << written;
+          threadStats.setErrorCode(SOCKET_READ_ERROR);
+          return ACCEPT_WITH_TIMEOUT;
+        }
+        threadStats.addHeaderBytes(toWrite);
+        WDT_CHECK(senderReadTimeout > 0);  // must have received settings
+        int timeoutMillis = senderReadTimeout / kWaitTimeoutFactor;
+        auto waitingTime = std::chrono::milliseconds(timeoutMillis);
+        lock.lock();
+        conditionFileChunksSent_.wait_for(lock, waitingTime);
+        continue;
+      }
+      case NOT_STARTED: {
+        // This thread has to send file chunks
+        sendChunksStatus_ = IN_PROGRESS;
+        lock.unlock();
+        folly::ScopeGuard guard = folly::makeGuard([&] {
+          lock.lock();
+          sendChunksStatus_ = NOT_STARTED;
+          conditionFileChunksSent_.notify_one();
+        });
+        size_t off = 0;
+        buf[off++] = Protocol::CHUNKS_CMD;
+        Protocol::encodeChunksCmd(buf, off, bufferSize,
+                                  parsedFileChunksInfo_.size());
+        written = socket.write(buf, off);
+        if (written > 0) {
+          threadStats.addHeaderBytes(written);
+        }
+        if (written != off) {
+          LOG(ERROR) << "Socket write error " << off << " " << written;
+          threadStats.setErrorCode(SOCKET_READ_ERROR);
+          return ACCEPT_WITH_TIMEOUT;
+        }
+        int64_t numEntriesWritten = 0;
+        // we try to encode as many chunks as possible in the buffer. If a
+        // single
+        // chunk can not fit in the buffer, it is ignored. Format of encoding :
+        // <data-size><chunk1><chunk2>...
+        while (numEntriesWritten < parsedFileChunksInfo_.size()) {
+          off = sizeof(int32_t);
+          int64_t numEntriesEncoded = Protocol::encodeFileChunksInfoList(
+              buf, off, bufferSize, numEntriesWritten, parsedFileChunksInfo_);
+          int32_t dataSize = folly::Endian::little(off - sizeof(int32_t));
+          folly::storeUnaligned<int32_t>(buf, dataSize);
+          written = socket.write(buf, off);
+          if (written > 0) {
+            threadStats.addHeaderBytes(written);
+          }
+          if (written != off) {
+            break;
+          }
+          numEntriesWritten += numEntriesEncoded;
+        }
+        if (numEntriesWritten != parsedFileChunksInfo_.size()) {
+          LOG(ERROR) << "Could not write all the file chunks "
+                     << parsedFileChunksInfo_.size() << " "
+                     << numEntriesWritten;
+          threadStats.setErrorCode(SOCKET_WRITE_ERROR);
+          return ACCEPT_WITH_TIMEOUT;
+        }
+        // try to read ack
+        size_t toRead = 1;
+        ssize_t numRead = socket.read(buf, toRead);
+        if (numRead != toRead) {
+          LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
+          threadStats.setErrorCode(SOCKET_READ_ERROR);
+          return ACCEPT_WITH_TIMEOUT;
+        }
+        guard.dismiss();
+        lock.lock();
+        sendChunksStatus_ = SENT;
+        // no need to still store all the parsed data
+        parsedFileChunksInfo_.clear();
+        // sender is aware of previous transferred chunks. logging can now be
+        // enabled
+        transferLogManager_.enableLogging();
+        transferLogManager_.addLogHeader(recoveryId_);
+        conditionFileChunksSent_.notify_all();
+        return READ_NEXT_CMD;
+      }
+    }
+  }
+}
+
 Receiver::ReceiverState Receiver::sendGlobalCheckpoint(ThreadData &data) {
   LOG(INFO) << "entered SEND_GLOBAL_CHECKPOINTS state " << data.threadIndex_;
   char *buf = data.getBuf();
@@ -1009,9 +1159,7 @@ Receiver::ReceiverState Receiver::sendGlobalCheckpoint(ThreadData &data) {
   // leave space for length
   off += sizeof(uint16_t);
   auto oldOffset = off;
-  bool retValue =
-      Protocol::encodeCheckpoints(buf, off, bufferSize, newCheckpoints);
-  WDT_CHECK(retValue);
+  Protocol::encodeCheckpoints(buf, off, bufferSize, newCheckpoints);
   uint16_t length = off - oldOffset;
   folly::storeUnaligned<uint16_t>(buf + 1, folly::Endian::little(length));
 
@@ -1034,15 +1182,10 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
   char *buf = data.getBuf();
   auto &socket = data.socket_;
   int32_t protocolVersion = protocolVersion_;
-  int offset = 0;
+  size_t offset = 0;
   buf[offset++] = Protocol::ABORT_CMD;
-  folly::storeUnaligned<int32_t>(buf + offset,
-                                 folly::Endian::little(protocolVersion));
-  offset += sizeof(int32_t);
-  buf[offset++] = threadStats.getErrorCode();
-  int64_t checkpoint = folly::Endian::little(threadStats.getNumBlocks());
-  folly::storeUnaligned<int64_t>(buf + offset, checkpoint);
-  offset += sizeof(int64_t);
+  Protocol::encodeAbort(buf, offset, protocolVersion,
+                        threadStats.getErrorCode(), threadStats.getNumFiles());
   socket.write(buf, offset);
   // No need to check if we were successful in sending ABORT
   // This thread will simply disconnect and sender thread on the
@@ -1150,7 +1293,7 @@ Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
   // we must send periodic wait cmd to keep the sender thread alive
   while (true) {
     WDT_CHECK(senderReadTimeout > 0);  // must have received settings
-    int timeoutMillis = senderReadTimeout / kWaitTinmeoutFactor;
+    int timeoutMillis = senderReadTimeout / kWaitTimeoutFactor;
     auto waitingTime = std::chrono::milliseconds(timeoutMillis);
     START_PERF_TIMER
     conditionAllFinished_.wait_for(lock, waitingTime);

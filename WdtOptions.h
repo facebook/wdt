@@ -182,8 +182,8 @@ class WdtOptions {
   int abort_check_interval_millis{200};
 
   /**
-  * Disk sync interval in mb. A negative value disables syncing
-  */
+   * Disk sync interval in mb. A negative value disables syncing
+   */
   double disk_sync_interval_mb{0.5};
 
   /**
@@ -201,6 +201,21 @@ class WdtOptions {
    * If true, perf stats are collected and reported at the end of transfer
    */
   bool enable_perf_stat_collection{false};
+
+  /**
+   * Interval in milliseconds after which transfer log is written to disk
+   */
+  int transfer_log_write_interval_ms{100};
+
+  /**
+   * If true, download resumption is enabled
+   */
+  bool enable_download_resumption{false};
+
+  /**
+   * At transfer end, do not delete transfer log
+   */
+  bool keep_transfer_log{true};
 
   /**
    * Since this is a singleton copy constructor

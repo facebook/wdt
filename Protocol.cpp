@@ -2,20 +2,23 @@
 
 #include "ErrorCodes.h"
 #include "WdtOptions.h"
+#include "SerializationUtil.h"
 
-#include "folly/Range.h"
 #include "folly/String.h"  // exceptionStr
-#include "folly/Varint.h"
 #include <algorithm>
+#include "folly/Bits.h"
 
-using namespace facebook::wdt;
+namespace facebook {
+namespace wdt {
 
-const int Protocol::protocol_version = 12;
+const int Protocol::protocol_version = 13;
 
 const int Protocol::RECEIVER_PROGRESS_REPORT_VERSION = 11;
 const int Protocol::CHECKSUM_VERSION = 12;
+const int Protocol::DOWNLOAD_RESUMPTION_VERSION = 13;
 
 const int Protocol::SETTINGS_FLAG_VERSION = 12;
+const int Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION = 13;
 
 int Protocol::negotiateProtocol(int requestedProtocolVersion) {
   if (requestedProtocolVersion < 10) {
@@ -25,74 +28,126 @@ int Protocol::negotiateProtocol(int requestedProtocolVersion) {
   return std::min<int>(protocol_version, requestedProtocolVersion);
 }
 
-/* static */
-bool Protocol::encodeHeader(char *dest, size_t &off, size_t max, std::string id,
-                            uint64_t seqId, int64_t size, int64_t offset,
-                            int64_t fileSize) {
-  // TODO: add version and/or magic number
-  size_t idLen = id.size();
-  off += folly::encodeVarint(idLen, (uint8_t *)dest + off);
-  memcpy(dest + off, id.data(), idLen);
-  off += idLen;
-  off += folly::encodeVarint(seqId, (uint8_t *)dest + off);
-  off += folly::encodeVarint(size, (uint8_t *)dest + off);
-  off += folly::encodeVarint(offset, (uint8_t *)dest + off);
-  off += folly::encodeVarint(fileSize, (uint8_t *)dest + off);
-  WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
-  return true;
+void FileChunksInfo::addChunk(const Interval &chunk) {
+  chunks_.emplace_back(chunk);
 }
 
-bool Protocol::decodeHeader(char *src, size_t &off, size_t max, std::string &id,
-                            uint64_t &seqId, int64_t &size, int64_t &offset,
-                            int64_t &fileSize) {
-  folly::ByteRange br((uint8_t *)(src + off), max);
-  size_t idLen = folly::decodeVarint(br);
-  if (idLen + off + 1 >= max) {
-    LOG(ERROR) << "Not enough room with " << max << " to decode " << idLen
-               << " at " << off;
-    return false;
+void FileChunksInfo::mergeChunks() {
+  if (chunks_.empty()) {
+    return;
   }
-  id.assign((const char *)(br.start()), idLen);
-  br.advance(idLen);
+  std::sort(chunks_.begin(), chunks_.end());
+  std::vector<Interval> mergedChunks;
+  Interval curChunk = chunks_[0];
+  for (int i = 1; i < chunks_.size(); i++) {
+    if (chunks_[i].start_ > curChunk.end_) {
+      mergedChunks.emplace_back(curChunk);
+      curChunk = chunks_[i];
+    } else {
+      curChunk.end_ = std::max(curChunk.end_, chunks_[i].end_);
+    }
+  }
+  mergedChunks.emplace_back(curChunk);
+  chunks_ = mergedChunks;
+}
+
+std::vector<Interval> FileChunksInfo::getRemainingChunks() {
+  std::vector<Interval> remainingChunks;
+  int64_t curStart = 0;
+  for (const auto &chunk : chunks_) {
+    if (chunk.start_ > curStart) {
+      remainingChunks.emplace_back(curStart, chunk.start_);
+    }
+    curStart = chunk.end_;
+  }
+  if (curStart < fileSize_) {
+    remainingChunks.emplace_back(curStart, fileSize_);
+  }
+  return remainingChunks;
+}
+
+std::ostream &operator<<(std::ostream &os,
+                         FileChunksInfo const &fileChunksInfo) {
+  os << "name " << fileChunksInfo.getFileName() << " seqId "
+     << fileChunksInfo.getSeqId() << " file-size "
+     << fileChunksInfo.getFileSize() << " number of chunks "
+     << fileChunksInfo.getChunks().size();
+  for (const auto &chunk : fileChunksInfo.getChunks()) {
+    os << " (" << chunk.start_ << ", " << chunk.end_ << ") ";
+  }
+  return os;
+}
+
+void Protocol::encodeHeader(int senderProtocolVersion, char *dest, size_t &off,
+                            size_t max, const BlockDetails &blockDetails) {
+  encodeString(dest, off, blockDetails.fileName);
+  encodeInt(dest, off, blockDetails.seqId);
+  encodeInt(dest, off, blockDetails.dataSize);
+  encodeInt(dest, off, blockDetails.offset);
+  encodeInt(dest, off, blockDetails.fileSize);
+  if (senderProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
+    uint8_t flags = blockDetails.allocationStatus;
+    dest[off++] = flags;
+    if (blockDetails.allocationStatus == EXISTS_TOO_SMALL ||
+        blockDetails.allocationStatus == EXISTS_TOO_LARGE) {
+      // prev seq-id is only used in case the size is less on the sender side
+      encodeInt(dest, off, blockDetails.prevSeqId);
+    }
+  }
+  WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
+}
+
+bool Protocol::decodeHeader(int receiverProtocolVersion, char *src, size_t &off,
+                            size_t max, BlockDetails &blockDetails) {
+  folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    seqId = folly::decodeVarint(br);
-    size = folly::decodeVarint(br);
-    offset = folly::decodeVarint(br);
-    fileSize = folly::decodeVarint(br);
+    if (!decodeString(br, src, max, blockDetails.fileName)) {
+      return false;
+    }
+    blockDetails.seqId = decodeInt(br);
+    blockDetails.dataSize = decodeInt(br);
+    blockDetails.offset = decodeInt(br);
+    blockDetails.fileSize = decodeInt(br);
+    if (receiverProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
+      uint8_t flags = br.front();
+      // first 2 bytes are used to represent allocation status
+      blockDetails.allocationStatus = (FileAllocationStatus)(flags & 3);
+      br.pop_front();
+      if (blockDetails.allocationStatus == EXISTS_TOO_SMALL ||
+          blockDetails.allocationStatus == EXISTS_TOO_LARGE) {
+        blockDetails.prevSeqId = decodeInt(br);
+      }
+    }
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  if (off > max) {
-    LOG(ERROR) << "Read past the end:" << off << " " << max;
-    return false;
-  }
-  return true;
+  return checkForOverflow(off, max);
 }
 
-bool Protocol::encodeCheckpoints(char *dest, size_t &off, size_t max,
+void Protocol::encodeCheckpoints(char *dest, size_t &off, size_t max,
                                  const std::vector<Checkpoint> &checkpoints) {
-  off += folly::encodeVarint(checkpoints.size(), (uint8_t *)dest + off);
+  encodeInt(dest, off, checkpoints.size());
   for (auto &checkpoint : checkpoints) {
-    off += folly::encodeVarint(checkpoint.first, (uint8_t *)dest + off);
-    off += folly::encodeVarint(checkpoint.second, (uint8_t *)dest + off);
+    encodeInt(dest, off, checkpoint.first);
+    encodeInt(dest, off, checkpoint.second);
   }
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
-  return true;
 }
 
 bool Protocol::decodeCheckpoints(char *src, size_t &off, size_t max,
                                  std::vector<Checkpoint> &checkpoints) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    uint64_t len = folly::decodeVarint(br);
-    for (int i = 0; i < len; i++) {
-      uint16_t port = folly::decodeVarint(br);
-      uint64_t numReceivedSources = folly::decodeVarint(br);
+    int64_t len;
+    len = decodeInt(br);
+    for (int64_t i = 0; i < len; i++) {
+      int64_t port, numReceivedSources;
+      port = decodeInt(br);
+      numReceivedSources = decodeInt(br);
       off = br.start() - (uint8_t *)src;
-      if (off > max) {
-        LOG(ERROR) << "Read past the end:" << off << " " << max;
+      if (!checkForOverflow(off, max)) {
         return false;
       }
       checkpoints.emplace_back(port, numReceivedSources);
@@ -104,95 +159,222 @@ bool Protocol::decodeCheckpoints(char *src, size_t &off, size_t max,
   return true;
 }
 
-bool Protocol::encodeDone(char *dest, size_t &off, size_t max,
+void Protocol::encodeDone(char *dest, size_t &off, size_t max,
                           int64_t numBlocks) {
-  off += folly::encodeVarint(numBlocks, (uint8_t *)dest + off);
+  encodeInt(dest, off, numBlocks);
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
-  return true;
 }
 
 bool Protocol::decodeDone(char *src, size_t &off, size_t max,
                           int64_t &numBlocks) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    numBlocks = folly::decodeVarint(br);
+    numBlocks = decodeInt(br);
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  if (off > max) {
-    LOG(ERROR) << "Read past the end:" << off << " " << max;
-    return false;
-  }
-  return true;
+  return checkForOverflow(off, max);
 }
 
-bool Protocol::encodeSize(char *dest, size_t &off, size_t max,
+void Protocol::encodeSize(char *dest, size_t &off, size_t max,
                           int64_t totalNumBytes) {
-  off += folly::encodeVarint(totalNumBytes, (uint8_t *)dest + off);
+  encodeInt(dest, off, totalNumBytes);
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
-  return true;
 }
 
 bool Protocol::decodeSize(char *src, size_t &off, size_t max,
                           int64_t &totalNumBytes) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    totalNumBytes = folly::decodeVarint(br);
+    totalNumBytes = decodeInt(br);
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  if (off > max) {
-    LOG(ERROR) << "Read past the end:" << off << " " << max;
+  return checkForOverflow(off, max);
+}
+
+void Protocol::encodeAbort(char *dest, size_t &off, int32_t protocolVersion,
+                           ErrorCode errCode, int64_t checkpoint) {
+  folly::storeUnaligned<int32_t>(dest + off,
+                                 folly::Endian::little(protocolVersion));
+  off += sizeof(int32_t);
+  dest[off++] = errCode;
+  folly::storeUnaligned<int64_t>(dest + off, folly::Endian::little(checkpoint));
+  off += sizeof(int64_t);
+}
+
+void Protocol::decodeAbort(char *src, size_t &off, int32_t &protocolVersion,
+                           ErrorCode &errCode, int64_t &checkpoint) {
+  protocolVersion = folly::loadUnaligned<int32_t>(src + off);
+  protocolVersion = folly::Endian::little(protocolVersion);
+  off += sizeof(int32_t);
+  errCode = (ErrorCode)src[off++];
+  checkpoint = folly::loadUnaligned<int64_t>(src + off);
+  checkpoint = folly::Endian::little(checkpoint);
+  off += sizeof(int64_t);
+}
+
+void Protocol::encodeChunksCmd(char *dest, size_t &off, int64_t bufSize,
+                               int64_t numFiles) {
+  folly::storeUnaligned<int64_t>(dest + off, folly::Endian::little(bufSize));
+  off += sizeof(int64_t);
+  folly::storeUnaligned<int64_t>(dest + off, folly::Endian::little(numFiles));
+  off += sizeof(int64_t);
+}
+
+void Protocol::decodeChunksCmd(char *src, size_t &off, int64_t &bufSize,
+                               int64_t &numFiles) {
+  bufSize = folly::loadUnaligned<int64_t>(src + off);
+  bufSize = folly::Endian::little(bufSize);
+  off += sizeof(int64_t);
+  numFiles = folly::loadUnaligned<int64_t>(src + off);
+  numFiles = folly::Endian::little(numFiles);
+  off += sizeof(int64_t);
+}
+
+void Protocol::encodeChunkInfo(char *dest, size_t &off, size_t max,
+                               const Interval &chunk) {
+  encodeInt(dest, off, chunk.start_);
+  encodeInt(dest, off, chunk.end_);
+  WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
+}
+
+bool Protocol::decodeChunkInfo(folly::ByteRange &br, char *src, size_t max,
+                               Interval &chunk) {
+  try {
+    chunk.start_ = decodeInt(br);
+    chunk.end_ = decodeInt(br);
+  } catch (const std::exception &ex) {
+    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
+  size_t off = br.start() - (uint8_t *)src;
+  return checkForOverflow(off, max);
+}
+
+void Protocol::encodeFileChunksInfo(char *dest, size_t &off, size_t max,
+                                    const FileChunksInfo &fileChunksInfo) {
+  encodeInt(dest, off, fileChunksInfo.getSeqId());
+  encodeString(dest, off, fileChunksInfo.getFileName());
+  encodeInt(dest, off, fileChunksInfo.getFileSize());
+  encodeInt(dest, off, fileChunksInfo.getChunks().size());
+  for (const auto &chunk : fileChunksInfo.getChunks()) {
+    encodeChunkInfo(dest, off, max, chunk);
+  }
+  WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
+}
+
+bool Protocol::decodeFileChunksInfo(folly::ByteRange &br, char *src, size_t max,
+                                    FileChunksInfo &fileChunksInfo) {
+  try {
+    int64_t seqId, fileSize;
+    std::string fileName;
+    seqId = decodeInt(br);
+    if (!decodeString(br, src, max, fileName)) {
+      return false;
+    }
+    fileSize = decodeInt(br);
+    fileChunksInfo.setSeqId(seqId);
+    fileChunksInfo.setFileName(fileName);
+    fileChunksInfo.setFileSize(fileSize);
+    int64_t numChunks;
+    numChunks = decodeInt(br);
+    for (int64_t i = 0; i < numChunks; i++) {
+      Interval chunk;
+      if (!decodeChunkInfo(br, src, max, chunk)) {
+        return false;
+      }
+      fileChunksInfo.addChunk(chunk);
+    }
+  } catch (const std::exception &ex) {
+    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    return false;
+  }
+  size_t off = br.start() - (uint8_t *)src;
+  return checkForOverflow(off, max);
+}
+
+int64_t Protocol::maxEncodeLen(const FileChunksInfo &fileChunkInfo) {
+  return 10 + 2 + fileChunkInfo.getFileName().size() + 10 + 10 +
+         fileChunkInfo.getChunks().size() * kMaxChunkEncodeLen;
+}
+
+int64_t Protocol::encodeFileChunksInfoList(
+    char *dest, size_t &off, size_t bufSize, int64_t startIndex,
+    const std::vector<FileChunksInfo> &fileChunksInfoList) {
+  size_t oldOffset = off;
+  int64_t numEncoded = 0;
+  for (int64_t i = startIndex; i < fileChunksInfoList.size(); i++) {
+    const FileChunksInfo &fileChunksInfo = fileChunksInfoList[i];
+    int64_t maxLength = maxEncodeLen(fileChunksInfo);
+    if (maxLength + oldOffset > bufSize) {
+      LOG(WARNING) << "Chunk info for " << fileChunksInfo.getFileName()
+                   << " can not be encoded in a buffer of size " << bufSize
+                   << ", Ignoring.";
+      continue;
+    }
+    if (maxLength + off >= bufSize) {
+      break;
+    }
+    encodeFileChunksInfo(dest, off, bufSize, fileChunksInfo);
+    numEncoded++;
+  }
+  return numEncoded;
+}
+
+bool Protocol::decodeFileChunksInfoList(
+    char *src, size_t &off, size_t dataSize,
+    std::vector<FileChunksInfo> &fileChunksInfoList) {
+  folly::ByteRange br((uint8_t *)(src + off), off + dataSize);
+  while (!br.empty()) {
+    FileChunksInfo fileChunkInfo;
+    if (!decodeFileChunksInfo(br, src, off + dataSize, fileChunkInfo)) {
+      return false;
+    }
+    fileChunksInfoList.emplace_back(std::move(fileChunkInfo));
+  }
+  off = br.start() - (uint8_t *)src;
   return true;
 }
 
-bool Protocol::encodeSettings(int senderProtocolVersion, char *dest,
-                              size_t &off, size_t max,
-                              int64_t readTimeoutMillis,
-                              int64_t writeTimeoutMillis,
-                              const std::string &senderId,
-                              bool enableChecksum) {
-  off += folly::encodeVarint(senderProtocolVersion, (uint8_t *)dest + off);
-  off += folly::encodeVarint(readTimeoutMillis, (uint8_t *)dest + off);
-  off += folly::encodeVarint(writeTimeoutMillis, (uint8_t *)dest + off);
-  size_t idLen = senderId.size();
-  off += folly::encodeVarint(idLen, (uint8_t *)dest + off);
-  memcpy(dest + off, senderId.data(), idLen);
-  off += idLen;
-  if (senderProtocolVersion >= SETTINGS_FLAG_VERSION) {
+void Protocol::encodeSettings(char *dest, size_t &off, size_t max,
+                              const Settings &settings) {
+  encodeInt(dest, off, settings.senderProtocolVersion);
+  encodeInt(dest, off, settings.readTimeoutMillis);
+  encodeInt(dest, off, settings.writeTimeoutMillis);
+  encodeString(dest, off, settings.transferId);
+  if (settings.senderProtocolVersion >= SETTINGS_FLAG_VERSION) {
     uint8_t flags = 0;
-    if (enableChecksum) {
+    if (settings.enableChecksum) {
       flags |= 1;
+    }
+    if (settings.sendFileChunks) {
+      flags |= (1 << 1);
     }
     dest[off++] = flags;
   }
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
-  return true;
 }
 
 bool Protocol::decodeSettings(int receiverProtocolVersion, char *src,
-                              size_t &off, size_t max,
-                              int32_t &senderProtocolVersion,
-                              int64_t &readTimeoutMillis,
-                              int64_t &writeTimeoutMillis,
-                              std::string &senderId, bool &enableChecksum) {
+                              size_t &off, size_t max, Settings &settings) {
+  settings.enableChecksum = settings.sendFileChunks = false;
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    senderProtocolVersion = folly::decodeVarint(br);
-    readTimeoutMillis = folly::decodeVarint(br);
-    writeTimeoutMillis = folly::decodeVarint(br);
-    size_t idLen = folly::decodeVarint(br);
-    senderId.assign((const char *)(br.start()), idLen);
-    br.advance(idLen);
+    settings.senderProtocolVersion = decodeInt(br);
+    settings.readTimeoutMillis = decodeInt(br);
+    settings.writeTimeoutMillis = decodeInt(br);
+    if (!decodeString(br, src, max, settings.transferId)) {
+      return false;
+    }
     if (receiverProtocolVersion >= SETTINGS_FLAG_VERSION) {
       uint8_t flags = br.front();
-      enableChecksum = flags & 1;
+      settings.enableChecksum = flags & 1;
+      settings.sendFileChunks = flags & (1 << 1);
       br.pop_front();
     }
   } catch (const std::exception &ex) {
@@ -200,33 +382,26 @@ bool Protocol::decodeSettings(int receiverProtocolVersion, char *src,
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  if (off > max) {
-    LOG(ERROR) << "Read past the end:" << off << " " << max;
-    return false;
-  }
-  return true;
+  return checkForOverflow(off, max);
 }
 
-bool Protocol::encodeFooter(char *dest, size_t &off, size_t max,
+void Protocol::encodeFooter(char *dest, size_t &off, size_t max,
                             uint32_t checksum) {
-  off += folly::encodeVarint(checksum, (uint8_t *)dest + off);
+  encodeInt(dest, off, checksum);
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
-  return true;
 }
 
 bool Protocol::decodeFooter(char *src, size_t &off, size_t max,
                             uint32_t &checksum) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    checksum = folly::decodeVarint(br);
+    checksum = decodeInt(br);
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  if (off > max) {
-    LOG(ERROR) << "Read past the end:" << off << " " << max;
-    return false;
-  }
-  return true;
+  return checkForOverflow(off, max);
+}
+}
 }

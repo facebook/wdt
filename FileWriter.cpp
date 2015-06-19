@@ -16,18 +16,17 @@ ErrorCode FileWriter::open() {
   if (options.skip_writes) {
     return OK;
   }
-  if (fileSize_ == dataSize_) {
+  if (blockDetails_->fileSize == blockDetails_->dataSize) {
     // single block file
-    WDT_CHECK(offset_ == 0);
-    fd_ = fileCreator_->openAndSetSize(fileName_, fileSize_);
+    WDT_CHECK(blockDetails_->offset == 0);
+    fd_ = fileCreator_->openAndSetSize(blockDetails_);
   } else {
     // multi block file
-    fd_ =
-        fileCreator_->openForBlocks(threadIndex_, fileName_, seqId_, fileSize_);
-    if (fd_ >= 0 && offset_ > 0) {
+    fd_ = fileCreator_->openForBlocks(threadIndex_, blockDetails_);
+    if (fd_ >= 0 && blockDetails_->offset > 0) {
       START_PERF_TIMER
-      if (lseek(fd_, offset_, SEEK_SET) < 0) {
-        PLOG(ERROR) << "Unable to seek " << fileName_;
+      if (lseek(fd_, blockDetails_->offset, SEEK_SET) < 0) {
+        PLOG(ERROR) << "Unable to seek " << blockDetails_->fileName;
         close();
       } else {
         RECORD_PERF_RESULT(PerfStatReport::FILE_SEEK)
@@ -35,7 +34,7 @@ ErrorCode FileWriter::open() {
     }
   }
   if (fd_ == -1) {
-    LOG(ERROR) << "File open/seek failed for " << fileName_;
+    LOG(ERROR) << "File open/seek failed for " << blockDetails_->fileName;
     return FILE_WRITE_ERROR;
   }
   return OK;
@@ -61,7 +60,8 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
       ssize_t written = ::write(fd_, buf + count, size - count);
       if (written == -1) {
         if (errno == EINTR) {
-          VLOG(1) << "Disk write interrupted, retrying " << fileName_;
+          VLOG(1) << "Disk write interrupted, retrying "
+                  << blockDetails_->fileName;
           continue;
         }
         PLOG(ERROR) << "File write failed for " << fd_ << " " << written << " "
@@ -72,8 +72,18 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
       count += written;
     }
     VLOG(1) << "Successfully written " << count << " bytes to fd " << fd_;
-    bool finished = ((totalWritten_ + size) == dataSize_);
-    syncFileRange(count, finished);
+    bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
+    if (options.enable_download_resumption && finished) {
+      if (fsync(fd_) != 0) {
+        PLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
+                    << " offset " << blockDetails_->offset << " file-size "
+                    << blockDetails_->fileSize
+                    << " data-size  << blockDetails_->dataSize";
+        return FILE_WRITE_ERROR;
+      }
+    } else {
+      syncFileRange(count, finished);
+    }
   }
   totalWritten_ += size;
   return OK;

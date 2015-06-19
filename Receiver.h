@@ -25,6 +25,7 @@
 #include "Protocol.h"
 #include "Writer.h"
 #include "Throttler.h"
+#include "TransferLogManager.h"
 #include <memory>
 #include <string>
 #include <condition_variable>
@@ -84,6 +85,9 @@ class Receiver : public WdtBase {
   /// @param receiverId   unique id of this receiver
   void setReceiverId(const std::string &receiverId);
 
+  /// @param recoveryId   unique-id used to verify transfer log
+  void setRecoveryId(const std::string &recoveryId);
+
   /// @param protocolVersion    protocol to use
   void setProtocolVersion(int protocolVersion);
 
@@ -103,7 +107,6 @@ class Receiver : public WdtBase {
 
   /**
    * @param isFinished         Mark transfer active/inactive
-   *
    */
   void markTransferFinished(bool isFinished);
 
@@ -125,6 +128,7 @@ class Receiver : public WdtBase {
     PROCESS_SETTINGS_CMD,
     PROCESS_DONE_CMD,
     PROCESS_SIZE_CMD,
+    SEND_FILE_CHUNKS,
     SEND_GLOBAL_CHECKPOINTS,
     SEND_DONE_CMD,
     SEND_ABORT_CMD,
@@ -289,7 +293,8 @@ class Receiver : public WdtBase {
    * Previous states : READ_NEXT_CMD,
    * Next states : READ_NEXT_CMD(success),
    *               WAIT_FOR_FINISH_WITH_THREAD_ERROR(protocol error),
-   *               ACCEPT_WITH_TIMEOUT(socket read failure)
+   *               ACCEPT_WITH_TIMEOUT(socket read failure),
+   *               SEND_FILE_CHUNKS(If the sender wants to resume transfer)
    */
   ReceiverState processSettingsCmd(ThreadData &data);
   /**
@@ -308,6 +313,16 @@ class Receiver : public WdtBase {
    *               WAIT_FOR_FINISH_WITH_THREAD_ERROR(protocol error)
    */
   ReceiverState processSizeCmd(ThreadData &data);
+  /**
+   * sends file chunks. Checks to see if it has already been transferred or not.
+   * In that case, send ACK. If some other thread is sending it, sends wait cmd
+   * and checks again later. Otherwise, breaks the entire data into bufferSIze_
+   * chunks and sends it.
+   * Previous states: PROCESS_SETTINGS_CMD,
+   * Next states : ACCEPT_WITH_TIMEOUT(network error),
+   *               READ_NEXT_CMD(success)
+   */
+  ReceiverState sendFileChunks(ThreadData &data);
   /**
    * sends global checkpoints to sender
    * Previous states : PROCESS_DONE_CMD,
@@ -432,7 +447,7 @@ class Receiver : public WdtBase {
    */
   bool transferFinished_{true};
   /// Flag based on which threads finish processing on receiving a done
-  bool isJoinable_;
+  bool isJoinable_{false};
   /// Destination directory where the received files will be written
   std::string destDir_;
   /// Responsible for writing files on the disk
@@ -441,6 +456,10 @@ class Receiver : public WdtBase {
   /// Unique id of this receiver object, this must match sender-id sent as part
   /// of settings
   std::string receiverId_;
+
+  /// unique-id used to verify transfer log. This value must be same for
+  /// transfers across resumption
+  std::string recoveryId_;
   /// protocol version to use, this is determined by negotiating protocol
   /// version with the other side
   int protocolVersion_{Protocol::protocol_version};
@@ -472,6 +491,19 @@ class Receiver : public WdtBase {
 
   /// per thread perf report
   std::vector<PerfStatReport> perfReports_;
+
+  /// transfer log manager
+  TransferLogManager transferLogManager_;
+
+  /// parsed log entries
+  std::vector<FileChunksInfo> parsedFileChunksInfo_;
+
+  /// enum representing status of file chunks transfer
+  enum SendChunkStatus { NOT_STARTED, IN_PROGRESS, SENT };
+
+  SendChunkStatus sendChunksStatus_{NOT_STARTED};
+
+  mutable std::condition_variable conditionFileChunksSent_;
 
   /// number of blocks send by the sender
   int64_t numBlocksSend_{-1};

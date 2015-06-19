@@ -1,11 +1,35 @@
 #pragma once
 
 #include "Reporting.h"
+#include "Protocol.h"
 
 #include <string>
 
 namespace facebook {
 namespace wdt {
+
+/// struct representing file level data shared between blocks
+struct SourceMetaData {
+  /// full filepath
+  std::string fullPath;
+  /// relative pathname
+  std::string relPath;
+  /**
+   * sequence number associated with the file. Sequence number
+   * represents the order in which files were first added to the queue.
+   * This is a file level identifier. It is same for blocks belonging
+   * to the same file. This is efficient while using in sets. Instead
+   * of using full path of the file, we can use this to identify the
+   * file.
+   */
+  uint64_t seqId;
+  /// size of the entire source
+  size_t size;
+  /// file allocation status in the receiver side
+  FileAllocationStatus allocationStatus;
+  /// if there is a size mismatch, this is the previous sequence id
+  uint64_t prevSeqId;
+};
 
 class ByteSource {
  public:
@@ -15,20 +39,14 @@ class ByteSource {
   /// @return identifier for the source
   virtual const std::string &getIdentifier() const = 0;
 
-  /// @return full path of the source
-  virtual const std::string &getFullPath() const = 0;
-
-  /// @return sequence number assigned to the source
-  virtual uint64_t getSeqId() const = 0;
-
   /// @return number of bytes in this source
   virtual uint64_t getSize() const = 0;
 
-  /// @return number of bytes in the original source
-  virtual uint64_t getTotalSize() const = 0;
-
   /// @return offset from which to start reading
   virtual uint64_t getOffset() const = 0;
+
+  /// @return metadata for the source
+  virtual const SourceMetaData &getMetaData() const = 0;
 
   /// @return true iff all data read successfully
   virtual bool finished() const = 0;

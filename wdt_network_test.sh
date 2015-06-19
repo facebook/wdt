@@ -13,8 +13,6 @@ checkLastCmdStatus() {
   fi
 }
 
-NC="nc -4" # ipv4 only
-
 threads=4
 # starting port is different from default because e2e test and this test will be
 # run in parallel during runtests.
@@ -24,7 +22,8 @@ TEST_COUNT=0
 
 WDTBIN_OPTS="-ipv4 -ipv6=false -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
--full_reporting -read_timeout_millis=500 -write_timeout_millis=500 -progress_report_interval_millis=-1"
+-full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
+-progress_report_interval_millis=-1"
 WDTBIN="_bin/wdt/wdt -num_ports=$threads $WDTBIN_OPTS"
 WDTBIN_MORE_THREADS="_bin/wdt/wdt -num_ports=$((threads + 1)) $WDTBIN_OPTS"
 WDTBIN_LESS_THREADS="_bin/wdt/wdt -num_ports=$((threads - 1)) $WDTBIN_OPTS"
@@ -34,7 +33,7 @@ mkdir -p $BASEDIR
 DIR=`mktemp -d --tmpdir=$BASEDIR`
 echo "Testing in $DIR"
 
-pkill -x wdt
+#pkill -x wdt
 
 mkdir -p $DIR/src/dir1
 cp -R folly $DIR/src/dir1

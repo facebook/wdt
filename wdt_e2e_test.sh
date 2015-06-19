@@ -98,7 +98,7 @@ mkdir -p $BASEDIR
 DIR=`mktemp -d --tmpdir=$BASEDIR`
 echo "Testing in $DIR"
 
-pkill -x wdt
+#pkill -x wdt
 
 mkdir $DIR/src
 mkdir $DIR/extsrc

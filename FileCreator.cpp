@@ -37,24 +37,36 @@ bool FileCreator::setFileSize(int fd, size_t fileSize) {
   return true;
 }
 
-int FileCreator::openAndSetSize(const std::string &relPath, size_t size) {
-  int fd = createFile(relPath);
+int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
+  const auto &options = WdtOptions::get();
+  int fd = createFile(blockDetails->fileName);
   if (fd < 0) {
     return -1;
   }
-  if (!setFileSize(fd, size)) {
+  if (!setFileSize(fd, blockDetails->fileSize)) {
     close(fd);
     return -1;
+  }
+  if (options.enable_download_resumption) {
+    if (blockDetails->allocationStatus == EXISTS_TOO_SMALL ||
+        blockDetails->allocationStatus == EXISTS_TOO_LARGE) {
+      LOG(INFO) << "File size mismatch in the sender side "
+                << blockDetails->fileName
+                << ", marking previous transferred chunks as invalid";
+      transferLogManager_.addInvalidationEntry(blockDetails->prevSeqId);
+    }
+    transferLogManager_.addFileCreationEntry(
+        blockDetails->fileName, blockDetails->seqId, blockDetails->fileSize);
   }
   return fd;
 }
 
-int FileCreator::openForFirstBlock(int threadIndex, const std::string &relPath,
-                                   uint64_t seqId, size_t size) {
-  int fd = openAndSetSize(relPath, size);
+int FileCreator::openForFirstBlock(int threadIndex,
+                                   BlockDetails const *blockDetails) {
+  int fd = openAndSetSize(blockDetails);
   {
     folly::SpinLockGuard guard(lock_);
-    auto it = fileStatusMap_.find(seqId);
+    auto it = fileStatusMap_.find(blockDetails->seqId);
     WDT_CHECK(it != fileStatusMap_.end());
     it->second = fd >= 0 ? ALLOCATED : FAILED;
   }
@@ -82,15 +94,20 @@ bool FileCreator::waitForAllocationFinish(int allocatingThreadIndex,
   }
 }
 
-int FileCreator::openForBlocks(int threadIndex, const std::string &relPath,
-                               uint64_t seqId, size_t size) {
+int FileCreator::openForBlocks(int threadIndex,
+                               BlockDetails const *blockDetails) {
   lock_.lock();
-  auto it = fileStatusMap_.find(seqId);
+  auto it = fileStatusMap_.find(blockDetails->seqId);
+  if (blockDetails->allocationStatus == EXISTS_CORRECT_SIZE &&
+      it == fileStatusMap_.end()) {
+    it = fileStatusMap_.insert(std::make_pair(blockDetails->seqId,
+                                              FileCreator::ALLOCATED)).first;
+  }
   if (it == fileStatusMap_.end()) {
     // allocation has not started for this file
-    fileStatusMap_.insert(std::make_pair(seqId, threadIndex));
+    fileStatusMap_.insert(std::make_pair(blockDetails->seqId, threadIndex));
     lock_.unlock();
-    return openForFirstBlock(threadIndex, relPath, seqId, size);
+    return openForFirstBlock(threadIndex, blockDetails);
   }
   auto status = it->second;
   lock_.unlock();
@@ -100,11 +117,11 @@ int FileCreator::openForBlocks(int threadIndex, const std::string &relPath,
   }
   if (status != ALLOCATED) {
     // allocation in progress
-    if (!waitForAllocationFinish(it->second, seqId)) {
+    if (!waitForAllocationFinish(it->second, blockDetails->seqId)) {
       return -1;
     }
   }
-  return createFile(relPath);
+  return createFile(blockDetails->fileName);
 }
 
 using std::string;

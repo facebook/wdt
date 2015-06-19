@@ -3,22 +3,19 @@
 #include <wdt/WdtConfig.h>
 #include "Writer.h"
 #include "FileCreator.h"
+#include "Protocol.h"
 
 namespace facebook {
 namespace wdt {
+
 class FileWriter : public Writer {
  public:
-  FileWriter(int threadIndex, std::string &fileName, uint64_t seqId,
-             uint64_t fileSize, uint64_t offset, uint64_t dataSize,
+  FileWriter(int threadIndex, BlockDetails const *blockDetails,
              FileCreator *fileCreator)
       : threadIndex_(threadIndex),
-        fileName_(fileName),
-        seqId_(seqId),
-        fileSize_(fileSize),
-        offset_(offset),
-        dataSize_(dataSize),
+        blockDetails_(blockDetails),
 #ifdef HAS_SYNC_FILE_RANGE
-        nextSyncOffset_(offset),
+        nextSyncOffset_(blockDetails->offset),
 #endif
         fileCreator_(fileCreator) {
   }
@@ -55,16 +52,9 @@ class FileWriter : public Writer {
   /// index of the owner receiver thread. This is needed for co-ordination of
   /// disk space allocation in fileCreator
   int threadIndex_;
-  /// name of the file
-  std::string fileName_;
-  /// sequence-id of the file
-  uint64_t seqId_;
-  /// size of the file
-  uint64_t fileSize_;
-  /// offset of the block from the start of the file
-  uint64_t offset_;
-  /// size of the block
-  uint64_t dataSize_;
+
+  /// details of the block
+  BlockDetails const *blockDetails_;
 
   /// number of bytes written
   uint64_t totalWritten_{0};

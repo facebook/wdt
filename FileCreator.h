@@ -1,6 +1,8 @@
 #pragma once
 
 #include <wdt/WdtConfig.h>
+#include "Protocol.h"
+#include "TransferLogManager.h"
 
 #include <glog/logging.h>
 #include <mutex>
@@ -26,7 +28,9 @@ namespace wdt {
 class FileCreator {
  public:
   /// rootDir is assumed to exist
-  explicit FileCreator(const std::string &rootDir, int numThreads) {
+  FileCreator(const std::string &rootDir, int numThreads,
+              TransferLogManager &transferLogManager)
+      : transferLogManager_(transferLogManager) {
     CHECK(!rootDir.empty());
 
     // For creating root directory, we are using createDirRecursively.
@@ -50,12 +54,11 @@ class FileCreator {
    * required size, the file is truncated using ftruncate. Space is
    * allocated using posix_fallocate.
    *
-   * @param relPath   path of the file relative to root directory
-   * @param size      size of the file
+   * @param blockDetails  block-details
    *
    * @return          file descriptor in case of success, -1 otherwise
    */
-  int openAndSetSize(const std::string &relPath, size_t size);
+  int openAndSetSize(BlockDetails const *blockDetails);
 
   /**
    * This is used to open the file in block mode. If the current thread is the
@@ -64,14 +67,11 @@ class FileCreator {
    * and opens the file without setting size.
    *
    * @param threadIndex   index of the calling thread
-   * @param relPath       path of the file relative to root directory
-   * @param seqId         sequence id of the file
-   * @param size          size of the file
+   * @param blockDetails  block-details
    *
    * @return              file descriptor in case of success, -1 otherwise
    */
-  int openForBlocks(int threadIndex, const std::string &relPath, uint64_t seqId,
-                    size_t size);
+  int openForBlocks(int threadIndex, BlockDetails const *blockDetails);
 
   /// reset internal directory cache
   void resetDirCache() {
@@ -116,14 +116,11 @@ class FileCreator {
    * and notifies other waiting thread.
    *
    * @param threadIndex   index of the calling thread
-   * @param relPath   path relative to root dir
-   * @param seqId         sequence id of the file
-   * @param size          size of the file
+   * @param blockDetails  block-details
    *
    * @return          file descriptor or -1 on error
    */
-  int openForFirstBlock(int threadIndex, const std::string &relPath,
-                        uint64_t seqId, size_t size);
+  int openForFirstBlock(int threadIndex, BlockDetails const *blockDetails);
 
   /// waits for allocation of a file to finish
   bool waitForAllocationFinish(int allocatingThreadIndex, uint64_t seqId);
@@ -159,14 +156,16 @@ class FileCreator {
   /// protects createdDirs_
   std::mutex mutex_;
 
-  const static int ALLOCATED = -1;
-  const static int FAILED = -2;
+  const int ALLOCATED{-1};
+  const int FAILED{-2};
 
   /// map from file sequence id to allocation status. There are four possible
   /// allocation status. NOT STARTED(no entry in the map), ALLOCATED(-1),
   /// FAILED(-2) and IN_PROGRESS(map value is the index of the allocating
   /// thread)
   std::map<uint64_t, int> fileStatusMap_;
+  /// transfer log manger used by receiver
+  TransferLogManager &transferLogManager_;
   /// mutex to coordinate waiting among threads
   std::mutex allocationMutex_;
   /// array of condition_variables for different threads

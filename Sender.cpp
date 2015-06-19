@@ -120,8 +120,9 @@ void ThreadTransferHistory::markSourceAsFailed(
 const Sender::StateFunction Sender::stateMap_[] = {
     &Sender::connect, &Sender::readLocalCheckPoint, &Sender::sendSettings,
     &Sender::sendBlocks, &Sender::sendDoneCmd, &Sender::sendSizeCmd,
-    &Sender::checkForAbort, &Sender::readReceiverCmd, &Sender::processDoneCmd,
-    &Sender::processWaitCmd, &Sender::processErrCmd, &Sender::processAbortCmd};
+    &Sender::checkForAbort, &Sender::readFileChunks, &Sender::readReceiverCmd,
+    &Sender::processDoneCmd, &Sender::processWaitCmd, &Sender::processErrCmd,
+    &Sender::processAbortCmd};
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   destHost_ = destHost;
@@ -260,12 +261,14 @@ std::unique_ptr<TransferReport> Sender::finish() {
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
   double directoryTime;
-  if (!twoPhases) {
-    dirThread_.join();
-  }
   directoryTime = dirQueue_->getDirectoryTime();
   for (int i = 0; i < ports_.size(); i++) {
     senderThreads_[i].join();
+  }
+  if (!downloadResumptionEnabled_ || fileChunksReceived_) {
+    if (!twoPhases) {
+      dirThread_.join();
+    }
   }
   WDT_CHECK(numActiveThreads_ == 0);
   if (progressReportEnabled) {
@@ -353,12 +356,17 @@ ErrorCode Sender::start() {
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
             << ports_ << "]";
   startTime_ = Clock::now();
-  dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
+  downloadResumptionEnabled_ =
+      options.enable_download_resumption &&
+      protocolVersion_ >= Protocol::DOWNLOAD_RESUMPTION_VERSION;
+  if (!downloadResumptionEnabled_) {
+    dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
+    if (twoPhases) {
+      dirThread_.join();
+    }
+  }
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
-  if (twoPhases) {
-    dirThread_.join();
-  }
   if (throttler_) {
     LOG(INFO) << "Skipping throttler setup. External throttler set."
               << "Throttler details : " << *throttler_;
@@ -561,19 +569,28 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   int64_t writeTimeoutMillis = options.write_timeout_millis;
   size_t off = 0;
   buf[off++] = Protocol::SETTINGS_CMD;
-
-  bool success = Protocol::encodeSettings(
-      protocolVersion_, buf, off, Protocol::kMaxSettings, readTimeoutMillis,
-      writeTimeoutMillis, senderId_, options.enable_checksum);
-  WDT_CHECK(success);
-  ssize_t written = socket->write(buf, off);
-  if (written != off) {
-    LOG(ERROR) << "Socket write failure " << written << " " << off;
+  bool sendFileChunks;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    sendFileChunks = downloadResumptionEnabled_ && !fileChunksReceived_;
+  }
+  Settings settings;
+  settings.senderProtocolVersion = protocolVersion_;
+  settings.readTimeoutMillis = readTimeoutMillis;
+  settings.writeTimeoutMillis = writeTimeoutMillis;
+  settings.transferId = senderId_;
+  settings.enableChecksum = options.enable_checksum;
+  settings.sendFileChunks = sendFileChunks;
+  Protocol::encodeSettings(buf, off, Protocol::kMaxSettings, settings);
+  size_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
+  ssize_t written = socket->write(buf, toWrite);
+  if (written != toWrite) {
+    LOG(ERROR) << "Socket write failure " << written << " " << toWrite;
     threadStats.setErrorCode(SOCKET_WRITE_ERROR);
     return CONNECT;
   }
-  threadStats.addHeaderBytes(off);
-  return SEND_BLOCKS;
+  threadStats.addHeaderBytes(toWrite);
+  return sendFileChunks ? READ_FILE_CHUNKS : SEND_BLOCKS;
 }
 
 Sender::SenderState Sender::sendBlocks(ThreadData &data) {
@@ -650,9 +667,7 @@ Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
   ErrorCode transferStatus = pair.second;
   buf[off++] = transferStatus;
 
-  bool success =
-      Protocol::encodeDone(buf, off, Protocol::kMaxDone, numBlocksDiscovered);
-  WDT_CHECK(success);
+  Protocol::encodeDone(buf, off, Protocol::kMaxDone, numBlocksDiscovered);
 
   int toWrite = Protocol::kMinBufLength;
   ssize_t written = socket->write(buf, toWrite);
@@ -685,6 +700,103 @@ Sender::SenderState Sender::checkForAbort(ThreadData &data) {
   }
   threadStats.addHeaderBytes(1);
   return PROCESS_ABORT_CMD;
+}
+
+Sender::SenderState Sender::readFileChunks(ThreadData &data) {
+  LOG(INFO) << "entered READ_RECEIVER_CMD state " << data.threadIndex_;
+  char *buf = data.buf_;
+  auto &socket = data.socket_;
+  auto &threadStats = data.threadStats_;
+  ssize_t numRead = socket->read(buf, 1);
+  if (numRead != 1) {
+    LOG(ERROR) << "Socket read error 1 " << numRead;
+    threadStats.setErrorCode(SOCKET_READ_ERROR);
+    return CHECK_FOR_ABORT;
+  }
+  threadStats.addHeaderBytes(numRead);
+  Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[0];
+  if (cmd == Protocol::WAIT_CMD) {
+    return READ_FILE_CHUNKS;
+  }
+  if (cmd == Protocol::ACK_CMD) {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (!fileChunksReceived_) {
+        LOG(ERROR) << "Sender has not yet received file chunks, but receiver "
+                      "thinks it has already sent it";
+        threadStats.setErrorCode(PROTOCOL_ERROR);
+        return END;
+      }
+    }
+    return SEND_BLOCKS;
+  }
+  if (cmd != Protocol::CHUNKS_CMD) {
+    LOG(ERROR) << "Unexpected cmd " << cmd;
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return END;
+  }
+  size_t toRead = Protocol::kChunksCmdLen;
+  numRead = socket->read(buf, toRead);
+  if (numRead != toRead) {
+    LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
+    threadStats.setErrorCode(SOCKET_READ_ERROR);
+    return CHECK_FOR_ABORT;
+  }
+  threadStats.addHeaderBytes(numRead);
+  size_t off = 0;
+  int64_t bufSize, numFiles;
+  Protocol::decodeChunksCmd(buf, off, bufSize, numFiles);
+  LOG(INFO) << "File chunk list has " << numFiles
+            << " entries and is broken in buffers of length " << bufSize;
+  std::unique_ptr<char[]> chunkBuffer(new char[bufSize]);
+  std::vector<FileChunksInfo> fileChunksInfoList;
+  while (fileChunksInfoList.size() < numFiles) {
+    toRead = sizeof(int32_t);
+    numRead = socket->read(buf, toRead);
+    if (numRead != toRead) {
+      LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
+      threadStats.setErrorCode(SOCKET_READ_ERROR);
+      return CHECK_FOR_ABORT;
+    }
+    toRead = folly::loadUnaligned<int32_t>(buf);
+    toRead = folly::Endian::little(toRead);
+    numRead = socket->read(chunkBuffer.get(), toRead);
+    if (numRead != toRead) {
+      LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
+      threadStats.setErrorCode(SOCKET_READ_ERROR);
+      return CHECK_FOR_ABORT;
+    }
+    threadStats.addHeaderBytes(numRead);
+    off = 0;
+    bool success = Protocol::decodeFileChunksInfoList(
+        chunkBuffer.get(), off, toRead, fileChunksInfoList);
+    if (!success) {
+      LOG(ERROR) << "Unable to decode file chunks list";
+      threadStats.setErrorCode(PROTOCOL_ERROR);
+      return CHECK_FOR_ABORT;
+    }
+  }
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (fileChunksReceived_) {
+      LOG(WARNING) << "File chunks list received multiple times";
+    } else {
+      dirQueue_->setPreviouslyReceivedChunks(fileChunksInfoList);
+      dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
+      fileChunksReceived_ = true;
+    }
+  }
+  // send ack for file chunks list
+  buf[0] = Protocol::ACK_CMD;
+  size_t toWrite = 1;
+  ssize_t written = socket->write(buf, toWrite);
+  if (toWrite != written) {
+    LOG(ERROR) << "Socket write error " << toWrite << " " << written;
+    threadStats.setErrorCode(SOCKET_WRITE_ERROR);
+    return CHECK_FOR_ABORT;
+  }
+  threadStats.addHeaderBytes(written);
+  return SEND_BLOCKS;
 }
 
 Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
@@ -807,7 +919,7 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
 
   threadStats.setErrorCode(ABORT);
-  int toRead = 1 + sizeof(int32_t) + sizeof(int64_t);
+  int toRead = Protocol::kAbortLength;
   auto numRead = socket->read(buf, toRead);
   if (numRead != toRead) {
     // can not read checkpoint, but still must exit because of ABORT
@@ -815,15 +927,12 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
                << toRead;
     return END;
   }
-
-  int offset = 0;
-  int32_t protocolVersion = folly::loadUnaligned<int32_t>(buf + offset);
-  protocolVersion = folly::Endian::little(protocolVersion);
-  offset += sizeof(int32_t);
-  ErrorCode remoteError = (ErrorCode)buf[offset++];
+  size_t offset = 0;
+  int32_t protocolVersion;
+  ErrorCode remoteError;
+  int64_t checkpoint;
+  Protocol::decodeAbort(buf, offset, protocolVersion, remoteError, checkpoint);
   threadStats.setRemoteErrorCode(remoteError);
-  int64_t checkpoint = folly::loadUnaligned<int64_t>(buf + offset);
-  checkpoint = folly::Endian::little(checkpoint);
   std::string failedFileName = transferHistory.getSourceId(checkpoint);
   LOG(WARNING) << "Received abort on " << data.threadIndex_
                << " remote protocol version " << protocolVersion
@@ -889,10 +998,19 @@ TransferStats Sender::sendOneByteSource(
   off += sizeof(uint16_t);
   const size_t expectedSize = source->getSize();
   size_t actualSize = 0;
-  Protocol::encodeHeader(headerBuf, off, Protocol::kMaxHeader,
-                         source->getIdentifier(), source->getSeqId(),
-                         expectedSize, source->getOffset(),
-                         source->getTotalSize());
+
+  const SourceMetaData &metadata = source->getMetaData();
+  BlockDetails blockDetails;
+  blockDetails.fileName = metadata.relPath;
+  blockDetails.seqId = metadata.seqId;
+  blockDetails.fileSize = metadata.size;
+  blockDetails.offset = source->getOffset();
+  blockDetails.dataSize = source->getSize();
+  blockDetails.allocationStatus = metadata.allocationStatus;
+  blockDetails.prevSeqId = metadata.prevSeqId;
+
+  Protocol::encodeHeader(protocolVersion_, headerBuf, off, Protocol::kMaxHeader,
+                         blockDetails);
   uint16_t littleEndianOff = folly::Endian::little((uint16_t)off);
   folly::storeUnaligned<uint16_t>(headerLenPtr, littleEndianOff);
   ssize_t written = socket->write(headerBuf, off);
@@ -981,12 +1099,11 @@ TransferStats Sender::sendOneByteSource(
     LOG(ERROR) << "UGH " << source->getIdentifier() << " " << expectedSize
                << " " << actualSize;
     struct stat fileStat;
-    if (stat(source->getFullPath().c_str(), &fileStat) != 0) {
-      PLOG(ERROR) << "stat failed on path " << source->getFullPath();
+    if (stat(metadata.fullPath.c_str(), &fileStat) != 0) {
+      PLOG(ERROR) << "stat failed on path " << metadata.fullPath;
     } else {
       LOG(WARNING) << "file " << source->getIdentifier() << " previous size "
-                   << source->getTotalSize() << " current size "
-                   << fileStat.st_size;
+                   << metadata.size << " current size " << fileStat.st_size;
     }
     stats.setErrorCode(BYTE_SOURCE_READ_ERROR);
     stats.incrFailedAttempts();
@@ -1000,9 +1117,7 @@ TransferStats Sender::sendOneByteSource(
       options.enable_checksum) {
     off = 0;
     headerBuf[off++] = Protocol::FOOTER_CMD;
-    bool success =
-        Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum);
-    WDT_CHECK(success) << "Failed to encode footer";
+    Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum);
     int toWrite = off;
     written = socket->write(headerBuf, toWrite);
     if (written != toWrite) {

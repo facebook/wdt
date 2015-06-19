@@ -9,10 +9,12 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <unordered_map>
 
 #include "SourceQueue.h"
 #include "WdtOptions.h"
 #include "FileByteSource.h"
+#include "Protocol.h"
 
 namespace facebook {
 namespace wdt {
@@ -130,6 +132,14 @@ class DirectorySourceQueue : public SourceQueue {
   void setFollowSymlinks(const bool followSymlinks);
 
   /**
+   * sets chunks which were sent in some previous transfer
+   *
+   * @param previouslyTransferredChunks   previously sent chunk info
+   */
+  void setPreviouslyReceivedChunks(
+      std::vector<FileChunksInfo> &previouslyTransferredChunks);
+
+  /**
    * returns sources to the queue, checks for fail/retries, doesn't increment
    * numentries
    *
@@ -157,11 +167,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// @return   returns list of directories which could not be opened
   std::vector<std::string> &getFailedDirectories();
 
-  virtual ~DirectorySourceQueue() {
-    for (FileMetaData *fileData : sharedFileData_) {
-      delete fileData;
-    }
-  }
+  virtual ~DirectorySourceQueue();
 
   /// Returns the time it took to traverse the directory tree
   double getDirectoryTime() const {
@@ -274,6 +280,9 @@ class DirectorySourceQueue : public SourceQueue {
   /// Total number of files that have passed through the queue
   size_t numEntries_{0};
 
+  /// Seq-id of the next file to be inserted into the queue
+  int64_t nextSeqId_{0};
+
   /// total number of blocks that have passed through the queue. Even when
   /// blocks are actually disabled, our code internally treats files like single
   /// blocks. So, numBlocks_ >= numFiles_.
@@ -287,7 +296,10 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// shared file data. this are used during transfer to add blocks
   /// contribution
-  std::vector<FileMetaData *> sharedFileData_;
+  std::vector<SourceMetaData *> sharedFileData_;
+
+  /// A map from relative file name to previously received chunks
+  std::unordered_map<std::string, FileChunksInfo> previouslyTransferredChunks_;
 
   const WdtOptions &options_;
 
