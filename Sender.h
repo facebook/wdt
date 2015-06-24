@@ -417,8 +417,6 @@ class Sender : public WdtBase {
   std::string destHost_;
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
-  /// Holds the instance of the progress reporter default or customized
-  std::unique_ptr<ProgressReporter> progressReporter_;
   /// Whether download resumption is enabled or not
   bool downloadResumptionEnabled_{false};
   /// Flags representing whether file chunks have been received or not
