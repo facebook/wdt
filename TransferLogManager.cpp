@@ -14,6 +14,7 @@
 #include <map>
 #include <ctime>
 #include <iomanip>
+
 namespace facebook {
 namespace wdt {
 
@@ -65,20 +66,19 @@ int64_t TransferLogManager::timestampInMicroseconds() const {
 }
 
 std::string TransferLogManager::getFormattedTimestamp(int64_t timestampMicros) {
-  std::stringstream str;
-  auto timePoint = std::chrono::time_point<Clock>(
-      std::chrono::microseconds(timestampMicros));
-  std::time_t t = Clock::to_time_t(timePoint);
-  char buf[18];  // need 18 bytes to encode date in format mm/dd/yy HH:MM:SS
+  // This assumes Clock's epoch is Posix's epoch (1970/1/1)
+  // to_time_t is unfortunately only on the system_clock and not
+  // on high_resolution_clock (on MacOS at least it isn't)
+  time_t seconds = timestampMicros / kMicroToSec;
+  int microseconds = timestampMicros - seconds * kMicroToSec;
+  // need 25 bytes to encode date in format mm/dd/yy HH:MM:SS.MMMMMM
+  char buf[25];
   struct tm tm;
-  if (std::strftime(buf, sizeof(buf), "%m/%d/%y %H:%M:%S",
-                    localtime_r(&t, &tm))) {
-    str << buf << ".";
-    int64_t timestampSeconds = timestampMicros / kMicroToSec;
-    int64_t microseconds = timestampMicros - timestampSeconds * kMicroToSec;
-    str << std::setfill('0') << std::setw(6) << microseconds;
-  }
-  return str.str();
+  localtime_r(&seconds, &tm);
+  snprintf(buf, sizeof(buf), "%02d/%02d/%02d %02d:%02d:%02d.%06d",
+           tm.tm_mon + 1, tm.tm_mday, (tm.tm_year % 100), tm.tm_hour, tm.tm_min,
+           tm.tm_sec, microseconds);
+  return buf;
 }
 
 void TransferLogManager::addLogHeader(const std::string &recoveryId) {
@@ -461,7 +461,7 @@ bool TransferLogManager::parseVerifyAndFix(
         if (parseOnly) {
           std::cout << getFormattedTimestamp(timestamp)
                     << " New transfer started, log-version " << logVersion
-                    << " recovery-id " << logRecoveryId;
+                    << " recovery-id " << logRecoveryId << std::endl;
         }
         break;
       }
@@ -479,7 +479,7 @@ bool TransferLogManager::parseVerifyAndFix(
         if (parseOnly) {
           std::cout << getFormattedTimestamp(timestamp) << " File created "
                     << fileName << " seq-id " << seqId << " file-size "
-                    << fileSize;
+                    << fileSize << std::endl;
           fileInfoMap.emplace(seqId, FileChunksInfo(seqId, fileName, fileSize));
           break;
         }
@@ -526,7 +526,8 @@ bool TransferLogManager::parseVerifyAndFix(
         if (parseOnly) {
           std::cout << getFormattedTimestamp(timestamp) << " Block written "
                     << chunksInfo.getFileName() << " seq-id " << seqId
-                    << " offset " << offset << " block-size " << blockSize;
+                    << " offset " << offset << " block-size " << blockSize
+                    << std::endl;
         } else {
           auto sizeIt = seqIdToSizeMap.find(seqId);
           WDT_CHECK(sizeIt != seqIdToSizeMap.end());
@@ -554,7 +555,7 @@ bool TransferLogManager::parseVerifyAndFix(
         }
         if (parseOnly) {
           std::cout << getFormattedTimestamp(timestamp)
-                    << " Invalidation entry for seq-id " << seqId;
+                    << " Invalidation entry for seq-id " << seqId << std::endl;
         }
         fileInfoMap.erase(seqId);
         invalidSeqIds.erase(seqId);
