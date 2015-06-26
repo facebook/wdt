@@ -1073,7 +1073,7 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
         // This thread has to send file chunks
         sendChunksStatus_ = IN_PROGRESS;
         lock.unlock();
-        folly::ScopeGuard guard = folly::makeGuard([&] {
+        auto guard = folly::makeGuard([&] {
           lock.lock();
           sendChunksStatus_ = NOT_STARTED;
           conditionFileChunksSent_.notify_one();

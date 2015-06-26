@@ -11,6 +11,8 @@
 namespace facebook {
 namespace wdt {
 
+using std::string;
+
 const int Protocol::protocol_version = 13;
 
 const int Protocol::RECEIVER_PROGRESS_REPORT_VERSION = 11;
@@ -109,6 +111,10 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src, size_t &off,
     blockDetails.offset = decodeInt(br);
     blockDetails.fileSize = decodeInt(br);
     if (receiverProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
+      if (!(br.size() >= 1)) {
+        LOG(ERROR) << "Invalid (too short) input " << string(src + off, max);
+        return false;
+      }
       uint8_t flags = br.front();
       // first 2 bytes are used to represent allocation status
       blockDetails.allocationStatus = (FileAllocationStatus)(flags & 3);
@@ -272,7 +278,7 @@ bool Protocol::decodeFileChunksInfo(folly::ByteRange &br, char *src, size_t max,
                                     FileChunksInfo &fileChunksInfo) {
   try {
     int64_t seqId, fileSize;
-    std::string fileName;
+    string fileName;
     seqId = decodeInt(br);
     if (!decodeString(br, src, max, fileName)) {
       return false;

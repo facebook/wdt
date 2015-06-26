@@ -37,7 +37,7 @@ set(BUILD_SHARED_LIBS on CACHE Bool "build shared libs")
 #set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_FLAGS "-msse4.2")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "_bin/wdt")
 
 # Check that we have the Folly source tree
 set(FOLLY_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/folly CACHE path
@@ -231,6 +231,6 @@ if (BUILD_TESTING)
 
   add_executable(protocol_test ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
-  add_test(AllTestsInProtocolTest protocol_test)
+  add_test(NAME AllTestsInProtocolTest COMMAND protocol_test)
 
 endif(BUILD_TESTING)
