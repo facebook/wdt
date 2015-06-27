@@ -11,7 +11,7 @@
 namespace facebook {
 namespace wdt {
 
-bool FileCreator::setFileSize(int fd, size_t fileSize) {
+bool FileCreator::setFileSize(int fd, int64_t fileSize) {
   struct stat fileStat;
   if (fstat(fd, &fileStat) != 0) {
     PLOG(ERROR) << "fstat() failed for " << fd;
@@ -76,7 +76,7 @@ int FileCreator::openForFirstBlock(int threadIndex,
 }
 
 bool FileCreator::waitForAllocationFinish(int allocatingThreadIndex,
-                                          uint64_t seqId) {
+                                          int64_t seqId) {
   std::unique_lock<std::mutex> waitLock(allocationMutex_);
   while (true) {
     {
@@ -186,7 +186,7 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
 
   CHECK(dir.back() == '/');
 
-  size_t lastIndex = dir.size() - 1;
+  int64_t lastIndex = dir.size() - 1;
   while (lastIndex > 0 && dir[lastIndex - 1] != '/') {
     lastIndex--;
   }

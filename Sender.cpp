@@ -31,7 +31,8 @@ ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue &queue,
 std::string ThreadTransferHistory::getSourceId(int64_t index) {
   folly::SpinLockGuard guard(lock_);
   std::string sourceId;
-  if (index >= 0 && index < history_.size()) {
+  const int64_t historySize = history_.size();
+  if (index >= 0 && index < historySize) {
     sourceId = history_[index]->getIdentifier();
   } else {
     LOG(WARNING) << "Trying to read out of bounds data " << index << " "
@@ -57,7 +58,8 @@ bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
 int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
     int64_t numReceivedSources, bool globalCheckpoint) {
   folly::SpinLockGuard guard(lock_);
-  if (numReceivedSources > history_.size()) {
+  const int64_t historySize = history_.size();
+  if (numReceivedSources > historySize) {
     LOG(ERROR)
         << "checkpoint is greater than total number of sources transfereed "
         << history_.size() << " " << numReceivedSources;
@@ -70,9 +72,9 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
   }
   globalCheckpoint_ |= globalCheckpoint;
   numAcknowledged_ = numReceivedSources;
-  int64_t numFailedSources = history_.size() - numReceivedSources;
+  int64_t numFailedSources = historySize - numReceivedSources;
   std::vector<std::unique_ptr<ByteSource>> sourcesToReturn;
-  while (history_.size() > numReceivedSources) {
+  for (int64_t i = 0; i < numFailedSources; i++) {
     std::unique_ptr<ByteSource> source = std::move(history_.back());
     history_.pop_back();
     markSourceAsFailed(source);
@@ -83,7 +85,8 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
 }
 
 std::vector<TransferStats> ThreadTransferHistory::popAckedSourceStats() {
-  WDT_CHECK(numAcknowledged_ == history_.size());
+  const int64_t historySize = history_.size();
+  WDT_CHECK(numAcknowledged_ == historySize);
   // no locking needed, as this should be called after transfer has finished
   std::vector<TransferStats> sourceStats;
   while (!history_.empty()) {
@@ -215,7 +218,7 @@ const std::string &Sender::getDestination() const {
 }
 
 std::unique_ptr<TransferReport> Sender::getTransferReport() {
-  size_t totalFileSize = dirQueue_->getTotalSize();
+  int64_t totalFileSize = dirQueue_->getTotalSize();
   double totalTime = durationSeconds(Clock::now() - startTime_);
   std::unique_ptr<TransferReport> transferReport =
       folly::make_unique<TransferReport>(globalThreadStats_, totalTime,
@@ -262,7 +265,8 @@ std::unique_ptr<TransferReport> Sender::finish() {
       progressReporter_ && progressReportIntervalMillis_ > 0;
   double directoryTime;
   directoryTime = dirQueue_->getDirectoryTime();
-  for (int i = 0; i < ports_.size(); i++) {
+  const int64_t numPorts = ports_.size();
+  for (int64_t i = 0; i < numPorts; i++) {
     senderThreads_[i].join();
   }
   if (!downloadResumptionEnabled_ || fileChunksReceived_) {
@@ -310,7 +314,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
                           dirQueue_->getFailedSourceStats(),
                           globalThreadStats_);
   }
-  size_t totalFileSize = dirQueue_->getTotalSize();
+  int64_t totalFileSize = dirQueue_->getTotalSize();
   double totalTime = durationSeconds(endTime_ - startTime_);
   std::unique_ptr<TransferReport> transferReport =
       folly::make_unique<TransferReport>(
@@ -377,16 +381,17 @@ ErrorCode Sender::start() {
   // WARNING: Do not MERGE the follwing two loops. ThreadTransferHistory keeps a
   // reference of TransferStats. And, any emplace operation on a vector
   // invalidates all its references
-  for (int i = 0; i < ports_.size(); i++) {
+  const int64_t numPorts = ports_.size();
+  for (int64_t i = 0; i < numPorts; i++) {
     globalThreadStats_.emplace_back(true);
   }
-  for (int i = 0; i < ports_.size(); i++) {
+  for (int64_t i = 0; i < numPorts; i++) {
     transferHistories_.emplace_back(*dirQueue_, globalThreadStats_[i]);
   }
-  perfReports_.resize(ports_.size());
-  numActiveThreads_ = ports_.size();
+  perfReports_.resize(numPorts);
+  numActiveThreads_ = numPorts;
   transferFinished_ = false;
-  for (int i = 0; i < ports_.size(); i++) {
+  for (int64_t i = 0; i < numPorts; i++) {
     globalThreadStats_[i].setId(folly::to<std::string>(i));
     senderThreads_.emplace_back(&Sender::sendOne, this, i);
   }
@@ -402,15 +407,15 @@ void Sender::validateTransferStats(
     const std::vector<TransferStats> &transferredSourceStats,
     const std::vector<TransferStats> &failedSourceStats,
     const std::vector<TransferStats> &threadStats) {
-  size_t sourceFailedAttempts = 0;
-  size_t sourceDataBytes = 0;
-  size_t sourceEffectiveDataBytes = 0;
-  size_t sourceNumBlocks = 0;
+  int64_t sourceFailedAttempts = 0;
+  int64_t sourceDataBytes = 0;
+  int64_t sourceEffectiveDataBytes = 0;
+  int64_t sourceNumBlocks = 0;
 
-  size_t threadFailedAttempts = 0;
-  size_t threadDataBytes = 0;
-  size_t threadEffectiveDataBytes = 0;
-  size_t threadNumBlocks = 0;
+  int64_t threadFailedAttempts = 0;
+  int64_t threadDataBytes = 0;
+  int64_t threadEffectiveDataBytes = 0;
+  int64_t threadNumBlocks = 0;
 
   for (const auto &stat : transferredSourceStats) {
     sourceFailedAttempts += stat.getFailedAttempts();
@@ -516,9 +521,9 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
 
   std::vector<Checkpoint> checkpoints;
-  size_t decodeOffset = 0;
+  int64_t decodeOffset = 0;
   char *buf = data.buf_;
-  ssize_t numRead = data.socket_->read(buf, Protocol::kMaxLocalCheckpoint);
+  int64_t numRead = data.socket_->read(buf, Protocol::kMaxLocalCheckpoint);
   if (numRead != Protocol::kMaxLocalCheckpoint) {
     VLOG(1) << "read mismatch " << Protocol::kMaxLocalCheckpoint << " "
             << numRead << " port " << port;
@@ -567,7 +572,7 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   auto &options = WdtOptions::get();
   int64_t readTimeoutMillis = options.read_timeout_millis;
   int64_t writeTimeoutMillis = options.write_timeout_millis;
-  size_t off = 0;
+  int64_t off = 0;
   buf[off++] = Protocol::SETTINGS_CMD;
   bool sendFileChunks;
   {
@@ -582,8 +587,8 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   settings.enableChecksum = options.enable_checksum;
   settings.sendFileChunks = sendFileChunks;
   Protocol::encodeSettings(buf, off, Protocol::kMaxSettings, settings);
-  size_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
-  ssize_t written = socket->write(buf, toWrite);
+  int64_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
+  int64_t written = socket->write(buf, toWrite);
   if (written != toWrite) {
     LOG(ERROR) << "Socket write failure " << written << " " << toWrite;
     threadStats.setErrorCode(SOCKET_WRITE_ERROR);
@@ -638,11 +643,11 @@ Sender::SenderState Sender::sendSizeCmd(ThreadData &data) {
   auto &socket = data.socket_;
   auto &queue = data.queue_;
   auto &totalSizeSent = data.totalSizeSent_;
-  size_t off = 0;
+  int64_t off = 0;
   buf[off++] = Protocol::SIZE_CMD;
 
   Protocol::encodeSize(buf, off, Protocol::kMaxSize, queue.getTotalSize());
-  ssize_t written = socket->write(buf, off);
+  int64_t written = socket->write(buf, off);
   if (written != off) {
     LOG(ERROR) << "Socket write error " << off << " " << written;
     threadStats.setErrorCode(SOCKET_WRITE_ERROR);
@@ -659,7 +664,7 @@ Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
   char *buf = data.buf_;
   auto &socket = data.socket_;
   auto &queue = data.queue_;
-  size_t off = 0;
+  int64_t off = 0;
   buf[off++] = Protocol::DONE_CMD;
 
   auto pair = queue.getNumBlocksAndStatus();
@@ -670,7 +675,7 @@ Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
   Protocol::encodeDone(buf, off, Protocol::kMaxDone, numBlocksDiscovered);
 
   int toWrite = Protocol::kMinBufLength;
-  ssize_t written = socket->write(buf, toWrite);
+  int64_t written = socket->write(buf, toWrite);
   if (written != toWrite) {
     LOG(ERROR) << "Socket write failure " << written << " " << toWrite;
     threadStats.setErrorCode(SOCKET_WRITE_ERROR);
@@ -707,7 +712,7 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
   char *buf = data.buf_;
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
-  ssize_t numRead = socket->read(buf, 1);
+  int64_t numRead = socket->read(buf, 1);
   if (numRead != 1) {
     LOG(ERROR) << "Socket read error 1 " << numRead;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
@@ -735,7 +740,7 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  size_t toRead = Protocol::kChunksCmdLen;
+  int64_t toRead = Protocol::kChunksCmdLen;
   numRead = socket->read(buf, toRead);
   if (numRead != toRead) {
     LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
@@ -743,14 +748,30 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
     return CHECK_FOR_ABORT;
   }
   threadStats.addHeaderBytes(numRead);
-  size_t off = 0;
+  int64_t off = 0;
   int64_t bufSize, numFiles;
   Protocol::decodeChunksCmd(buf, off, bufSize, numFiles);
   LOG(INFO) << "File chunk list has " << numFiles
             << " entries and is broken in buffers of length " << bufSize;
   std::unique_ptr<char[]> chunkBuffer(new char[bufSize]);
   std::vector<FileChunksInfo> fileChunksInfoList;
-  while (fileChunksInfoList.size() < numFiles) {
+  while (true) {
+    int64_t numFileChunks = fileChunksInfoList.size();
+    if (numFileChunks > numFiles) {
+      // We should never be able to read more file chunks than mentioned in the
+      // chunks cmd. Chunks cmd has buffer size used to transfer chunks and also
+      // number of chunks. This chunks are read and parsed and added to
+      // fileChunksInfoList. Number of chunks we decode should match with the
+      // number mentioned in the Chunks cmd.
+      LOG(ERROR) << "Number of file chunks received is more than the number "
+                    "mentioned in CHUNKS_CMD " << numFileChunks << " "
+                 << numFiles;
+      threadStats.setErrorCode(PROTOCOL_ERROR);
+      return END;
+    }
+    if (numFileChunks == numFiles) {
+      break;
+    }
     toRead = sizeof(int32_t);
     numRead = socket->read(buf, toRead);
     if (numRead != toRead) {
@@ -768,12 +789,13 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
     }
     threadStats.addHeaderBytes(numRead);
     off = 0;
+    // decode function below adds decoded file chunks to fileChunksInfoList
     bool success = Protocol::decodeFileChunksInfoList(
         chunkBuffer.get(), off, toRead, fileChunksInfoList);
     if (!success) {
       LOG(ERROR) << "Unable to decode file chunks list";
       threadStats.setErrorCode(PROTOCOL_ERROR);
-      return CHECK_FOR_ABORT;
+      return END;
     }
   }
   {
@@ -788,8 +810,8 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
   }
   // send ack for file chunks list
   buf[0] = Protocol::ACK_CMD;
-  size_t toWrite = 1;
-  ssize_t written = socket->write(buf, toWrite);
+  int64_t toWrite = 1;
+  int64_t written = socket->write(buf, toWrite);
   if (toWrite != written) {
     LOG(ERROR) << "Socket write error " << toWrite << " " << written;
     threadStats.setErrorCode(SOCKET_WRITE_ERROR);
@@ -803,7 +825,7 @@ Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
   VLOG(1) << "entered READ_RECEIVER_CMD state " << data.threadIndex_;
   TransferStats &threadStats = data.threadStats_;
   char *buf = data.buf_;
-  ssize_t numRead = data.socket_->read(buf, 1);
+  int64_t numRead = data.socket_->read(buf, 1);
   if (numRead != 1) {
     LOG(ERROR) << "READ unexpected " << numRead;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
@@ -867,15 +889,15 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
   auto &socket = data.socket_;
   char *buf = data.buf_;
 
-  auto toRead = sizeof(uint16_t);
-  auto numRead = socket->read(buf, toRead);
+  int64_t toRead = sizeof(int16_t);
+  int64_t numRead = socket->read(buf, toRead);
   if (numRead != toRead) {
     LOG(ERROR) << "read unexpected " << toRead << " " << numRead;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return CONNECT;
   }
 
-  uint16_t checkpointsLen = folly::loadUnaligned<uint16_t>(buf);
+  int16_t checkpointsLen = folly::loadUnaligned<int16_t>(buf);
   checkpointsLen = folly::Endian::little(checkpointsLen);
   char checkpointBuf[checkpointsLen];
   numRead = socket->read(checkpointBuf, checkpointsLen);
@@ -886,7 +908,7 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
   }
 
   std::vector<Checkpoint> checkpoints;
-  size_t decodeOffset = 0;
+  int64_t decodeOffset = 0;
   if (!Protocol::decodeCheckpoints(checkpointBuf, decodeOffset, checkpointsLen,
                                    checkpoints)) {
     LOG(ERROR) << "checkpoint decode failure "
@@ -927,7 +949,7 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
                << toRead;
     return END;
   }
-  size_t offset = 0;
+  int64_t offset = 0;
   int32_t protocolVersion;
   ErrorCode remoteError;
   int64_t checkpoint;
@@ -991,13 +1013,13 @@ TransferStats Sender::sendOneByteSource(
   TransferStats stats;
   auto &options = WdtOptions::get();
   char headerBuf[Protocol::kMaxHeader];
-  size_t off = 0;
+  int64_t off = 0;
   headerBuf[off++] = Protocol::FILE_CMD;
   headerBuf[off++] = transferStatus;
   char *headerLenPtr = headerBuf + off;
-  off += sizeof(uint16_t);
-  const size_t expectedSize = source->getSize();
-  size_t actualSize = 0;
+  off += sizeof(int16_t);
+  const int64_t expectedSize = source->getSize();
+  int64_t actualSize = 0;
 
   const SourceMetaData &metadata = source->getMetaData();
   BlockDetails blockDetails;
@@ -1011,9 +1033,9 @@ TransferStats Sender::sendOneByteSource(
 
   Protocol::encodeHeader(protocolVersion_, headerBuf, off, Protocol::kMaxHeader,
                          blockDetails);
-  uint16_t littleEndianOff = folly::Endian::little((uint16_t)off);
-  folly::storeUnaligned<uint16_t>(headerLenPtr, littleEndianOff);
-  ssize_t written = socket->write(headerBuf, off);
+  int16_t littleEndianOff = folly::Endian::little((int16_t)off);
+  folly::storeUnaligned<int16_t>(headerLenPtr, littleEndianOff);
+  int64_t written = socket->write(headerBuf, off);
   if (written != off) {
     PLOG(ERROR) << "Write error/mismatch " << written << " " << off
                 << ". fd = " << socket->getFd()
@@ -1023,14 +1045,14 @@ TransferStats Sender::sendOneByteSource(
     return stats;
   }
   stats.addHeaderBytes(written);
-  size_t byteSourceHeaderBytes = written;
-  size_t throttlerInstanceBytes = byteSourceHeaderBytes;
-  size_t totalThrottlerBytes = 0;
+  int64_t byteSourceHeaderBytes = written;
+  int64_t throttlerInstanceBytes = byteSourceHeaderBytes;
+  int64_t totalThrottlerBytes = 0;
   VLOG(3) << "Sent " << written << " on " << socket->getFd() << " : "
           << folly::humanify(std::string(headerBuf, off));
-  uint32_t checksum = 0;
+  int32_t checksum = 0;
   while (!source->finished()) {
-    size_t size;
+    int64_t size;
     char *buffer = source->read(size);
     if (source->hasError()) {
       LOG(ERROR) << "Failed reading file " << source->getIdentifier()
@@ -1059,7 +1081,7 @@ TransferStats Sender::sendOneByteSource(
       throttlerInstanceBytes = 0;
     }
     do {
-      ssize_t w = socket->write(buffer + written, size - written);
+      int64_t w = socket->write(buffer + written, size - written);
       if (w < 0) {
         // TODO: retries, close connection etc...
         PLOG(ERROR) << "Write error " << written << " (" << size << ")"

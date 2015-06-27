@@ -108,7 +108,7 @@ class FileCreator {
    *
    * @return          true for suzzess, false otherwise
    */
-  bool setFileSize(int fd, size_t fileSize);
+  bool setFileSize(int fd, int64_t fileSize);
 
   /**
    * opens the file and sets it size. Called only for the first block to request
@@ -123,7 +123,7 @@ class FileCreator {
   int openForFirstBlock(int threadIndex, BlockDetails const *blockDetails);
 
   /// waits for allocation of a file to finish
-  bool waitForAllocationFinish(int allocatingThreadIndex, uint64_t seqId);
+  bool waitForAllocationFinish(int allocatingThreadIndex, int64_t seqId);
 
   /// appends a trailing / if not already there to path
   static void addTrailingSlash(std::string &path);
@@ -163,7 +163,7 @@ class FileCreator {
   /// allocation status. NOT STARTED(no entry in the map), ALLOCATED(-1),
   /// FAILED(-2) and IN_PROGRESS(map value is the index of the allocating
   /// thread)
-  std::map<uint64_t, int> fileStatusMap_;
+  std::map<int64_t, int> fileStatusMap_;
   /// transfer log manger used by receiver
   TransferLogManager &transferLogManager_;
   /// mutex to coordinate waiting among threads

@@ -89,7 +89,7 @@ ErrorCode ClientSocket::connect() {
           return CONN_ERROR;
         }
         int pollTimeout = connectTimeout - timeElapsed;
-        struct pollfd pollFds[] = {{fd_, POLLOUT}};
+        struct pollfd pollFds[] = {{fd_, POLLOUT, 0}};
 
         int retValue;
         if ((retValue = poll(pollFds, 1, pollTimeout)) <= 0) {

@@ -103,7 +103,7 @@ class TransferLogManager {
   const std::string BUGGY_LOG_NAME = ".wdt.log.bug";
   /// 2 bytes for entry size, 1 byte for entry-type, PATH_MAX for file-name, 10
   /// bytes for seq-id, 10 bytes for file-size, 10 bytes for timestamp
-  static const size_t kMaxEntryLength = 2 + 1 + 10 + PATH_MAX + 2 * 10;
+  static const int64_t kMaxEntryLength = 2 + 1 + 10 + PATH_MAX + 2 * 10;
   enum EntryType {
     HEADER,             // log header
     FILE_CREATION,      // File created and space allocated
@@ -146,7 +146,7 @@ class TransferLogManager {
    * @param off     offset in the buffer, this moved to end of the encoding
    * @param seqId   sequence-id
    */
-  void encodeInvalidationEntry(char *dest, size_t &off, int64_t seqId);
+  void encodeInvalidationEntry(char *dest, int64_t &off, int64_t seqId);
 
   /**
    * writes invalidation entries to the disk.

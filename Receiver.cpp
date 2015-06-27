@@ -23,8 +23,8 @@ namespace wdt {
 const static int kTimeoutBufferMillis = 1000;
 const static int kWaitTimeoutFactor = 5;
 
-size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
-                   ssize_t len) {
+int64_t readAtLeast(ServerSocket &s, char *buf, int64_t max, int64_t atLeast,
+                    int64_t len) {
   VLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
           << atLeast << " from " << s.getFd();
   CHECK(len >= 0) << "negative len " << len;
@@ -33,7 +33,7 @@ size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
   while (len < atLeast) {
     // because we want to process data as soon as it arrives, tryFull option for
     // read is false
-    ssize_t n = s.read(buf + len, max - len, false);
+    int64_t n = s.read(buf + len, max - len, false);
     if (n < 0) {
       PLOG(ERROR) << "Read error on " << s.getPort() << " after " << count;
       if (len) {
@@ -55,12 +55,12 @@ size_t readAtLeast(ServerSocket &s, char *buf, size_t max, ssize_t atLeast,
   return len;
 }
 
-size_t readAtMost(ServerSocket &s, char *buf, size_t max, size_t atMost) {
+int64_t readAtMost(ServerSocket &s, char *buf, int64_t max, int64_t atMost) {
   const int64_t target = atMost < max ? atMost : max;
   VLOG(3) << "readAtMost target " << target;
   // because we want to process data as soon as it arrives, tryFull option for
   // read is false
-  ssize_t n = s.read(buf, target, false);
+  int64_t n = s.read(buf, target, false);
   if (n < 0) {
     PLOG(ERROR) << "Read error on " << s.getPort() << " with target " << target;
     return n;
@@ -93,7 +93,8 @@ void Receiver::addCheckpoint(Checkpoint checkpoint) {
 
 std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
   std::vector<Checkpoint> checkpoints;
-  for (int i = startIndex; i < checkpoints_.size(); i++) {
+  const int64_t numCheckpoints = checkpoints_.size();
+  for (int64_t i = startIndex; i < numCheckpoints; i++) {
     checkpoints.emplace_back(checkpoints_[i]);
   }
   return checkpoints;
@@ -214,7 +215,8 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
                  << " finish and this method will never return";
   }
-  for (int i = 0; i < threadServerSockets_.size(); i++) {
+  const int64_t numSockets = threadServerSockets_.size();
+  for (int64_t i = 0; i < numSockets; i++) {
     receiverThreads_[i].join();
   }
 
@@ -399,7 +401,7 @@ void Receiver::start() {
             << "] Target dir : " << destDir_;
   markTransferFinished(false);
   const auto &options = WdtOptions::get();
-  size_t bufferSize = options.buffer_size;
+  int64_t bufferSize = options.buffer_size;
   if (bufferSize < Protocol::kMaxHeader) {
     // round up to even k
     bufferSize = 2 * 1024 * ((Protocol::kMaxHeader - 1) / (2 * 1024) + 1);
@@ -410,7 +412,8 @@ void Receiver::start() {
   fileCreator_.reset(new FileCreator(destDir_, threadServerSockets_.size(),
                                      transferLogManager_));
   perfReports_.resize(threadServerSockets_.size());
-  for (int i = 0; i < threadServerSockets_.size(); i++) {
+  const int64_t numSockets = threadServerSockets_.size();
+  for (int64_t i = 0; i < numSockets; i++) {
     threadStats_.emplace_back(true);
   }
   if (!throttler_) {
@@ -419,7 +422,7 @@ void Receiver::start() {
     LOG(INFO) << "Throttler set externally. Throttler : " << *throttler_;
   }
 
-  for (int i = 0; i < threadServerSockets_.size(); i++) {
+  for (int64_t i = 0; i < numSockets; i++) {
     receiverThreads_.emplace_back(&Receiver::receiveOne, this, i,
                                   std::ref(threadServerSockets_[i]), bufferSize,
                                   std::ref(threadStats_[i]));
@@ -437,8 +440,9 @@ void Receiver::start() {
 }
 
 bool Receiver::areAllThreadsFinished(bool checkpointAdded) {
+  const int64_t numSockets = threadServerSockets_.size();
   bool finished = (failedThreadCount_ + waitingThreadCount_ +
-                   waitingWithErrorThreadCount_) == threadServerSockets_.size();
+                   waitingWithErrorThreadCount_) == numSockets;
   if (checkpointAdded) {
     // The thread has added a global checkpoint. So,
     // even if all the threads are waiting, the session does no end. However,
@@ -656,7 +660,7 @@ Receiver::ReceiverState Receiver::sendLocalCheckpoint(ThreadData &data) {
   std::vector<Checkpoint> checkpoints;
   checkpoints.emplace_back(threadServerSockets_[data.threadIndex_].getPort(),
                            checkpoint);
-  size_t off = 0;
+  int64_t off = 0;
   Protocol::encodeCheckpoints(buf, off, Protocol::kMaxLocalCheckpoint,
                               checkpoints);
   auto written = socket.write(buf, Protocol::kMaxLocalCheckpoint);
@@ -804,12 +808,12 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     VLOG(1) << "sender entered into error state "
             << errorCodeToStr(transferStatus);
   }
-  uint16_t headerLen = folly::loadUnaligned<uint16_t>(buf + off);
+  int16_t headerLen = folly::loadUnaligned<int16_t>(buf + off);
   headerLen = folly::Endian::little(headerLen);
   VLOG(2) << "header len " << headerLen;
 
   if (headerLen > numRead) {
-    size_t end = oldOffset + numRead;
+    int64_t end = oldOffset + numRead;
     numRead =
         readAtLeast(socket, buf + end, bufferSize - end, headerLen, numRead);
   }
@@ -818,10 +822,10 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
-  off += sizeof(uint16_t);
+  off += sizeof(int16_t);
   bool success = Protocol::decodeHeader(protocolVersion_, buf, off,
                                         numRead + oldOffset, blockDetails);
-  ssize_t headerBytes = off - oldOffset;
+  int64_t headerBytes = off - oldOffset;
   // transferred header length must match decoded header length
   WDT_CHECK(headerLen == headerBytes);
   threadStats.addHeaderBytes(headerBytes);
@@ -845,9 +849,10 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     threadStats.setErrorCode(FILE_WRITE_ERROR);
     return SEND_ABORT_CMD;
   }
-  uint32_t checksum = 0;
-  ssize_t remainingData = numRead + oldOffset - off;
-  ssize_t toWrite = remainingData;
+  int32_t checksum = 0;
+  int64_t remainingData = numRead + oldOffset - off;
+  int64_t toWrite = remainingData;
+  WDT_CHECK(remainingData >= 0);
   if (remainingData >= blockDetails.dataSize) {
     toWrite = blockDetails.dataSize;
   }
@@ -943,7 +948,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
       threadStats.setErrorCode(PROTOCOL_ERROR);
       return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
     }
-    uint32_t receivedChecksum;
+    int32_t receivedChecksum;
     bool success = Protocol::decodeFooter(
         buf, off, oldOffset + Protocol::kMaxFooter, receivedChecksum);
     if (!success) {
@@ -958,7 +963,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
       threadStats.setErrorCode(CHECKSUM_MISMATCH);
       return ACCEPT_WITH_TIMEOUT;
     }
-    size_t msgLen = off - oldOffset;
+    int64_t msgLen = off - oldOffset;
     numRead -= msgLen;
   }
   if (options.enable_download_resumption) {
@@ -1033,8 +1038,8 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
   auto &senderReadTimeout = data.senderReadTimeout_;
-  size_t toWrite;
-  ssize_t written;
+  int64_t toWrite;
+  int64_t written;
   std::unique_lock<std::mutex> lock(mutex_);
   while (true) {
     switch (sendChunksStatus_) {
@@ -1078,10 +1083,10 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
           sendChunksStatus_ = NOT_STARTED;
           conditionFileChunksSent_.notify_one();
         });
-        size_t off = 0;
+        int64_t off = 0;
         buf[off++] = Protocol::CHUNKS_CMD;
-        Protocol::encodeChunksCmd(buf, off, bufferSize,
-                                  parsedFileChunksInfo_.size());
+        const int64_t numParsedChunksInfo = parsedFileChunksInfo_.size();
+        Protocol::encodeChunksCmd(buf, off, bufferSize, numParsedChunksInfo);
         written = socket.write(buf, off);
         if (written > 0) {
           threadStats.addHeaderBytes(written);
@@ -1096,7 +1101,7 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
         // single
         // chunk can not fit in the buffer, it is ignored. Format of encoding :
         // <data-size><chunk1><chunk2>...
-        while (numEntriesWritten < parsedFileChunksInfo_.size()) {
+        while (numEntriesWritten < numParsedChunksInfo) {
           off = sizeof(int32_t);
           int64_t numEntriesEncoded = Protocol::encodeFileChunksInfoList(
               buf, off, bufferSize, numEntriesWritten, parsedFileChunksInfo_);
@@ -1111,16 +1116,15 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
           }
           numEntriesWritten += numEntriesEncoded;
         }
-        if (numEntriesWritten != parsedFileChunksInfo_.size()) {
+        if (numEntriesWritten != numParsedChunksInfo) {
           LOG(ERROR) << "Could not write all the file chunks "
-                     << parsedFileChunksInfo_.size() << " "
-                     << numEntriesWritten;
+                     << numParsedChunksInfo << " " << numEntriesWritten;
           threadStats.setErrorCode(SOCKET_WRITE_ERROR);
           return ACCEPT_WITH_TIMEOUT;
         }
         // try to read ack
-        size_t toRead = 1;
-        ssize_t numRead = socket.read(buf, toRead);
+        int64_t toRead = 1;
+        int64_t numRead = socket.read(buf, toRead);
         if (numRead != toRead) {
           LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
           threadStats.setErrorCode(SOCKET_READ_ERROR);
@@ -1157,11 +1161,11 @@ Receiver::ReceiverState Receiver::sendGlobalCheckpoint(ThreadData &data) {
   buf[0] = Protocol::ERR_CMD;
   off = 1;
   // leave space for length
-  off += sizeof(uint16_t);
+  off += sizeof(int16_t);
   auto oldOffset = off;
   Protocol::encodeCheckpoints(buf, off, bufferSize, newCheckpoints);
-  uint16_t length = off - oldOffset;
-  folly::storeUnaligned<uint16_t>(buf + 1, folly::Endian::little(length));
+  int16_t length = off - oldOffset;
+  folly::storeUnaligned<int16_t>(buf + 1, folly::Endian::little(length));
 
   auto written = socket.write(buf, off);
   if (written != off) {
@@ -1182,7 +1186,7 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
   char *buf = data.getBuf();
   auto &socket = data.socket_;
   int32_t protocolVersion = protocolVersion_;
-  size_t offset = 0;
+  int64_t offset = 0;
   buf[offset++] = Protocol::ABORT_CMD;
   Protocol::encodeAbort(buf, offset, protocolVersion,
                         threadStats.getErrorCode(), threadStats.getNumFiles());
@@ -1338,7 +1342,7 @@ Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
 }
 
 void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
-                          size_t bufferSize, TransferStats &threadStats) {
+                          int64_t bufferSize, TransferStats &threadStats) {
   INIT_PERF_STAT_REPORT
   auto guard = folly::makeGuard([&] {
     perfReports_[threadIndex] = *perfStatReport;  // copy when done

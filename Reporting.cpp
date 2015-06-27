@@ -10,7 +10,7 @@
 namespace facebook {
 namespace wdt {
 
-const static size_t kMaxEntriesToPrint = 10;
+const static int64_t kMaxEntriesToPrint = 10;
 
 TransferStats& TransferStats::operator+=(const TransferStats& stats) {
   folly::RWSpinLock::WriteHolder writeLock(mutex_.get());
@@ -80,7 +80,7 @@ TransferReport::TransferReport(
     std::vector<TransferStats>& failedSourceStats,
     std::vector<TransferStats>& threadStats,
     std::vector<std::string>& failedDirectories, double totalTime,
-    size_t totalFileSize, size_t numDiscoveredFiles)
+    int64_t totalFileSize, int64_t numDiscoveredFiles)
     : transferredSourceStats_(std::move(transferredSourceStats)),
       failedSourceStats_(std::move(failedSourceStats)),
       threadStats_(std::move(threadStats)),
@@ -99,12 +99,12 @@ TransferReport::TransferReport(
   for (auto& stats : failedSourceStats_) {
     failedFilesSet.insert(stats.getId());
   }
-  size_t numTransferredFiles = numDiscoveredFiles - failedFilesSet.size();
+  int64_t numTransferredFiles = numDiscoveredFiles - failedFilesSet.size();
   summary_.setNumFiles(numTransferredFiles);
 }
 
 TransferReport::TransferReport(const std::vector<TransferStats>& threadStats,
-                               double totalTime, size_t totalFileSize)
+                               double totalTime, int64_t totalFileSize)
     : totalTime_(totalTime), totalFileSize_(totalFileSize) {
   for (const auto& stats : threadStats) {
     summary_ += stats;
@@ -130,10 +130,11 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
       for (auto& stats : report.getFailedSourceStats()) {
         failedFilesSet.insert(stats.getId());
       }
-      int numOfFilesToPrint =
-          std::min(kMaxEntriesToPrint, failedFilesSet.size());
+      int64_t numFailedFiles = failedFilesSet.size();
+      int64_t numOfFilesToPrint =
+          std::min<int64_t>(kMaxEntriesToPrint, numFailedFiles);
 
-      int displayCount = 0;
+      int64_t displayCount = 0;
       for (auto& fileName : failedFilesSet) {
         if (displayCount >= numOfFilesToPrint) {
           break;
@@ -142,22 +143,22 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
         displayCount++;
       }
 
-      if (numOfFilesToPrint < failedFilesSet.size()) {
-        os << "more...(" << failedFilesSet.size() - numOfFilesToPrint
-           << " files)";
+      if (numOfFilesToPrint < numFailedFiles) {
+        os << "more...(" << numFailedFiles - numOfFilesToPrint << " files)";
       }
     }
   }
   if (!report.failedDirectories_.empty()) {
     os << "\n"
        << "Failed directories :\n";
-    int numOfDirToPrint =
-        std::min(kMaxEntriesToPrint, report.failedDirectories_.size());
-    for (int i = 0; i < numOfDirToPrint; i++) {
+    int64_t numFailedDirectories = report.failedDirectories_.size();
+    int64_t numOfDirToPrint =
+        std::min<int64_t>(kMaxEntriesToPrint, numFailedDirectories);
+    for (int64_t i = 0; i < numOfDirToPrint; i++) {
       os << report.failedDirectories_[i] << "\n";
     }
-    if (numOfDirToPrint < report.failedDirectories_.size()) {
-      os << "more...(" << report.failedDirectories_.size() - numOfDirToPrint
+    if (numOfDirToPrint < numFailedDirectories) {
+      os << "more...(" << numFailedDirectories - numOfDirToPrint
          << " directories)";
     }
   }
@@ -166,7 +167,7 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
 
 void ProgressReporter::progress(const std::unique_ptr<TransferReport>& report) {
   const TransferStats& stats = report->getSummary();
-  size_t totalDiscoveredSize = report->getTotalFileSize();
+  int64_t totalDiscoveredSize = report->getTotalFileSize();
   int progress = 0;
   if (totalDiscoveredSize > 0) {
     progress = stats.getEffectiveDataBytes() * 100 / totalDiscoveredSize;

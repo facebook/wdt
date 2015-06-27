@@ -30,7 +30,7 @@ class Writer {
   virtual ErrorCode write(char *buf, int64_t size) = 0;
 
   /// @return   total number of bytes written
-  virtual uint64_t getTotalWritten() = 0;
+  virtual int64_t getTotalWritten() = 0;
 
   /// close the writer
   virtual void close() = 0;

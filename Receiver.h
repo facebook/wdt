@@ -146,10 +146,10 @@ class Receiver : public WdtBase {
     TransferStats &threadStats_;
 
     std::unique_ptr<char[]> buf_;
-    const size_t bufferSize_;
-    ssize_t numRead_{0};
-    size_t off_{0};
-    size_t oldOffset_{0};
+    const int64_t bufferSize_;
+    int64_t numRead_{0};
+    int64_t off_{0};
+    int64_t oldOffset_{0};
 
     /// number of checkpoints already transferred
     int checkpointIndex_{0};
@@ -160,10 +160,10 @@ class Receiver : public WdtBase {
     int pendingCheckpointIndex_{0};
 
     /// a counter incremented each time a new session starts for this thread
-    uint64_t transferStartedCount_{0};
+    int64_t transferStartedCount_{0};
 
     /// a counter incremented each time a new session ends for this thread
-    uint64_t transferFinishedCount_{0};
+    int64_t transferFinishedCount_{0};
 
     /// read timeout for sender
     int64_t senderReadTimeout_{-1};
@@ -182,7 +182,7 @@ class Receiver : public WdtBase {
     std::vector<Checkpoint> newCheckpoints_;
 
     ThreadData(int threadIndex, ServerSocket &socket,
-               TransferStats &threadStats, size_t bufferSize)
+               TransferStats &threadStats, int64_t bufferSize)
         : threadIndex_(threadIndex),
           socket_(socket),
           threadStats_(threadStats),
@@ -381,7 +381,7 @@ class Receiver : public WdtBase {
    */
   void start();
 
-  void receiveOne(int threadIndex, ServerSocket &s, size_t bufferSize,
+  void receiveOne(int threadIndex, ServerSocket &s, int64_t bufferSize,
                   TransferStats &threadStats);
 
   /**
@@ -521,10 +521,10 @@ class Receiver : public WdtBase {
   int waitingWithErrorThreadCount_{0};
 
   /// a counter incremented each time a new session starts
-  uint64_t transferStartedCount_{0};
+  int64_t transferStartedCount_{0};
 
   /// a counter incremented each time a new session ends
-  uint64_t transferFinishedCount_{0};
+  int64_t transferFinishedCount_{0};
 
   /// total number of data bytes sender wants to transfer
   int64_t totalSenderBytes_{-1};
@@ -542,7 +542,7 @@ class Receiver : public WdtBase {
   bool areThreadsJoined_{false};
 
   /// Number of active threads, decremented every time a thread is finished
-  uint32_t numActiveThreads_{0};
+  int32_t numActiveThreads_{0};
 
   /// Mutex for the management of this instance, specifically to keep the
   /// instance sane for multi threaded public API calls

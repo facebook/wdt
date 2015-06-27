@@ -15,11 +15,11 @@ class SocketUtils {
   static void setReadTimeout(int fd);
   static void setWriteTimeout(int fd);
   /// @see ioWithAbortCheck
-  static ssize_t readWithAbortCheck(int fd, char *buf, size_t nbyte,
+  static int64_t readWithAbortCheck(int fd, char *buf, int64_t nbyte,
                                     WdtBase::IAbortChecker const *abortChecker,
                                     bool tryFull);
   /// @see ioWithAbortCheck
-  static ssize_t writeWithAbortCheck(int fd, const char *buf, size_t nbyte,
+  static int64_t writeWithAbortCheck(int fd, const char *buf, int64_t nbyte,
                                      WdtBase::IAbortChecker const *abortChecker,
                                      bool tryFull);
 
@@ -44,8 +44,8 @@ class SocketUtils {
    *                      returns -1
    */
   template <typename F, typename T>
-  static ssize_t ioWithAbortCheck(F readOrWrite, int fd, T tbuf,
-                                  size_t numBytes,
+  static int64_t ioWithAbortCheck(F readOrWrite, int fd, T tbuf,
+                                  int64_t numBytes,
                                   WdtBase::IAbortChecker const *abortChecker,
                                   int timeoutMs, bool tryFull);
 

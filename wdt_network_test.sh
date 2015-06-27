@@ -22,8 +22,8 @@ TEST_COUNT=0
 
 WDTBIN_OPTS="-ipv4 -ipv6=false -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
--full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
--progress_report_interval_millis=-1"
+-full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
+-progress_report_interval_millis=-1 -abort_check_interval_millis=100"
 WDTBIN="_bin/wdt/wdt -num_ports=$threads $WDTBIN_OPTS"
 WDTBIN_MORE_THREADS="_bin/wdt/wdt -num_ports=$((threads + 1)) $WDTBIN_OPTS"
 WDTBIN_LESS_THREADS="_bin/wdt/wdt -num_ports=$((threads - 1)) $WDTBIN_OPTS"

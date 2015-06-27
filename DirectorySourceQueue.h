@@ -80,10 +80,10 @@ class DirectorySourceQueue : public SourceQueue {
   virtual std::unique_ptr<ByteSource> getNextSource(ErrorCode &status) override;
 
   /// @return         total number of files processed/enqueued
-  virtual size_t getCount() const override;
+  virtual int64_t getCount() const override;
 
   /// @return         total size of files processed/enqueued
-  virtual size_t getTotalSize() const override;
+  virtual int64_t getTotalSize() const override;
 
   /// @return         total number of blocks and status of the transfer
   std::pair<int64_t, ErrorCode> getNumBlocksAndStatus() const;
@@ -114,7 +114,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param fileSourceBufferSize  buffers size
    */
-  void setFileSourceBufferSize(const size_t fileSourceBufferSize);
+  void setFileSourceBufferSize(const int64_t fileSourceBufferSize);
 
   /**
    * Stat the FileInfo input files (if their size aren't already specified) and
@@ -198,7 +198,7 @@ class DirectorySourceQueue : public SourceQueue {
    */
   virtual void createIntoQueue(const std::string &fullPath,
                                const std::string &relPath,
-                               const size_t fileSize);
+                               const int64_t fileSize);
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple
@@ -207,7 +207,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param addedSource     number of sources added
    */
-  void smartNotify(uint32_t addedSource);
+  void smartNotify(int32_t addedSource);
 
   /// root directory to recurse on if fileInfo_ is empty
   std::string rootDir_;
@@ -225,7 +225,7 @@ class DirectorySourceQueue : public SourceQueue {
    * buffer size to use when creating individual FileByteSource objects
    * (returned by getNextSource).
    */
-  size_t fileSourceBufferSize_;
+  int64_t fileSourceBufferSize_;
 
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<FileInfo> fileInfo_;
@@ -278,7 +278,7 @@ class DirectorySourceQueue : public SourceQueue {
   std::vector<std::string> failedDirectories_;
 
   /// Total number of files that have passed through the queue
-  size_t numEntries_{0};
+  int64_t numEntries_{0};
 
   /// Seq-id of the next file to be inserted into the queue
   int64_t nextSeqId_{0};
@@ -289,7 +289,7 @@ class DirectorySourceQueue : public SourceQueue {
   int64_t numBlocks_{0};
 
   /// Total size of entries/files that have passed through the queue
-  size_t totalFileSize_{0};
+  int64_t totalFileSize_{0};
 
   /// Whether to follow symlinks or not
   bool followSymlinks_{false};

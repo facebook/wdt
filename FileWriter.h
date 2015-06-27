@@ -31,7 +31,7 @@ class FileWriter : public Writer {
   virtual ErrorCode write(char *buf, int64_t size) override;
 
   /// @see Writer.h
-  virtual uint64_t getTotalWritten() override {
+  virtual int64_t getTotalWritten() override {
     return totalWritten_;
   }
 
@@ -45,7 +45,7 @@ class FileWriter : public Writer {
    * @param written   number of bytes last written
    * @param forced    whether to force syncing or not
    */
-  void syncFileRange(uint64_t written, bool forced);
+  void syncFileRange(int64_t written, bool forced);
 
   /// file handler
   int fd_{-1};
@@ -57,13 +57,13 @@ class FileWriter : public Writer {
   BlockDetails const *blockDetails_;
 
   /// number of bytes written
-  uint64_t totalWritten_{0};
+  int64_t totalWritten_{0};
 
 #ifdef HAS_SYNC_FILE_RANGE
   /// offset to use for next sync
-  uint64_t nextSyncOffset_;
+  int64_t nextSyncOffset_;
   /// number of bytes written since last sync
-  uint64_t writtenSinceLastSync_{0};
+  int64_t writtenSinceLastSync_{0};
 #endif
   /// reference to file creator
   FileCreator *fileCreator_;

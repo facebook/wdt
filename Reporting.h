@@ -49,23 +49,23 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
 class TransferStats {
  private:
   /// number of header bytes transferred
-  size_t headerBytes_ = 0;
+  int64_t headerBytes_ = 0;
   /// number of data bytes transferred
-  size_t dataBytes_ = 0;
+  int64_t dataBytes_ = 0;
 
   /// number of header bytes transferred as part of successful file transfer
-  size_t effectiveHeaderBytes_ = 0;
+  int64_t effectiveHeaderBytes_ = 0;
   /// number of data bytes transferred as part of successful file transfer
-  size_t effectiveDataBytes_ = 0;
+  int64_t effectiveDataBytes_ = 0;
 
   /// number of files successfully transferred
-  size_t numFiles_ = 0;
+  int64_t numFiles_ = 0;
 
   /// number of blocks successfully transferred
-  size_t numBlocks_ = 0;
+  int64_t numBlocks_ = 0;
 
   /// number of failed transfers
-  size_t failedAttempts_ = 0;
+  int64_t failedAttempts_ = 0;
 
   /// status of the transfer
   ErrorCode errCode_ = OK;
@@ -107,13 +107,13 @@ class TransferStats {
   }
 
   /// @return number of header bytes transferred
-  size_t getHeaderBytes() const {
+  int64_t getHeaderBytes() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return headerBytes_;
   }
 
   /// @return number of data bytes transferred
-  size_t getDataBytes() const {
+  int64_t getDataBytes() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return dataBytes_;
   }
@@ -126,7 +126,7 @@ class TransferStats {
    *
    * @return                number of total bytes transferred
    */
-  size_t getTotalBytes(bool needLocking = true) const {
+  int64_t getTotalBytes(bool needLocking = true) const {
     if (needLocking) {
       folly::RWSpinLock::ReadHolder lock(mutex_.get());
       return headerBytes_ + dataBytes_;
@@ -138,7 +138,7 @@ class TransferStats {
    * @return    number of header bytes transferred as part of successful file
    *            transfer
    */
-  size_t getEffectiveHeaderBytes() const {
+  int64_t getEffectiveHeaderBytes() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return effectiveHeaderBytes_;
   }
@@ -147,7 +147,7 @@ class TransferStats {
    * @return    number of data bytes transferred as part of successful file
    *            transfer
    */
-  size_t getEffectiveDataBytes() const {
+  int64_t getEffectiveDataBytes() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return effectiveDataBytes_;
   }
@@ -156,25 +156,25 @@ class TransferStats {
    * @return    number of total bytes transferred as part of successful file
    *            transfer
    */
-  size_t getEffectiveTotalBytes() const {
+  int64_t getEffectiveTotalBytes() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return effectiveHeaderBytes_ + effectiveDataBytes_;
   }
 
   /// @return number of files successfully transferred
-  size_t getNumFiles() const {
+  int64_t getNumFiles() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return numFiles_;
   }
 
   /// @return number of blocks successfully transferred
-  size_t getNumBlocks() const {
+  int64_t getNumBlocks() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return numBlocks_;
   }
 
   /// @return number of failed transfers
-  size_t getFailedAttempts() const {
+  int64_t getFailedAttempts() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return failedAttempts_;
   }
@@ -206,13 +206,13 @@ class TransferStats {
   }
 
   /// @param number of additional data bytes transferred
-  void addDataBytes(size_t count) {
+  void addDataBytes(int64_t count) {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
     dataBytes_ += count;
   }
 
   /// @param number of additional header bytes transferred
-  void addHeaderBytes(size_t count) {
+  void addHeaderBytes(int64_t count) {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
     headerBytes_ += count;
   }
@@ -242,7 +242,7 @@ class TransferStats {
   }
 
   /// @param numFiles number of files successfully send
-  void setNumFiles(size_t numFiles) {
+  void setNumFiles(int64_t numFiles) {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
     numFiles_ = numFiles;
   }
@@ -264,13 +264,13 @@ class TransferStats {
    * @param dataBytes   data bytes transferred part of a successful file
    *                    transfer
    */
-  void addEffectiveBytes(size_t headerBytes, size_t dataBytes) {
+  void addEffectiveBytes(int64_t headerBytes, int64_t dataBytes) {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
     effectiveHeaderBytes_ += headerBytes;
     effectiveDataBytes_ += dataBytes;
   }
 
-  void subtractEffectiveBytes(size_t headerBytes, size_t dataBytes) {
+  void subtractEffectiveBytes(int64_t headerBytes, int64_t dataBytes) {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
     effectiveHeaderBytes_ -= headerBytes;
     effectiveDataBytes_ -= dataBytes;
@@ -294,14 +294,14 @@ class TransferReport {
                  std::vector<TransferStats> &failedSourceStats,
                  std::vector<TransferStats> &threadStats,
                  std::vector<std::string> &failedDirectories, double totalTime,
-                 size_t totalFileSize, size_t numDiscoveredFiles);
+                 int64_t totalFileSize, int64_t numDiscoveredFiles);
 
   /**
    * This function does not move the thread stats passed to it. This is called
    * by the progress reporter thread.
    */
   TransferReport(const std::vector<TransferStats> &threadStats,
-                 double totalTime, size_t totalFileSize);
+                 double totalTime, int64_t totalFileSize);
 
   /// constructor used by receiver, does move the thread stats
   explicit TransferReport(std::vector<TransferStats> &threadStats);
@@ -332,7 +332,7 @@ class TransferReport {
   const std::vector<std::string> &getFailedDirectories() const {
     return failedDirectories_;
   }
-  size_t getTotalFileSize() const {
+  int64_t getTotalFileSize() const {
     return totalFileSize_;
   }
   /// @return   recent throughput in mbps
@@ -353,7 +353,7 @@ class TransferReport {
   void setTotalTime(double totalTime) {
     totalTime_ = totalTime;
   }
-  void setTotalFileSize(size_t totalFileSize) {
+  void setTotalFileSize(int64_t totalFileSize) {
     totalFileSize_ = totalFileSize;
   }
   friend std::ostream &operator<<(std::ostream &os,
@@ -372,7 +372,7 @@ class TransferReport {
   /// total transfer time
   double totalTime_{0};
   /// sum of all the file sizes
-  size_t totalFileSize_{0};
+  int64_t totalFileSize_{0};
   /// recent throughput in bytes/sec
   double currentThroughput_{0};
 };

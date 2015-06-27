@@ -4,9 +4,9 @@
 #include "WdtOptions.h"
 #include "SerializationUtil.h"
 
-#include "folly/String.h"  // exceptionStr
+#include <folly/String.h>  // exceptionStr
 #include <algorithm>
-#include "folly/Bits.h"
+#include <folly/Bits.h>
 
 namespace facebook {
 namespace wdt {
@@ -41,7 +41,8 @@ void FileChunksInfo::mergeChunks() {
   std::sort(chunks_.begin(), chunks_.end());
   std::vector<Interval> mergedChunks;
   Interval curChunk = chunks_[0];
-  for (int i = 1; i < chunks_.size(); i++) {
+  const int64_t numChunks = chunks_.size();
+  for (int64_t i = 1; i < numChunks; i++) {
     if (chunks_[i].start_ > curChunk.end_) {
       mergedChunks.emplace_back(curChunk);
       curChunk = chunks_[i];
@@ -80,8 +81,8 @@ std::ostream &operator<<(std::ostream &os,
   return os;
 }
 
-void Protocol::encodeHeader(int senderProtocolVersion, char *dest, size_t &off,
-                            size_t max, const BlockDetails &blockDetails) {
+void Protocol::encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
+                            int64_t max, const BlockDetails &blockDetails) {
   encodeString(dest, off, blockDetails.fileName);
   encodeInt(dest, off, blockDetails.seqId);
   encodeInt(dest, off, blockDetails.dataSize);
@@ -99,8 +100,9 @@ void Protocol::encodeHeader(int senderProtocolVersion, char *dest, size_t &off,
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeHeader(int receiverProtocolVersion, char *src, size_t &off,
-                            size_t max, BlockDetails &blockDetails) {
+bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
+                            int64_t &off, int64_t max,
+                            BlockDetails &blockDetails) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
     if (!decodeString(br, src, max, blockDetails.fileName)) {
@@ -132,7 +134,7 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src, size_t &off,
   return checkForOverflow(off, max);
 }
 
-void Protocol::encodeCheckpoints(char *dest, size_t &off, size_t max,
+void Protocol::encodeCheckpoints(char *dest, int64_t &off, int64_t max,
                                  const std::vector<Checkpoint> &checkpoints) {
   encodeInt(dest, off, checkpoints.size());
   for (auto &checkpoint : checkpoints) {
@@ -142,7 +144,7 @@ void Protocol::encodeCheckpoints(char *dest, size_t &off, size_t max,
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeCheckpoints(char *src, size_t &off, size_t max,
+bool Protocol::decodeCheckpoints(char *src, int64_t &off, int64_t max,
                                  std::vector<Checkpoint> &checkpoints) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
@@ -165,13 +167,13 @@ bool Protocol::decodeCheckpoints(char *src, size_t &off, size_t max,
   return true;
 }
 
-void Protocol::encodeDone(char *dest, size_t &off, size_t max,
+void Protocol::encodeDone(char *dest, int64_t &off, int64_t max,
                           int64_t numBlocks) {
   encodeInt(dest, off, numBlocks);
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeDone(char *src, size_t &off, size_t max,
+bool Protocol::decodeDone(char *src, int64_t &off, int64_t max,
                           int64_t &numBlocks) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
@@ -184,13 +186,13 @@ bool Protocol::decodeDone(char *src, size_t &off, size_t max,
   return checkForOverflow(off, max);
 }
 
-void Protocol::encodeSize(char *dest, size_t &off, size_t max,
+void Protocol::encodeSize(char *dest, int64_t &off, int64_t max,
                           int64_t totalNumBytes) {
   encodeInt(dest, off, totalNumBytes);
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeSize(char *src, size_t &off, size_t max,
+bool Protocol::decodeSize(char *src, int64_t &off, int64_t max,
                           int64_t &totalNumBytes) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
@@ -203,7 +205,7 @@ bool Protocol::decodeSize(char *src, size_t &off, size_t max,
   return checkForOverflow(off, max);
 }
 
-void Protocol::encodeAbort(char *dest, size_t &off, int32_t protocolVersion,
+void Protocol::encodeAbort(char *dest, int64_t &off, int32_t protocolVersion,
                            ErrorCode errCode, int64_t checkpoint) {
   folly::storeUnaligned<int32_t>(dest + off,
                                  folly::Endian::little(protocolVersion));
@@ -213,7 +215,7 @@ void Protocol::encodeAbort(char *dest, size_t &off, int32_t protocolVersion,
   off += sizeof(int64_t);
 }
 
-void Protocol::decodeAbort(char *src, size_t &off, int32_t &protocolVersion,
+void Protocol::decodeAbort(char *src, int64_t &off, int32_t &protocolVersion,
                            ErrorCode &errCode, int64_t &checkpoint) {
   protocolVersion = folly::loadUnaligned<int32_t>(src + off);
   protocolVersion = folly::Endian::little(protocolVersion);
@@ -224,7 +226,7 @@ void Protocol::decodeAbort(char *src, size_t &off, int32_t &protocolVersion,
   off += sizeof(int64_t);
 }
 
-void Protocol::encodeChunksCmd(char *dest, size_t &off, int64_t bufSize,
+void Protocol::encodeChunksCmd(char *dest, int64_t &off, int64_t bufSize,
                                int64_t numFiles) {
   folly::storeUnaligned<int64_t>(dest + off, folly::Endian::little(bufSize));
   off += sizeof(int64_t);
@@ -232,7 +234,7 @@ void Protocol::encodeChunksCmd(char *dest, size_t &off, int64_t bufSize,
   off += sizeof(int64_t);
 }
 
-void Protocol::decodeChunksCmd(char *src, size_t &off, int64_t &bufSize,
+void Protocol::decodeChunksCmd(char *src, int64_t &off, int64_t &bufSize,
                                int64_t &numFiles) {
   bufSize = folly::loadUnaligned<int64_t>(src + off);
   bufSize = folly::Endian::little(bufSize);
@@ -242,14 +244,14 @@ void Protocol::decodeChunksCmd(char *src, size_t &off, int64_t &bufSize,
   off += sizeof(int64_t);
 }
 
-void Protocol::encodeChunkInfo(char *dest, size_t &off, size_t max,
+void Protocol::encodeChunkInfo(char *dest, int64_t &off, int64_t max,
                                const Interval &chunk) {
   encodeInt(dest, off, chunk.start_);
   encodeInt(dest, off, chunk.end_);
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeChunkInfo(folly::ByteRange &br, char *src, size_t max,
+bool Protocol::decodeChunkInfo(folly::ByteRange &br, char *src, int64_t max,
                                Interval &chunk) {
   try {
     chunk.start_ = decodeInt(br);
@@ -258,11 +260,11 @@ bool Protocol::decodeChunkInfo(folly::ByteRange &br, char *src, size_t max,
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
-  size_t off = br.start() - (uint8_t *)src;
+  int64_t off = br.start() - (uint8_t *)src;
   return checkForOverflow(off, max);
 }
 
-void Protocol::encodeFileChunksInfo(char *dest, size_t &off, size_t max,
+void Protocol::encodeFileChunksInfo(char *dest, int64_t &off, int64_t max,
                                     const FileChunksInfo &fileChunksInfo) {
   encodeInt(dest, off, fileChunksInfo.getSeqId());
   encodeString(dest, off, fileChunksInfo.getFileName());
@@ -274,7 +276,8 @@ void Protocol::encodeFileChunksInfo(char *dest, size_t &off, size_t max,
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeFileChunksInfo(folly::ByteRange &br, char *src, size_t max,
+bool Protocol::decodeFileChunksInfo(folly::ByteRange &br, char *src,
+                                    int64_t max,
                                     FileChunksInfo &fileChunksInfo) {
   try {
     int64_t seqId, fileSize;
@@ -300,7 +303,7 @@ bool Protocol::decodeFileChunksInfo(folly::ByteRange &br, char *src, size_t max,
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
-  size_t off = br.start() - (uint8_t *)src;
+  int64_t off = br.start() - (uint8_t *)src;
   return checkForOverflow(off, max);
 }
 
@@ -310,11 +313,12 @@ int64_t Protocol::maxEncodeLen(const FileChunksInfo &fileChunkInfo) {
 }
 
 int64_t Protocol::encodeFileChunksInfoList(
-    char *dest, size_t &off, size_t bufSize, int64_t startIndex,
+    char *dest, int64_t &off, int64_t bufSize, int64_t startIndex,
     const std::vector<FileChunksInfo> &fileChunksInfoList) {
-  size_t oldOffset = off;
+  int64_t oldOffset = off;
   int64_t numEncoded = 0;
-  for (int64_t i = startIndex; i < fileChunksInfoList.size(); i++) {
+  const int64_t numFileChunks = fileChunksInfoList.size();
+  for (int64_t i = startIndex; i < numFileChunks; i++) {
     const FileChunksInfo &fileChunksInfo = fileChunksInfoList[i];
     int64_t maxLength = maxEncodeLen(fileChunksInfo);
     if (maxLength + oldOffset > bufSize) {
@@ -333,7 +337,7 @@ int64_t Protocol::encodeFileChunksInfoList(
 }
 
 bool Protocol::decodeFileChunksInfoList(
-    char *src, size_t &off, size_t dataSize,
+    char *src, int64_t &off, int64_t dataSize,
     std::vector<FileChunksInfo> &fileChunksInfoList) {
   folly::ByteRange br((uint8_t *)(src + off), off + dataSize);
   while (!br.empty()) {
@@ -347,7 +351,7 @@ bool Protocol::decodeFileChunksInfoList(
   return true;
 }
 
-void Protocol::encodeSettings(char *dest, size_t &off, size_t max,
+void Protocol::encodeSettings(char *dest, int64_t &off, int64_t max,
                               const Settings &settings) {
   encodeInt(dest, off, settings.senderProtocolVersion);
   encodeInt(dest, off, settings.readTimeoutMillis);
@@ -367,7 +371,7 @@ void Protocol::encodeSettings(char *dest, size_t &off, size_t max,
 }
 
 bool Protocol::decodeSettings(int receiverProtocolVersion, char *src,
-                              size_t &off, size_t max, Settings &settings) {
+                              int64_t &off, int64_t max, Settings &settings) {
   settings.enableChecksum = settings.sendFileChunks = false;
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
@@ -391,14 +395,14 @@ bool Protocol::decodeSettings(int receiverProtocolVersion, char *src,
   return checkForOverflow(off, max);
 }
 
-void Protocol::encodeFooter(char *dest, size_t &off, size_t max,
-                            uint32_t checksum) {
+void Protocol::encodeFooter(char *dest, int64_t &off, int64_t max,
+                            int32_t checksum) {
   encodeInt(dest, off, checksum);
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeFooter(char *src, size_t &off, size_t max,
-                            uint32_t &checksum) {
+bool Protocol::decodeFooter(char *src, int64_t &off, int64_t max,
+                            int32_t &checksum) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
     checksum = decodeInt(br);

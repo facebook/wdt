@@ -22,13 +22,13 @@ struct SourceMetaData {
    * of using full path of the file, we can use this to identify the
    * file.
    */
-  uint64_t seqId;
+  int64_t seqId;
   /// size of the entire source
-  size_t size;
+  int64_t size;
   /// file allocation status in the receiver side
   FileAllocationStatus allocationStatus;
   /// if there is a size mismatch, this is the previous sequence id
-  uint64_t prevSeqId;
+  int64_t prevSeqId;
 };
 
 class ByteSource {
@@ -40,10 +40,10 @@ class ByteSource {
   virtual const std::string &getIdentifier() const = 0;
 
   /// @return number of bytes in this source
-  virtual uint64_t getSize() const = 0;
+  virtual int64_t getSize() const = 0;
 
   /// @return offset from which to start reading
-  virtual uint64_t getOffset() const = 0;
+  virtual int64_t getOffset() const = 0;
 
   /// @return metadata for the source
   virtual const SourceMetaData &getMetaData() const = 0;
@@ -68,7 +68,7 @@ class ByteSource {
    *                  use finished() and hasError() members to distinguish
    *                  the two cases
    */
-  virtual char *read(size_t &size) = 0;
+  virtual char *read(int64_t &size) = 0;
 
   /// open the source for reading
   virtual ErrorCode open() = 0;

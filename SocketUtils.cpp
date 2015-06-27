@@ -71,40 +71,40 @@ int SocketUtils::getTimeout(int networkTimeout) {
   return std::min(networkTimeout, abortInterval);
 }
 
-ssize_t SocketUtils::readWithAbortCheck(
-    int fd, char *buf, size_t nbyte, WdtBase::IAbortChecker const *abortChecker,
-    bool tryFull) {
+int64_t SocketUtils::readWithAbortCheck(
+    int fd, char *buf, int64_t nbyte,
+    WdtBase::IAbortChecker const *abortChecker, bool tryFull) {
   const auto &options = WdtOptions::get();
   START_PERF_TIMER
-  ssize_t numRead = ioWithAbortCheck(read, fd, buf, nbyte, abortChecker,
+  int64_t numRead = ioWithAbortCheck(read, fd, buf, nbyte, abortChecker,
                                      options.read_timeout_millis, tryFull);
   RECORD_PERF_RESULT(PerfStatReport::SOCKET_READ);
   return numRead;
 }
 
-ssize_t SocketUtils::writeWithAbortCheck(
-    int fd, const char *buf, size_t nbyte,
+int64_t SocketUtils::writeWithAbortCheck(
+    int fd, const char *buf, int64_t nbyte,
     WdtBase::IAbortChecker const *abortChecker, bool tryFull) {
   const auto &options = WdtOptions::get();
   START_PERF_TIMER
-  ssize_t written = ioWithAbortCheck(write, fd, buf, nbyte, abortChecker,
+  int64_t written = ioWithAbortCheck(write, fd, buf, nbyte, abortChecker,
                                      options.write_timeout_millis, tryFull);
   RECORD_PERF_RESULT(PerfStatReport::SOCKET_WRITE)
   return written;
 }
 
 template <typename F, typename T>
-ssize_t SocketUtils::ioWithAbortCheck(
-    F readOrWrite, int fd, T tbuf, size_t numBytes,
+int64_t SocketUtils::ioWithAbortCheck(
+    F readOrWrite, int fd, T tbuf, int64_t numBytes,
     WdtBase::IAbortChecker const *abortChecker, int timeoutMs, bool tryFull) {
   WDT_CHECK(abortChecker != nullptr) << "abort checker can not be null";
   const auto &options = WdtOptions::get();
   bool checkAbort = (options.abort_check_interval_millis > 0);
   auto startTime = Clock::now();
-  ssize_t doneBytes = 0;
+  int64_t doneBytes = 0;
   int retries = 0;
   while (doneBytes < numBytes) {
-    ssize_t ret = readOrWrite(fd, tbuf + doneBytes, numBytes - doneBytes);
+    const int64_t ret = readOrWrite(fd, tbuf + doneBytes, numBytes - doneBytes);
     if (ret < 0) {
       // error
       if (errno != EINTR && errno != EAGAIN) {

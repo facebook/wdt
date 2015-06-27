@@ -3,7 +3,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include "folly/Random.h"
+#include <folly/Random.h>
 
 DEFINE_int32(random_seed, folly::randomNumberSeed(), "random seed");
 
@@ -22,14 +22,14 @@ void testHeader() {
   bd.allocationStatus = EXISTS_CORRECT_SIZE;
 
   char buf[128];
-  size_t off = 0;
+  int64_t off = 0;
   Protocol::encodeHeader(Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf,
                          off, sizeof(buf), bd);
   EXPECT_EQ(off,
             bd.fileName.size() + 1 + 1 + 1 + 1 + 1 +
                 1);  // 1 byte varint for seqId, len, size, offset and filesize
   BlockDetails nbd;
-  size_t noff = 0;
+  int64_t noff = 0;
   bool success =
       Protocol::decodeHeader(Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf,
                              noff, sizeof(buf), nbd);
@@ -99,13 +99,13 @@ void testFileChunksInfo() {
   fileChunksInfo.addChunk(Interval(20, 30));
 
   char buf[128];
-  size_t off = 0;
+  int64_t off = 0;
   Protocol::encodeFileChunksInfo(buf, off, sizeof(buf), fileChunksInfo);
   FileChunksInfo nFileChunksInfo;
   folly::ByteRange br((uint8_t *)buf, sizeof(buf));
   bool success = Protocol::decodeFileChunksInfo(br, buf, off, nFileChunksInfo);
   EXPECT_TRUE(success);
-  size_t noff = br.start() - (uint8_t *)buf;
+  int64_t noff = br.start() - (uint8_t *)buf;
   EXPECT_EQ(noff, off);
   EXPECT_EQ(nFileChunksInfo, fileChunksInfo);
 
@@ -125,11 +125,11 @@ void testSettings() {
   settings.sendFileChunks = true;
 
   char buf[128];
-  size_t off = 0;
+  int64_t off = 0;
   Protocol::encodeSettings(buf, off, sizeof(buf), settings);
 
   Settings nsettings;
-  size_t noff = 0;
+  int64_t noff = 0;
   bool success = Protocol::decodeSettings(Protocol::SETTINGS_FLAG_VERSION, buf,
                                           noff, off, nsettings);
   EXPECT_TRUE(success);

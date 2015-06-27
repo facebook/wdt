@@ -163,7 +163,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
         return CONN_ERROR;
       }
       int pollTimeout = timeoutMillis - timeElapsed;
-      struct pollfd pollFds[] = {{listeningFd_, POLLIN}};
+      struct pollfd pollFds[] = {{listeningFd_, POLLIN, 0}};
 
       int retValue;
       if ((retValue = poll(pollFds, 1, pollTimeout)) <= 0) {

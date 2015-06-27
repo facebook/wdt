@@ -4,7 +4,7 @@
 
 #include "ByteSource.h"
 #include "Reporting.h"
-#include "folly/ThreadLocal.h"
+#include <folly/ThreadLocal.h>
 
 namespace facebook {
 namespace wdt {
@@ -27,8 +27,8 @@ class FileByteSource : public ByteSource {
    * @param bufferSize        size of buffer for temporarily storing read
    *                          bytes
    */
-  FileByteSource(SourceMetaData *metadata, uint64_t size, uint64_t offset,
-                 size_t bufferSize);
+  FileByteSource(SourceMetaData *metadata, int64_t size, int64_t offset,
+                 int64_t bufferSize);
 
   /// close file descriptor if still open
   virtual ~FileByteSource() {
@@ -41,12 +41,12 @@ class FileByteSource : public ByteSource {
   }
 
   /// @return size of file in bytes
-  virtual uint64_t getSize() const override {
+  virtual int64_t getSize() const override {
     return size_;
   }
 
   /// @return offset from which to start reading
-  virtual uint64_t getOffset() const override {
+  virtual int64_t getOffset() const override {
     return offset_;
   }
 
@@ -66,7 +66,7 @@ class FileByteSource : public ByteSource {
   }
 
   /// @see ByteSource.h
-  virtual char *read(size_t &size) override;
+  virtual char *read(int64_t &size) override;
 
   /// open the source for reading
   virtual ErrorCode open() override;
@@ -96,7 +96,7 @@ class FileByteSource : public ByteSource {
 
  private:
   struct Buffer {
-    explicit Buffer(size_t size) : size_(size) {
+    explicit Buffer(int64_t size) : size_(size) {
       data_ = new char[size + 1];
     }
 
@@ -105,7 +105,7 @@ class FileByteSource : public ByteSource {
     }
 
     char *data_;
-    size_t size_;
+    int64_t size_;
   };
 
   /**
@@ -119,19 +119,19 @@ class FileByteSource : public ByteSource {
   SourceMetaData *metadata_;
 
   /// filesize
-  const uint64_t size_;
+  const int64_t size_;
 
   /// open file descriptor for file (set to < 0 on error)
   int fd_{-1};
 
   /// block offset
-  const uint64_t offset_;
+  const int64_t offset_;
 
   /// number of bytes read so far from file
-  uint64_t bytesRead_;
+  int64_t bytesRead_;
 
   /// buffer size
-  size_t bufferSize_;
+  int64_t bufferSize_;
 
   /// transfer stats
   TransferStats transferStats_;

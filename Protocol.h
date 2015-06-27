@@ -142,17 +142,17 @@ struct BlockDetails {
   /// name of the file
   std::string fileName;
   /// sequence-id of the file
-  uint64_t seqId;
+  int64_t seqId;
   /// size of the file
-  uint64_t fileSize;
+  int64_t fileSize;
   /// offset of the block from the start of the file
-  uint64_t offset;
+  int64_t offset;
   /// size of the block
-  uint64_t dataSize;
+  int64_t dataSize;
   /// receiver side file allocation status
   FileAllocationStatus allocationStatus;
   /// seq-id of previous transfer, only valid if there is a size mismatch
-  uint64_t prevSeqId;
+  int64_t prevSeqId;
 };
 
 /// structure representing settings cmd
@@ -206,30 +206,30 @@ class Protocol {
   };
 
   /// Max size of sender or receiver id
-  static const size_t kMaxTransferIdLength = 50;
+  static const int64_t kMaxTransferIdLength = 50;
   /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 4
   /// variants(seq-id, data-size, offset, file-size), 1 byte for flag, 10 bytes
   /// prev seq-id
-  static const size_t kMaxHeader = 1 + 2 + PATH_MAX + 4 * 10 + 1 + 10;
+  static const int64_t kMaxHeader = 1 + 2 + PATH_MAX + 4 * 10 + 1 + 10;
   /// min number of bytes that must be send to unblock receiver
-  static const size_t kMinBufLength = 256;
+  static const int64_t kMinBufLength = 256;
   /// max size of local checkpoint encoding
-  static const size_t kMaxLocalCheckpoint = 10 + 2 * 10;
+  static const int64_t kMaxLocalCheckpoint = 10 + 2 * 10;
   /// max size of done command encoding(1 byte for cmd, 1 for status, 10 for
   /// number of blocks)
-  static const size_t kMaxDone = 2 + 10;
+  static const int64_t kMaxDone = 2 + 10;
   /// max length of the size cmd encoding
-  static const size_t kMaxSize = 1 + 10;
+  static const int64_t kMaxSize = 1 + 10;
   /// max size of settings command encoding
-  static const size_t kMaxSettings = 1 + 4 * 10 + kMaxTransferIdLength + 1;
+  static const int64_t kMaxSettings = 1 + 4 * 10 + kMaxTransferIdLength + 1;
   /// max length of the footer cmd encoding
-  static const size_t kMaxFooter = 1 + 10;
+  static const int64_t kMaxFooter = 1 + 10;
   /// max size of chunks cmd
-  static const size_t kChunksCmdLen = sizeof(int64_t) + sizeof(int64_t);
+  static const int64_t kChunksCmdLen = sizeof(int64_t) + sizeof(int64_t);
   /// max size of chunkInfo encoding length
-  static const size_t kMaxChunkEncodeLen = 20;
+  static const int64_t kMaxChunkEncodeLen = 20;
   /// abort cmd length
-  static const size_t kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
+  static const int64_t kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
 
   /**
    * Decides whether the current running wdt version can support the request
@@ -246,115 +246,115 @@ class Protocol {
   /// encodes blockDetails into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeHeader(int senderProtocolVersion, char *dest, size_t &off,
-                           size_t max, const BlockDetails &blockDetails);
+  static void encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
+                           int64_t max, const BlockDetails &blockDetails);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets BlockDetails
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeHeader(int receiverProtocolVersion, char *src, size_t &off,
-                           size_t max, BlockDetails &blockDetails);
+  static bool decodeHeader(int receiverProtocolVersion, char *src, int64_t &off,
+                           int64_t max, BlockDetails &blockDetails);
 
   /// encodes checkpoints into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeCheckpoints(char *dest, size_t &off, size_t max,
+  static void encodeCheckpoints(char *dest, int64_t &off, int64_t max,
                                 const std::vector<Checkpoint> &checkpoints);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets checkpoints
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeCheckpoints(char *src, size_t &off, size_t max,
+  static bool decodeCheckpoints(char *src, int64_t &off, int64_t max,
                                 std::vector<Checkpoint> &checkpoints);
 
   /// encodes numBlocks into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeDone(char *dest, size_t &off, size_t max,
+  static void encodeDone(char *dest, int64_t &off, int64_t max,
                          int64_t numBlocks);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets numBlocks
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeDone(char *src, size_t &off, size_t max,
+  static bool decodeDone(char *src, int64_t &off, int64_t max,
                          int64_t &numBlocks);
 
   /// encodes settings into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeSettings(char *dest, size_t &off, size_t max,
+  static void encodeSettings(char *dest, int64_t &off, int64_t max,
                              const Settings &settings);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets settings
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeSettings(int receiverProtocolVersion, char *src,
-                             size_t &off, size_t max, Settings &settings);
+                             int64_t &off, int64_t max, Settings &settings);
 
   /// encodes totalNumBytes into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeSize(char *dest, size_t &off, size_t max,
+  static void encodeSize(char *dest, int64_t &off, int64_t max,
                          int64_t totalNumBytes);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets totalNumBytes
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeSize(char *src, size_t &off, size_t max,
+  static bool decodeSize(char *src, int64_t &off, int64_t max,
                          int64_t &totalNumBytes);
 
   /// encodes checksum into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeFooter(char *dest, size_t &off, size_t max,
-                           uint32_t checksum);
+  static void encodeFooter(char *dest, int64_t &off, int64_t max,
+                           int32_t checksum);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets checksum
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeFooter(char *src, size_t &off, size_t max,
-                           uint32_t &checksum);
+  static bool decodeFooter(char *src, int64_t &off, int64_t max,
+                           int32_t &checksum);
 
   /// encodes protocolVersion, errCode and checkpoint into dest+off
   /// moves the off into dest pointer
-  static void encodeAbort(char *dest, size_t &off, int32_t protocolVersion,
+  static void encodeAbort(char *dest, int64_t &off, int32_t protocolVersion,
                           ErrorCode errCode, int64_t checkpoint);
 
   /// decodes from src+off and consumes/moves off
   /// sets protocolversion, errcode, checkpoint
-  static void decodeAbort(char *src, size_t &off, int32_t &protocolVersion,
+  static void decodeAbort(char *src, int64_t &off, int32_t &protocolVersion,
                           ErrorCode &errCode, int64_t &checkpoint);
 
   /// encodes bufSize and numFiles into dest+off
   /// moves the off into dest pointer
-  static void encodeChunksCmd(char *dest, size_t &off, int64_t bufSize,
+  static void encodeChunksCmd(char *dest, int64_t &off, int64_t bufSize,
                               int64_t numFiles);
 
   /// decodes from src+off and consumes/moves off
   /// sets bufSize and numFiles
-  static void decodeChunksCmd(char *src, size_t &off, int64_t &bufSize,
+  static void decodeChunksCmd(char *src, int64_t &off, int64_t &bufSize,
                               int64_t &numFiles);
 
   /// encodes chunk into dest+off
   /// moves the off into dest pointer
-  static void encodeChunkInfo(char *dest, size_t &off, size_t max,
+  static void encodeChunkInfo(char *dest, int64_t &off, int64_t max,
                               const Interval &chunk);
 
   /// decodes from src+off and consumes/moves off
   /// sets chunk
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeChunkInfo(folly::ByteRange &br, char *src, size_t max,
+  static bool decodeChunkInfo(folly::ByteRange &br, char *src, int64_t max,
                               Interval &chunk);
 
   /// encodes fileChunksInfo into dest+off
   /// moves the off into dest pointer
-  static void encodeFileChunksInfo(char *dest, size_t &off, size_t max,
+  static void encodeFileChunksInfo(char *dest, int64_t &off, int64_t max,
                                    const FileChunksInfo &fileChunksInfo);
 
   /// decodes from src+off and consumes/moves off
   /// sets fileChunksInfo
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeFileChunksInfo(folly::ByteRange &br, char *src, size_t max,
+  static bool decodeFileChunksInfo(folly::ByteRange &br, char *src, int64_t max,
                                    FileChunksInfo &fileChunksInfo);
 
   /**
@@ -370,14 +370,14 @@ class Protocol {
   /// moves the off into dest pointer
   /// returns number of fileChunks encoded
   static int64_t encodeFileChunksInfoList(
-      char *dest, size_t &off, size_t bufSize, int64_t startIndex,
+      char *dest, int64_t &off, int64_t bufSize, int64_t startIndex,
       const std::vector<FileChunksInfo> &fileChunksInfoList);
 
   /// decodes from src+off and consumes/moves off
   /// sets fileChunksInfoList
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeFileChunksInfoList(
-      char *src, size_t &off, size_t dataSize,
+      char *src, int64_t &off, int64_t dataSize,
       std::vector<FileChunksInfo> &fileChunksInfoList);
 };
 }

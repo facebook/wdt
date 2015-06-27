@@ -37,7 +37,7 @@ void DirectorySourceQueue::setPruneDirPattern(
 }
 
 void DirectorySourceQueue::setFileSourceBufferSize(
-    const size_t fileSourceBufferSize) {
+    const int64_t fileSourceBufferSize) {
   fileSourceBufferSize_ = fileSourceBufferSize;
   CHECK(fileSourceBufferSize_ > 0);
 }
@@ -264,7 +264,7 @@ bool DirectorySourceQueue::explore() {
   return !hasError;
 }
 
-void DirectorySourceQueue::smartNotify(uint32_t addedSource) {
+void DirectorySourceQueue::smartNotify(int32_t addedSource) {
   if (addedSource >= options_.num_ports) {
     conditionNotEmpty_.notify_all();
     return;
@@ -279,7 +279,7 @@ void DirectorySourceQueue::returnToQueue(
   int returnedCount = 0;
   std::unique_lock<std::mutex> lock(mutex_);
   for (auto &source : sources) {
-    size_t retries = source->getTransferStats().getFailedAttempts();
+    const int64_t retries = source->getTransferStats().getFailedAttempts();
     if (retries >= options_.max_transfer_retries) {
       LOG(ERROR) << source->getIdentifier() << " failed after " << retries
                  << " number of tries.";
@@ -301,7 +301,7 @@ void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
 
 void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
                                            const std::string &relPath,
-                                           const size_t fileSize) {
+                                           const int64_t fileSize) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
   // large file. This can be optimized as follows -
@@ -364,10 +364,10 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
     sharedFileData_.emplace_back(metadata);
 
     for (const auto &chunk : remainingChunks) {
-      size_t offset = chunk.start_;
-      size_t remainingBytes = chunk.size();
+      int64_t offset = chunk.start_;
+      int64_t remainingBytes = chunk.size();
       do {
-        size_t size = std::min<size_t>(remainingBytes, blockSize);
+        const int64_t size = std::min<int64_t>(remainingBytes, blockSize);
         std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
             metadata, size, offset, fileSourceBufferSize_);
         sourceQueue_.push(std::move(source));
@@ -399,7 +399,7 @@ std::vector<std::string> &DirectorySourceQueue::getFailedDirectories() {
 bool DirectorySourceQueue::enqueueFiles() {
   for (const auto &info : fileInfo_) {
     const auto &fullPath = rootDir_ + info.first;
-    uint64_t filesize;
+    int64_t filesize;
     if (info.second < 0) {
       struct stat fileStat;
       if (stat(fullPath.c_str(), &fileStat) != 0) {
@@ -420,7 +420,7 @@ bool DirectorySourceQueue::finished() const {
   return initFinished_ && sourceQueue_.empty();
 }
 
-size_t DirectorySourceQueue::getCount() const {
+int64_t DirectorySourceQueue::getCount() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return numEntries_;
 }
@@ -435,7 +435,7 @@ std::pair<int64_t, ErrorCode> DirectorySourceQueue::getNumBlocksAndStatus()
   return std::make_pair(numBlocks_, status);
 }
 
-size_t DirectorySourceQueue::getTotalSize() const {
+int64_t DirectorySourceQueue::getTotalSize() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return totalFileSize_;
 }

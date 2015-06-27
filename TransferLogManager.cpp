@@ -89,7 +89,7 @@ void TransferLogManager::addLogHeader(const std::string &recoveryId) {
   char buf[kMaxEntryLength];
   // increment by 2 bytes to later store the total length
   char *ptr = buf + sizeof(int16_t);
-  size_t size = 0;
+  int64_t size = 0;
   ptr[size++] = HEADER;
   encodeInt(ptr, size, timestampInMicroseconds());
   encodeInt(ptr, size, LOG_VERSION);
@@ -110,7 +110,7 @@ void TransferLogManager::addFileCreationEntry(const std::string &fileName,
   char buf[kMaxEntryLength];
   // increment by 2 bytes to later store the total length
   char *ptr = buf + sizeof(int16_t);
-  size_t size = 0;
+  int64_t size = 0;
   ptr[size++] = FILE_CREATION;
   encodeInt(ptr, size, timestampInMicroseconds());
   encodeString(ptr, size, fileName);
@@ -132,7 +132,7 @@ void TransferLogManager::addBlockWriteEntry(int64_t seqId, int64_t offset,
   char buf[kMaxEntryLength];
   // increment by 2 bytes to later store the total length
   char *ptr = buf + sizeof(int16_t);
-  size_t size = 0;
+  int64_t size = 0;
   ptr[size++] = BLOCK_WRITE;
   encodeInt(ptr, size, timestampInMicroseconds());
   encodeInt(ptr, size, seqId);
@@ -150,7 +150,7 @@ void TransferLogManager::addInvalidationEntry(int64_t seqId) {
   }
   VLOG(1) << "Adding invalidation entry " << seqId;
   char buf[kMaxEntryLength];
-  size_t size = 0;
+  int64_t size = 0;
   encodeInvalidationEntry(buf, size, seqId);
   std::lock_guard<std::mutex> lock(mutex_);
   entries_.emplace_back(buf, size + sizeof(int16_t));
@@ -298,9 +298,9 @@ bool TransferLogManager::parseInvalidationEntry(char *buf, int16_t entrySize,
   return checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
 }
 
-void TransferLogManager::encodeInvalidationEntry(char *dest, size_t &off,
+void TransferLogManager::encodeInvalidationEntry(char *dest, int64_t &off,
                                                  int64_t seqId) {
-  size_t oldOffset = off;
+  int64_t oldOffset = off;
   char *ptr = dest + off + sizeof(int16_t);
   ptr[off++] = ENTRY_INVALIDATION;
   encodeInt(ptr, off, timestampInMicroseconds());
@@ -316,7 +316,7 @@ bool TransferLogManager::writeInvalidationEntries(
   }
   char buf[kMaxEntryLength];
   for (auto seqId : seqIds) {
-    size_t size = 0;
+    int64_t size = 0;
     encodeInvalidationEntry(buf, size, seqId);
     int toWrite = size + sizeof(int16_t);
     int written = ::write(fd, buf, toWrite);
@@ -418,7 +418,7 @@ bool TransferLogManager::parseVerifyAndFix(
       }
       break;
     }
-    if (entrySize > kMaxEntryLength) {
+    if (entrySize < 0 || entrySize > kMaxEntryLength) {
       LOG(ERROR) << "Transfer log parse error, invalid entry length "
                  << entrySize;
       return false;

@@ -410,7 +410,7 @@ class Sender : public WdtBase {
   /// List of ports where the receiver threads are running on the destination
   std::vector<int32_t> ports_;
   /// Number of active threads, decremented every time a thread is finished
-  uint32_t numActiveThreads_{0};
+  int32_t numActiveThreads_{0};
   /// The directory from where the files are read
   std::string srcDir_;
   /// Address of the destination host where the files are sent

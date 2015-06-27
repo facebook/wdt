@@ -54,10 +54,10 @@ void FileWriter::close() {
 ErrorCode FileWriter::write(char *buf, int64_t size) {
   auto &options = WdtOptions::get();
   if (!options.skip_writes) {
-    ssize_t count = 0;
+    int64_t count = 0;
     while (count < size) {
       START_PERF_TIMER
-      ssize_t written = ::write(fd_, buf + count, size - count);
+      int64_t written = ::write(fd_, buf + count, size - count);
       if (written == -1) {
         if (errno == EINTR) {
           VLOG(1) << "Disk write interrupted, retrying "
@@ -89,13 +89,13 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
   return OK;
 }
 
-void FileWriter::syncFileRange(uint64_t written, bool forced) {
+void FileWriter::syncFileRange(int64_t written, bool forced) {
 #ifdef HAS_SYNC_FILE_RANGE
   auto &options = WdtOptions::get();
-  int64_t syncIntervalBytes = options.disk_sync_interval_mb * 1024 * 1024;
-  if (syncIntervalBytes < 0) {
+  if (options.disk_sync_interval_mb < 0) {
     return;
   }
+  const int64_t syncIntervalBytes = options.disk_sync_interval_mb * 1024 * 1024;
   writtenSinceLastSync_ += written;
   if (writtenSinceLastSync_ == 0) {
     // no need to sync

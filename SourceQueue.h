@@ -37,10 +37,10 @@ class SourceQueue {
   virtual std::unique_ptr<ByteSource> getNextSource(ErrorCode &status) = 0;
 
   /// @return         total number of files processed/enqueued
-  virtual size_t getCount() const = 0;
+  virtual int64_t getCount() const = 0;
 
   /// @return         total size of files processed/enqueued
-  virtual size_t getTotalSize() const = 0;
+  virtual int64_t getTotalSize() const = 0;
 };
 }
 }
