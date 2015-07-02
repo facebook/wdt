@@ -25,9 +25,9 @@ class ServerSocket {
   /// will accept next (/only) incoming connection
   ErrorCode acceptNextConnection(int timeoutMillis);
   /// tries to read nbyte data and periodically checks for abort
-  int read(char *buf, int nbyte, bool tryFull = true) const;
+  int read(char *buf, int nbyte, bool tryFull = true);
   /// tries to write nbyte data and periodically checks for abort
-  int write(const char *buf, int nbyte, bool tryFull = true) const;
+  int write(const char *buf, int nbyte, bool tryFull = true);
   int getFd() const;
   int getListenFd() const;
   int closeCurrentConnection();

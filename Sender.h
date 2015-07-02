@@ -194,6 +194,17 @@ class Sender : public WdtBase {
   /// Makes the minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
 
+  typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
+      const std::string &dest, const std::string &port,
+      WdtBase::IAbortChecker const *abortChecker);
+
+  /**
+   * Sets socket creator
+   *
+   * @param socketCreator   socket-creator to be used
+   */
+  void setSocketCreator(const SocketCreator socketCreator);
+
  private:
   /// state machine states
   enum SenderState {
@@ -363,10 +374,6 @@ class Sender : public WdtBase {
   /// Every sender thread executes this method to send the data
   void sendOne(int threadIndex);
 
-  /// Responsible for making socket to connect to the receiver
-  virtual std::unique_ptr<ClientSocket> makeSocket(const std::string &destHost,
-                                                   int port);
-
   std::unique_ptr<ClientSocket> connectToReceiver(const int port,
                                                   ErrorCode &errCode);
 
@@ -417,6 +424,8 @@ class Sender : public WdtBase {
   std::string destHost_;
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
+  /// Socket creator used to optionally create different kinds of client socket
+  SocketCreator socketCreator_{nullptr};
   /// Whether download resumption is enabled or not
   bool downloadResumptionEnabled_{false};
   /// Flags representing whether file chunks have been received or not

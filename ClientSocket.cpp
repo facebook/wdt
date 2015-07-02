@@ -1,7 +1,6 @@
 #include "ClientSocket.h"
 #include "SocketUtils.h"
 #include "WdtOptions.h"
-#include <folly/ScopeGuard.h>
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <poll.h>
@@ -27,9 +26,8 @@ ClientSocket::ClientSocket(const string &dest, const string &port,
 }
 
 ErrorCode ClientSocket::connect() {
-  if (fd_ > 0) {
-    return OK;
-  }
+  WDT_CHECK(fd_ < 0) << "Previous connection not closed " << fd_ << " "
+                     << port_;
   // Lookup
   struct addrinfo *infoList = nullptr;
   auto guard = folly::makeGuard([&] {
@@ -158,12 +156,12 @@ std::string ClientSocket::getPort() const {
   return port_;
 }
 
-int ClientSocket::read(char *buf, int nbyte, bool tryFull) const {
+int ClientSocket::read(char *buf, int nbyte, bool tryFull) {
   return SocketUtils::readWithAbortCheck(fd_, buf, nbyte, abortChecker_,
                                          tryFull);
 }
 
-int ClientSocket::write(const char *buf, int nbyte, bool tryFull) const {
+int ClientSocket::write(const char *buf, int nbyte, bool tryFull) {
   return SocketUtils::writeWithAbortCheck(fd_, buf, nbyte, abortChecker_,
                                           tryFull);
 }
@@ -178,7 +176,7 @@ void ClientSocket::close() {
   }
 }
 
-void ClientSocket::shutdown() const {
+void ClientSocket::shutdown() {
   if (::shutdown(fd_, SHUT_WR) < 0) {
     VLOG(1) << "Socket shutdown failed for fd " << fd_;
   }

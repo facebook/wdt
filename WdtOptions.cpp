@@ -1,13 +1,18 @@
 #include "WdtOptions.h"
-using std::string;
 namespace facebook {
 namespace wdt {
+
+WdtOptions* WdtOptions::instance_ = nullptr;
+
 const WdtOptions& WdtOptions::get() {
   return getMutable();
 }
+
 WdtOptions& WdtOptions::getMutable() {
-  static WdtOptions* instance = new WdtOptions();
-  return *instance;
+  if (instance_ == nullptr) {
+    instance_ = new WdtOptions();
+  }
+  return *instance_;
 }
 }
 }

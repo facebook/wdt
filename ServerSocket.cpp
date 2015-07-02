@@ -196,12 +196,12 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
   return OK;
 }
 
-int ServerSocket::read(char *buf, int nbyte, bool tryFull) const {
+int ServerSocket::read(char *buf, int nbyte, bool tryFull) {
   return SocketUtils::readWithAbortCheck(fd_, buf, nbyte, abortChecker_,
                                          tryFull);
 }
 
-int ServerSocket::write(const char *buf, int nbyte, bool tryFull) const {
+int ServerSocket::write(const char *buf, int nbyte, bool tryFull) {
   return SocketUtils::writeWithAbortCheck(fd_, buf, nbyte, abortChecker_,
                                           tryFull);
 }

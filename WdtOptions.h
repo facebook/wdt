@@ -1,9 +1,6 @@
 #pragma once
 #include <wdt/WdtConfig.h>
 #include <folly/String.h>
-#include <memory>
-#include <thread>
-#include <mutex>
 namespace facebook {
 namespace wdt {
 /**
@@ -225,6 +222,13 @@ class WdtOptions {
   WdtOptions& operator=(const WdtOptions&) = delete;
   WdtOptions() {
   }
+
+  virtual ~WdtOptions() {
+  }
+
+ protected:
+  /// singleton options instance
+  static WdtOptions* instance_;
 };
 }
 }

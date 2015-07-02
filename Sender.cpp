@@ -442,10 +442,8 @@ void Sender::validateTransferStats(
   WDT_CHECK(sourceNumBlocks == threadNumBlocks);
 }
 
-std::unique_ptr<ClientSocket> Sender::makeSocket(const std::string &destHost,
-                                                 int port) {
-  return folly::make_unique<ClientSocket>(
-      destHost, folly::to<std::string>(port), &abortCheckerCallback_);
+void Sender::setSocketCreator(const SocketCreator socketCreator) {
+  socketCreator_ = socketCreator;
 }
 
 std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
@@ -453,7 +451,15 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
   auto startTime = Clock::now();
   const auto &options = WdtOptions::get();
   int connectAttempts = 0;
-  std::unique_ptr<ClientSocket> socket = makeSocket(destHost_, port);
+  std::unique_ptr<ClientSocket> socket;
+  if (!socketCreator_) {
+    // socket creator not set, creating ClientSocket
+    socket = folly::make_unique<ClientSocket>(
+        destHost_, folly::to<std::string>(port), &abortCheckerCallback_);
+  } else {
+    socket = socketCreator_(destHost_, folly::to<std::string>(port),
+                            &abortCheckerCallback_);
+  }
   double retryInterval = options.sleep_millis;
   int maxRetries = options.max_retries;
   if (maxRetries < 1) {

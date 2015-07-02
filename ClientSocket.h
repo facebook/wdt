@@ -15,13 +15,13 @@ class ClientSocket {
                WdtBase::IAbortChecker const *abortChecker);
   virtual ErrorCode connect();
   /// tries to read nbyte data and periodically checks for abort
-  virtual int read(char *buf, int nbyte, bool tryFull = true) const;
+  virtual int read(char *buf, int nbyte, bool tryFull = true);
   /// tries to write nbyte data and periodically checks for abort
-  virtual int write(const char *buf, int nbyte, bool tryFull = true) const;
-  void close();
+  virtual int write(const char *buf, int nbyte, bool tryFull = true);
+  virtual void close();
   int getFd() const;
   std::string getPort() const;
-  void shutdown() const;
+  virtual void shutdown();
   virtual ~ClientSocket();
 
  private:

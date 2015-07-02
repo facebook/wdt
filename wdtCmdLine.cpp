@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include "Sender.h"
-#include "Receiver.h"
+#include "wdt/Sender.h"
+#include "wdt/Receiver.h"
 #include <chrono>
 #include <future>
 #include <folly/String.h>
@@ -24,9 +24,17 @@
 #include <iostream>
 #include <signal.h>
 #include <thread>
+
+#ifndef FLAGS_INCLUDE_FILE
+#define FLAGS_INCLUDE_FILE "WdtFlags.cpp.inc"
+#endif
+
+#ifndef ADDITIONAL_SENDER_SETUP
+#define ADDITIONAL_SENDER_SETUP
+#endif
+
 #define STANDALONE_APP
-#include "WdtFlags.h"
-#include "WdtFlags.cpp.inc"
+#include FLAGS_INCLUDE_FILE
 
 // Flags not already in WdtOptions.h/WdtFlags.cpp.inc
 DEFINE_bool(run_as_daemon, true,
@@ -125,7 +133,7 @@ int main(int argc, char *argv[]) {
 
 #define STANDALONE_APP
 #define ASSIGN_OPT
-#include "WdtFlags.cpp.inc"  //nolint
+#include FLAGS_INCLUDE_FILE  //nolint
 
   LOG(INFO) << "Starting with directory = " << FLAGS_directory
             << " and destination = " << FLAGS_destination
@@ -183,6 +191,7 @@ int main(int argc, char *argv[]) {
       ports.push_back(options.start_port + i);
     }
     Sender sender(FLAGS_destination, FLAGS_directory, ports, fileInfo);
+    ADDITIONAL_SENDER_SETUP
     setUpAbort(sender);
     sender.setSenderId(FLAGS_transfer_id);
     if (FLAGS_protocol_version > 0) {
