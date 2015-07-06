@@ -132,7 +132,11 @@ class WdtOptions {
   /**
    * IntervalMillis(in milliseconds) between progress reports
    */
-  int progress_report_interval_millis{20};
+  int progress_report_interval_millis{
+      isatty(STDOUT_FILENO) ? 20 : 200};  // default value is much higher for
+                                          // logging case, this is done to avoid
+                                          // flooding the log with progress
+                                          // information
 
   /**
    * block size, it is used to break bigger files into smaller chunks

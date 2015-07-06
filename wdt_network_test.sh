@@ -263,6 +263,7 @@ do
   # treating PROTOCOL_ERROR as errors
   cd $DIR; grep "PROTOCOL_ERROR" server${i}.log > /dev/null && STATUS=1
   cd $DIR; grep "PROTOCOL_ERROR" client${i}.log > /dev/null && STATUS=1
+  cat $DIR/server${i}.log
 done
 
 if [ $STATUS -eq 0 ] ; then

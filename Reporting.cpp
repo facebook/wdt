@@ -172,14 +172,22 @@ void ProgressReporter::progress(const std::unique_ptr<TransferReport>& report) {
   if (totalDiscoveredSize > 0) {
     progress = stats.getEffectiveDataBytes() * 100 / totalDiscoveredSize;
   }
-  displayProgress(progress, report->getThroughputMBps(),
-                  report->getCurrentThroughputMBps());
+  if (isTty_) {
+    displayProgress(progress, report->getThroughputMBps(),
+                    report->getCurrentThroughputMBps());
+  } else {
+    logProgress(stats.getEffectiveDataBytes(), progress,
+                report->getThroughputMBps(),
+                report->getCurrentThroughputMBps());
+  }
 }
 
 void ProgressReporter::end(const std::unique_ptr<TransferReport>& report) {
   progress(report);
-  std::cout << '\n';
-  std::cout.flush();
+  if (isTty_) {
+    std::cout << '\n';
+    std::cout.flush();
+  }
 }
 
 void ProgressReporter::displayProgress(int progress, double averageThroughput,
@@ -204,6 +212,15 @@ void ProgressReporter::displayProgress(int progress, double averageThroughput,
     std::cout << " Mbytes/s          ";
   }
   std::cout.flush();
+}
+
+void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
+                                   double averageThroughput,
+                                   double currentThroughput) {
+  LOG(INFO) << "wdt transfer progress " << (effectiveDataBytes / kMbToB)
+            << " Mb ,completed " << progress << "%, Average throughput "
+            << averageThroughput << " Mbps, Recent throughput "
+            << currentThroughput << "Mbps.";
 }
 
 folly::ThreadLocalPtr<PerfStatReport> perfStatReport;

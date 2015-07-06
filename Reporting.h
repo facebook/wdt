@@ -383,14 +383,19 @@ class TransferReport {
  */
 class ProgressReporter {
  public:
+  ProgressReporter() {
+    isTty_ = isatty(STDOUT_FILENO);
+  }
+
   /// this method is called before the transfer starts
   virtual void start() {
   }
 
   /**
    * This method gets called repeatedly with interval defined by
-   * progress_report_interval. By default it displays transfer progress in
-   * stdout. Example output [===>    ] 30% 5.00 MBytes/sec
+   * progress_report_interval. If stdout is a terminal, then it displays
+   * transfer progress in stdout. Example output [===>    ] 30% 5.00 MBytes/sec.
+   * Else, it prints progress details in stdout.
    *
    * @param report                current transfer report
    */
@@ -416,6 +421,20 @@ class ProgressReporter {
    */
   void displayProgress(int progress, double averageThroughput,
                        double currentThroughput);
+
+  /**
+   * logs progress details
+   *
+   * @param effectiveDataBytes    number of bytes sent
+   * @param progress              progress percentage
+   * @param throughput            average throughput
+   * @param currentThroughput     recent throughput
+   */
+  void logProgress(int64_t effectiveDataBytes, int progress,
+                   double averageThroughput, double currentThroughput);
+
+  /// whether stdout is redirected to a terminal or not
+  bool isTty_;
 };
 
 #define INIT_PERF_STAT_REPORT perfStatReport.reset(new PerfStatReport);
