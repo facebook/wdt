@@ -173,7 +173,7 @@ done
 if [ $STATUS -eq 0 ] ; then
   echo "Good run, deleting logs in $DIR"
   find $DIR -type d | xargs chmod 755 # cp -r makes lib/locale not writeable somehow
-  #rm -rf $DIR
+  rm -rf $DIR
 else
   echo "Bad run ($STATUS) - keeping full logs and partial transfer in $DIR"
 fi
