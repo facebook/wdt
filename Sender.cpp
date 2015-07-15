@@ -736,6 +736,9 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
   }
   threadStats.addHeaderBytes(numRead);
   Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[0];
+  if (cmd == Protocol::ABORT_CMD) {
+    return PROCESS_ABORT_CMD;
+  }
   if (cmd == Protocol::WAIT_CMD) {
     return READ_FILE_CHUNKS;
   }

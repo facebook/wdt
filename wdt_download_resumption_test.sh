@@ -13,7 +13,6 @@ checkLastCmdStatus() {
 
 checkLastCmdStatusExpectingFailure() {
   LAST_STATUS=$?
-  echo "Last cmd status $LAST_STATUS"
   if [ $LAST_STATUS -eq 0 ] ; then
     sudo iptables-restore < $DIR/iptable
     echo "expecting wdt failure, but transfer was successful, failing test"
