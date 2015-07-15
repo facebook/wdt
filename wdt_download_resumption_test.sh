@@ -11,12 +11,24 @@ checkLastCmdStatus() {
   fi
 }
 
+checkLastCmdStatusExpectingFailure() {
+  LAST_STATUS=$?
+  echo "Last cmd status $LAST_STATUS"
+  if [ $LAST_STATUS -eq 0 ] ; then
+    sudo iptables-restore < $DIR/iptable
+    echo "expecting wdt failure, but transfer was successful, failing test"
+    exit 1 
+  fi
+}
+
 startNewTransfer() {
   $WDTBIN -directory $DIR/dst${TEST_COUNT} -start_port=$STARTING_PORT \
+  -transfer_id=$RECEIVER_ID -protocol_version=$RECEIVER_PROTOCOL_VERSION \
   >> $DIR/server${TEST_COUNT}.log 2>&1 &
   pidofreceiver=$!
   $WDTBIN -directory $DIR/src -destination $HOSTNAME \
   -start_port=$STARTING_PORT -block_size_mbytes=$BLOCK_SIZE_MBYTES \
+  -transfer_id=$SENDER_ID -protocol_version=$SENDER_PROTOCOL_VERSION \
   |& tee -a $DIR/client${TEST_COUNT}.log &
   pidofsender=$!
 }
@@ -28,6 +40,18 @@ waitForTransferEnd() {
   checkLastCmdStatus
 }
 
+waitForTransferEndWithoutCheckingStatus() {
+  wait $pidofreceiver
+  wait $pidofsender
+}
+
+waitForTransferEndExpectingFailure() {
+  wait $pidofreceiver
+  checkLastCmdStatusExpectingFailure
+  wait $pidofsender
+  checkLastCmdStatusExpectingFailure
+}
+
 killCurrentTransfer() {
   kill -9 $pidofreceiver
   kill -9 $pidofsender
@@ -36,6 +60,15 @@ killCurrentTransfer() {
 threads=4
 STARTING_PORT=22500
 ERROR_COUNT=10
+
+#sender and receiver id, used to check transfer-id verification
+SENDER_ID="123456"
+RECEIVER_ID="123456"
+
+#protocol versions, used to check version verification
+#version 0 represents default version
+SENDER_PROTOCOL_VERSION=0
+RECEIVER_PROTOCOL_VERSION=0
 
 WDTBIN_OPTS="-ipv4 -ipv6=false -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
@@ -71,6 +104,8 @@ done
 cd -
 BLOCK_SIZE_MBYTES=10
 TEST_COUNT=0
+# Tests for which there is no need to verify source and destination md5s
+TESTS_SKIP_VERIFICATION=()
 
 echo "Download resumption test(1)"
 startNewTransfer
@@ -151,11 +186,67 @@ startNewTransfer
 waitForTransferEnd
 TEST_COUNT=$((TEST_COUNT + 1))
 
+echo "Abort timing test"
+ABORT_AFTER_SECONDS=2
+ABORT_CHECK_INTERVAL_MILLIS=100
+ABORT_AFTER_MILLIS=$((ABORT_AFTER_SECONDS * 1000))
+EXPECTED_TRANSFER_DURATION_MILLIS=$((ABORT_AFTER_MILLIS + \
+ABORT_CHECK_INTERVAL_MILLIS))
+# add 50ms overhead
+EXPECTED_TRANSFER_DURATION_MILLIS=$((EXPECTED_TRANSFER_DURATION_MILLIS + 50))
+STARTING_PORT=$((STARTING_PORT + threads))
+WDTBIN_OLD=$WDTBIN
+WDTBIN+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
+-abort_after_seconds=$ABORT_AFTER_SECONDS"
+START_TIME_MILLIS=`date +%s%3N`
+startNewTransfer
+waitForTransferEndWithoutCheckingStatus
+END_TIME_MILLIS=`date +%s%3N`
+DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
+echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
+${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
+if [[ $DURATION -gt $EXPECTED_TRANSFER_DURATION_MILLIS ]]; then
+  echo "Abort timing test failed, exiting"
+  exit 1
+fi
+WDTBIN=$WDTBIN_OLD
+TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+TEST_COUNT=$((TEST_COUNT + 1))
+
+echo "Transfer-id mismatch test"
+SENDER_ID_OLD=$SENDER_ID
+SENDER_ID="abcdef"
+startNewTransfer
+waitForTransferEndExpectingFailure
+SENDER_ID=$SENDER_ID_OLD
+TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+TEST_COUNT=$((TEST_COUNT + 1))
+
+echo "Version mismatch test(1) - Sender with lower version"
+SENDER_PROTOCOL_VERSION=10
+startNewTransfer
+waitForTransferEndExpectingFailure
+SENDER_PROTOCOL_VERSION=0
+TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+TEST_COUNT=$((TEST_COUNT + 1))
+
+echo "Version mismatch test(1) - Receiver with lower version"
+RECEIVER_PROTOCOL_VERSION=10
+startNewTransfer
+waitForTransferEndExpectingFailure
+RECEIVER_PROTOCOL_VERSION=0
+TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+TEST_COUNT=$((TEST_COUNT + 1))
 
 STATUS=0
 (cd $DIR/src ; ( find . -type f -print0 | xargs -0 md5sum | sort ) > ../src.md5s )
 for ((i = 0; i < TEST_COUNT; i++))
 do
+  cat $DIR/server${i}.log
+  if [[ ${TESTS_SKIP_VERIFICATION[*]} =~ $i ]]; then
+    echo "Skipping verification for test $i"
+    continue
+  fi
   (cd $DIR/dst${i} ; ( find . -type f -print0 | xargs -0 md5sum | sort ) > \
   ../dst${i}.md5s )
   echo "Verifying correctness for test $((i + 1))"

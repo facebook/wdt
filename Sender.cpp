@@ -321,6 +321,14 @@ std::unique_ptr<TransferReport> Sender::finish() {
           transferredSourceStats, dirQueue_->getFailedSourceStats(),
           globalThreadStats_, dirQueue_->getFailedDirectories(), totalTime,
           totalFileSize, dirQueue_->getCount());
+  if (downloadResumptionEnabled_ && !fileChunksReceived_) {
+    // Even though download resumption is enabled, we did not receive
+    // previously transferred file chunks. So, directory traversal thread never
+    // started and none of the files to transfer got added to the queue. So,
+    // transfer report status would be OK. We have to explicitly set it to
+    // error.
+    transferReport->setErrorCode(ERROR);
+  }
 
   if (progressReportEnabled) {
     progressReporter_->end(transferReport);
@@ -357,6 +365,8 @@ ErrorCode Sender::start() {
   areThreadsJoined_ = false;
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
+  WDT_CHECK(!(twoPhases && options.enable_download_resumption))
+      << "Two phase is not supported with download resumption";
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
             << ports_ << "]";
   startTime_ = Clock::now();
