@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
     }
   } else if (FLAGS_destination.empty()) {
     Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
-    receiver.setReceiverId(FLAGS_transfer_id);
+    receiver.setTransferId(FLAGS_transfer_id);
     if (FLAGS_protocol_version > 0) {
       receiver.setProtocolVersion(FLAGS_protocol_version);
     }
@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
     Sender sender(FLAGS_destination, FLAGS_directory, ports, fileInfo);
     ADDITIONAL_SENDER_SETUP
     setUpAbort(sender);
-    sender.setSenderId(FLAGS_transfer_id);
+    sender.setTransferId(FLAGS_transfer_id);
     if (FLAGS_protocol_version > 0) {
       sender.setProtocolVersion(FLAGS_protocol_version);
     }

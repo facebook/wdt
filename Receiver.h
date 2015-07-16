@@ -38,6 +38,9 @@ namespace wdt {
 
 class Receiver : public WdtBase {
  public:
+  /// Constructor with the wdt transfer request object
+  explicit Receiver(const WdtTransferRequest &transferRequest);
+
   /// Constructor that only needs start port and number of ports
   Receiver(int startPort, int numPorts);
 
@@ -54,9 +57,9 @@ class Receiver : public WdtBase {
    * is called by default when the wdt receiver is expected
    * to run as forever running process. However this has to
    * be explicitly called when the caller expects to conclude
-   * a transfer. TODO: move to base?
+   * a transfer.
    */
-  std::unique_ptr<TransferReport> finish();
+  std::unique_ptr<TransferReport> finish() override;
 
   /**
    * Call this method when you don't want the wdt receiver
@@ -68,7 +71,7 @@ class Receiver : public WdtBase {
    * Starts the threads, and returns. Expects the caller to call
    * finish() after this method has been called.
    */
-  ErrorCode transferAsync();
+  ErrorCode transferAsync() override;
 
   /**
    * Setter for the directory where the files received are to
@@ -79,17 +82,8 @@ class Receiver : public WdtBase {
   /// Get the dir where receiver is transferring
   const std::string &getDir();
 
-  /// Get the unique id of this receiver
-  const std::string &getReceiverId();
-
-  /// @param receiverId   unique id of this receiver
-  void setReceiverId(const std::string &receiverId);
-
   /// @param recoveryId   unique-id used to verify transfer log
   void setRecoveryId(const std::string &recoveryId);
-
-  /// @param protocolVersion    protocol to use
-  void setProtocolVersion(int protocolVersion);
 
   /**
    * Destructor for the receiver should try to join threads.
@@ -113,7 +107,7 @@ class Receiver : public WdtBase {
   /**
    * Use the method to get a list of ports
    */
-  std::vector<int32_t> getPorts();
+  std::vector<int32_t> getPorts() const;
 
  protected:
   /// receiver state
@@ -427,9 +421,6 @@ class Receiver : public WdtBase {
   /// ends current thread session
   void endCurThreadSession(ThreadData &data);
 
-  /// Auto configure the throttler if none set externally
-  void configureThrottler();
-
   /**
    * increments failed thread count, does not wait for transfer to finish
    */
@@ -452,10 +443,6 @@ class Receiver : public WdtBase {
   std::string destDir_;
   /// Responsible for writing files on the disk
   std::unique_ptr<FileCreator> fileCreator_;
-
-  /// Unique id of this receiver object, this must match sender-id sent as part
-  /// of settings
-  std::string receiverId_;
 
   /// unique-id used to verify transfer log. This value must be same for
   /// transfers across resumption

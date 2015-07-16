@@ -79,6 +79,8 @@ WdtOptions.cpp
 FileWriter.cpp
 TransferLogManager.cpp
 SerializationUtil.cpp
+WdtBase.cpp
+WdtResourceController.cpp
 )
 add_library(wdtlib
 WdtFlags.cpp
@@ -232,5 +234,9 @@ if (BUILD_TESTING)
   add_executable(protocol_test ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
   add_test(NAME AllTestsInProtocolTest COMMAND protocol_test)
+
+  add_executable(resource_controller_test  WdtResourceControllerTest.cpp)
+  target_link_libraries(resource_controller_test wdt4tests)
+  add_test(NAME ResourceControllerTests COMMAND resource_controller_test)
 
 endif(BUILD_TESTING)

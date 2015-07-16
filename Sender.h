@@ -116,6 +116,9 @@ class ThreadTransferHistory {
  */
 class Sender : public WdtBase {
  public:
+  /// Creates a counter part sender for the receiver according to the details
+  explicit Sender(const WdtTransferRequest &transferRequest);
+
   Sender(const std::string &destHost, const std::string &srcDir);
 
   Sender(const std::string &destHost, const std::string &srcDir,
@@ -125,18 +128,20 @@ class Sender : public WdtBase {
   virtual ~Sender();
 
   /**
+   * Joins on the threads spawned by start. This method
+   * is called by default when the wdt receiver is expected
+   * to run as forever running process. However this has to
+   * be explicitly called when the caller expects to conclude
+   * a transfer.
+   */
+  std::unique_ptr<TransferReport> finish() override;
+
+  /**
    * API to initiate a transfer and return back to the context
    * from where it was called. Caller would have to call finish
    * to get the stats for the transfer
    */
-  ErrorCode transferAsync();
-
-  /**
-   * This method should only be called when an async transfer was
-   * initiated using the API transferAsync
-   * TODO: move to base
-   */
-  std::unique_ptr<TransferReport> finish();
+  ErrorCode transferAsync() override;
 
   /**
    * A blocking call which will initiate a transfer based on
@@ -164,15 +169,6 @@ class Sender : public WdtBase {
 
   /// Sets whether to follow symlink or not
   void setFollowSymlinks(const bool followSymlinks);
-
-  /// @param senderId   unique id of the sender
-  void setSenderId(const std::string &senderId);
-
-  /// @param protocolVersion    protocol to use
-  void setProtocolVersion(int protocolVersion);
-
-  /// Get the sender id attached to the sender
-  const std::string &getSenderId() const;
 
   /// Get the ports sender is operating on
   const std::vector<int32_t> &getPorts() const;
@@ -403,17 +399,8 @@ class Sender : public WdtBase {
    */
   void reportProgress();
 
-  /// Configures the global throttler using the wdt options
-  void configureThrottler();
-
   /// Pointer to DirectorySourceQueue which reads the srcDir and the files
   std::unique_ptr<DirectorySourceQueue> dirQueue_;
-  /// unique id of this sender object. This is send to the receiver for
-  /// identification
-  std::string senderId_;
-  /// protocol version to use, this is determined by negotiating protocol
-  /// version with the other side
-  int protocolVersion_{Protocol::protocol_version};
   /// List of ports where the receiver threads are running on the destination
   std::vector<int32_t> ports_;
   /// Number of active threads, decremented every time a thread is finished

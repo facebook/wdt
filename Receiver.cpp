@@ -100,21 +100,24 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
   return checkpoints;
 }
 
-Receiver::Receiver(int port, int numSockets) {
+Receiver::Receiver(const WdtTransferRequest &transferRequest) {
+  // TODO generate the transfer Id if empty
+  transferId_ = transferRequest.transferId;
+  protocolVersion_ = transferRequest.protocolVersion;
+  destDir_ = transferRequest.directory;
   const auto &options = WdtOptions::get();
-  if (port == 0) {
-    LOG(INFO) << "Auto configure mode. Selecting ephemeral ports";
-    for (int i = 0; i < numSockets; i++) {
-      ServerSocket socket(0, options.backlog, &abortCheckerCallback_);
+  for (int32_t portNum : transferRequest.ports) {
+    ServerSocket socket(portNum, options.backlog, &abortCheckerCallback_);
+    if (portNum == 0) {
       WDT_CHECK(socket.listen() == OK);
-      threadServerSockets_.push_back(std::move(socket));
+      VLOG(1) << "Auto configured a port to " << socket.getPort();
     }
-    return;
+    threadServerSockets_.emplace_back(std::move(socket));
   }
-  for (int i = 0; i < numSockets; i++) {
-    threadServerSockets_.emplace_back(port + i, options.backlog,
-                                      &abortCheckerCallback_);
-  }
+}
+
+Receiver::Receiver(int port, int numSockets)
+    : Receiver(WdtTransferRequest(port, numSockets)) {
 }
 
 Receiver::Receiver(int port, int numSockets, const std::string &destDir)
@@ -151,26 +154,9 @@ const std::string &Receiver::getDir() {
   return destDir_;
 }
 
-const std::string &Receiver::getReceiverId() {
-  return receiverId_;
-}
-
-void Receiver::setReceiverId(const std::string &receiverId) {
-  WDT_CHECK(receiverId.length() <= Protocol::kMaxTransferIdLength);
-  receiverId_ = receiverId;
-  LOG(INFO) << "receiver id " << receiverId_;
-}
-
 void Receiver::setRecoveryId(const std::string &recoveryId) {
   recoveryId_ = recoveryId;
   LOG(INFO) << "recovery id " << recoveryId_;
-}
-
-void Receiver::setProtocolVersion(int protocolVersion) {
-  WDT_CHECK(Protocol::negotiateProtocol(protocolVersion) == protocolVersion)
-      << "Can not support wdt version " << protocolVersion;
-  protocolVersion_ = protocolVersion;
-  LOG(INFO) << "using wdt protocol version " << protocolVersion_;
 }
 
 Receiver::~Receiver() {
@@ -182,7 +168,7 @@ Receiver::~Receiver() {
   finish();
 }
 
-vector<int32_t> Receiver::getPorts() {
+vector<int32_t> Receiver::getPorts() const {
   vector<int32_t> ports;
   for (const auto &socket : threadServerSockets_) {
     ports.push_back(socket.getPort());
@@ -215,8 +201,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
                  << " finish and this method will never return";
   }
-  const int64_t numSockets = threadServerSockets_.size();
-  for (int64_t i = 0; i < numSockets; i++) {
+  for (size_t i = 0; i < receiverThreads_.size(); i++) {
     receiverThreads_[i].join();
   }
 
@@ -274,23 +259,6 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
     }
   }
   return report;
-}
-
-void Receiver::configureThrottler() {
-  WDT_CHECK(!throttler_);
-  VLOG(1) << "Configuring throttler options";
-  const auto &options = WdtOptions::get();
-  double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
-  double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
-  double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
-  throttler_ = Throttler::makeThrottler(avgRateBytesPerSec, peakRateBytesPerSec,
-                                        bucketLimitBytes,
-                                        options.throttler_log_time_millis);
-  if (throttler_) {
-    LOG(INFO) << "Enabling throttling " << *throttler_;
-  } else {
-    LOG(INFO) << "Throttling not enabled";
-  }
 }
 
 ErrorCode Receiver::transferAsync() {
@@ -762,9 +730,10 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
     threadStats.setErrorCode(VERSION_MISMATCH);
     return SEND_ABORT_CMD;
   }
-  if (receiverId_ != settings.transferId) {
-    LOG(ERROR) << "Receiver and sender id mismatch " << settings.transferId
-               << " " << receiverId_;
+  auto senderId = settings.transferId;
+  if (transferId_ != senderId) {
+    LOG(ERROR) << "Receiver and sender id mismatch " << senderId << " "
+               << transferId_;
     threadStats.setErrorCode(ID_MISMATCH);
     return SEND_ABORT_CMD;
   }

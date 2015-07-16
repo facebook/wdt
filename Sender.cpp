@@ -147,6 +147,13 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   progressReporter_ = folly::make_unique<ProgressReporter>();
 }
 
+Sender::Sender(const WdtTransferRequest &transferRequest)
+    : Sender(transferRequest.hostName, transferRequest.directory,
+             transferRequest.ports, transferRequest.fileInfo) {
+  transferId_ = transferRequest.transferId;
+  protocolVersion_ = transferRequest.protocolVersion;
+}
+
 Sender::Sender(const std::string &destHost, const std::string &srcDir,
                const std::vector<int32_t> &ports,
                const std::vector<FileInfo> &srcFileInfo)
@@ -188,23 +195,6 @@ void Sender::setProgressReportIntervalMillis(
   progressReportIntervalMillis_ = progressReportIntervalMillis;
 }
 
-void Sender::setSenderId(const std::string &senderId) {
-  WDT_CHECK(senderId.length() <= Protocol::kMaxTransferIdLength);
-  senderId_ = senderId;
-  LOG(INFO) << "sender id " << senderId_;
-}
-
-void Sender::setProtocolVersion(int protocolVersion) {
-  WDT_CHECK(Protocol::negotiateProtocol(protocolVersion) == protocolVersion)
-      << "Can not support wdt version " << protocolVersion;
-  protocolVersion_ = protocolVersion;
-  LOG(INFO) << "using wdt protocol version " << protocolVersion_;
-}
-
-const std::string &Sender::getSenderId() const {
-  return senderId_;
-}
-
 const std::vector<int32_t> &Sender::getPorts() const {
   return ports_;
 }
@@ -233,23 +223,6 @@ bool Sender::isTransferFinished() {
 
 Clock::time_point Sender::getEndTime() {
   return endTime_;
-}
-
-void Sender::configureThrottler() {
-  WDT_CHECK(!throttler_);
-  VLOG(1) << "Configuring throttler options";
-  const auto &options = WdtOptions::get();
-  double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
-  double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
-  double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
-  throttler_ = Throttler::makeThrottler(avgRateBytesPerSec, peakRateBytesPerSec,
-                                        bucketLimitBytes,
-                                        options.throttler_log_time_millis);
-  if (throttler_) {
-    LOG(INFO) << "Enabling throttling " << *throttler_;
-  } else {
-    LOG(INFO) << "Throttling not enabled";
-  }
 }
 
 std::unique_ptr<TransferReport> Sender::finish() {
@@ -599,7 +572,7 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   settings.senderProtocolVersion = protocolVersion_;
   settings.readTimeoutMillis = readTimeoutMillis;
   settings.writeTimeoutMillis = writeTimeoutMillis;
-  settings.transferId = senderId_;
+  settings.transferId = transferId_;
   settings.enableChecksum = options.enable_checksum;
   settings.sendFileChunks = sendFileChunks;
   Protocol::encodeSettings(buf, off, Protocol::kMaxSettings, settings);

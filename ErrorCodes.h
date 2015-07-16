@@ -25,7 +25,8 @@ namespace wdt {
   X(PROTOCOL_ERROR)          /** WDT protocol error  */                  \
   X(VERSION_MISMATCH)        /** Sender and Receiver version mismatch */ \
   X(ID_MISMATCH)             /** Sender and Receiver id mismatch*/       \
-  X(CHECKSUM_MISMATCH)       /** Checksums do not match */
+  X(CHECKSUM_MISMATCH)       /** Checksums do not match */               \
+  X(RESOURCE_NOT_FOUND)      /** Not found in the resource controller */
 
 enum ErrorCode {
 #define X(A) A,
