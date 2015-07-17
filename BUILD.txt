@@ -1,4 +1,4 @@
-WDT opensource build uses CMake 3.1.x or later
+WDT opensource build uses CMake 3.2.x or later
 
 This should build in a variety of environments (if it doesn't please open
 and issue or even better, contribute a patch)

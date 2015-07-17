@@ -1,4 +1,4 @@
-# CMake build file - use CMake 3.1 or later to build WDT and its dependencies.
+# CMake build file - use CMake 3.2 or later to build WDT and its dependencies.
 #
 # mkdir build; cd build; cmake .. -DBUILD_TESTING=on; make -j
 # omit -DBUILD_TESTING=on if you don't want the extra dependencies for
@@ -86,6 +86,9 @@ add_library(wdtlib
 WdtFlags.cpp
 )
 target_link_libraries(wdtlib wdtlib_min)
+
+
+
 # Folly uses boost system
 #set(Boost_USE_STATIC_LIBS on)
 find_package(Boost COMPONENTS system REQUIRED)
@@ -229,7 +232,6 @@ if (BUILD_TESTING)
     "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
     wdtlib
   )
-
 
   add_executable(protocol_test ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)

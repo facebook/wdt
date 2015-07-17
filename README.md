@@ -1,53 +1,23 @@
 `WDT` Warp speed Data Transfer
 ------------------------------
 
-## Design philosophy
+## Design philosophy/Overview
 
 Goal:
 Lowest possible total transfer time - and when not using self imposed
 resource limits to be only hardware limited (disc or network bandwidth
-not latency) and as efficient as possible
+not latency) and as efficient as possible (low CPU/memory/resources
+utilization)
 
 
-Zero copy stream/buffer pipeline: To maintain efficiency, the best overall
-total transfer time and time to first byte we can see WDT's internal
-architecture as chainable units
+## Performance/Results
 
-[Disk/flash/Storage IO] -> [Compression] -> [Protocol handling]
--> [Encryption] -> [Network IO]
-
-And the reverse chain on the receiving/writing end
-The trick is the data is variable length input and some units can change length
-and we need to process things by blocks
-Constraints/Design:
-- No locking / contention when possible
-- (Hard) Limits on memory used
-- Minimal number of copies/moving memory around
-- Still works the same for simple
-   read file fd -> control -> write socked fd current basic implementation
-
-Possible Solution(?) API:
-- Double linked list of Units
-- read/pull from left (pull() ?)
-- push to the right (push() ?)
-- end of stream from left
-- propagate last bytes to right
-
-Can still be fully synchronous / blocking, works thanks to eof handling
-(synchronous gives us lock free/single thread - internally a unit is
-free to use parallelization like the compression stage is likely to want/need)
-
-Another thing we touched on is processing chunks out of order - by changing
-header to be ( fileid, offset, size ) instead of ( filename, size )
-and assuming everything is following in 1 continuous block (will also help
-the use case of small number of large files/chunks) : mmap'in
-the target/destination file
-The issue then is who creates it in what order - similar to the directory
-creation problem - we could use a meta info channel to avoid locking/contention
-but that requires synchronization
-
-We want things to work with even up to 1 second latency without incurring
-a 1 second delay before we send the first payload byte
+In an internal use at Facebook to transfer RocksDB snapshot between hosts
+we are able to transfer data at a throttled 600 Mbytes/sec even across
+long distance, high latency links (e.g. Sweden to Oregon). That's 3x the speed
+of previous highly optimized http based solution and with less strain on the
+system. When not throttling we are able to easily saturate a 40 Gbit/s NIC and
+get near theoritical link speed (above 4 Gbytes/sec).
 
 ## Dependencies
 
@@ -61,7 +31,7 @@ gmock and gtest (google testing) but only for tests
 glog (google logging library)
 
 Parts of facebook Folly open source library (as set in the CMakefile)
-Mostly conv and threadlocal
+Mostly conv, threadlocal and checksum support.
 
 You can build and embed wdt as a library with as little as a C++11 compiler and
 glog - and you could macro way glog or replace by printing to stderr if needed
@@ -102,6 +72,10 @@ To specify the behavior of wdt. If wdt is used as a library, then the
 caller get the mutable object of options and set different options accordingly.
 When wdt is run in a standalone mode, behavior is changed through gflags in
 wdtCmdLine.cpp
+
+* WdtBase.{h|cpp}
+
+Common functionality and settings between Sender and Receiver
 
 ### Producing/Sending
 
@@ -173,7 +147,54 @@ Header file for error codes
 
 * Reporting.{h|cpp}
 
-Class represnting transfer stats and reports
+Class representing transfer stats and reports
+
+## Future development/extensibility
+
+The current implementation works well and has high efficiency.
+It is also extensible by implementing different byte sources both in and
+out. But inserting processing units isn't as easy.
+
+For that we plan on restructuring the code to use a Zero copy stream/buffer
+pipeline: To maintain efficiency, the best overall total transfer time and
+time to first byte we can see WDT's internal architecture as chainable units
+
+[Disk/flash/Storage IO] -> [Compression] -> [Protocol handling]
+-> [Encryption] -> [Network IO]
+
+And the reverse chain on the receiving/writing end
+The trick is the data is variable length input and some units can change length
+and we need to process things by blocks
+Constraints/Design:
+- No locking / contention when possible
+- (Hard) Limits on memory used
+- Minimal number of copies/moving memory around
+- Still works the same for simple
+   read file fd -> control -> write socked fd current basic implementation
+
+Possible Solution(?) API:
+- Double linked list of Units
+- read/pull from left (pull() ?)
+- push to the right (push() ?)
+- end of stream from left
+- propagate last bytes to right
+
+Can still be fully synchronous / blocking, works thanks to eof handling
+(synchronous gives us lock free/single thread - internally a unit is
+free to use parallelization like the compression stage is likely to want/need)
+
+Another thing we touched on is processing chunks out of order - by changing
+header to be ( fileid, offset, size ) instead of ( filename, size )
+and assuming everything is following in 1 continuous block (will also help
+the use case of small number of large files/chunks) : mmap'in
+the target/destination file
+The issue then is who creates it in what order - similar to the directory
+creation problem - we could use a meta info channel to avoid locking/contention
+but that requires synchronization
+
+We want things to work with even up to 1 second latency without incurring
+a 1 second delay before we send the first payload byte
+
 
 ## Submitting diffs/making changes
 
@@ -200,7 +221,7 @@ Also :
 
 * Update this file
 * Make sure your diff has a task
-* Put (releveant) log output of sender/receiver in the diff test plan or comment
+* Put (relevant) log output of sender/receiver in the diff test plan or comment
 * Depending on the changes
   * Perf: wdt/wdt_e2e_test.sh has a mix of ~ > 700 files, > 8 Gbytes/sec
   * do run remote network tests (wdt/wdt_remote_test.sh)
