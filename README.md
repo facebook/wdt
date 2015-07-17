@@ -77,6 +77,10 @@ wdtCmdLine.cpp
 
 Common functionality and settings between Sender and Receiver
 
+* WdtResourceController.{h|cpp}
+
+Optional factory for Sender/Receiver with limit on number being created.
+
 ### Producing/Sending
 
 * ByteSource.h
