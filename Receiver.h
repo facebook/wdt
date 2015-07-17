@@ -439,9 +439,6 @@ class Receiver : public WdtBase {
   /// unique-id used to verify transfer log. This value must be same for
   /// transfers across resumption
   std::string recoveryId_;
-  /// protocol version to use, this is determined by negotiating protocol
-  /// version with the other side
-  int protocolVersion_{Protocol::protocol_version};
 
   /**
    * Progress tracker thread is a thread which has to be joined when the
