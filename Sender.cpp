@@ -242,10 +242,8 @@ std::unique_ptr<TransferReport> Sender::finish() {
   for (int64_t i = 0; i < numPorts; i++) {
     senderThreads_[i].join();
   }
-  if (!downloadResumptionEnabled_ || fileChunksReceived_) {
-    if (!twoPhases) {
-      dirThread_.join();
-    }
+  if (!twoPhases) {
+    dirThread_.join();
   }
   WDT_CHECK(numActiveThreads_ == 0);
   if (progressReportEnabled) {
@@ -294,14 +292,6 @@ std::unique_ptr<TransferReport> Sender::finish() {
           transferredSourceStats, dirQueue_->getFailedSourceStats(),
           globalThreadStats_, dirQueue_->getFailedDirectories(), totalTime,
           totalFileSize, dirQueue_->getCount());
-  if (downloadResumptionEnabled_ && !fileChunksReceived_) {
-    // Even though download resumption is enabled, we did not receive
-    // previously transferred file chunks. So, directory traversal thread never
-    // started and none of the files to transfer got added to the queue. So,
-    // transfer report status would be OK. We have to explicitly set it to
-    // error.
-    transferReport->setErrorCode(ERROR);
-  }
 
   if (progressReportEnabled) {
     progressReporter_->end(transferReport);
@@ -346,11 +336,9 @@ ErrorCode Sender::start() {
   downloadResumptionEnabled_ =
       options.enable_download_resumption &&
       protocolVersion_ >= Protocol::DOWNLOAD_RESUMPTION_VERSION;
-  if (!downloadResumptionEnabled_) {
-    dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
-    if (twoPhases) {
-      dirThread_.join();
-    }
+  dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
+  if (twoPhases) {
+    dirThread_.join();
   }
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
@@ -796,7 +784,6 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
       LOG(WARNING) << "File chunks list received multiple times";
     } else {
       dirQueue_->setPreviouslyReceivedChunks(fileChunksInfoList);
-      dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
       fileChunksReceived_ = true;
     }
   }

@@ -195,10 +195,11 @@ class DirectorySourceQueue : public SourceQueue {
    * @param fullPath             full path of the file to be added
    * @param relPath              file path relative to root dir
    * @param fileSize             size of the file
+   * @param alreadyLocked        whether lock has already been acquired by the
+   *                             calling method
    */
-  virtual void createIntoQueue(const std::string &fullPath,
-                               const std::string &relPath,
-                               const int64_t fileSize);
+  void createIntoQueue(const std::string &fullPath, const std::string &relPath,
+                       const int64_t fileSize, bool alreadyLocked);
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple
@@ -290,6 +291,9 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// Total size of entries/files that have passed through the queue
   int64_t totalFileSize_{0};
+
+  /// Number of blocks dequeued
+  int64_t numBlocksDequeued_{0};
 
   /// Whether to follow symlinks or not
   bool followSymlinks_{false};

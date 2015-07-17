@@ -53,10 +53,28 @@ void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
 void DirectorySourceQueue::setPreviouslyReceivedChunks(
     std::vector<FileChunksInfo> &previouslyTransferredChunks) {
   std::unique_lock<std::mutex> lock(mutex_);
+  WDT_CHECK(numBlocksDequeued_ == 0);
+  // reset all the queue variables
+  nextSeqId_ = 0;
+  totalFileSize_ = 0;
+  numEntries_ = 0;
+  numBlocks_ = 0;
   for (auto &chunkInfo : previouslyTransferredChunks) {
     nextSeqId_ = std::max(nextSeqId_, chunkInfo.getSeqId() + 1);
     previouslyTransferredChunks_.insert(
         std::make_pair(chunkInfo.getFileName(), std::move(chunkInfo)));
+  }
+  // clear current content of the queue. For some reason, priority_queue does
+  // not have a clear method
+  while (!sourceQueue_.empty()) {
+    sourceQueue_.pop();
+  }
+  std::vector<SourceMetaData *> discoveredFileInfo = std::move(sharedFileData_);
+  // recreate the queue
+  for (const auto fileInfo : discoveredFileInfo) {
+    createIntoQueue(fileInfo->fullPath, fileInfo->relPath, fileInfo->size,
+                    true);
+    delete fileInfo;
   }
 }
 
@@ -235,7 +253,8 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          createIntoQueue(newFullPath, newRelativePath, fileStat.st_size);
+          createIntoQueue(newFullPath, newRelativePath, fileStat.st_size,
+                          false);
           continue;
         }
       }
@@ -288,6 +307,8 @@ void DirectorySourceQueue::returnToQueue(
       sourceQueue_.push(std::move(source));
       returnedCount++;
     }
+    WDT_CHECK(numBlocksDequeued_ > 0);
+    numBlocksDequeued_--;
   }
   lock.unlock();
   smartNotify(returnedCount);
@@ -301,7 +322,8 @@ void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
 
 void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
                                            const std::string &relPath,
-                                           const int64_t fileSize) {
+                                           const int64_t fileSize,
+                                           bool alreadyLocked) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
   // large file. This can be optimized as follows -
@@ -320,65 +342,69 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   // ensures that we create a single block
   auto blockSize = enableBlockTransfer ? blockSizeBytes : fileSize;
   int blockCount = 0;
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
+  std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+  if (!alreadyLocked) {
+    lock.lock();
+  }
 
-    std::vector<Interval> remainingChunks;
-    int64_t seqId;
-    FileAllocationStatus allocationStatus;
-    int64_t prevSeqId = 0;
-    auto it = previouslyTransferredChunks_.find(relPath);
-    if (it == previouslyTransferredChunks_.end()) {
-      // No previously transferred chunks
-      remainingChunks.emplace_back(0, fileSize);
-      seqId = nextSeqId_++;
-      allocationStatus = NOT_EXISTS;
-    } else if (it->second.getFileSize() != fileSize) {
-      // file size is greater on the receiver side
-      remainingChunks.emplace_back(0, fileSize);
-      seqId = nextSeqId_++;
-      LOG(INFO) << "File size is different in the receiver side " << relPath
-                << " " << fileSize << " " << it->second.getFileSize();
-      allocationStatus = it->second.getFileSize() > fileSize ? EXISTS_TOO_LARGE
-                                                             : EXISTS_TOO_SMALL;
-      prevSeqId = it->second.getSeqId();
-    } else {
-      auto &fileChunksInfo = it->second;
-      remainingChunks = fileChunksInfo.getRemainingChunks();
-      if (remainingChunks.empty()) {
-        LOG(INFO) << relPath << " completely sent in previous transfer";
-        return;
-      }
-      seqId = fileChunksInfo.getSeqId();
-      allocationStatus = EXISTS_CORRECT_SIZE;
+  std::vector<Interval> remainingChunks;
+  int64_t seqId;
+  FileAllocationStatus allocationStatus;
+  int64_t prevSeqId = 0;
+  auto it = previouslyTransferredChunks_.find(relPath);
+  if (it == previouslyTransferredChunks_.end()) {
+    // No previously transferred chunks
+    remainingChunks.emplace_back(0, fileSize);
+    seqId = nextSeqId_++;
+    allocationStatus = NOT_EXISTS;
+  } else if (it->second.getFileSize() != fileSize) {
+    // file size is greater on the receiver side
+    remainingChunks.emplace_back(0, fileSize);
+    seqId = nextSeqId_++;
+    LOG(INFO) << "File size is different in the receiver side " << relPath
+              << " " << fileSize << " " << it->second.getFileSize();
+    allocationStatus = it->second.getFileSize() > fileSize ? EXISTS_TOO_LARGE
+                                                           : EXISTS_TOO_SMALL;
+    prevSeqId = it->second.getSeqId();
+  } else {
+    auto &fileChunksInfo = it->second;
+    remainingChunks = fileChunksInfo.getRemainingChunks();
+    if (remainingChunks.empty()) {
+      LOG(INFO) << relPath << " completely sent in previous transfer";
+      return;
     }
+    seqId = fileChunksInfo.getSeqId();
+    allocationStatus = EXISTS_CORRECT_SIZE;
+  }
 
-    SourceMetaData *metadata = new SourceMetaData();
-    metadata->fullPath = fullPath;
-    metadata->relPath = relPath;
-    metadata->seqId = seqId;
-    metadata->size = fileSize;
-    metadata->allocationStatus = allocationStatus;
-    metadata->prevSeqId = prevSeqId;
+  SourceMetaData *metadata = new SourceMetaData();
+  metadata->fullPath = fullPath;
+  metadata->relPath = relPath;
+  metadata->seqId = seqId;
+  metadata->size = fileSize;
+  metadata->allocationStatus = allocationStatus;
+  metadata->prevSeqId = prevSeqId;
 
-    sharedFileData_.emplace_back(metadata);
+  sharedFileData_.emplace_back(metadata);
 
-    for (const auto &chunk : remainingChunks) {
-      int64_t offset = chunk.start_;
-      int64_t remainingBytes = chunk.size();
-      do {
-        const int64_t size = std::min<int64_t>(remainingBytes, blockSize);
-        std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
-            metadata, size, offset, fileSourceBufferSize_);
-        sourceQueue_.push(std::move(source));
-        remainingBytes -= size;
-        offset += size;
-        blockCount++;
-      } while (remainingBytes > 0);
-      totalFileSize_ += chunk.size();
-    }
-    numEntries_++;
-    numBlocks_ += blockCount;
+  for (const auto &chunk : remainingChunks) {
+    int64_t offset = chunk.start_;
+    int64_t remainingBytes = chunk.size();
+    do {
+      const int64_t size = std::min<int64_t>(remainingBytes, blockSize);
+      std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
+          metadata, size, offset, fileSourceBufferSize_);
+      sourceQueue_.push(std::move(source));
+      remainingBytes -= size;
+      offset += size;
+      blockCount++;
+    } while (remainingBytes > 0);
+    totalFileSize_ += chunk.size();
+  }
+  numEntries_++;
+  numBlocks_ += blockCount;
+  if (!alreadyLocked) {
+    lock.unlock();
   }
   smartNotify(blockCount);
 }
@@ -398,7 +424,7 @@ std::vector<std::string> &DirectorySourceQueue::getFailedDirectories() {
 
 bool DirectorySourceQueue::enqueueFiles() {
   for (const auto &info : fileInfo_) {
-    const auto &fullPath = rootDir_ + info.first;
+    const std::string fullPath = rootDir_ + info.first;
     int64_t filesize;
     if (info.second < 0) {
       struct stat fileStat;
@@ -410,7 +436,7 @@ bool DirectorySourceQueue::enqueueFiles() {
     } else {
       filesize = info.second;
     }
-    createIntoQueue(fullPath, info.first, filesize);
+    createIntoQueue(fullPath, info.first, filesize, false);
   }
   return true;
 }
@@ -473,6 +499,7 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
             << " size " << source->getSize();
     // try to open the source
     if (source->open() == OK) {
+      numBlocksDequeued_++;
       return source;
     }
     source->close();
