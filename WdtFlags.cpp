@@ -8,9 +8,12 @@
  */
 #include "WdtFlags.h"
 #include "WdtFlags.cpp.inc"
+#include "Protocol.h"
+
 namespace facebook {
 namespace wdt {
 void WdtFlags::initializeFromFlags() {
+  LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
 #define ASSIGN_OPT
 #include "WdtFlags.cpp.inc"  //nolint
 }

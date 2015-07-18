@@ -21,7 +21,7 @@ namespace wdt {
 
 using std::string;
 
-const int Protocol::protocol_version = 13;
+const int Protocol::protocol_version = WDT_PROTOCOL_VERSION;
 
 const int Protocol::RECEIVER_PROGRESS_REPORT_VERSION = 11;
 const int Protocol::CHECKSUM_VERSION = 12;
@@ -29,6 +29,13 @@ const int Protocol::DOWNLOAD_RESUMPTION_VERSION = 13;
 
 const int Protocol::SETTINGS_FLAG_VERSION = 12;
 const int Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION = 13;
+
+const std::string Protocol::getFullVersion() {
+  std::string fullVersion(WDT_VERSION_STR);
+  fullVersion.append(" p ");
+  fullVersion.append(std::to_string(protocol_version));
+  return fullVersion;
+}
 
 int Protocol::negotiateProtocol(int requestedProtocolVersion) {
   if (requestedProtocolVersion < 10) {

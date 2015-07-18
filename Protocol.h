@@ -240,6 +240,12 @@ class Protocol {
   static const int64_t kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
 
   /**
+   * Return the library version, including protocol.
+   * For debugging/identification purpose.
+   */
+  static const std::string getFullVersion();
+
+  /**
    * Decides whether the current running wdt version can support the request
    * protocol version or not
    *

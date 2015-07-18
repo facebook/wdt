@@ -110,8 +110,8 @@ int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
   google::SetArgv(argc, const_cast<const char **>(argv));
-  google::SetVersionString(WDT_VERSION_STR);
-  std::string usage("WDT Warp-speed Data Transfer. version ");
+  google::SetVersionString(Protocol::getFullVersion());
+  std::string usage("WDT Warp-speed Data Transfer. v ");
   usage.append(google::VersionString());
   usage.append(". Sample usage:\n\t");
   usage.append(google::ProgramInvocationShortName());
@@ -127,6 +127,7 @@ int main(int argc, char *argv[]) {
 #define ASSIGN_OPT
 #include FLAGS_INCLUDE_FILE  //nolint
 
+  LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
   LOG(INFO) << "Starting with directory = " << FLAGS_directory
             << " and destination = " << FLAGS_destination
             << " num sockets = " << FLAGS_num_ports

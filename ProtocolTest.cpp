@@ -8,7 +8,7 @@
  */
 #include "Protocol.h"
 
-#include <gflags/gflags.h>
+#include "WdtFlags.h"
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
@@ -164,6 +164,7 @@ int main(int argc, char *argv[]) {
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  facebook::wdt::WdtFlags::initializeFromFlags();
   int ret = RUN_ALL_TESTS();
   return ret;
 }
