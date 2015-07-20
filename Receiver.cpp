@@ -206,12 +206,13 @@ void Receiver::markTransferFinished(bool isFinished) {
 std::unique_ptr<TransferReport> Receiver::finish() {
   std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
   if (areThreadsJoined_) {
-    LOG(INFO) << "Threads have already been joined. Returning the "
-              << "transfer report";
+    VLOG(1) << "Threads have already been joined. Returning the "
+            << "transfer report";
     return getTransferReport();
   }
   const auto &options = WdtOptions::get();
   if (!isJoinable_) {
+    // TODO: don't complain about this when coming from runForever()
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
                  << " finish and this method will never return";
   }
@@ -374,6 +375,7 @@ void Receiver::progressTracker() {
 }
 
 void Receiver::start() {
+  startTime_ = Clock::now();
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an existing transfer in progress on this object";
   }

@@ -49,7 +49,8 @@ echo "Run from ~/fbcode - or fbmake runtests"
 # to 1 : slow/expensive but checks correctness
 # to 0 : fast for repeated benchmarking not for correctness
 DO_VERIFY=1
-NC="nc -4" # ipv4 only
+# echo e | $NC was used to stop daemon servers
+#NC="nc -4" # ipv4 only
 REALPATH=/mnt/vol/engshare/svnroot/tfb/trunk/www/scripts/bin/realpath
 
 # Verbose:
@@ -105,7 +106,7 @@ mkdir $DIR/extsrc
 
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
-cp -R wdt folly /usr/share $DIR/src
+cp -R wdt folly /usr/bin /usr/lib $DIR/src
 #cp -R wdt folly $DIR/src
 # Removing symlinks which point to the same source tree
 for link in `find -L $DIR/src -xtype l`
@@ -161,13 +162,9 @@ fi
 echo "$WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log"
 time $WDTBIN -directory $DIR/src -destination $HOSTNAME |& tee $DIR/client.log
 
-echo -n e | $NC localhost 22356
-
 $WDTBIN -directory $DIR/dst_symlinks >> $DIR/server.log 2>&1 &
 echo "$WDTBIN -follow_symlinks -directory $DIR/src -destination $HOSTNAME |& tee -a $DIR/client.log"
 time $WDTBIN -follow_symlinks -directory $DIR/src -destination $HOSTNAME |& tee -a $DIR/client.log
-
-echo -n e | $NC localhost 22356
 
 # rsync test:
 #time rsync --stats -v -W -r $DIR/src/ $DIR/dst/

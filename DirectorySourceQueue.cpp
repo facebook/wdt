@@ -126,7 +126,8 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
     }
   }
   directoryTime_ = durationSeconds(Clock::now() - startTime);
-  VLOG(1) << "finished initialization of DirectorySourceQueue";
+  VLOG(1) << "finished initialization of DirectorySourceQueue in "
+          << directoryTime_;
   return res;
 }
 
@@ -286,8 +287,8 @@ bool DirectorySourceQueue::explore() {
     }
     closedir(dirPtr);
   }
-  LOG(INFO) << "Number of files explored " << numEntries_
-            << " errors : " << std::boolalpha << hasError;
+  LOG(INFO) << "Number of files explored: " << numEntries_
+            << ", errors: " << std::boolalpha << hasError;
   return !hasError;
 }
 

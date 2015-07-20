@@ -73,7 +73,7 @@ do
 done
 echo "Done with staging src test files"
 
-/usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst -skip_writes=$SKIP_WRITES > \
+/usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst -run_as_daemon=true -skip_writes=$SKIP_WRITES > \
 $DIR/server.log 2>&1 &
 
 # wait for server to be up

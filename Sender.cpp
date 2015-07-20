@@ -235,17 +235,16 @@ Clock::time_point Sender::getEndTime() {
 
 std::unique_ptr<TransferReport> Sender::finish() {
   std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
+  VLOG(1) << "Sender::finish()";
   if (areThreadsJoined_) {
-    LOG(INFO) << "Threads have already been joined. Returning the "
-              << "minimal transfer report";
+    VLOG(1) << "Threads have already been joined. Returning the"
+            << " existing transfer report";
     return getTransferReport();
   }
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
-  double directoryTime;
-  directoryTime = dirQueue_->getDirectoryTime();
   const int64_t numPorts = ports_.size();
   for (int64_t i = 0; i < numPorts; i++) {
     senderThreads_[i].join();
@@ -311,6 +310,8 @@ std::unique_ptr<TransferReport> Sender::finish() {
     }
     LOG(INFO) << report;
   }
+  double directoryTime;
+  directoryTime = dirQueue_->getDirectoryTime();
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
             << directoryTime << " dirTime)"
             << ". Transfer summary : " << *transferReport
@@ -962,8 +963,8 @@ void Sender::sendOne(int threadIndex) {
     std::unique_lock<std::mutex> lock(mutex_);
     numActiveThreads_--;
     if (numActiveThreads_ == 0) {
-      LOG(WARNING) << "Last thread finished "
-                   << durationSeconds(Clock::now() - startTime_);
+      LOG(INFO) << "Last thread finished "
+                << durationSeconds(Clock::now() - startTime_);
       endTime_ = Clock::now();
       transferFinished_ = true;
     }
@@ -986,8 +987,8 @@ void Sender::sendOne(int threadIndex) {
   }
 
   double totalTime = durationSeconds(Clock::now() - startTime);
-  LOG(INFO) << "Got reply - all done for port :" << port << ". "
-            << "Transfer stat : " << threadStats << " Total throughput = "
+  LOG(INFO) << "Port " << port << " done. " << threadStats
+            << " Total throughput = "
             << threadStats.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
   perfReports_[threadIndex] = *perfStatReport;

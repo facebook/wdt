@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.14.1507170)
+project("WDT" LANGUAGES C CXX VERSION 1.14.1507210)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -30,6 +30,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED on)
 
 # somehow 'option' for this doesn't seeem to work/I don't know how to make it
 set(BUILD_SHARED_LIBS on CACHE Bool "build shared libs")
+
+# CMake default behavior should be to set rpath when needed (non system install)
+# it's not so let's set this for now:
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+
 
 # Optimized by default
 # TODO: This doesn't seem to work / sets default to "" instead of Release...

@@ -9,6 +9,48 @@ resource limits to be only hardware limited (disc or network bandwidth
 not latency) and as efficient as possible (low CPU/memory/resources
 utilization)
 
+We are trying to keep dependencies minimal in order to maximize portability
+and ensure smallest binary size. A side benefit is to minimize compile time.
+
+We aren't using exceptions for performance and because using exceptions would
+makes it harder to reason about the control flow of the library.
+We also believe WDT library is easier to integrate as a result. To some extent
+our philosophy is to write moderately structured and encapsultated C code
+as opposed to using every feature of C++.
+
+We try to minimize the number of system calls which is one of the reason
+we are using blocking thread IOs, we can maximize system throughput because
+at any given point some threads are reading while others are writing and data
+is buffered on both paths keeping each subsystem busy while minimizing
+kernel to user space switches.
+
+## Example
+
+While WDT is essentially a library, we also have a small command line tool
+which we use for tests and is useful standalone - a more complete example
+is in "wcp.sh" which installs as "wcp" but here is a quick example:
+
+Receiver side: (starts the server indicating destination directory)
+
+[ldemailly@devbig074]$ wdt -directory /data/users/ldemailly/transfer1
+
+Sender side: (discover and sends all files in a directory tree to destination)
+
+[root@dev443]$ wdt -directory /usr/bin -destination devbig074.prn2
+
+[=================================================] 100% 588.8 Mbytes/s
+I0720 21:48:08.446014 3245296 Sender.cpp:314] Total sender time = 2.68699
+seconds (0.00640992 dirTime). Transfer summary : Transfer status = OK. Number
+of files transferred = 1887. Data Mbytes = 1582.08. Header kBytes = 62.083
+(0.00383215% overhead). Total bytes = 1658999858. Wasted bytes due to
+failure = 0 (0% overhead). Total sender throughput = 588.816 Mbytes/sec
+(590.224 Mbytes/sec pure transf rate)
+
+Note that in this simple examples with lots of small files (/usr/bin from
+a linux distribution), but not much total data (~1.5Gbyte), the maximum
+speed isn't as good as it would with more data (as there is still a tcp ramp
+up time even though it's faster because of parallelization) like when we use
+it in our production use cases:
 
 ## Performance/Results
 
@@ -17,7 +59,11 @@ we are able to transfer data at a throttled 600 Mbytes/sec even across
 long distance, high latency links (e.g. Sweden to Oregon). That's 3x the speed
 of previous highly optimized http based solution and with less strain on the
 system. When not throttling we are able to easily saturate a 40 Gbit/s NIC and
-get near theoritical link speed (above 4 Gbytes/sec).
+get near theoretical link speed (above 4 Gbytes/sec).
+
+We have so far optimized WDT for servers with fast IOs - in particular flash
+card or in memory read/writes. If you use disks throughput won't be as good
+but we do plan on optimizing for disks as well in the future.
 
 ## Dependencies
 
@@ -201,6 +247,14 @@ a 1 second delay before we send the first payload byte
 
 
 ## Submitting diffs/making changes
+
+See CONTRIBUTING.md
+
+Please run the tests (make test) and the manual tests (integration upcoming)
+wdt_e2e_test.sh
+wdt_download_resumption_test.sh
+wdt_network_test.sh
+wdt_max_send_test.sh
 
 (facebook only:)
 Make sure to do the following, before "arc diff":

@@ -29,7 +29,7 @@
 #include FLAGS_INCLUDE_FILE
 
 // Flags not already in WdtOptions.h/WdtFlags.cpp.inc
-DEFINE_bool(run_as_daemon, true,
+DEFINE_bool(run_as_daemon, false,
             "If true, run the receiver as never ending process");
 
 DEFINE_string(directory, ".", "Source/Destination directory");
@@ -134,6 +134,7 @@ int main(int argc, char *argv[]) {
             << " from port = " << FLAGS_start_port;
   ErrorCode retCode = OK;
   if (FLAGS_parse_transfer_log) {
+    // Log parsing mode
     TransferLogManager transferLogManager;
     transferLogManager.setRootDir(FLAGS_directory);
     if (!transferLogManager.parseAndPrint()) {
@@ -141,6 +142,7 @@ int main(int argc, char *argv[]) {
       retCode = ERROR;
     }
   } else if (FLAGS_destination.empty()) {
+    // Receiver mode
     Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
     receiver.setTransferId(FLAGS_transfer_id);
     if (FLAGS_protocol_version > 0) {
@@ -152,16 +154,16 @@ int main(int argc, char *argv[]) {
       return 0;
     }
     setUpAbort(receiver);
-    // TODO fix this
     if (!FLAGS_run_as_daemon) {
       receiver.transferAsync();
       std::unique_ptr<TransferReport> report = receiver.finish();
       retCode = report->getSummary().getErrorCode();
     } else {
-      receiver.runForever();
-      retCode = OK;
+      retCode = receiver.runForever();
+      // not reached
     }
   } else {
+    // Sender mode
     std::vector<FileInfo> fileInfo;
     if (FLAGS_files) {
       // Each line should have the filename and optionally

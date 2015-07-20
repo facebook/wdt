@@ -4,6 +4,8 @@ possible.
 
 ## Our Development Process
 
+See also README.md
+
 ## Pull Requests
 We actively welcome your pull requests.
 1. Fork the repo and create your branch from `master`.
@@ -29,7 +31,6 @@ outlined on that page and do not file a public issue.
 
 ## Coding Style
 * run clangformat.sh
-
 
 ## License
 By contributing to WDT, you agree that your contributions will be licensed

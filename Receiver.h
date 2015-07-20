@@ -71,8 +71,8 @@ class Receiver : public WdtBase {
   std::unique_ptr<TransferReport> finish() override;
 
   /**
-   * Call this method when you don't want the wdt receiver
-   * to stop after one transfer.
+   * Call this method instead of transferAsync() when you don't
+   * want the wdt receiver to stop after one transfer.
    */
   ErrorCode runForever();
 
@@ -107,16 +107,16 @@ class Receiver : public WdtBase {
   bool hasPendingTransfer();
 
   /**
-   * @param isFinished         Mark transfer active/inactive
-   */
-  void markTransferFinished(bool isFinished);
-
-  /**
    * Use the method to get the list of ports receiver is listening on
    */
   std::vector<int32_t> getPorts() const;
 
  protected:
+  /**
+   * @param isFinished         Mark transfer active/inactive
+   */
+  void markTransferFinished(bool isFinished);
+
   /**
    * Wdt receiver has logic to maintain the consistency of the
    * the transfers through connection errors. All threads are run by the logic
