@@ -507,6 +507,7 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
             << " size " << source->getSize();
     // try to open the source
     if (source->open() == OK) {
+      lock.lock();
       numBlocksDequeued_++;
       return source;
     }

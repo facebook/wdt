@@ -210,6 +210,7 @@ if [[ $DURATION -gt $EXPECTED_TRANSFER_DURATION_MILLIS ]]; then
 fi
 WDTBIN=$WDTBIN_OLD
 TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+STARTING_PORT=$((STARTING_PORT + threads))
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Transfer-id mismatch test"
@@ -219,6 +220,7 @@ startNewTransfer
 waitForTransferEndExpectingFailure
 SENDER_ID=$SENDER_ID_OLD
 TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+STARTING_PORT=$((STARTING_PORT + threads))
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Version mismatch test(1) - Sender with lower version"
@@ -227,6 +229,7 @@ startNewTransfer
 waitForTransferEndExpectingFailure
 SENDER_PROTOCOL_VERSION=0
 TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+STARTING_PORT=$((STARTING_PORT + threads))
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Version mismatch test(1) - Receiver with lower version"
