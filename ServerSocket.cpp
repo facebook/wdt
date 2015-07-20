@@ -180,9 +180,11 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
           continue;
         }
         if (retValue == 0) {
-          VLOG(1) << "poll() timed out " << port_ << " " << listeningFd_;
+          VLOG(1) << "poll() timed out on port : " << port_
+                  << ", listening fd : " << listeningFd_;
         } else {
-          PLOG(ERROR) << "poll() failed " << port_ << " " << listeningFd_;
+          PLOG(ERROR) << "poll() failed on port : " << port_
+                      << ", listening fd : " << listeningFd_;
         }
         return CONN_ERROR;
       }
@@ -197,7 +199,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
     PLOG(ERROR) << "accept error";
     return CONN_ERROR;
   }
-  VLOG(1) << "new connection " << fd_ << " from "
+  VLOG(1) << "New connection, fd : " << fd_ << " from "
           << SocketUtils::getNameInfo(&addr, addrLen);
   SocketUtils::setReadTimeout(fd_);
   SocketUtils::setWriteTimeout(fd_);
@@ -226,13 +228,15 @@ int ServerSocket::closeCurrentConnection() {
 int ServerSocket::getListenFd() const {
   return listeningFd_;
 }
+
 int ServerSocket::getFd() const {
-  VLOG(1) << "fd is " << fd_;
   return fd_;
 }
+
 int32_t ServerSocket::getPort() const {
   return port_;
 }
+
 int ServerSocket::getBackLog() const {
   return backlog_;
 }

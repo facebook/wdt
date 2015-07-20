@@ -72,14 +72,16 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
                   << blockDetails_->fileName;
           continue;
         }
-        PLOG(ERROR) << "File write failed for " << fd_ << " " << written << " "
-                    << count << " " << size;
+        PLOG(ERROR) << "File write failed for " << blockDetails_->fileName
+                    << "fd : " << fd_ << " " << written << " " << count << " "
+                    << size;
         return FILE_WRITE_ERROR;
       }
       RECORD_PERF_RESULT(PerfStatReport::FILE_WRITE)
       count += written;
     }
-    VLOG(1) << "Successfully written " << count << " bytes to fd " << fd_;
+    VLOG(1) << "Successfully written " << count << " bytes to fd " << fd_
+            << " for file " << blockDetails_->fileName;
     bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
     if (options.enable_download_resumption && finished) {
       if (fsync(fd_) != 0) {
@@ -107,7 +109,9 @@ void FileWriter::syncFileRange(int64_t written, bool forced) {
   writtenSinceLastSync_ += written;
   if (writtenSinceLastSync_ == 0) {
     // no need to sync
-    VLOG(1) << "skipping syncFileRange " << written << "  " << forced;
+    VLOG(1) << "skipping syncFileRange for " << blockDetails_->fileName
+            << ". Data written " << written
+            << " sync forced = " << std::boolalpha << forced;
     return;
   }
   if (forced || writtenSinceLastSync_ > syncIntervalBytes) {
@@ -118,12 +122,13 @@ void FileWriter::syncFileRange(int64_t written, bool forced) {
     auto status = sync_file_range(fd_, nextSyncOffset_, writtenSinceLastSync_,
                                   SYNC_FILE_RANGE_WRITE);
     if (status != 0) {
-      PLOG(ERROR) << "sync_file_range() failed for fd " << fd_;
+      PLOG(ERROR) << "sync_file_range() failed for " << blockDetails_->fileName
+                  << "fd " << fd_;
       return;
     }
     RECORD_PERF_RESULT(PerfStatReport::SYNC_FILE_RANGE)
-    VLOG(1) << "file range synced " << nextSyncOffset_ << " "
-            << writtenSinceLastSync_;
+    VLOG(1) << "file range [" << nextSyncOffset_ << " " << writtenSinceLastSync_
+            << "] synced for file " << blockDetails_->fileName;
     nextSyncOffset_ += writtenSinceLastSync_;
     writtenSinceLastSync_ = 0;
   }

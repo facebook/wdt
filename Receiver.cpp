@@ -31,6 +31,12 @@ namespace wdt {
 const static int kTimeoutBufferMillis = 1000;
 const static int kWaitTimeoutFactor = 5;
 
+std::ostream &operator<<(std::ostream &os, const Receiver::ThreadData &data) {
+  os << "Thread[" << data.threadIndex_ << ", port: " << data.socket_.getPort()
+     << "] ";
+  return os;
+}
+
 int64_t readAtLeast(ServerSocket &s, char *buf, int64_t max, int64_t atLeast,
                     int64_t len) {
   VLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
@@ -51,15 +57,15 @@ int64_t readAtLeast(ServerSocket &s, char *buf, int64_t max, int64_t atLeast,
       }
     }
     if (n == 0) {
-      VLOG(2) << "Eof on " << s.getPort() << " after " << count << " read "
-              << len;
+      VLOG(2) << "Eof on " << s.getPort() << " after " << count << " reads "
+              << "got " << len;
       return len;
     }
     len += n;
     count++;
   }
-  VLOG(3) << "took " << count << " read to get " << len << " from "
-          << s.getFd();
+  VLOG(3) << "Took " << count << " reads to get " << len
+          << " from fd : " << s.getFd();
   return len;
 }
 
@@ -492,7 +498,7 @@ void Receiver::endCurThreadSession(ThreadData &data) {
 
 /***LISTEN STATE***/
 Receiver::ReceiverState Receiver::listen(ThreadData &data) {
-  VLOG(1) << "entered LISTEN state " << data.threadIndex_;
+  VLOG(1) << data << " entered LISTEN state ";
   const auto &options = WdtOptions::get();
   const bool doActualWrites = !options.skip_writes;
   auto &socket = data.socket_;
@@ -527,7 +533,7 @@ Receiver::ReceiverState Receiver::listen(ThreadData &data) {
 
 /***ACCEPT_FIRST_CONNECTION***/
 Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
-  VLOG(1) << "entered ACCEPT_FIRST_CONNECTION state " << data.threadIndex_;
+  VLOG(1) << data << " entered ACCEPT_FIRST_CONNECTION state ";
   const auto &options = WdtOptions::get();
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
@@ -578,7 +584,7 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
 
 /***ACCEPT_WITH_TIMEOUT STATE***/
 Receiver::ReceiverState Receiver::acceptWithTimeout(ThreadData &data) {
-  LOG(INFO) << "entered ACCEPT_WITH_TIMEOUT state " << data.threadIndex_;
+  LOG(INFO) << data << " entered ACCEPT_WITH_TIMEOUT state ";
   const auto &options = WdtOptions::get();
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
@@ -624,7 +630,7 @@ Receiver::ReceiverState Receiver::acceptWithTimeout(ThreadData &data) {
 
 /***SEND_LOCAL_CHECKPOINT STATE***/
 Receiver::ReceiverState Receiver::sendLocalCheckpoint(ThreadData &data) {
-  LOG(INFO) << "entered SEND_LOCAL_CHECKPOINT state " << data.threadIndex_;
+  LOG(INFO) << data << " entered SEND_LOCAL_CHECKPOINT state ";
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
   auto &doneSendFailure = data.doneSendFailure_;
@@ -655,7 +661,7 @@ Receiver::ReceiverState Receiver::sendLocalCheckpoint(ThreadData &data) {
 
 /***READ_NEXT_CMD***/
 Receiver::ReceiverState Receiver::readNextCmd(ThreadData &data) {
-  VLOG(1) << "entered READ_NEXT_CMD state " << data.threadIndex_;
+  VLOG(1) << data << " entered READ_NEXT_CMD state ";
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
   char *buf = data.getBuf();
@@ -696,7 +702,7 @@ Receiver::ReceiverState Receiver::readNextCmd(ThreadData &data) {
 
 /***PROCESS_EXIT_CMD STATE***/
 Receiver::ReceiverState Receiver::processExitCmd(ThreadData &data) {
-  LOG(INFO) << "entered PROCESS_EXIT_CMD state " << data.threadIndex_;
+  LOG(INFO) << data << " entered PROCESS_EXIT_CMD state ";
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
 
@@ -712,7 +718,7 @@ Receiver::ReceiverState Receiver::processExitCmd(ThreadData &data) {
 
 /***PROCESS_SETTINGS_CMD***/
 Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
-  VLOG(1) << "entered PROCESS_SETTINGS_CMD state " << data.threadIndex_;
+  VLOG(1) << data << " entered PROCESS_SETTINGS_CMD state ";
   char *buf = data.getBuf();
   auto &off = data.off_;
   auto &oldOffset = data.oldOffset_;
@@ -758,7 +764,7 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
 
 /***PROCESS_FILE_CMD***/
 Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
-  VLOG(1) << "entered PROCESS_FILE_CMD state " << data.threadIndex_;
+  VLOG(1) << data << " entered PROCESS_FILE_CMD state ";
   const auto &options = WdtOptions::get();
   auto &socket = data.socket_;
   auto &threadIndex = data.threadIndex_;
@@ -787,7 +793,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   }
   int16_t headerLen = folly::loadUnaligned<int16_t>(buf + off);
   headerLen = folly::Endian::little(headerLen);
-  VLOG(2) << "header len " << headerLen;
+  VLOG(2) << "Processing FILE_CMD, header len " << headerLen;
 
   if (headerLen > numRead) {
     int64_t end = oldOffset + numRead;
@@ -795,7 +801,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
         readAtLeast(socket, buf + end, bufferSize - end, headerLen, numRead);
   }
   if (numRead < headerLen) {
-    LOG(ERROR) << "unable to read full header " << headerLen << " " << numRead;
+    LOG(ERROR) << "Unable to read full header " << headerLen << " " << numRead;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
@@ -901,9 +907,9 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
               /* how much */ remainingData);
       off = 0;
     } else {
-      // otherwise just change the offset
-      VLOG(3) << "will use remaining extra " << remainingData
-              << " leftover bytes @ " << off;
+      // otherwise just continue from the offset
+      VLOG(3) << "Using remaining extra " << remainingData
+              << " leftover bytes starting @ " << off;
     }
   } else {
     numRead = off = 0;
@@ -953,7 +959,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
 }
 
 Receiver::ReceiverState Receiver::processDoneCmd(ThreadData &data) {
-  VLOG(1) << "entered PROCESS_DONE_CMD state " << data.threadIndex_;
+  VLOG(1) << data << " entered PROCESS_DONE_CMD state ";
   auto &numRead = data.numRead_;
   auto &threadStats = data.threadStats_;
   auto &checkpointIndex = data.checkpointIndex_;
@@ -988,7 +994,7 @@ Receiver::ReceiverState Receiver::processDoneCmd(ThreadData &data) {
 }
 
 Receiver::ReceiverState Receiver::processSizeCmd(ThreadData &data) {
-  VLOG(1) << "entered PROCESS_SIZE_CMD state " << data.threadIndex_;
+  VLOG(1) << data << " entered PROCESS_SIZE_CMD state ";
   auto &threadStats = data.threadStats_;
   auto &numRead = data.numRead_;
   auto &off = data.off_;
@@ -1009,7 +1015,7 @@ Receiver::ReceiverState Receiver::processSizeCmd(ThreadData &data) {
 }
 
 Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
-  LOG(INFO) << "entered SEND_FILE_CHUNKS state " << data.threadIndex_;
+  LOG(INFO) << data << " entered SEND_FILE_CHUNKS state ";
   char *buf = data.getBuf();
   auto bufferSize = data.bufferSize_;
   auto &socket = data.socket_;
@@ -1124,7 +1130,7 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
 }
 
 Receiver::ReceiverState Receiver::sendGlobalCheckpoint(ThreadData &data) {
-  LOG(INFO) << "entered SEND_GLOBAL_CHECKPOINTS state " << data.threadIndex_;
+  LOG(INFO) << data << " entered SEND_GLOBAL_CHECKPOINTS state ";
   char *buf = data.getBuf();
   auto &off = data.off_;
   auto &newCheckpoints = data.newCheckpoints_;
@@ -1158,7 +1164,7 @@ Receiver::ReceiverState Receiver::sendGlobalCheckpoint(ThreadData &data) {
 }
 
 Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
-  LOG(INFO) << "Entered SEND_ABORT_CMD state " << data.threadIndex_;
+  LOG(INFO) << data << " entered SEND_ABORT_CMD state ";
   auto &threadStats = data.threadStats_;
   char *buf = data.getBuf();
   auto &socket = data.socket_;
@@ -1177,7 +1183,7 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
 }
 
 Receiver::ReceiverState Receiver::sendDoneCmd(ThreadData &data) {
-  VLOG(1) << "entered SEND_DONE_CMD state " << data.threadIndex_;
+  VLOG(1) << data << " entered SEND_DONE_CMD state ";
   char *buf = data.getBuf();
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
@@ -1194,26 +1200,25 @@ Receiver::ReceiverState Receiver::sendDoneCmd(ThreadData &data) {
 
   auto read = socket.read(buf, 1);
   if (read != 1 || buf[0] != Protocol::DONE_CMD) {
-    LOG(ERROR) << "did not receive ack for DONE";
+    LOG(ERROR) << data << " did not receive ack for DONE";
     doneSendFailure = true;
     return ACCEPT_WITH_TIMEOUT;
   }
 
   read = socket.read(buf, Protocol::kMinBufLength);
   if (read != 0) {
-    LOG(ERROR) << "EOF not found where expected";
+    LOG(ERROR) << data << " EOF not found where expected";
     doneSendFailure = true;
     return ACCEPT_WITH_TIMEOUT;
   }
   socket.closeCurrentConnection();
-  LOG(INFO) << "Got ack for DONE. Transfer finished for " << socket.getPort();
+  LOG(INFO) << data << " got ack for DONE. Transfer finished";
   return END;
 }
 
 Receiver::ReceiverState Receiver::waitForFinishWithThreadError(
     ThreadData &data) {
-  LOG(INFO) << "entered WAIT_FOR_FINISH_WITH_THREAD_ERROR state "
-            << data.threadIndex_;
+  LOG(INFO) << data << " entered WAIT_FOR_FINISH_WITH_THREAD_ERROR state ";
   auto &threadStats = data.threadStats_;
   auto &socket = data.socket_;
   // should only be in this state if there is some error
@@ -1244,8 +1249,7 @@ Receiver::ReceiverState Receiver::waitForFinishWithThreadError(
 
 Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
     ThreadData &data) {
-  VLOG(1) << "entered WAIT_FOR_FINISH_OR_NEW_CHECKPOINT state "
-          << data.threadIndex_;
+  VLOG(1) << data << " entered WAIT_FOR_FINISH_OR_NEW_CHECKPOINT state ";
   auto &threadStats = data.threadStats_;
   auto &senderReadTimeout = data.senderReadTimeout_;
   auto &checkpointIndex = data.checkpointIndex_;
@@ -1300,7 +1304,7 @@ Receiver::ReceiverState Receiver::waitForFinishOrNewCheckpoint(
     // send WAIT cmd to keep sender thread alive
     buf[0] = Protocol::WAIT_CMD;
     if (socket.write(buf, 1) != 1) {
-      PLOG(ERROR) << "unable to write WAIT " << data.threadIndex_;
+      PLOG(ERROR) << data << " unable to write WAIT ";
       threadStats.setErrorCode(SOCKET_WRITE_ERROR);
       lock.lock();
       // we again have to check if the session has finished or not. while
@@ -1326,7 +1330,7 @@ void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
     std::unique_lock<std::mutex> lock(mutex_);
     numActiveThreads_--;
     if (numActiveThreads_ == 0) {
-      LOG(WARNING) << "Last thread finished "
+      LOG(WARNING) << "Last thread finished. Duration of the transfer "
                    << durationSeconds(Clock::now() - startTime_);
       transferFinished_ = true;
     }

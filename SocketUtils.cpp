@@ -122,8 +122,9 @@ int64_t SocketUtils::ioWithAbortCheck(
       }
     } else if (ret == 0) {
       // eof
-      VLOG(1) << "EOF received during socket io " << fd << " " << doneBytes
-              << " " << retries;
+      VLOG(1) << "EOF received during socket io. fd : " << fd
+              << ", finished bytes : " << doneBytes
+              << ", retries : " << retries;
       return doneBytes;
     } else {
       // success
