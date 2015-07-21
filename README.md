@@ -4,31 +4,29 @@
 ## Design philosophy/Overview
 
 Goal:
-Lowest possible total transfer time - and when not using self imposed
-resource limits to be only hardware limited (disc or network bandwidth
-not latency) and as efficient as possible (low CPU/memory/resources
-utilization)
+Lowest possible total transfer time -  to be only hardware limited
+(disc or network bandwidth not latency) and as efficient as possible
+(low CPU/memory/resources utilization)
 
-We are trying to keep dependencies minimal in order to maximize portability
-and ensure smallest binary size. A side benefit is to minimize compile time.
+We keep dependencies minimal in order to maximize portability
+and ensure a small binary size. As a bonus, this also minimizes compile time.
 
-We aren't using exceptions for performance and because using exceptions would
-makes it harder to reason about the control flow of the library.
-We also believe WDT library is easier to integrate as a result. To some extent
-our philosophy is to write moderately structured and encapsultated C code
+We aren't using exceptions for performance reasons and because using exceptions would
+make it harder to reason about the control flow of the library.
+We also believe the WDT library is easier to integrate as a result.
+Our philosophy is to write moderately structured and encapsulated C code
 as opposed to using every feature of C++.
 
-We try to minimize the number of system calls which is one of the reason
-we are using blocking thread IOs, we can maximize system throughput because
-at any given point some threads are reading while others are writing and data
-is buffered on both paths keeping each subsystem busy while minimizing
-kernel to user space switches.
+We try to minimize the number of system calls, which is one of the reasons
+we are using blocking thread IOs. We can maximize system throughput because
+at any given point some threads are reading while others are writing, and data
+is buffered on both paths - keeping each subsystem busy while minimizing
+kernel to userspace switches.
 
 ## Example
 
-While WDT is essentially a library, we also have a small command line tool
-which we use for tests and is useful standalone - a more complete example
-is in "wcp.sh" which installs as "wcp" but here is a quick example:
+While WDT is primarily a library, we also have a small command line tool
+which we use for tests and which is useful by itself. Here is a quick example:
 
 Receiver side: (starts the server indicating destination directory)
 
@@ -46,23 +44,25 @@ of files transferred = 1887. Data Mbytes = 1582.08. Header kBytes = 62.083
 failure = 0 (0% overhead). Total sender throughput = 588.816 Mbytes/sec
 (590.224 Mbytes/sec pure transf rate)
 
-Note that in this simple examples with lots of small files (/usr/bin from
-a linux distribution), but not much total data (~1.5Gbyte), the maximum
-speed isn't as good as it would with more data (as there is still a tcp ramp
+Note that in this simple example with lots of small files (/usr/bin from
+a linux distribution), but not much data (~1.5Gbyte), the maximum
+speed isn't as good as it would with more data (as there is still a TCP ramp
 up time even though it's faster because of parallelization) like when we use
-it in our production use cases:
+it in our production use cases.
+
+See "wcp.sh" (which installs as "wcp") for a more detailed example.
 
 ## Performance/Results
 
 In an internal use at Facebook to transfer RocksDB snapshot between hosts
 we are able to transfer data at a throttled 600 Mbytes/sec even across
 long distance, high latency links (e.g. Sweden to Oregon). That's 3x the speed
-of previous highly optimized http based solution and with less strain on the
-system. When not throttling we are able to easily saturate a 40 Gbit/s NIC and
+of the previous highly optimized HTTP-based solution and with less strain on the
+system. When not throttling, we are able to easily saturate a 40 Gbit/s NIC and
 get near theoretical link speed (above 4 Gbytes/sec).
 
 We have so far optimized WDT for servers with fast IOs - in particular flash
-card or in memory read/writes. If you use disks throughput won't be as good
+card or in-memory read/writes. If you use disks throughput won't be as good,
 but we do plan on optimizing for disks as well in the future.
 
 ## Dependencies
@@ -76,11 +76,11 @@ gmock and gtest (google testing) but only for tests
 
 glog (google logging library)
 
-Parts of facebook Folly open source library (as set in the CMakefile)
+Parts of the Facebook Folly open source library (as set in the CMakefile)
 Mostly conv, threadlocal and checksum support.
 
 You can build and embed wdt as a library with as little as a C++11 compiler and
-glog - and you could macro way glog or replace by printing to stderr if needed
+glog - and you could macro away glog or replace it by printing to stderr if needed.
 
 ## Code layout
 
