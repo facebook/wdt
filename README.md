@@ -30,6 +30,7 @@ While WDT is essentially a library, we also have a small command line tool
 which we use for tests and is useful standalone - a more complete example
 is in "wcp.sh" which installs as "wcp" but here is a quick example:
 
+```
 Receiver side: (starts the server indicating destination directory)
 
 [ldemailly@devbig074]$ wdt -directory /data/users/ldemailly/transfer1
@@ -45,6 +46,7 @@ of files transferred = 1887. Data Mbytes = 1582.08. Header kBytes = 62.083
 (0.00383215% overhead). Total bytes = 1658999858. Wasted bytes due to
 failure = 0 (0% overhead). Total sender throughput = 588.816 Mbytes/sec
 (590.224 Mbytes/sec pure transf rate)
+```
 
 Note that in this simple examples with lots of small files (/usr/bin from
 a linux distribution), but not much total data (~1.5Gbyte), the maximum
