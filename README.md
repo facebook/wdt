@@ -11,8 +11,8 @@ Lowest possible total transfer time -  to be only hardware limited
 We keep dependencies minimal in order to maximize portability
 and ensure a small binary size. As a bonus, this also minimizes compile time.
 
-We aren't using exceptions for performance reasons and because using exceptions would
-make it harder to reason about the control flow of the library.
+We aren't using exceptions for performance reasons and because using exceptions
+would make it harder to reason about the control flow of the library.
 We also believe the WDT library is easier to integrate as a result.
 Our philosophy is to write moderately structured and encapsulated C code
 as opposed to using every feature of C++.
@@ -78,11 +78,12 @@ gmock and gtest (google testing) but only for tests
 
 glog (google logging library)
 
-Parts of the Facebook Folly open source library (as set in the CMakefile)
+Parts of Facebook's Folly open source library (as set in the CMakefile)
 Mostly conv, threadlocal and checksum support.
 
-You can build and embed wdt as a library with as little as a C++11 compiler and
-glog - and you could macro away glog or replace it by printing to stderr if needed.
+You can build and embed wdt as a library with as little as a C++11 compiler
+and glog - and you could macro away glog or replace it by printing to stderr if
+needed.
 
 ## Code layout
 
