@@ -327,11 +327,14 @@ void Receiver::progressTracker() {
   // Progress tracker will check for progress after the time specified
   // in milliseconds.
   int progressReportIntervalMillis = options.progress_report_interval_millis;
-  int throughputUpdateInterval = WdtOptions::get().throughput_update_interval;
-  if (progressReportIntervalMillis <= 0 || throughputUpdateInterval < 0 ||
+  int throughputUpdateIntervalMillis =
+      WdtOptions::get().throughput_update_interval_millis;
+  if (progressReportIntervalMillis <= 0 || throughputUpdateIntervalMillis < 0 ||
       !isJoinable_) {
     return;
   }
+  int throughputUpdateInterval =
+      throughputUpdateIntervalMillis / progressReportIntervalMillis;
 
   int64_t lastEffectiveBytes = 0;
   std::chrono::time_point<Clock> lastUpdateTime = Clock::now();

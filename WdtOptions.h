@@ -196,10 +196,10 @@ class WdtOptions {
   double disk_sync_interval_mb{0.5};
 
   /**
-   * Number of intervals after which progress reporter updates current
+   * Intervals in millis after which progress reporter updates current
    * throughput
    */
-  int throughput_update_interval{50};
+  int throughput_update_interval_millis{500};
 
   /**
    * Flag for turning on/off checksum

@@ -167,7 +167,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
       // reduced timeout
       int timeElapsed = durationMillis(Clock::now() - startTime);
       if (timeElapsed >= timeoutMillis) {
-        LOG(ERROR) << "accept() timed out";
+        VLOG(1) << "accept() timed out";
         return CONN_ERROR;
       }
       int pollTimeout = timeoutMillis - timeElapsed;

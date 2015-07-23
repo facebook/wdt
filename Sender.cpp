@@ -588,16 +588,15 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
   VLOG(1) << "entered SEND_BLOCKS state " << data.threadIndex_;
   TransferStats &threadStats = data.threadStats_;
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
-  DirectorySourceQueue &queue = data.queue_;
   auto &totalSizeSent = data.totalSizeSent_;
 
   if (protocolVersion_ >= Protocol::RECEIVER_PROGRESS_REPORT_VERSION &&
-      !totalSizeSent && queue.fileDiscoveryFinished()) {
+      !totalSizeSent && dirQueue_->fileDiscoveryFinished()) {
     return SEND_SIZE_CMD;
   }
 
   ErrorCode transferStatus;
-  std::unique_ptr<ByteSource> source = queue.getNextSource(transferStatus);
+  std::unique_ptr<ByteSource> source = dirQueue_->getNextSource(transferStatus);
   if (!source) {
     return SEND_DONE_CMD;
   }
@@ -616,7 +615,7 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
       return END;
     }
   } else {
-    queue.returnToQueue(source);
+    dirQueue_->returnToQueue(source);
     return CHECK_FOR_ABORT;
   }
   return SEND_BLOCKS;
@@ -627,12 +626,11 @@ Sender::SenderState Sender::sendSizeCmd(ThreadData &data) {
   TransferStats &threadStats = data.threadStats_;
   char *buf = data.buf_;
   auto &socket = data.socket_;
-  auto &queue = data.queue_;
   auto &totalSizeSent = data.totalSizeSent_;
   int64_t off = 0;
   buf[off++] = Protocol::SIZE_CMD;
 
-  Protocol::encodeSize(buf, off, Protocol::kMaxSize, queue.getTotalSize());
+  Protocol::encodeSize(buf, off, Protocol::kMaxSize, dirQueue_->getTotalSize());
   int64_t written = socket->write(buf, off);
   if (written != off) {
     LOG(ERROR) << "Socket write error " << off << " " << written;
@@ -649,11 +647,10 @@ Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
   TransferStats &threadStats = data.threadStats_;
   char *buf = data.buf_;
   auto &socket = data.socket_;
-  auto &queue = data.queue_;
   int64_t off = 0;
   buf[off++] = Protocol::DONE_CMD;
 
-  auto pair = queue.getNumBlocksAndStatus();
+  auto pair = dirQueue_->getNumBlocksAndStatus();
   int64_t numBlocksDiscovered = pair.first;
   ErrorCode transferStatus = pair.second;
   buf[off++] = transferStatus;
@@ -956,7 +953,6 @@ void Sender::sendOne(int threadIndex) {
   INIT_PERF_STAT_REPORT
   std::vector<ThreadTransferHistory> &transferHistories = transferHistories_;
   TransferStats &threadStats = globalThreadStats_[threadIndex];
-  DirectorySourceQueue &queue(*dirQueue_);
   Clock::time_point startTime = Clock::now();
   int port = ports_[threadIndex];
   auto completionGuard = folly::makeGuard([&] {
@@ -975,7 +971,7 @@ void Sender::sendOne(int threadIndex) {
   if (throttler_) {
     throttler_->registerTransfer();
   }
-  ThreadData threadData(threadIndex, queue, threadStats, transferHistories);
+  ThreadData threadData(threadIndex, threadStats, transferHistories);
   SenderState state = CONNECT;
   while (state != END) {
     if (wasAbortRequested()) {
@@ -1146,8 +1142,11 @@ TransferStats Sender::sendOneByteSource(
 
 void Sender::reportProgress() {
   WDT_CHECK(progressReportIntervalMillis_ > 0);
-  int throughputUpdateInterval = WdtOptions::get().throughput_update_interval;
-  WDT_CHECK(throughputUpdateInterval >= 0);
+  int throughputUpdateIntervalMillis =
+      WdtOptions::get().throughput_update_interval_millis;
+  WDT_CHECK(throughputUpdateIntervalMillis >= 0);
+  int throughputUpdateInterval =
+      throughputUpdateIntervalMillis / progressReportIntervalMillis_;
 
   int64_t lastEffectiveBytes = 0;
   std::chrono::time_point<Clock> lastUpdateTime = Clock::now();

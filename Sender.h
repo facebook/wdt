@@ -111,20 +111,34 @@ class Sender : public WdtBase {
   /// Creates a counter part sender for the receiver according to the details
   explicit Sender(const WdtTransferRequest &transferRequest);
 
+  /**
+   * @param destHost    destination hostname
+   * @param srcDir      source directory
+   */
   Sender(const std::string &destHost, const std::string &srcDir);
 
+  /**
+   * @param destHost    destination hostname
+   * @param srcDir      source directory
+   * @param ports       list of destination ports
+   * @param srcFileInfo list of (file, size) pair
+   */
   Sender(const std::string &destHost, const std::string &srcDir,
          const std::vector<int32_t> &ports,
          const std::vector<FileInfo> &srcFileInfo);
 
+  /**
+   * If the transfer has not finished, then it is aborted. finish() is called to
+   * wait for threads to end.
+   */
   virtual ~Sender();
 
   /**
-   * Joins on the threads spawned by start. This method
-   * is called by default when the wdt receiver is expected
-   * to run as forever running process. However this has to
+   * Joins on the threads spawned by start. This has to
    * be explicitly called when the caller expects to conclude
-   * a transfer.
+   * a transfer. This method can be called multiple times and is thread-safe.
+   *
+   * @return    transfer report
    */
   std::unique_ptr<TransferReport> finish() override;
 
@@ -138,37 +152,48 @@ class Sender : public WdtBase {
   /**
    * A blocking call which will initiate a transfer based on
    * the configuration and return back the stats for the transfer
+   *
+   * @return    transfer report
    */
   std::unique_ptr<TransferReport> transfer();
 
-  /// Returns whether transfer is finished TODO: move to base
+  /// TODO: move to base
+  /// @return    whether transfer is finished
   bool isTransferFinished();
 
   /// End time of the transfer
   Clock::time_point getEndTime();
 
   /// Sets regex representing files to include for transfer
+  /// @param includeRegex     regex for files to include for transfer
   void setIncludeRegex(const std::string &includeRegex);
 
   /// Sets regex representing files to exclude for transfer
+  /// @param excludeRegex     regex for files to exclude for transfer
   void setExcludeRegex(const std::string &excludeRegex);
 
   /// Sets regex representing directories to exclude for transfer
+  /// @param pruneDirRegex    regex for directories to exclude
   void setPruneDirRegex(const std::string &pruneDirRegex);
 
   /// Sets specific files to be transferred
+  /// @param setFileInfo      list of (file, size) pair
   void setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo);
 
   /// Sets whether to follow symlink or not
+  /// @param followSymlinks   whether to follow symlinks or not
   void setFollowSymlinks(const bool followSymlinks);
 
   /// Get the ports sender is operating on
+  /// @return     list of destination ports
   const std::vector<int32_t> &getPorts() const;
 
   /// Get the destination sender is sending to
+  /// @return     destination host-name
   const std::string &getDestination() const;
 
   /// Get the source directory sender is reading from
+  /// @return     source directory
   const std::string &getSrcDir() const;
 
   /**
@@ -179,7 +204,7 @@ class Sender : public WdtBase {
    */
   void setProgressReportIntervalMillis(const int progressReportIntervalMillis);
 
-  /// Makes the minimal transfer report using transfer stats of the thread
+  /// @retun    minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
 
   typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
@@ -215,17 +240,15 @@ class Sender : public WdtBase {
   /// structure to share data among different states
   struct ThreadData {
     const int threadIndex_;
-    DirectorySourceQueue &queue_;
     TransferStats &threadStats_;
     std::vector<ThreadTransferHistory> &transferHistories_;
     std::unique_ptr<ClientSocket> socket_;
     char buf_[Protocol::kMinBufLength];
+    /// whether total file size has been sent to the receiver
     bool totalSizeSent_{false};
-    ThreadData(int threadIndex, DirectorySourceQueue &queue,
-               TransferStats &threadStats,
+    ThreadData(int threadIndex, TransferStats &threadStats,
                std::vector<ThreadTransferHistory> &transferHistories)
         : threadIndex_(threadIndex),
-          queue_(queue),
           threadStats_(threadStats),
           transferHistories_(transferHistories) {
     }

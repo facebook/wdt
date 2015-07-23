@@ -147,9 +147,9 @@ WDT_OPT(abort_check_interval_millis, int32,
         "negative value or 0 disables abort check");
 WDT_OPT(disk_sync_interval_mb, double,
         "Disk sync interval in mb. A negative value disables syncing");
-WDT_OPT(throughput_update_interval, int32,
-        "Number of intervals after which"
-        " progress reporter updates current throughput");
+WDT_OPT(throughput_update_interval_millis, int32,
+        "Intervals in millis after which progress reporter updates current"
+        " throughput");
 WDT_OPT(enable_checksum, bool,
         "If true, blocks are checksumed during transfer");
 WDT_OPT(
