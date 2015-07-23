@@ -93,6 +93,8 @@ cd wdt_mac
 cmake pathtosrccode -G Xcode -DBUILD_TESTING=on
 # Using unix makefiles
 cmake pathtosrccode -G "Unix Makefiles" -DBUILD_TESTING=on
+# Do not use -j the first time as gmock download cause issues
+# http://www.cmake.org/Bug/view.php?id=15663
 make -j
 make test
 sudo make install
