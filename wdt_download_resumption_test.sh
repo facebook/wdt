@@ -21,11 +21,11 @@ checkLastCmdStatusExpectingFailure() {
 }
 
 startNewTransfer() {
-  $WDTBIN -directory $DIR/dst${TEST_COUNT} -start_port=$STARTING_PORT \
+  $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} -start_port=$STARTING_PORT \
   -transfer_id=$RECEIVER_ID -protocol_version=$RECEIVER_PROTOCOL_VERSION \
   >> $DIR/server${TEST_COUNT}.log 2>&1 &
   pidofreceiver=$!
-  $WDTBIN -directory $DIR/src -destination $HOSTNAME \
+  $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME \
   -start_port=$STARTING_PORT -block_size_mbytes=$BLOCK_SIZE_MBYTES \
   -transfer_id=$SENDER_ID -protocol_version=$SENDER_PROTOCOL_VERSION \
   |& tee -a $DIR/client${TEST_COUNT}.log &
@@ -56,6 +56,38 @@ killCurrentTransfer() {
   kill -9 $pidofsender
 }
 
+usage="
+The possible options to this script are
+-s sender protocol version
+-r receiver protocol version
+"
+
+#protocol versions, used to check version verification
+#version 0 represents default version
+SENDER_PROTOCOL_VERSION=0
+RECEIVER_PROTOCOL_VERSION=0
+
+if [ "$1" == "-h" ]; then
+  echo "$usage"
+  exit 0
+fi
+while getopts ":s:r:" opt; do
+  case $opt in
+    s) SENDER_PROTOCOL_VERSION="$OPTARG"
+    ;;
+    r) RECEIVER_PROTOCOL_VERSION="$OPTARG"
+    ;;
+    h) echo "$usage"
+       exit
+    ;;
+    \?) echo "Invalid option -$OPTARG" >&2
+    ;;
+  esac
+done
+
+echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
+version $RECEIVER_PROTOCOL_VERSION"
+
 threads=4
 STARTING_PORT=22500
 ERROR_COUNT=10
@@ -64,17 +96,14 @@ ERROR_COUNT=10
 SENDER_ID="123456"
 RECEIVER_ID="123456"
 
-#protocol versions, used to check version verification
-#version 0 represents default version
-SENDER_PROTOCOL_VERSION=0
-RECEIVER_PROTOCOL_VERSION=0
-
-WDTBIN_OPTS="-ipv4 -ipv6=false -start_port=$STARTING_PORT \
+WDTBIN_OPTS="-ipv4 -ipv6=false -num_ports=$threads \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption=true -keep_transfer_log=false \
 -progress_report_interval_millis=-1"
-WDTBIN="_bin/wdt/wdt -num_ports=$threads $WDTBIN_OPTS"
+WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
+WDTBIN_CLIENT=$WDTBIN
+WDTBIN_SERVER=$WDTBIN
 
 BASEDIR=/dev/shm/tmpWDT
 
@@ -184,8 +213,9 @@ BLOCK_SIZE_MBYTES=8
 startNewTransfer
 waitForTransferEnd
 TEST_COUNT=$((TEST_COUNT + 1))
+STARTING_PORT=$((STARTING_PORT + threads))
 
-echo "Abort timing test"
+# abort set-up
 ABORT_AFTER_SECONDS=2
 ABORT_CHECK_INTERVAL_MILLIS=100
 ABORT_AFTER_MILLIS=$((ABORT_AFTER_SECONDS * 1000))
@@ -193,14 +223,16 @@ EXPECTED_TRANSFER_DURATION_MILLIS=$((ABORT_AFTER_MILLIS + \
 ABORT_CHECK_INTERVAL_MILLIS))
 # add 50ms overhead
 EXPECTED_TRANSFER_DURATION_MILLIS=$((EXPECTED_TRANSFER_DURATION_MILLIS + 50))
-STARTING_PORT=$((STARTING_PORT + threads))
-WDTBIN_OLD=$WDTBIN
-WDTBIN+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
+
+echo "Abort timing test(1) - Sender side abort"
+WDTBIN_CLIENT_OLD=$WDTBIN_CLIENT
+WDTBIN_CLIENT+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
 -abort_after_seconds=$ABORT_AFTER_SECONDS"
 START_TIME_MILLIS=`date +%s%3N`
 startNewTransfer
-waitForTransferEndWithoutCheckingStatus
+wait $pidofsender
 END_TIME_MILLIS=`date +%s%3N`
+wait $pidofreceiver
 DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
 echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
 ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
@@ -208,10 +240,33 @@ if [[ $DURATION -gt $EXPECTED_TRANSFER_DURATION_MILLIS ]]; then
   echo "Abort timing test failed, exiting"
   exit 1
 fi
-WDTBIN=$WDTBIN_OLD
+WDTBIN_CLIENT=$WDTBIN_CLIENT_OLD
 TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
 STARTING_PORT=$((STARTING_PORT + threads))
 TEST_COUNT=$((TEST_COUNT + 1))
+STARTING_PORT=$((STARTING_PORT + threads))
+
+echo "Abort timing test(2) - Receiver side abort"
+WDTBIN_SERVER_OLD=$WDTBIN_SERVER
+WDTBIN_SERVER+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
+-abort_after_seconds=$ABORT_AFTER_SECONDS"
+START_TIME_MILLIS=`date +%s%3N`
+startNewTransfer
+wait $pidofreceiver
+END_TIME_MILLIS=`date +%s%3N`
+wait $pidofsender
+DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
+echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
+${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
+if [[ $DURATION -gt $EXPECTED_TRANSFER_DURATION_MILLIS ]]; then
+  echo "Abort timing test failed, exiting"
+  exit 1
+fi
+WDTBIN_SERVER=$WDTBIN_SERVER_OLD
+TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+STARTING_PORT=$((STARTING_PORT + threads))
+TEST_COUNT=$((TEST_COUNT + 1))
+STARTING_PORT=$((STARTING_PORT + threads))
 
 echo "Transfer-id mismatch test"
 SENDER_ID_OLD=$SENDER_ID
@@ -221,23 +276,6 @@ waitForTransferEndExpectingFailure
 SENDER_ID=$SENDER_ID_OLD
 TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
 STARTING_PORT=$((STARTING_PORT + threads))
-TEST_COUNT=$((TEST_COUNT + 1))
-
-echo "Version mismatch test(1) - Sender with lower version"
-SENDER_PROTOCOL_VERSION=10
-startNewTransfer
-waitForTransferEndExpectingFailure
-SENDER_PROTOCOL_VERSION=0
-TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
-STARTING_PORT=$((STARTING_PORT + threads))
-TEST_COUNT=$((TEST_COUNT + 1))
-
-echo "Version mismatch test(1) - Receiver with lower version"
-RECEIVER_PROTOCOL_VERSION=10
-startNewTransfer
-waitForTransferEndExpectingFailure
-RECEIVER_PROTOCOL_VERSION=0
-TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
 TEST_COUNT=$((TEST_COUNT + 1))
 
 STATUS=0

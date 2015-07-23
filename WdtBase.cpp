@@ -27,22 +27,39 @@ WdtBase::~WdtBase() {
   abortChecker_ = nullptr;
 }
 
-void WdtBase::abort() {
-  LOG(WARNING) << "Setting the abort flag";
-  abortTransfer_.store(true);
+void WdtBase::abort(const ErrorCode abortCode) {
+  folly::RWSpinLock::WriteHolder guard(abortCodeLock_);
+  if (abortCode == VERSION_MISMATCH && abortCode_ != OK) {
+    // VERSION_MISMATCH is the lowest priority abort code. If the abort code is
+    // anything other than OK, we should not override it
+    return;
+  }
+  LOG(WARNING) << "Setting the abort code " << abortCode;
+  abortCode_ = abortCode;
+}
+
+void WdtBase::clearAbort() {
+  folly::RWSpinLock::WriteHolder guard(abortCodeLock_);
+  if (abortCode_ != VERSION_MISMATCH) {
+    // We do no clear abort code unless it is VERSION_MISMATCH
+    return;
+  }
+  LOG(WARNING) << "Clearing the abort code";
+  abortCode_ = OK;
 }
 
 void WdtBase::setAbortChecker(IAbortChecker const *checker) {
   abortChecker_ = checker;
 }
 
-bool WdtBase::wasAbortRequested() const {
+ErrorCode WdtBase::getCurAbortCode() {
   // external check, if any:
   if (abortChecker_ && abortChecker_->shouldAbort()) {
-    return true;
+    return ABORTED_BY_APPLICATION;
   }
+  folly::RWSpinLock::ReadHolder guard(abortCodeLock_);
   // internal check:
-  return abortTransfer_.load();
+  return abortCode_;
 }
 
 void WdtBase::setProgressReporter(

@@ -126,7 +126,7 @@ void testFileChunksInfo() {
 
 void testSettings() {
   Settings settings;
-  settings.senderProtocolVersion = Protocol::SETTINGS_FLAG_VERSION;
+  int senderProtocolVersion = Protocol::SETTINGS_FLAG_VERSION;
   settings.readTimeoutMillis = 500;
   settings.writeTimeoutMillis = 500;
   settings.transferId = "abc";
@@ -135,15 +135,20 @@ void testSettings() {
 
   char buf[128];
   int64_t off = 0;
-  Protocol::encodeSettings(buf, off, sizeof(buf), settings);
+  Protocol::encodeSettings(senderProtocolVersion, buf, off, sizeof(buf),
+                           settings);
 
+  int nsenderProtocolVersion;
   Settings nsettings;
   int64_t noff = 0;
-  bool success = Protocol::decodeSettings(Protocol::SETTINGS_FLAG_VERSION, buf,
-                                          noff, off, nsettings);
+  bool success =
+      Protocol::decodeVersion(buf, noff, off, nsenderProtocolVersion);
+  EXPECT_TRUE(success);
+  EXPECT_EQ(nsenderProtocolVersion, senderProtocolVersion);
+  success = Protocol::decodeSettings(Protocol::SETTINGS_FLAG_VERSION, buf, noff,
+                                     off, nsettings);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
-  EXPECT_EQ(nsettings.senderProtocolVersion, settings.senderProtocolVersion);
   EXPECT_EQ(nsettings.readTimeoutMillis, settings.readTimeoutMillis);
   EXPECT_EQ(nsettings.writeTimeoutMillis, settings.writeTimeoutMillis);
   EXPECT_EQ(nsettings.transferId, settings.transferId);

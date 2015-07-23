@@ -177,7 +177,7 @@ Receiver::~Receiver() {
   if (hasPendingTransfer()) {
     LOG(WARNING) << "There is an ongoing transfer and the destructor"
                  << " is being called. Trying to finish the transfer";
-    abort();
+    abort(ABORTED_BY_APPLICATION);
   }
   finish();
 }
@@ -349,7 +349,7 @@ void Receiver::progressTracker() {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       conditionRecvFinished_.wait_for(lock, waitingTime);
-      if (transferFinished_ || wasAbortRequested()) {
+      if (transferFinished_ || getCurAbortCode() != OK) {
         break;
       }
       if (totalSenderBytes_ == -1) {
@@ -562,11 +562,11 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
       return FAILED;
     }
 
-    if (wasAbortRequested()) {
+    if (getCurAbortCode() != OK) {
       LOG(ERROR) << "Thread marked to abort while trying to accept first"
                  << " connection. Num attempts " << acceptAttempts;
       // Even though there is a transition FAILED here
-      // wasAbortRequested() is going to be checked again in the receiveOne.
+      // getCurAbortCode() is going to be checked again in the receiveOne.
       // So this is pretty much irrelavant
       return FAILED;
     }
@@ -732,22 +732,45 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   auto &senderWriteTimeout = data.senderWriteTimeout_;
   auto &threadStats = data.threadStats_;
   auto &enableChecksum = data.enableChecksum_;
+  auto &threadProtocolVersion = data.threadProtocolVersion_;
   Settings settings;
-  bool success = Protocol::decodeSettings(
-      protocolVersion_, buf, off, oldOffset + Protocol::kMaxSettings, settings);
+  int senderProtocolVersion;
+
+  bool success = Protocol::decodeVersion(
+      buf, off, oldOffset + Protocol::kMaxVersion, senderProtocolVersion);
   if (!success) {
-    LOG(ERROR) << "Unable to decode settings cmd";
+    LOG(ERROR) << "Unable to decode version " << data.threadIndex_;
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
   }
-  senderReadTimeout = settings.readTimeoutMillis;
-  senderWriteTimeout = settings.writeTimeoutMillis;
-  enableChecksum = settings.enableChecksum;
-  if (settings.senderProtocolVersion != protocolVersion_) {
+  if (senderProtocolVersion != threadProtocolVersion) {
     LOG(ERROR) << "Receiver and sender protocol version mismatch "
-               << settings.senderProtocolVersion << " " << protocolVersion_;
-    threadStats.setErrorCode(VERSION_MISMATCH);
-    return SEND_ABORT_CMD;
+               << senderProtocolVersion << " " << threadProtocolVersion;
+    int negotiatedProtocol = Protocol::negotiateProtocol(senderProtocolVersion,
+                                                         threadProtocolVersion);
+    if (negotiatedProtocol == 0) {
+      LOG(WARNING) << "Can not support sender with version "
+                   << senderProtocolVersion << ", aborting!";
+      threadStats.setErrorCode(VERSION_INCOMPATIBLE);
+      return SEND_ABORT_CMD;
+    } else {
+      LOG_IF(INFO, threadProtocolVersion != negotiatedProtocol)
+          << "Changing receiver protocol version to " << negotiatedProtocol;
+      threadProtocolVersion = negotiatedProtocol;
+      if (negotiatedProtocol != senderProtocolVersion) {
+        threadStats.setErrorCode(VERSION_MISMATCH);
+        return SEND_ABORT_CMD;
+      }
+    }
+  }
+
+  success = Protocol::decodeSettings(
+      threadProtocolVersion, buf, off,
+      oldOffset + Protocol::kMaxVersion + Protocol::kMaxSettings, settings);
+  if (!success) {
+    LOG(ERROR) << "Unable to decode settings cmd " << data.threadIndex_;
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
   }
   auto senderId = settings.transferId;
   if (transferId_ != senderId) {
@@ -756,6 +779,9 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
     threadStats.setErrorCode(ID_MISMATCH);
     return SEND_ABORT_CMD;
   }
+  senderReadTimeout = settings.readTimeoutMillis;
+  senderWriteTimeout = settings.writeTimeoutMillis;
+  enableChecksum = settings.enableChecksum;
   if (settings.sendFileChunks) {
     // We only move to SEND_FILE_CHUNKS state, if download resumption is enabled
     // in the sender side
@@ -782,6 +808,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   auto &checkpointIndex = data.checkpointIndex_;
   auto &pendingCheckpointIndex = data.pendingCheckpointIndex_;
   auto &enableChecksum = data.enableChecksum_;
+  auto &protocolVersion = data.threadProtocolVersion_;
   BlockDetails blockDetails;
 
   auto guard = folly::makeGuard([&socket, &threadStats] {
@@ -811,7 +838,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     return ACCEPT_WITH_TIMEOUT;
   }
   off += sizeof(int16_t);
-  bool success = Protocol::decodeHeader(protocolVersion_, buf, off,
+  bool success = Protocol::decodeHeader(protocolVersion, buf, off,
                                         numRead + oldOffset, blockDetails);
   int64_t headerBytes = off - oldOffset;
   // transferred header length must match decoded header length
@@ -863,7 +890,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   remainingData -= toWrite;
   // also means no leftOver so it's ok we use buf from start
   while (writer.getTotalWritten() < blockDetails.dataSize) {
-    if (wasAbortRequested()) {
+    if (getCurAbortCode() != OK) {
       LOG(ERROR) << "Thread marked for abort while processing a file."
                  << " port : " << socket.getPort();
       return FAILED;
@@ -1173,7 +1200,7 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
   auto &threadStats = data.threadStats_;
   char *buf = data.getBuf();
   auto &socket = data.socket_;
-  int32_t protocolVersion = protocolVersion_;
+  int32_t protocolVersion = data.threadProtocolVersion_;
   int64_t offset = 0;
   buf[offset++] = Protocol::ABORT_CMD;
   Protocol::encodeAbort(buf, offset, protocolVersion,
@@ -1184,6 +1211,10 @@ Receiver::ReceiverState Receiver::sendAbortCmd(ThreadData &data) {
   // other side will timeout
   socket.closeCurrentConnection();
   threadStats.addHeaderBytes(offset);
+  if (threadStats.getErrorCode() == VERSION_MISMATCH) {
+    // Receiver should try again expecting sender to have changed its version
+    return ACCEPT_WITH_TIMEOUT;
+  }
   return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
 }
 
@@ -1340,7 +1371,8 @@ void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
       transferFinished_ = true;
     }
   });
-  ThreadData data(threadIndex, socket, threadStats, bufferSize);
+  ThreadData data(threadIndex, socket, threadStats, protocolVersion_,
+                  bufferSize);
   if (!data.getBuf()) {
     LOG(ERROR) << "error allocating " << bufferSize;
     threadStats.setErrorCode(MEMORY_ALLOCATION_ERROR);
@@ -1348,8 +1380,10 @@ void Receiver::receiveOne(int threadIndex, ServerSocket &socket,
   }
   ReceiverState state = LISTEN;
   while (true) {
-    if (wasAbortRequested()) {
-      LOG(ERROR) << "Transfer aborted " << socket.getPort();
+    ErrorCode abortCode = getCurAbortCode();
+    if (abortCode != OK) {
+      LOG(ERROR) << "Transfer aborted " << socket.getPort() << " "
+                 << errorCodeToStr(abortCode);
       threadStats.setErrorCode(ABORT);
       incrFailedThreadCountAndCheckForSessionEnd(data);
       break;

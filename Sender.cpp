@@ -133,7 +133,7 @@ const Sender::StateFunction Sender::stateMap_[] = {
     &Sender::sendBlocks, &Sender::sendDoneCmd, &Sender::sendSizeCmd,
     &Sender::checkForAbort, &Sender::readFileChunks, &Sender::readReceiverCmd,
     &Sender::processDoneCmd, &Sender::processWaitCmd, &Sender::processErrCmd,
-    &Sender::processAbortCmd};
+    &Sender::processAbortCmd, &Sender::processVersionMismatch};
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   destHost_ = destHost;
@@ -173,7 +173,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir,
 Sender::~Sender() {
   if (!isTransferFinished()) {
     LOG(WARNING) << "Sender being deleted. Forcefully aborting the transfer";
-    abort();
+    abort(ABORTED_BY_APPLICATION);
   }
   finish();
 }
@@ -342,9 +342,7 @@ ErrorCode Sender::start() {
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
             << ports_ << "]";
   startTime_ = Clock::now();
-  downloadResumptionEnabled_ =
-      options.enable_download_resumption &&
-      protocolVersion_ >= Protocol::DOWNLOAD_RESUMPTION_VERSION;
+  downloadResumptionEnabled_ = options.enable_download_resumption;
   dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
   if (twoPhases) {
     dirThread_.join();
@@ -369,6 +367,7 @@ ErrorCode Sender::start() {
     transferHistories_.emplace_back(*dirQueue_, globalThreadStats_[i]);
   }
   perfReports_.resize(numPorts);
+  negotiatedProtocolVersions_.resize(numPorts, 0);
   numActiveThreads_ = numPorts;
   transferFinished_ = false;
   for (int64_t i = 0; i < numPorts; i++) {
@@ -454,6 +453,10 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
     } else if (errCode == CONN_ERROR) {
       return nullptr;
     }
+    if (getCurAbortCode() != OK) {
+      errCode = ABORT;
+      return nullptr;
+    }
     if (i != maxRetries) {
       // sleep between attempts but not after the last
       VLOG(1) << "Sleeping after failed attempt " << i;
@@ -486,6 +489,13 @@ Sender::SenderState Sender::connect(ThreadData &data) {
 
   ErrorCode code;
   socket = connectToReceiver(port, code);
+  if (code == ABORT) {
+    threadStats.setErrorCode(ABORT);
+    if (getCurAbortCode() == VERSION_MISMATCH) {
+      return PROCESS_VERSION_MISMATCH;
+    }
+    return END;
+  }
   if (code != OK) {
     threadStats.setErrorCode(code);
     return END;
@@ -563,16 +573,19 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   bool sendFileChunks;
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    sendFileChunks = downloadResumptionEnabled_ && !fileChunksReceived_;
+    sendFileChunks =
+        downloadResumptionEnabled_ &&
+        protocolVersion_ >= Protocol::DOWNLOAD_RESUMPTION_VERSION &&
+        !fileChunksReceived_;
   }
   Settings settings;
-  settings.senderProtocolVersion = protocolVersion_;
   settings.readTimeoutMillis = readTimeoutMillis;
   settings.writeTimeoutMillis = writeTimeoutMillis;
   settings.transferId = transferId_;
   settings.enableChecksum = options.enable_checksum;
   settings.sendFileChunks = sendFileChunks;
-  Protocol::encodeSettings(buf, off, Protocol::kMaxSettings, settings);
+  Protocol::encodeSettings(protocolVersion_, buf, off, Protocol::kMaxSettings,
+                           settings);
   int64_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
   int64_t written = socket->write(buf, toWrite);
   if (written != toWrite) {
@@ -935,18 +948,103 @@ Sender::SenderState Sender::processAbortCmd(ThreadData &data) {
     return END;
   }
   int64_t offset = 0;
-  int32_t protocolVersion;
+  int32_t negotiatedProtocol;
   ErrorCode remoteError;
   int64_t checkpoint;
-  Protocol::decodeAbort(buf, offset, protocolVersion, remoteError, checkpoint);
+  Protocol::decodeAbort(buf, offset, negotiatedProtocol, remoteError,
+                        checkpoint);
   threadStats.setRemoteErrorCode(remoteError);
   std::string failedFileName = transferHistory.getSourceId(checkpoint);
   LOG(WARNING) << "Received abort on " << data.threadIndex_
-               << " remote protocol version " << protocolVersion
+               << " remote protocol version " << negotiatedProtocol
                << " remote error code " << errorCodeToStr(remoteError)
                << " file " << failedFileName << " checkpoint " << checkpoint;
-  abort();
+  abort(remoteError);
+  if (remoteError == VERSION_MISMATCH) {
+    if (Protocol::negotiateProtocol(negotiatedProtocol, protocolVersion_) ==
+        negotiatedProtocol) {
+      // sender can support this negotiated version
+      negotiatedProtocolVersions_[data.threadIndex_] = negotiatedProtocol;
+      return PROCESS_VERSION_MISMATCH;
+    } else {
+      LOG(ERROR) << "Sender can not support receiver version "
+                 << negotiatedProtocol;
+      threadStats.setRemoteErrorCode(VERSION_INCOMPATIBLE);
+    }
+  }
   return END;
+}
+
+Sender::SenderState Sender::processVersionMismatch(ThreadData &data) {
+  LOG(INFO) << "entered PROCESS_VERSION_MISMATCH state " << data.threadIndex_;
+  auto &threadStats = data.threadStats_;
+
+  WDT_CHECK(threadStats.getErrorCode() == ABORT);
+  std::unique_lock<std::mutex> lock(mutex_);
+  if (protoNegotiationStatus_ != V_MISMATCH_WAIT) {
+    LOG(WARNING) << "Protocol version already negotiated, but transfer still "
+                    "aborted due to version mismatch, port "
+                 << ports_[data.threadIndex_];
+    return END;
+  }
+  numWaitingWithAbort_++;
+  while (protoNegotiationStatus_ == V_MISMATCH_WAIT &&
+         numWaitingWithAbort_ != numActiveThreads_) {
+    WDT_CHECK(numWaitingWithAbort_ < numActiveThreads_);
+    conditionAllAborted_.wait(lock);
+  }
+  numWaitingWithAbort_--;
+  if (protoNegotiationStatus_ == V_MISMATCH_FAILED) {
+    return END;
+  }
+  if (protoNegotiationStatus_ == V_MISMATCH_RESOLVED) {
+    threadStats.setRemoteErrorCode(OK);
+    return CONNECT;
+  }
+  protoNegotiationStatus_ = V_MISMATCH_FAILED;
+
+  for (const auto &stat : globalThreadStats_) {
+    if (stat.getErrorCode() == OK) {
+      // Some other thread finished successfully, should never happen in case of
+      // version mismatch
+      return END;
+    }
+  }
+
+  const int numHistories = transferHistories_.size();
+  for (int i = 0; i < numHistories; i++) {
+    auto &history = transferHistories_[i];
+    if (history.getNumAcked() > 0) {
+      LOG(ERROR) << "Even though the transfer aborted due to VERSION_MISMATCH, "
+                    "some blocks got acked by the receiver, port " << ports_[i]
+                 << " numAcked " << history.getNumAcked();
+      return END;
+    }
+    history.returnUnackedSourcesToQueue();
+  }
+
+  int negotiatedProtocol = 0;
+  for (int protocolVersion : negotiatedProtocolVersions_) {
+    if (protocolVersion > 0) {
+      if (negotiatedProtocol > 0 && negotiatedProtocol != protocolVersion) {
+        LOG(ERROR) << "Different threads negotiated different protocols "
+                   << negotiatedProtocol << " " << protocolVersion;
+        return END;
+      }
+      negotiatedProtocol = protocolVersion;
+    }
+  }
+  WDT_CHECK_GT(negotiatedProtocol, 0);
+
+  LOG_IF(INFO, negotiatedProtocol != protocolVersion_)
+      << "Changing protocol version to " << negotiatedProtocol
+      << ", previous version " << protocolVersion_;
+  protocolVersion_ = negotiatedProtocol;
+  threadStats.setRemoteErrorCode(OK);
+  protoNegotiationStatus_ = V_MISMATCH_RESOLVED;
+  clearAbort();
+  conditionAllAborted_.notify_all();
+  return CONNECT;
 }
 
 void Sender::sendOne(int threadIndex) {
@@ -967,6 +1065,7 @@ void Sender::sendOne(int threadIndex) {
     if (throttler_) {
       throttler_->deRegisterTransfer();
     }
+    conditionAllAborted_.notify_one();
   });
   if (throttler_) {
     throttler_->registerTransfer();
@@ -974,10 +1073,16 @@ void Sender::sendOne(int threadIndex) {
   ThreadData threadData(threadIndex, threadStats, transferHistories);
   SenderState state = CONNECT;
   while (state != END) {
-    if (wasAbortRequested()) {
-      LOG(ERROR) << "Transfer aborted " << port;
+    ErrorCode abortCode = getCurAbortCode();
+    if (abortCode != OK) {
+      LOG(ERROR) << "Transfer aborted " << port << " "
+                 << errorCodeToStr(abortCode);
       threadStats.setErrorCode(ABORT);
-      break;
+      if (abortCode == VERSION_MISMATCH) {
+        state = PROCESS_VERSION_MISMATCH;
+      } else {
+        break;
+      }
     }
     state = (this->*stateMap_[state])(threadData);
   }
@@ -1083,7 +1188,7 @@ TransferStats Sender::sendOneByteSource(
       } else {
         VLOG(3) << "Wrote all of " << size << " on " << socket->getFd();
       }
-      if (wasAbortRequested()) {
+      if (getCurAbortCode() != OK) {
         LOG(ERROR) << "Transfer aborted during block transfer "
                    << socket->getPort() << " " << source->getIdentifier();
         stats.setErrorCode(ABORT);

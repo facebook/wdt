@@ -252,7 +252,7 @@ bool TransferLogManager::parseLogHeader(char *buf, int16_t entrySize,
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
-  return checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
+  return !checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
 }
 
 bool TransferLogManager::parseFileCreationEntry(char *buf, int16_t entrySize,
@@ -272,7 +272,7 @@ bool TransferLogManager::parseFileCreationEntry(char *buf, int16_t entrySize,
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
-  return checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
+  return !checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
 }
 
 bool TransferLogManager::parseBlockWriteEntry(char *buf, int16_t entrySize,
@@ -289,7 +289,7 @@ bool TransferLogManager::parseBlockWriteEntry(char *buf, int16_t entrySize,
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
-  return checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
+  return !checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
 }
 
 bool TransferLogManager::parseInvalidationEntry(char *buf, int16_t entrySize,
@@ -303,7 +303,7 @@ bool TransferLogManager::parseInvalidationEntry(char *buf, int16_t entrySize,
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
-  return checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
+  return !checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
 }
 
 void TransferLogManager::encodeInvalidationEntry(char *dest, int64_t &off,

@@ -34,7 +34,7 @@ bool decodeString(folly::ByteRange &br, char *src, int64_t max,
 /// checks to see if encoding as overflowed or not
 /// @param off  final offset
 /// @param max  max buffer size
-/// @return     true if no overflow, false otherwise
+/// @return     true if overflow, false otherwise
 bool checkForOverflow(int64_t off, int64_t max);
 }
 }

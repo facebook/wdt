@@ -14,10 +14,10 @@
 #include "Throttler.h"
 #include "Protocol.h"
 #include "DirectorySourceQueue.h"
-#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
+#include <folly/RWSpinLock.h>
 
 namespace facebook {
 namespace wdt {
@@ -41,7 +41,6 @@ struct WdtTransferRequest {
   std::vector<FileInfo> fileInfo;
   /// Constructor
   WdtTransferRequest(int startPort, int numPorts);
-  /// Default constructor
 };
 
 /**
@@ -64,11 +63,14 @@ class WdtBase {
   /// Destructor
   virtual ~WdtBase();
 
-  /// Transfer can be marked to abort and receiver threads will eventually
+  /// Transfer can be marked to abort and threads will eventually
   /// get aborted after this method has been called based on
   /// whether they are doing read/write on the socket and the timeout for the
   /// socket. Push mode for abort.
-  void abort();
+  void abort(const ErrorCode abortCode);
+
+  /// clears abort flag
+  void clearAbort();
 
   /**
    * sets an extra external call back to check for abort
@@ -78,9 +80,9 @@ class WdtBase {
    */
   void setAbortChecker(IAbortChecker const *checker);
 
-  /// Receiver threads can call this method to find out
-  /// whether transfer has been marked to abort from outside the receiver
-  bool wasAbortRequested() const;
+  /// threads can call this method to find out
+  /// whether transfer has been marked from abort
+  ErrorCode getCurAbortCode();
 
   /// Wdt objects can report progress. Setter for progress reporter
   /// defined in Reporting.h
@@ -129,7 +131,7 @@ class WdtBase {
     }
 
     bool shouldAbort() const {
-      return wdtBase_->wasAbortRequested();
+      return wdtBase_->getCurAbortCode() != OK;
     }
 
    private:
@@ -140,8 +142,9 @@ class WdtBase {
   AbortChecker abortCheckerCallback_;
 
  private:
-  /// Internal and default abort transfer flag
-  std::atomic<bool> abortTransfer_{false};
+  folly::RWSpinLock abortCodeLock_;
+  /// Internal and default abort code
+  ErrorCode abortCode_{OK};
   /// Additional external source of check for abort requested
   IAbortChecker const *abortChecker_{nullptr};
 };

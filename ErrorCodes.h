@@ -18,6 +18,12 @@ namespace wdt {
 // For now just does regular check, for some library embedding may consider
 // skipping or being DCHECK
 #define WDT_CHECK CHECK
+#define WDT_CHECK_EQ CHECK_EQ
+#define WDT_CHECK_NE CHECK_NE
+#define WDT_CHECK_LE CHECK_LE
+#define WDT_CHECK_LT CHECK_LT
+#define WDT_CHECK_GE CHECK_GE
+#define WDT_CHECK_GT CHECK_GT
 
 #define ERRORS                                                           \
   X(OK)                      /** No error  */                            \
@@ -34,7 +40,9 @@ namespace wdt {
   X(VERSION_MISMATCH)        /** Sender and Receiver version mismatch */ \
   X(ID_MISMATCH)             /** Sender and Receiver id mismatch*/       \
   X(CHECKSUM_MISMATCH)       /** Checksums do not match */               \
-  X(RESOURCE_NOT_FOUND)      /** Not found in the resource controller */
+  X(RESOURCE_NOT_FOUND)      /** Not found in the resource controller */ \
+  X(ABORTED_BY_APPLICATION)  /** Transfer was aborted by application */  \
+  X(VERSION_INCOMPATIBLE)    /** Sender and receiver version incompatible */
 
 enum ErrorCode {
 #define X(A) A,

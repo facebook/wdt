@@ -161,6 +161,10 @@ class Receiver : public WdtBase {
     /// Statistics of the transfer for this thread
     TransferStats &threadStats_;
 
+    /// protocol version for this thread. This per thread protocol version is
+    /// kept separately from the global one to avoid locking
+    int threadProtocolVersion_;
+
     /// Buffer that receivers reads data into from the network
     std::unique_ptr<char[]> buf_;
     /// Maximum size of the buffer
@@ -211,10 +215,12 @@ class Receiver : public WdtBase {
 
     /// Constructor for thread data
     ThreadData(int threadIndex, ServerSocket &socket,
-               TransferStats &threadStats, int64_t bufferSize)
+               TransferStats &threadStats, int protocolVersion,
+               int64_t bufferSize)
         : threadIndex_(threadIndex),
           socket_(socket),
           threadStats_(threadStats),
+          threadProtocolVersion_(protocolVersion),
           bufferSize_(bufferSize) {
       buf_.reset(new char[bufferSize_]);
     }

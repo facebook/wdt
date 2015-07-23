@@ -165,8 +165,6 @@ struct BlockDetails {
 
 /// structure representing settings cmd
 struct Settings {
-  /// protocol version used by the sender
-  int senderProtocolVersion;
   /// sender side read timeout
   int readTimeoutMillis;
   /// sender side write timeout
@@ -229,7 +227,7 @@ class Protocol {
   /// max length of the size cmd encoding
   static const int64_t kMaxSize = 1 + 10;
   /// max size of settings command encoding
-  static const int64_t kMaxSettings = 1 + 4 * 10 + kMaxTransferIdLength + 1;
+  static const int64_t kMaxSettings = 1 + 3 * 10 + kMaxTransferIdLength + 1;
   /// max length of the footer cmd encoding
   static const int64_t kMaxFooter = 1 + 10;
   /// max size of chunks cmd
@@ -238,6 +236,8 @@ class Protocol {
   static const int64_t kMaxChunkEncodeLen = 20;
   /// abort cmd length
   static const int64_t kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
+  /// max size of version encoding
+  static const int64_t kMaxVersion = 10;
 
   /**
    * Return the library version, including protocol.
@@ -250,12 +250,14 @@ class Protocol {
    * protocol version or not
    *
    * @param requestedProtocolVersion    protocol version requested
+   * @param curProtocolVersion          current protocol version
    *
    * @return    If current wdt supports the requested version or some lower
    *            version, that version is returned. If it can not support the
    *            requested version, 0 is returned
    */
-  static int negotiateProtocol(int requestedProtocolVersion);
+  static int negotiateProtocol(int requestedProtocolVersion,
+                               int curProtocolVersion = protocol_version);
 
   /// encodes blockDetails into dest+off
   /// moves the off into dest pointer, not going past max
@@ -296,14 +298,21 @@ class Protocol {
   /// encodes settings into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeSettings(char *dest, int64_t &off, int64_t max,
+  static void encodeSettings(int senderProtocolVersion, char *dest,
+                             int64_t &off, int64_t max,
                              const Settings &settings);
+
+  /// decodes from src+off and consumes/moves off but not past max
+  /// sets senderProtocolVersion
+  /// @return false if there isn't enough data in src+off to src+max
+  static bool decodeVersion(char *src, int64_t &off, int64_t max,
+                            int &senderProtocolVersion);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets settings
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeSettings(int receiverProtocolVersion, char *src,
-                             int64_t &off, int64_t max, Settings &settings);
+  static bool decodeSettings(int protocolVersion, char *src, int64_t &off,
+                             int64_t max, Settings &settings);
 
   /// encodes totalNumBytes into dest+off
   /// moves the off into dest pointer, not going past max

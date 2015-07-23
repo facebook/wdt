@@ -43,9 +43,9 @@ bool decodeString(folly::ByteRange &br, char *src, int64_t max,
 bool checkForOverflow(int64_t off, int64_t max) {
   if (off > max) {
     LOG(ERROR) << "Read past the end:" << off << " " << max;
-    return false;
+    return true;
   }
-  return true;
+  return false;
 }
 }
 }

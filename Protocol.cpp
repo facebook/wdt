@@ -37,12 +37,13 @@ const std::string Protocol::getFullVersion() {
   return fullVersion;
 }
 
-int Protocol::negotiateProtocol(int requestedProtocolVersion) {
+int Protocol::negotiateProtocol(int requestedProtocolVersion,
+                                int curProtocolVersion) {
   if (requestedProtocolVersion < 10) {
     LOG(WARNING) << "Can not handle protocol " << requestedProtocolVersion;
     return 0;
   }
-  return std::min<int>(protocol_version, requestedProtocolVersion);
+  return std::min<int>(curProtocolVersion, requestedProtocolVersion);
 }
 
 void FileChunksInfo::addChunk(const Interval &chunk) {
@@ -146,7 +147,7 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  return checkForOverflow(off, max);
+  return !checkForOverflow(off, max);
 }
 
 void Protocol::encodeCheckpoints(char *dest, int64_t &off, int64_t max,
@@ -170,7 +171,7 @@ bool Protocol::decodeCheckpoints(char *src, int64_t &off, int64_t max,
       port = decodeInt(br);
       numReceivedSources = decodeInt(br);
       off = br.start() - (uint8_t *)src;
-      if (!checkForOverflow(off, max)) {
+      if (checkForOverflow(off, max)) {
         return false;
       }
       checkpoints.emplace_back(port, numReceivedSources);
@@ -198,7 +199,7 @@ bool Protocol::decodeDone(char *src, int64_t &off, int64_t max,
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  return checkForOverflow(off, max);
+  return !checkForOverflow(off, max);
 }
 
 void Protocol::encodeSize(char *dest, int64_t &off, int64_t max,
@@ -217,7 +218,7 @@ bool Protocol::decodeSize(char *src, int64_t &off, int64_t max,
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  return checkForOverflow(off, max);
+  return !checkForOverflow(off, max);
 }
 
 void Protocol::encodeAbort(char *dest, int64_t &off, int32_t protocolVersion,
@@ -276,7 +277,7 @@ bool Protocol::decodeChunkInfo(folly::ByteRange &br, char *src, int64_t max,
     return false;
   }
   int64_t off = br.start() - (uint8_t *)src;
-  return checkForOverflow(off, max);
+  return !checkForOverflow(off, max);
 }
 
 void Protocol::encodeFileChunksInfo(char *dest, int64_t &off, int64_t max,
@@ -319,7 +320,7 @@ bool Protocol::decodeFileChunksInfo(folly::ByteRange &br, char *src,
     return false;
   }
   int64_t off = br.start() - (uint8_t *)src;
-  return checkForOverflow(off, max);
+  return !checkForOverflow(off, max);
 }
 
 int64_t Protocol::maxEncodeLen(const FileChunksInfo &fileChunkInfo) {
@@ -366,13 +367,14 @@ bool Protocol::decodeFileChunksInfoList(
   return true;
 }
 
-void Protocol::encodeSettings(char *dest, int64_t &off, int64_t max,
+void Protocol::encodeSettings(int senderProtocolVersion, char *dest,
+                              int64_t &off, int64_t max,
                               const Settings &settings) {
-  encodeInt(dest, off, settings.senderProtocolVersion);
+  encodeInt(dest, off, senderProtocolVersion);
   encodeInt(dest, off, settings.readTimeoutMillis);
   encodeInt(dest, off, settings.writeTimeoutMillis);
   encodeString(dest, off, settings.transferId);
-  if (settings.senderProtocolVersion >= SETTINGS_FLAG_VERSION) {
+  if (senderProtocolVersion >= SETTINGS_FLAG_VERSION) {
     uint8_t flags = 0;
     if (settings.enableChecksum) {
       flags |= 1;
@@ -385,18 +387,30 @@ void Protocol::encodeSettings(char *dest, int64_t &off, int64_t max,
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeSettings(int receiverProtocolVersion, char *src,
-                              int64_t &off, int64_t max, Settings &settings) {
+bool Protocol::decodeVersion(char *src, int64_t &off, int64_t max,
+                             int &senderProtocolVersion) {
+  folly::ByteRange br((uint8_t *)(src + off), max);
+  try {
+    senderProtocolVersion = decodeInt(br);
+  } catch (const std::exception &ex) {
+    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    return ERROR;
+  }
+  off = br.start() - (uint8_t *)src;
+  return !checkForOverflow(off, max);
+}
+
+bool Protocol::decodeSettings(int protocolVersion, char *src, int64_t &off,
+                              int64_t max, Settings &settings) {
   settings.enableChecksum = settings.sendFileChunks = false;
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    settings.senderProtocolVersion = decodeInt(br);
     settings.readTimeoutMillis = decodeInt(br);
     settings.writeTimeoutMillis = decodeInt(br);
     if (!decodeString(br, src, max, settings.transferId)) {
       return false;
     }
-    if (receiverProtocolVersion >= SETTINGS_FLAG_VERSION) {
+    if (protocolVersion >= SETTINGS_FLAG_VERSION) {
       uint8_t flags = br.front();
       settings.enableChecksum = flags & 1;
       settings.sendFileChunks = flags & (1 << 1);
@@ -407,7 +421,7 @@ bool Protocol::decodeSettings(int receiverProtocolVersion, char *src,
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  return checkForOverflow(off, max);
+  return !checkForOverflow(off, max);
 }
 
 void Protocol::encodeFooter(char *dest, int64_t &off, int64_t max,
@@ -426,7 +440,7 @@ bool Protocol::decodeFooter(char *src, int64_t &off, int64_t max,
     return false;
   }
   off = br.start() - (uint8_t *)src;
-  return checkForOverflow(off, max);
+  return !checkForOverflow(off, max);
 }
 }
 }

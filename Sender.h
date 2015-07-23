@@ -83,6 +83,13 @@ class ThreadTransferHistory {
    */
   int64_t returnUnackedSourcesToQueue();
 
+  /**
+   * @return    number of sources acked by the receiver
+   */
+  int64_t getNumAcked() const {
+    return numAcknowledged_;
+  }
+
  private:
   void markSourceAsFailed(std::unique_ptr<ByteSource> &source);
 
@@ -234,6 +241,7 @@ class Sender : public WdtBase {
     PROCESS_WAIT_CMD,
     PROCESS_ERR_CMD,
     PROCESS_ABORT_CMD,
+    PROCESS_VERSION_MISMATCH,
     END
   };
 
@@ -374,6 +382,17 @@ class Sender : public WdtBase {
    */
   SenderState processAbortCmd(ThreadData &data);
 
+  /**
+   * waits for all active threads to be aborted, checks to see if the abort was
+   * due to version mismatch. Also performs various sanity checks.
+   * Previous states : Almost all threads, abort flags is checked between every
+   *                   state transition
+   * Next states : CONNECT(Abort was due to version kismatch),
+   *               END(if abort was not due to version mismatch or some sanity
+   *               check failed)
+   */
+  SenderState processVersionMismatch(ThreadData &data);
+
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];
 
@@ -442,6 +461,25 @@ class Sender : public WdtBase {
   std::vector<TransferStats> globalThreadStats_;
   /// per thread perf report
   std::vector<PerfStatReport> perfReports_;
+  /// per thread negotiated protocol versions
+  std::vector<int> negotiatedProtocolVersions_;
+  /// number of threads waiting in PROCESS_VERSION_MISMATCH state
+  int numWaitingWithAbort_{0};
+  /// Condition variable used to co-ordinate threads waiting in
+  /// PROCESS_VERSION_MISMATCH state
+  std::condition_variable conditionAllAborted_;
+
+  enum ProtoNegotiationStatus {
+    V_MISMATCH_WAIT,      // waiting for version mismatch to be processed
+    V_MISMATCH_RESOLVED,  // version mismatch processed and was successful
+    V_MISMATCH_FAILED,    // version mismatch processed and it failed
+  };
+  /// Protocol negotiation status, used to co-ordinate processing of version
+  /// mismatch. Threads aborted due to version mismatch waits for all threads to
+  /// abort and reach PROCESS_VERSION_MISMATCH state. Last thread processes
+  /// version mismatch and changes this status variable. Other threads check
+  /// this variable to decide when to proceed.
+  ProtoNegotiationStatus protoNegotiationStatus_{V_MISMATCH_WAIT};
   /// This condition is notified when the transfer is finished
   std::condition_variable conditionFinished_;
   /// Mutex which is shared between the parent thread, sender thread and

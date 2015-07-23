@@ -61,7 +61,7 @@ void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
 void DirectorySourceQueue::setPreviouslyReceivedChunks(
     std::vector<FileChunksInfo> &previouslyTransferredChunks) {
   std::unique_lock<std::mutex> lock(mutex_);
-  WDT_CHECK(numBlocksDequeued_ == 0);
+  WDT_CHECK_EQ(0, numBlocksDequeued_);
   // reset all the queue variables
   nextSeqId_ = 0;
   totalFileSize_ = 0;
@@ -316,7 +316,7 @@ void DirectorySourceQueue::returnToQueue(
       sourceQueue_.push(std::move(source));
       returnedCount++;
     }
-    WDT_CHECK(numBlocksDequeued_ > 0);
+    WDT_CHECK_GT(numBlocksDequeued_, 0);
     numBlocksDequeued_--;
   }
   lock.unlock();
