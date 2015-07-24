@@ -47,6 +47,9 @@ DEFINE_int32(
     protocol_version, 0,
     "Protocol version to use, this is used to simulate protocol negotiation");
 
+DEFINE_string(connection_url, "",
+              "Provide the connection string to connect to receiver");
+
 DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 
 DEFINE_int32(abort_after_seconds, 0,
@@ -128,10 +131,6 @@ int main(int argc, char *argv[]) {
 #include FLAGS_INCLUDE_FILE  //nolint
 
   LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
-  LOG(INFO) << "Starting with directory = " << FLAGS_directory
-            << " and destination = " << FLAGS_destination
-            << " num sockets = " << FLAGS_num_ports
-            << " from port = " << FLAGS_start_port;
   ErrorCode retCode = OK;
   if (FLAGS_parse_transfer_log) {
     // Log parsing mode
@@ -141,18 +140,22 @@ int main(int argc, char *argv[]) {
       LOG(ERROR) << "Transfer log parsing failed";
       retCode = ERROR;
     }
-  } else if (FLAGS_destination.empty()) {
-    // Receiver mode
-    Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
-    receiver.setTransferId(FLAGS_transfer_id);
+  } else if (FLAGS_destination.empty() && FLAGS_connection_url.empty()) {
+    WdtTransferRequest transferRequest(FLAGS_start_port, FLAGS_num_ports);
+    transferRequest.directory = FLAGS_directory;
+    transferRequest.transferId = FLAGS_transfer_id;
     if (FLAGS_protocol_version > 0) {
-      receiver.setProtocolVersion(FLAGS_protocol_version);
+      transferRequest.protocolVersion = FLAGS_protocol_version;
     }
-    int numSuccess = receiver.registerPorts();
-    if (numSuccess == 0) {
-      LOG(ERROR) << "Couldn't bind on any port";
-      return 0;
+    Receiver receiver(transferRequest);
+    transferRequest = receiver.init();
+    if (transferRequest.errorCode == ERROR) {
+      LOG(ERROR) << "Error setting up receiver";
+      return transferRequest.errorCode;
     }
+    LOG(INFO) << "Starting receiver with connection url ";
+    std::cout << transferRequest.generateUrl() << std::endl;
+    std::cout.flush();
     setUpAbort(receiver);
     if (!FLAGS_run_as_daemon) {
       receiver.transferAsync();
@@ -185,13 +188,26 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < options.num_ports; i++) {
       ports.push_back(options.start_port + i);
     }
-    Sender sender(FLAGS_destination, FLAGS_directory, ports, fileInfo);
+    std::unique_ptr<WdtTransferRequest> transferRequest;
+    if (FLAGS_connection_url.empty()) {
+      transferRequest.reset(new WdtTransferRequest(ports));
+      transferRequest->directory = FLAGS_directory;
+      transferRequest->fileInfo = fileInfo;
+      transferRequest->hostName = FLAGS_destination;
+      transferRequest->transferId = FLAGS_transfer_id;
+      if (FLAGS_protocol_version > 0) {
+        transferRequest->protocolVersion = FLAGS_protocol_version;
+      }
+    } else {
+      transferRequest.reset(new WdtTransferRequest(FLAGS_connection_url));
+      transferRequest->directory = FLAGS_directory;
+    }
+    Sender sender(*transferRequest);
+    WdtTransferRequest processedRequest = sender.init();
+    LOG(INFO) << "Starting sender with details "
+              << processedRequest.generateUrl(true);
     ADDITIONAL_SENDER_SETUP
     setUpAbort(sender);
-    sender.setTransferId(FLAGS_transfer_id);
-    if (FLAGS_protocol_version > 0) {
-      sender.setProtocolVersion(FLAGS_protocol_version);
-    }
     sender.setIncludeRegex(FLAGS_include_regex);
     sender.setExcludeRegex(FLAGS_exclude_regex);
     sender.setPruneDirRegex(FLAGS_prune_dir_regex);

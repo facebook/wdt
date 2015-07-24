@@ -115,18 +115,16 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
 }
 
 Receiver::Receiver(const WdtTransferRequest &transferRequest) {
-  // TODO generate the transfer Id if empty
   transferId_ = transferRequest.transferId;
+  if (transferId_.empty()) {
+    transferId_ = WdtBase::generateTransferId();
+  }
   protocolVersion_ = transferRequest.protocolVersion;
   destDir_ = transferRequest.directory;
   const auto &options = WdtOptions::get();
   for (int32_t portNum : transferRequest.ports) {
-    ServerSocket socket(portNum, options.backlog, &abortCheckerCallback_);
-    if (portNum == 0) {
-      WDT_CHECK(socket.listen() == OK);
-      VLOG(1) << "Auto configured a port to " << socket.getPort();
-    }
-    threadServerSockets_.emplace_back(std::move(socket));
+    threadServerSockets_.emplace_back(portNum, options.backlog,
+                                      &abortCheckerCallback_);
   }
 }
 
@@ -139,9 +137,10 @@ Receiver::Receiver(int port, int numSockets, const std::string &destDir)
   setDir(destDir);
 }
 
-int32_t Receiver::registerPorts(bool stopOnFailure) {
-  int32_t numSuccess = 0;
-  for (ServerSocket &socket : threadServerSockets_) {
+WdtTransferRequest Receiver::init() {
+  vector<ServerSocket> successfulSockets;
+  for (size_t i = 0; i < threadServerSockets_.size(); i++) {
+    ServerSocket socket = std::move(threadServerSockets_[i]);
     int max_retries = WdtOptions::get().max_retries;
     for (int retries = 0; retries < max_retries; retries++) {
       if (socket.listen() == OK) {
@@ -149,14 +148,37 @@ int32_t Receiver::registerPorts(bool stopOnFailure) {
       }
     }
     if (socket.listen() == OK) {
-      numSuccess++;
-      continue;
-    }
-    if (stopOnFailure) {
-      break;
+      successfulSockets.push_back(std::move(socket));
+    } else {
+      LOG(ERROR) << "Couldn't listen on port " << socket.getPort();
     }
   }
-  return numSuccess;
+  LOG(INFO) << "Registered " << successfulSockets.size() << " sockets";
+  ErrorCode code = OK;
+  if (threadServerSockets_.size() != successfulSockets.size()) {
+    code = FEWER_PORTS;
+    if (successfulSockets.size() == 0) {
+      code = ERROR;
+    }
+  }
+  threadServerSockets_ = std::move(successfulSockets);
+  WdtTransferRequest transferRequest(getPorts());
+  transferRequest.protocolVersion = protocolVersion_;
+  transferRequest.transferId = transferId_;
+  LOG(INFO) << "Transfer id " << transferRequest.transferId;
+  if (transferRequest.hostName.empty()) {
+    char hostName[1024];
+    int ret = gethostname(hostName, sizeof(hostName));
+    if (ret == 0) {
+      transferRequest.hostName.assign(hostName);
+    } else {
+      PLOG(ERROR) << "Couldn't find the host name";
+      code = ERROR;
+    }
+  }
+  transferRequest.directory = destDir_;
+  transferRequest.errorCode = code;
+  return transferRequest;
 }
 
 void Receiver::setDir(const std::string &destDir) {

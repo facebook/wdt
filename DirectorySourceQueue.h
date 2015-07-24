@@ -132,6 +132,9 @@ class DirectorySourceQueue : public SourceQueue {
    */
   void setFileInfo(const std::vector<FileInfo> &fileInfo);
 
+  /// Get the file info in this directory queue
+  const std::vector<FileInfo> &getFileInfo() const;
+
   /**
    * Sets whether to follow symlink or not
    *

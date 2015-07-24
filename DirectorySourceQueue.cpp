@@ -54,6 +54,10 @@ void DirectorySourceQueue::setFileInfo(const std::vector<FileInfo> &fileInfo) {
   fileInfo_ = fileInfo;
 }
 
+const std::vector<FileInfo> &DirectorySourceQueue::getFileInfo() const {
+  return fileInfo_;
+}
+
 void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   followSymlinks_ = followSymlinks;
 }

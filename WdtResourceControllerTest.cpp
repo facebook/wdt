@@ -8,6 +8,7 @@
  */
 #include "WdtResourceController.h"
 #include "Protocol.h"
+#include <folly/Random.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -22,6 +23,8 @@ class WdtResourceControllerTest : public WdtResourceController {
   const string hostName = "localhost";
   const string directory = "/tmp/wdt_resoure_controller_test";
   const int numFiles = 10;
+  typedef shared_ptr<Sender> SenderPtr;
+  typedef shared_ptr<Receiver> ReceiverPtr;
   WdtResourceControllerTest() : WdtResourceController() {
   }
   void AddObjectsWithNoLimitsTest();
@@ -29,6 +32,7 @@ class WdtResourceControllerTest : public WdtResourceController {
   void AddObjectsWithLimitsTest();
   void InvalidNamespaceTest();
   void ReleaseStaleTest();
+  void RequestSerializationTest();
 
  private:
   string getTransferId(const string& wdtNamespace, int index) {
@@ -37,6 +41,7 @@ class WdtResourceControllerTest : public WdtResourceController {
 
   WdtTransferRequest makeTransferRequest(const string& transferId) {
     WdtTransferRequest request(startPort, numPorts);
+    request.hostName = hostName;
     request.transferId = transferId;
     request.protocolVersion = protocolVersion;
     request.directory = directory;
@@ -52,9 +57,13 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
   for (; index < 3; index++) {
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
-    auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
+    ReceiverPtr receiverPtr;
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
-    auto senderPtr = addSender(wdtNamespace, transferRequest);
+    SenderPtr senderPtr;
+    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
   }
   int numSenders = index;
@@ -83,11 +92,15 @@ void WdtResourceControllerTest::MultipleNamespacesTest() {
     for (int index = 0; index < numObjectsPerNamespace; index++) {
       auto transferRequest =
           makeTransferRequest(getTransferId(transferPrefix, index));
-      auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
+      ReceiverPtr receiverPtr;
+      ErrorCode code =
+          createReceiver(wdtNamespace, transferRequest, receiverPtr);
+      ASSERT_TRUE(code == OK);
       ASSERT_TRUE(receiverPtr != nullptr);
-
-      auto senderPtr = addSender(wdtNamespace, transferRequest);
+      SenderPtr senderPtr;
+      code = createSender(wdtNamespace, transferRequest, senderPtr);
       ASSERT_TRUE(senderPtr != nullptr);
+      ASSERT_TRUE(code == OK);
 
       ++numSenders;
       ++numReceivers;
@@ -117,10 +130,13 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
     string wdtNamespace = "test-namespace-1";
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
-    auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
+    ReceiverPtr receiverPtr;
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
-
-    auto senderPtr = addSender(wdtNamespace, transferRequest);
+    SenderPtr senderPtr;
+    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     index++;
   }
@@ -128,11 +144,13 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
     string wdtNamespace = "test-namespace-1";
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
-    auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
-    // Receiver shouldn't be added
+    ReceiverPtr receiverPtr;
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ASSERT_TRUE(code == QUOTA_EXCEEDED);
     ASSERT_TRUE(receiverPtr == nullptr);
-
-    auto senderPtr = addSender(wdtNamespace, transferRequest);
+    SenderPtr senderPtr;
+    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     index++;
   }
@@ -141,12 +159,13 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
 
-    auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
-    /// Receiver should be added
+    ReceiverPtr receiverPtr;
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
-
-    auto senderPtr = addSender(wdtNamespace, transferRequest);
-    /// Sender should not be added
+    SenderPtr senderPtr;
+    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    ASSERT_TRUE(code == QUOTA_EXCEEDED);
     ASSERT_TRUE(senderPtr == nullptr);
     index++;
   }
@@ -155,11 +174,13 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
     string wdtNamespace = "test-namespace-2";
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
-    auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
-    /// Receiver shouldn't be added
+    ReceiverPtr receiverPtr;
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ASSERT_TRUE(code == QUOTA_EXCEEDED);
     ASSERT_TRUE(receiverPtr == nullptr);
-    auto senderPtr = addSender(wdtNamespace, transferRequest);
-    /// Sender should not be added
+    SenderPtr senderPtr;
+    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     index++;
   }
@@ -171,8 +192,9 @@ void WdtResourceControllerTest::InvalidNamespaceTest() {
   string transferPrefix = "invalid-namespace";
   auto transferRequest =
       makeTransferRequest(getTransferId(transferPrefix, index));
-  auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
-  /// Sender should not be added
+  ReceiverPtr receiverPtr;
+  ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+  /// Receiver should not be added
   ASSERT_TRUE(receiverPtr == nullptr);
   EXPECT_EQ(deRegisterWdtNamespace(wdtNamespace), ERROR);
 }
@@ -191,9 +213,13 @@ void WdtResourceControllerTest::ReleaseStaleTest() {
     string wdtNamespace = "test-namespace-1";
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
-    auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
+    ReceiverPtr receiverPtr;
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
-    auto senderPtr = addSender(wdtNamespace, transferRequest);
+    SenderPtr senderPtr;
+    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     index++;
   }
@@ -207,21 +233,146 @@ void WdtResourceControllerTest::ReleaseStaleTest() {
     string wdtNamespace = "test-namespace-1";
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
-    auto receiverPtr = addReceiver(wdtNamespace, transferRequest);
+    ReceiverPtr receiverPtr;
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
-    auto senderPtr = addSender(wdtNamespace, transferRequest);
+    SenderPtr senderPtr;
+    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     senderPtr = getSender(wdtNamespace, getTransferId(transferPrefix, index));
     receiverPtr =
         getReceiver(wdtNamespace, getTransferId(transferPrefix, index));
     ASSERT_TRUE(senderPtr != nullptr);
     ASSERT_TRUE(receiverPtr != nullptr);
-    ErrorCode code =
-        releaseReceiver(wdtNamespace, getTransferId(transferPrefix, index));
+    code = releaseReceiver(wdtNamespace, getTransferId(transferPrefix, index));
     EXPECT_EQ(code, OK);
     code = releaseReceiver(wdtNamespace, getTransferId(transferPrefix, index));
     ASSERT_TRUE(code != OK);
     index++;
+  }
+}
+
+void WdtResourceControllerTest::RequestSerializationTest() {
+  {
+    WdtUri uri("wdt://blah.com?k1=v1&k2=v2&k3=v3.1,v3.2");
+    EXPECT_EQ(uri.getErrorCode(), OK);
+    EXPECT_EQ(uri.getHostName(), "blah.com");
+    EXPECT_EQ(uri.getQueryParam("k1"), "v1");
+    EXPECT_EQ(uri.getQueryParam("k2"), "v2");
+    EXPECT_EQ(uri.getQueryParam("k3"), "v3.1,v3.2");
+    EXPECT_EQ(uri.getQueryParams().size(), 3);
+
+    uri = "wdt://blah?name=first,second";
+    EXPECT_EQ(uri.getErrorCode(), OK);
+    EXPECT_EQ(uri.getQueryParam("name"), "first,second");
+    uri = "http://blah.com?name=test";
+    ASSERT_TRUE(uri.getHostName().empty());
+
+    uri = "wdt://localhost";
+    EXPECT_EQ(uri.getErrorCode(), OK);
+    EXPECT_EQ(uri.getHostName(), "localhost");
+
+    uri = "wdt://localhost.facebook.com?key=value1,value2";
+    EXPECT_EQ(uri.getHostName(), "localhost.facebook.com");
+    EXPECT_EQ(uri.getQueryParam("key"), "value1,value2");
+
+    uri = "wdt://127.0.0.1?";
+    EXPECT_EQ(uri.getHostName(), "127.0.0.1");
+    EXPECT_EQ(uri.getQueryParams().size(), 0);
+
+    uri = "wdt://127.0.0.1?a";
+    EXPECT_EQ(uri.getHostName(), "127.0.0.1");
+    EXPECT_EQ(uri.getQueryParams().size(), 1);
+
+    EXPECT_EQ(uri.generateUrl(), "wdt://127.0.0.1?a=");
+
+    uri = "wdt://?a=10";
+    EXPECT_NE(uri.getErrorCode(), OK);
+
+    vector<string> keys;
+    vector<string> values;
+    WdtUri wdtUri;
+    for (int i = 0; i < 100; i++) {
+      keys.push_back(to_string(folly::Random::rand32()));
+      values.push_back(to_string(folly::Random::rand32()));
+    }
+    for (int i = 0; i < keys.size(); i++) {
+      wdtUri.setQueryParam(keys[i], values[i]);
+    }
+    uri = wdtUri.generateUrl();
+    EXPECT_NE(uri.getErrorCode(), OK);
+    ASSERT_TRUE(uri.getHostName().empty());
+    for (int i = 0; i < keys.size(); i++) {
+      EXPECT_EQ(uri.getQueryParam(keys[i]), values[i]);
+    }
+  }
+  {
+    int index = 0;
+    string wdtNamespace = "test-namespace-1";
+    string transferPrefix = "invalid-namespace";
+    auto transferRequest =
+        makeTransferRequest(getTransferId(transferPrefix, index));
+    string serialized = transferRequest.generateUrl(true);
+    WdtTransferRequest dummy(serialized);
+    EXPECT_EQ(dummy.errorCode, OK);
+    EXPECT_EQ(dummy.generateUrl(true), serialized);
+    EXPECT_EQ(dummy, transferRequest);
+  }
+  {
+    WdtTransferRequest transferRequest(0, 1);
+    // Lets not populate anything else
+    transferRequest.hostName = "localhost";
+    string serializedString = transferRequest.generateUrl(true);
+    LOG(INFO) << serializedString;
+    WdtTransferRequest dummy(serializedString);
+    LOG(INFO) << dummy.generateUrl();
+    EXPECT_EQ(transferRequest, dummy);
+  }
+  {
+    WdtTransferRequest transferRequest(0, 8);
+    Receiver receiver(transferRequest);
+    transferRequest = receiver.init();
+    ASSERT_TRUE(!receiver.getTransferId().empty());
+    ASSERT_TRUE(!transferRequest.transferId.empty());
+    EXPECT_EQ(transferRequest.errorCode, OK);
+    ASSERT_TRUE(transferRequest.ports.size() != 0);
+    for (auto port : transferRequest.ports) {
+      ASSERT_TRUE(port != 0);
+    }
+    LOG(INFO) << transferRequest.hostName;
+    ASSERT_TRUE(!transferRequest.hostName.empty());
+  }
+  {
+    string uri = "wdt://localhost?ports=1,2,3,10&dir=test&protocol=100&id=111";
+    WdtTransferRequest transferRequest(uri);
+    EXPECT_EQ(transferRequest.errorCode, OK);
+    EXPECT_EQ(transferRequest.hostName, "localhost");
+    EXPECT_EQ(transferRequest.directory, "test");
+    EXPECT_EQ(transferRequest.protocolVersion, 100);
+    EXPECT_EQ(transferRequest.transferId, "111");
+    vector<int32_t> expectedPorts;
+    for (int i = 0; i < 3; i++) {
+      expectedPorts.push_back(i + 1);
+    }
+    expectedPorts.push_back(10);
+    EXPECT_EQ(transferRequest.ports, expectedPorts);
+  }
+  {
+    string uri =
+        "wdt://localhost?ports=123*,*,*,*&dir=test&protocol=100&id=111";
+    WdtTransferRequest transferRequest(uri);
+    vector<int32_t> expectedPorts;
+    EXPECT_EQ(transferRequest.ports, expectedPorts);
+    EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
+    EXPECT_EQ(transferRequest.generateUrl(), "URI_PARSE_ERROR");
+  }
+  {
+    string url = "wdt://";
+    WdtTransferRequest transferRequest(url);
+    EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
+    EXPECT_EQ(transferRequest.generateUrl(), "URI_PARSE_ERROR");
   }
 }
 
@@ -248,6 +399,11 @@ TEST(WdtResourceController, InvalidNamespaceTest) {
 TEST(WdtResourceControllerTest, ReleaseStaleTest) {
   WdtResourceControllerTest t;
   t.ReleaseStaleTest();
+}
+
+TEST(WdtResourceControllerTest, RequestSerializationTest) {
+  WdtResourceControllerTest t;
+  t.RequestSerializationTest();
 }
 }
 }

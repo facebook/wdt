@@ -77,10 +77,11 @@ class WdtNamespaceController : public WdtControllerBase {
   explicit WdtNamespaceController(const std::string& wdtNamespace);
 
   /// Add a receiver for this namespace
-  ReceiverPtr addReceiver(const WdtTransferRequest& request);
+  ErrorCode createReceiver(const WdtTransferRequest& request,
+                           ReceiverPtr& receiver);
 
   /// Add a sender for this namespace
-  SenderPtr addSender(const WdtTransferRequest& request);
+  ErrorCode createSender(const WdtTransferRequest& request, SenderPtr& sender);
 
   /// Delete a receiver from this namespace
   ErrorCode releaseReceiver(const std::string& transferId);
@@ -121,12 +122,13 @@ class WdtResourceController : public WdtControllerBase {
   WdtResourceController();
 
   /// Add a sender specified with namespace
-  SenderPtr addSender(const std::string& wdtNameSpace,
-                      const WdtTransferRequest& request);
+  ErrorCode createSender(const std::string& wdtNameSpace,
+                         const WdtTransferRequest& request, SenderPtr& sender);
 
   /// Add a receiver specified with namespace
-  ReceiverPtr addReceiver(const std::string& wdtNameSpace,
-                          const WdtTransferRequest& request);
+  ErrorCode createReceiver(const std::string& wdtNameSpace,
+                           const WdtTransferRequest& request,
+                           ReceiverPtr& receiver);
 
   /// Release a sender specified with namespace and identifier
   ErrorCode releaseSender(const std::string& wdtNamespace,

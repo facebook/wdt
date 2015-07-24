@@ -159,6 +159,9 @@ Sender::Sender(const WdtTransferRequest &transferRequest)
     : Sender(transferRequest.hostName, transferRequest.directory,
              transferRequest.ports, transferRequest.fileInfo) {
   transferId_ = transferRequest.transferId;
+  if (transferId_.empty()) {
+    transferId_ = WdtBase::generateTransferId();
+  }
   protocolVersion_ = transferRequest.protocolVersion;
 }
 
@@ -168,6 +171,18 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir,
     : Sender(destHost, srcDir) {
   ports_ = ports;
   dirQueue_->setFileInfo(srcFileInfo);
+}
+
+WdtTransferRequest Sender::init() {
+  WdtTransferRequest transferRequest(getPorts());
+  transferRequest.transferId = transferId_;
+  transferRequest.protocolVersion = protocolVersion_;
+  transferRequest.directory = srcDir_;
+  transferRequest.hostName = destHost_;
+  // TODO Figure out what to do with file info
+  // transferRequest.fileInfo = dirQueue_->getFileInfo();
+  transferRequest.errorCode = OK;
+  return transferRequest;
 }
 
 Sender::~Sender() {

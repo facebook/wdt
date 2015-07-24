@@ -134,6 +134,9 @@ class Sender : public WdtBase {
          const std::vector<int32_t> &ports,
          const std::vector<FileInfo> &srcFileInfo);
 
+  /// Setup before start (@see WdtBase.h)
+  WdtTransferRequest init() override;
+
   /**
    * If the transfer has not finished, then it is aborted. finish() is called to
    * wait for threads to end.

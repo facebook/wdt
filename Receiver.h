@@ -51,15 +51,8 @@ class Receiver : public WdtBase {
    */
   Receiver(int port, int numSockets, const std::string &destDir);
 
-  /**
-   * Starts listening on as many ports as possible from the ports
-   * provided in the constructor and returns the number of successfully
-   * bound ports. Doesn't resize the ports, the ports which couldn't be
-   * bound remain in the threadServerSockets_
-   * @param stopOnFailure       Stops iteration over the ports to listen
-   *                            on first failure to listen
-   */
-  int32_t registerPorts(bool stopOnFailure = false);
+  /// Setup before starting (@see WdtBase.h)
+  WdtTransferRequest init() override;
 
   /**
    * Joins on the threads spawned by start. This method
