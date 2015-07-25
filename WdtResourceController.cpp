@@ -9,7 +9,7 @@
 #include "WdtResourceController.h"
 
 using namespace std;
-const int64_t kDelTimeToSleepSeonds = 2;
+const int64_t kDelTimeToSleepMillis = 100;
 
 namespace facebook {
 namespace wdt {
@@ -417,7 +417,7 @@ ErrorCode WdtResourceController::deRegisterWdtNamespace(
 
   while (controller.use_count() > 1) {
     /* sleep override */
-    usleep(kDelTimeToSleepSeonds * 1000 * 1000);
+    usleep(kDelTimeToSleepMillis * 1000);
     LOG(INFO) << "Trying to delete the namespace " << wdtNamespace;
   }
   LOG(INFO) << "Deleted the namespace " << wdtNamespace;

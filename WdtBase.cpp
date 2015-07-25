@@ -289,8 +289,13 @@ void WdtBase::configureThrottler() {
 }
 
 string WdtBase::generateTransferId() {
-  std::default_random_engine randomEngine(time(0));
-  string transferId = to_string(randomEngine());
+  static std::default_random_engine randomEngine{std::random_device()()};
+  static std::mutex mutex;
+  string transferId;
+  {
+    std::lock_guard<std::mutex> lock(mutex);
+    transferId = to_string(randomEngine());
+  }
   LOG(INFO) << "Generated a transfer id " << transferId;
   return transferId;
 }

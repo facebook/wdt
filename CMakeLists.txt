@@ -248,4 +248,6 @@ if (BUILD_TESTING)
   target_link_libraries(resource_controller_test wdt4tests)
   add_test(NAME ResourceControllerTests COMMAND resource_controller_test)
 
+  add_test(NAME WdtRandGenTest COMMAND
+  ${CMAKE_CURRENT_SOURCE_DIR}/wdt_rand_gen_test.sh)
 endif(BUILD_TESTING)

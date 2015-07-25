@@ -405,10 +405,17 @@ TEST(WdtResourceControllerTest, RequestSerializationTest) {
   WdtResourceControllerTest t;
   t.RequestSerializationTest();
 }
+
+TEST(WdtResourceControllerTest, TransferIdGenerationTest) {
+  string transferId1 = WdtBase::generateTransferId();
+  string transferId2 = WdtBase::generateTransferId();
+  EXPECT_NE(transferId1, transferId2);
+}
 }
 }
 
 int main(int argc, char* argv[]) {
+  FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);

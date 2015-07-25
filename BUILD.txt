@@ -20,7 +20,7 @@ See below for mac (Cmake 3.3/head on a mac is recommended for Xcode support)
 wget http://www.cmake.org/files/v3.2/cmake-3.2.3.tar.gz
 tar xvfz cmake-3.2.3.tar.gz
 cd cmake-3.2.3
-./bootstrap --prefix=/usr --parallel=16 && make && sudo make install
+./bootstrap --prefix=/usr --parallel=16 && make -j && sudo make install
 
 # Get folly
 mkdir deps/; cd deps
