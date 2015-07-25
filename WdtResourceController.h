@@ -19,6 +19,20 @@ namespace wdt {
 typedef std::shared_ptr<Receiver> ReceiverPtr;
 typedef std::shared_ptr<Sender> SenderPtr;
 
+/// A sample abort checker using std::atomic for abort
+class WdtAbortChecker : public WdtBase::IAbortChecker {
+ public:
+  explicit WdtAbortChecker(const std::atomic<bool> &abortTrigger)
+      : abortTriggerPtr_(&abortTrigger) {
+  }
+  bool shouldAbort() const {
+    return abortTriggerPtr_->load();
+  }
+
+ private:
+  std::atomic<bool> const *abortTriggerPtr_;
+};
+
 /**
  * Base class for both wdt global and namespace controller
  */

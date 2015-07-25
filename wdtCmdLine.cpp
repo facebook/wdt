@@ -8,6 +8,7 @@
  */
 #include "Sender.h"
 #include "Receiver.h"
+#include "WdtResourceController.h"
 #include <chrono>
 #include <future>
 #include <folly/String.h>
@@ -62,21 +63,6 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
   return os;
 }
 
-// Example of use of a std::atomic for abort even though in this
-// case we could check the time directly (but this is cheaper if more code)
-class AbortChecker : public WdtBase::IAbortChecker {
- public:
-  explicit AbortChecker(const std::atomic<bool> &abortTrigger)
-      : abortTriggerPtr_(&abortTrigger) {
-  }
-  bool shouldAbort() const {
-    return abortTriggerPtr_->load();
-  }
-
- private:
-  std::atomic<bool> const *abortTriggerPtr_;
-};
-
 std::mutex abortMutex;
 std::condition_variable abortCondVar;
 
@@ -87,7 +73,7 @@ void setUpAbort(WdtBase &senderOrReceiver) {
     return;
   }
   static std::atomic<bool> abortTrigger{false};
-  static AbortChecker chkr(abortTrigger);
+  static WdtAbortChecker chkr(abortTrigger);
   senderOrReceiver.setAbortChecker(&chkr);
   auto lambda = [=] {
     LOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
@@ -141,14 +127,12 @@ int main(int argc, char *argv[]) {
       retCode = ERROR;
     }
   } else if (FLAGS_destination.empty() && FLAGS_connection_url.empty()) {
-    WdtTransferRequest transferRequest(FLAGS_start_port, FLAGS_num_ports);
-    transferRequest.directory = FLAGS_directory;
-    transferRequest.transferId = FLAGS_transfer_id;
+    Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
+    receiver.setTransferId(FLAGS_transfer_id);
     if (FLAGS_protocol_version > 0) {
-      transferRequest.protocolVersion = FLAGS_protocol_version;
+      receiver.setProtocolVersion(FLAGS_protocol_version);
     }
-    Receiver receiver(transferRequest);
-    transferRequest = receiver.init();
+    WdtTransferRequest transferRequest = receiver.init();
     if (transferRequest.errorCode == ERROR) {
       LOG(ERROR) << "Error setting up receiver";
       return transferRequest.errorCode;
@@ -188,31 +172,35 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < options.num_ports; i++) {
       ports.push_back(options.start_port + i);
     }
-    std::unique_ptr<WdtTransferRequest> transferRequest;
+    std::unique_ptr<Sender> sender;
     if (FLAGS_connection_url.empty()) {
-      transferRequest.reset(new WdtTransferRequest(ports));
-      transferRequest->directory = FLAGS_directory;
-      transferRequest->fileInfo = fileInfo;
-      transferRequest->hostName = FLAGS_destination;
-      transferRequest->transferId = FLAGS_transfer_id;
+      sender.reset(
+          new Sender(FLAGS_destination, FLAGS_directory, ports, fileInfo));
       if (FLAGS_protocol_version > 0) {
-        transferRequest->protocolVersion = FLAGS_protocol_version;
+        sender->setProtocolVersion(FLAGS_protocol_version);
       }
+      sender->setTransferId(FLAGS_transfer_id);
     } else {
-      transferRequest.reset(new WdtTransferRequest(FLAGS_connection_url));
-      transferRequest->directory = FLAGS_directory;
+      // If you are using a connection url it is
+      // expected that you set protocol version, ports
+      // and transfer id in the url
+      WdtTransferRequest transferRequest(FLAGS_connection_url);
+      LOG(INFO) << transferRequest.generateUrl(true);
+      if (transferRequest.directory.empty()) {
+        transferRequest.directory = FLAGS_directory;
+      }
+      sender.reset(new Sender(transferRequest));
     }
-    Sender sender(*transferRequest);
-    WdtTransferRequest processedRequest = sender.init();
+    WdtTransferRequest processedRequest = sender->init();
     LOG(INFO) << "Starting sender with details "
               << processedRequest.generateUrl(true);
     ADDITIONAL_SENDER_SETUP
-    setUpAbort(sender);
-    sender.setIncludeRegex(FLAGS_include_regex);
-    sender.setExcludeRegex(FLAGS_exclude_regex);
-    sender.setPruneDirRegex(FLAGS_prune_dir_regex);
+    setUpAbort(*sender);
+    sender->setIncludeRegex(FLAGS_include_regex);
+    sender->setExcludeRegex(FLAGS_exclude_regex);
+    sender->setPruneDirRegex(FLAGS_prune_dir_regex);
     // TODO fix that
-    std::unique_ptr<TransferReport> report = sender.transfer();
+    std::unique_ptr<TransferReport> report = sender->transfer();
     retCode = report->getSummary().getErrorCode();
   }
   cancelAbort();

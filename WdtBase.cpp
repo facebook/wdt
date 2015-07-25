@@ -163,7 +163,7 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
 }
 
 string WdtTransferRequest::generateUrl(bool genFull) const {
-  if (errorCode != OK) {
+  if (errorCode == ERROR || errorCode == URI_PARSE_ERROR) {
     LOG(ERROR) << "Transfer request has errors present ";
     return errorCodeToStr(errorCode);
   }
