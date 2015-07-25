@@ -66,6 +66,9 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
   }
+  EXPECT_EQ(getAllReceivers(wdtNamespace).size(), index);
+  EXPECT_EQ(getAllSenders(wdtNamespace).size(), index);
+
   int numSenders = index;
   int numReceivers = index;
 

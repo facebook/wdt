@@ -196,6 +196,24 @@ ReceiverPtr WdtNamespaceController::getReceiver(
   return it->second;
 }
 
+vector<SenderPtr> WdtNamespaceController::getSenders() const {
+  vector<SenderPtr> senders;
+  GuardLock lock(controllerMutex_);
+  for (const auto& senderPair : sendersMap_) {
+    senders.push_back(senderPair.second);
+  }
+  return senders;
+}
+
+vector<ReceiverPtr> WdtNamespaceController::getReceivers() const {
+  vector<ReceiverPtr> receivers;
+  GuardLock lock(controllerMutex_);
+  for (const auto& receiverPair : receiversMap_) {
+    receivers.push_back(receiverPair.second);
+  }
+  return receivers;
+}
+
 WdtNamespaceController::~WdtNamespaceController() {
   releaseAllSenders();
   releaseAllReceivers();
@@ -369,6 +387,17 @@ SenderPtr WdtResourceController::getSender(const string& wdtNamespace,
   return controller->getSender(transferId);
 }
 
+vector<SenderPtr> WdtResourceController::getAllSenders(
+    const string& wdtNamespace) const {
+  NamespaceControllerPtr controller = nullptr;
+  controller = getNamespaceController(wdtNamespace, true);
+  if (!controller) {
+    LOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
+    return vector<SenderPtr>();
+  }
+  return controller->getSenders();
+}
+
 ReceiverPtr WdtResourceController::getReceiver(const string& wdtNamespace,
                                                const string& transferId) const {
   NamespaceControllerPtr controller = nullptr;
@@ -378,6 +407,17 @@ ReceiverPtr WdtResourceController::getReceiver(const string& wdtNamespace,
     return nullptr;
   }
   return controller->getReceiver(transferId);
+}
+
+vector<ReceiverPtr> WdtResourceController::getAllReceivers(
+    const string& wdtNamespace) const {
+  NamespaceControllerPtr controller = nullptr;
+  controller = getNamespaceController(wdtNamespace, true);
+  if (!controller) {
+    LOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
+    return vector<ReceiverPtr>();
+  }
+  return controller->getReceivers();
 }
 
 ErrorCode WdtResourceController::registerWdtNamespace(

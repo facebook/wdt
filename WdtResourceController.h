@@ -115,6 +115,12 @@ class WdtNamespaceController : public WdtControllerBase {
   /// Get the receiver created for transfer id
   ReceiverPtr getReceiver(const std::string& transferId) const;
 
+  /// Get all senders
+  std::vector<SenderPtr> getSenders() const;
+
+  /// Get all receivers
+  std::vector<ReceiverPtr> getReceivers() const;
+
   /// Destructor, clears the senders and receivers
   virtual ~WdtNamespaceController() override;
 
@@ -183,6 +189,13 @@ class WdtResourceController : public WdtControllerBase {
   /// Get a particular receiver from a wdt namespace
   ReceiverPtr getReceiver(const std::string& wdtNamespace,
                           const std::string& transferId) const;
+
+  /// Get all senders in a namespace
+  std::vector<SenderPtr> getAllSenders(const std::string& wdtNamespace) const;
+
+  /// Get all receivers in a namespace
+  std::vector<ReceiverPtr> getAllReceivers(
+      const std::string& wdtNamespace) const;
 
   /// Cleanly shuts down the controller
   void shutdown();
