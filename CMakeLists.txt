@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.14.1507210)
+project("WDT" LANGUAGES C CXX VERSION 1.14.1507270)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -47,14 +47,15 @@ set(CMAKE_CXX_FLAGS "-msse4.2")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "_bin/wdt")
 
 # Check that we have the Folly source tree
-set(FOLLY_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/folly CACHE path
+set(FOLLY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../folly" CACHE path
     "Folly source tree (folly/ThreadLocal.h should be reachable from there")
 # Check for folly - TODO: this doesn't work well for relative paths
 # (because of relative to build dir vs relative to source tree for -I)
 if(NOT EXISTS "${FOLLY_SOURCE_DIR}/folly/ThreadLocal.h")
   MESSAGE(FATAL_ERROR "${FOLLY_SOURCE_DIR}/folly/ThreadLocal.h not found
 Fix using:
-mkdir deps; cd deps; git clone https://github.com/facebook/folly.git
+(in a sister directory of the wdt source tree - same level:)
+git clone https://github.com/facebook/folly.git
 or change FOLLY_SOURCE_DIR (use ccmake or -DFOLLY_SOURCE_DIR=...)
 ")
 endif()
@@ -62,10 +63,10 @@ endif()
 
 # The part of folly that isn't pure .h and we use:
 set (FOLLY_CPP_SRC
-${FOLLY_SOURCE_DIR}/folly/Conv.cpp
-${FOLLY_SOURCE_DIR}/folly/Demangle.cpp
-${FOLLY_SOURCE_DIR}/folly/Malloc.cpp
-${FOLLY_SOURCE_DIR}/folly/Checksum.cpp
+"${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
+"${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
+"${FOLLY_SOURCE_DIR}/folly/Malloc.cpp"
+"${FOLLY_SOURCE_DIR}/folly/Checksum.cpp"
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
@@ -160,12 +161,12 @@ configure_file(WdtConfig.h.in wdt/WdtConfig.h)
 
 # Malloc stuff  tied to not supporting weaksympbols
 if (NOT FOLLY_HAVE_WEAK_SYMBOLS)
-  list(APPEND FOLLY_CPP_SRC ${FOLLY_SOURCE_DIR}/folly/detail/MallocImpl.cpp)
+  list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/detail/MallocImpl.cpp")
   message(STATUS "no weak symbols, adding MallocImpl to folly src")
 endif()
 # For missing __throw_logic_error:
 if (NOT FOLLY_HAVE_BITS_FUNCTEXCEPT)
-  list(APPEND FOLLY_CPP_SRC ${FOLLY_SOURCE_DIR}/folly/detail/FunctionalExcept.cpp)
+  list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/detail/FunctionalExcept.cpp")
   message(STATUS "no bits/functexcept.h, adding FunctionalExcept to folly src")
 endif()
 
@@ -201,8 +202,8 @@ if (BUILD_TESTING)
 
   # Extra code that we use in tests
   add_library(wdt4tests
-    ${FOLLY_SOURCE_DIR}/folly/FileUtil.cpp # used by Random used by tests
-    ${FOLLY_SOURCE_DIR}/folly/Random.cpp # used indirectly by tests
+    "${FOLLY_SOURCE_DIR}/folly/FileUtil.cpp" # used by Random used by tests
+    "${FOLLY_SOURCE_DIR}/folly/Random.cpp" # used indirectly by tests
   )
 
   include(ExternalProject)
@@ -223,7 +224,7 @@ if (BUILD_TESTING)
   )
   # Specify include dir for both gmock and gtest
   externalproject_get_property(gmock SOURCE_DIR)
-  include_directories(${SOURCE_DIR}/include ${SOURCE_DIR}/gtest/include)
+  include_directories("${SOURCE_DIR}/include" "${SOURCE_DIR}/gtest/include")
 
   externalproject_get_property(gmock BINARY_DIR)
 
@@ -232,6 +233,7 @@ if (BUILD_TESTING)
   #   ${GMOCK_PREFIX}/src/gmock/gmock-all.cc
   #   ${GMOCK_PREFIX}/src/gmock/gmock_main.cc)
 
+  add_dependencies(wdt4tests gmock)
 
   # ${BINARY_DIR}/libgmock.a works everywhere except xcode...
 # so ugly weird hack generating warnings about unknown dir for now:
@@ -249,5 +251,10 @@ if (BUILD_TESTING)
   add_test(NAME ResourceControllerTests COMMAND resource_controller_test)
 
   add_test(NAME WdtRandGenTest COMMAND
-  ${CMAKE_CURRENT_SOURCE_DIR}/wdt_rand_gen_test.sh)
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_rand_gen_test.sh")
+
+  add_test(NAME WdtBasicE2E COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_simple_test.sh")
+
+
 endif(BUILD_TESTING)

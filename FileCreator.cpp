@@ -208,7 +208,7 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
   std::string fullDirPath;
   folly::toAppend(rootDir_, dir, &fullDirPath);
   int code = mkdir(fullDirPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-  if (code != 0 && errno != EEXIST) {
+  if (code != 0 && errno != EEXIST && errno != EISDIR) {
     PLOG(ERROR) << "failed to make directory " << fullDirPath;
     return false;
   } else if (code != 0) {

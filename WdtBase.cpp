@@ -146,10 +146,11 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
                << wdtUri.getQueryParam(PROTOCOL_VERSION_PARAM);
     errorCode = URI_PARSE_ERROR;
   }
-  StringPiece portsList(wdtUri.getQueryParam(PORTS_PARAM));
+  string portsStr(wdtUri.getQueryParam(PORTS_PARAM));
+  StringPiece portsList(portsStr); // pointers into portsStr
   do {
     StringPiece portNum = portsList.split_step(',');
-    int port = 0;
+    int port;
     if (!portNum.empty()) {
       try {
         port = folly::to<int32_t>(portNum);

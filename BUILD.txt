@@ -36,7 +36,7 @@ sudo apt-get install libgoogle-glog-dev libboost-system-dev \
 # If double-conversion isn't available:
 
 git clone https://github.com/floitsch/double-conversion.git
-cd double-conversion; cmake . ; make && sudo make install
+cd double-conversion; cmake . ; make -j && sudo make install
 
 
 # Get and install gflags and glog - it's important to build and configure
@@ -46,11 +46,11 @@ git clone https://github.com/schuhschuh/gflags.git
 mkdir gflags/build
 cd gflags/build
 cmake -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on ..
-make && sudo make install
+make -j && sudo make install
 # Glog
 svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 cd glog
-./configure && make && sudo make install
+./configure && make -j && sudo make install
 
 
 # And finally Build wdt itself:
@@ -81,7 +81,7 @@ brew update
 brew install glog gflags boost
 ## Double conversion
 git clone https://github.com/floitsch/double-conversion.git
-cd double-conversion; cmake . ; make && sudo make install
+cd double-conversion; cmake . ; make -j && sudo make install
 
 ### Get folly source tree
 As above
@@ -93,8 +93,6 @@ cd wdt_mac
 cmake pathtosrccode -G Xcode -DBUILD_TESTING=on
 # Using unix makefiles
 cmake pathtosrccode -G "Unix Makefiles" -DBUILD_TESTING=on
-# Do not use -j the first time as gmock download cause issues
-# http://www.cmake.org/Bug/view.php?id=15663
 make -j
 make test
 sudo make install

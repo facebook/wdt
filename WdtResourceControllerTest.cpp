@@ -224,6 +224,7 @@ void WdtResourceControllerTest::InvalidNamespaceTest() {
   ReceiverPtr receiverPtr;
   ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
                                   transferRequest, receiverPtr);
+  ASSERT_EQ(code, NOT_FOUND);
   /// Receiver should not be added
   ASSERT_TRUE(receiverPtr == nullptr);
   EXPECT_EQ(deRegisterWdtNamespace(wdtNamespace), ERROR);

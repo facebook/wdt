@@ -1,3 +1,4 @@
+![](wdt_logo.png)
 `WDT` Warp speed Data Transfer
 ------------------------------
 
@@ -253,7 +254,12 @@ a 1 second delay before we send the first payload byte
 
 See CONTRIBUTING.md
 
-Please run the tests (make test) and the manual tests (integration upcoming)
+Please run the tests
+```
+CTEST_OUTPUT_ON_FAILURE=1 make test
+```
+And ideally also the manual tests (integration/porting upcoming)
+
 wdt_e2e_test.sh
 wdt_download_resumption_test.sh
 wdt_network_test.sh
