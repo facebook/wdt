@@ -119,8 +119,8 @@ Receiver::Receiver(const WdtTransferRequest &transferRequest) {
   if (transferId_.empty()) {
     transferId_ = WdtBase::generateTransferId();
   }
-  protocolVersion_ = transferRequest.protocolVersion;
-  destDir_ = transferRequest.directory;
+  setProtocolVersion(transferRequest.protocolVersion);
+  setDir(transferRequest.directory);
   const auto &options = WdtOptions::get();
   for (int32_t portNum : transferRequest.ports) {
     threadServerSockets_.emplace_back(portNum, options.backlog,

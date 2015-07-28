@@ -162,7 +162,7 @@ Sender::Sender(const WdtTransferRequest &transferRequest)
   if (transferId_.empty()) {
     transferId_ = WdtBase::generateTransferId();
   }
-  protocolVersion_ = transferRequest.protocolVersion;
+  setProtocolVersion(transferRequest.protocolVersion);
 }
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir,
