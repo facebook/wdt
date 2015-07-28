@@ -35,11 +35,11 @@ class WdtResourceControllerTest : public WdtResourceController {
   void RequestSerializationTest();
 
  private:
-  string getTransferId(const string& wdtNamespace, int index) {
+  string getTransferId(const string &wdtNamespace, int index) {
     return wdtNamespace + to_string(index);
   }
 
-  WdtTransferRequest makeTransferRequest(const string& transferId) {
+  WdtTransferRequest makeTransferRequest(const string &transferId) {
     WdtTransferRequest request(startPort, numPorts);
     request.hostName = hostName;
     request.transferId = transferId;
@@ -58,11 +58,13 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
     ReceiverPtr receiverPtr;
-    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                    transferRequest, receiverPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
     SenderPtr senderPtr;
-    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    code = createSender(wdtNamespace, transferRequest.transferId,
+                        transferRequest, senderPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
   }
@@ -80,6 +82,21 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
 
   ASSERT_TRUE(numSenders_ == numSenders - 1);
   ASSERT_TRUE(numReceivers_ == numReceivers - 1);
+  vector<string> erasedIds;
+  code = releaseStaleSenders(wdtNamespace, erasedIds);
+  EXPECT_EQ(code, OK);
+  vector<string> expectedErasedIds;
+  for (int i = 1; i <= 2; i++) {
+    expectedErasedIds.push_back(getTransferId(transferPrefix, i));
+  }
+  sort(erasedIds.begin(), erasedIds.end());
+  sort(expectedErasedIds.begin(), expectedErasedIds.end());
+  EXPECT_EQ(erasedIds, expectedErasedIds);
+
+  erasedIds.clear();
+  code = releaseStaleReceivers(wdtNamespace, erasedIds);
+  sort(erasedIds.begin(), erasedIds.end());
+  EXPECT_EQ(erasedIds, expectedErasedIds);
 }
 
 void WdtResourceControllerTest::MultipleNamespacesTest() {
@@ -96,12 +113,13 @@ void WdtResourceControllerTest::MultipleNamespacesTest() {
       auto transferRequest =
           makeTransferRequest(getTransferId(transferPrefix, index));
       ReceiverPtr receiverPtr;
-      ErrorCode code =
-          createReceiver(wdtNamespace, transferRequest, receiverPtr);
+      ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                      transferRequest, receiverPtr);
       ASSERT_TRUE(code == OK);
       ASSERT_TRUE(receiverPtr != nullptr);
       SenderPtr senderPtr;
-      code = createSender(wdtNamespace, transferRequest, senderPtr);
+      code = createSender(wdtNamespace, transferRequest.transferId,
+                          transferRequest, senderPtr);
       ASSERT_TRUE(senderPtr != nullptr);
       ASSERT_TRUE(code == OK);
 
@@ -134,11 +152,13 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
     ReceiverPtr receiverPtr;
-    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                    transferRequest, receiverPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
     SenderPtr senderPtr;
-    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    code = createSender(wdtNamespace, transferRequest.transferId,
+                        transferRequest, senderPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     index++;
@@ -148,11 +168,13 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
     ReceiverPtr receiverPtr;
-    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                    transferRequest, receiverPtr);
     ASSERT_TRUE(code == QUOTA_EXCEEDED);
     ASSERT_TRUE(receiverPtr == nullptr);
     SenderPtr senderPtr;
-    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    code = createSender(wdtNamespace, transferRequest.transferId,
+                        transferRequest, senderPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     index++;
@@ -163,11 +185,13 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
         makeTransferRequest(getTransferId(transferPrefix, index));
 
     ReceiverPtr receiverPtr;
-    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                    transferRequest, receiverPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
     SenderPtr senderPtr;
-    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    code = createSender(wdtNamespace, transferRequest.transferId,
+                        transferRequest, senderPtr);
     ASSERT_TRUE(code == QUOTA_EXCEEDED);
     ASSERT_TRUE(senderPtr == nullptr);
     index++;
@@ -178,11 +202,13 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
     ReceiverPtr receiverPtr;
-    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                    transferRequest, receiverPtr);
     ASSERT_TRUE(code == QUOTA_EXCEEDED);
     ASSERT_TRUE(receiverPtr == nullptr);
     SenderPtr senderPtr;
-    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    code = createSender(wdtNamespace, transferRequest.transferId,
+                        transferRequest, senderPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     index++;
@@ -196,7 +222,8 @@ void WdtResourceControllerTest::InvalidNamespaceTest() {
   auto transferRequest =
       makeTransferRequest(getTransferId(transferPrefix, index));
   ReceiverPtr receiverPtr;
-  ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+  ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                  transferRequest, receiverPtr);
   /// Receiver should not be added
   ASSERT_TRUE(receiverPtr == nullptr);
   EXPECT_EQ(deRegisterWdtNamespace(wdtNamespace), ERROR);
@@ -217,11 +244,13 @@ void WdtResourceControllerTest::ReleaseStaleTest() {
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
     ReceiverPtr receiverPtr;
-    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                    transferRequest, receiverPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
     SenderPtr senderPtr;
-    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    code = createSender(wdtNamespace, transferRequest.transferId,
+                        transferRequest, senderPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     index++;
@@ -237,11 +266,13 @@ void WdtResourceControllerTest::ReleaseStaleTest() {
     auto transferRequest =
         makeTransferRequest(getTransferId(transferPrefix, index));
     ReceiverPtr receiverPtr;
-    ErrorCode code = createReceiver(wdtNamespace, transferRequest, receiverPtr);
+    ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
+                                    transferRequest, receiverPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(receiverPtr != nullptr);
     SenderPtr senderPtr;
-    code = createSender(wdtNamespace, transferRequest, senderPtr);
+    code = createSender(wdtNamespace, transferRequest.transferId,
+                        transferRequest, senderPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     senderPtr = getSender(wdtNamespace, getTransferId(transferPrefix, index));
@@ -417,7 +448,7 @@ TEST(WdtResourceControllerTest, TransferIdGenerationTest) {
 }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);

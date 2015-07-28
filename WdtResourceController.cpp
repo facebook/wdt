@@ -37,24 +37,24 @@ shared_ptr<Throttler> WdtControllerBase::getThrottler() const {
   return throttler_;
 }
 
-WdtControllerBase::WdtControllerBase(const string& controllerName) {
+WdtControllerBase::WdtControllerBase(const string &controllerName) {
   controllerName_ = controllerName;
 }
 
-WdtNamespaceController::WdtNamespaceController(const string& wdtNamespace)
+WdtNamespaceController::WdtNamespaceController(const string &wdtNamespace)
     : WdtControllerBase(wdtNamespace) {
 }
 
 ErrorCode WdtNamespaceController::createReceiver(
-    const WdtTransferRequest& request, ReceiverPtr& receiver) {
-  const std::string& transferId = request.transferId;
+    const WdtTransferRequest &request, const string &identifier,
+    ReceiverPtr &receiver) {
   receiver = nullptr;
   {
     GuardLock lock(controllerMutex_);
     // Check for already existing
-    auto it = receiversMap_.find(transferId);
+    auto it = receiversMap_.find(identifier);
     if (it != receiversMap_.end()) {
-      LOG(WARNING) << "Receiver already added for transfer " << transferId;
+      LOG(WARNING) << "Receiver already added for transfer " << identifier;
       receiver = it->second;
       return OK;
     }
@@ -69,22 +69,22 @@ ErrorCode WdtNamespaceController::createReceiver(
   receiver->setThrottler(throttler_);
   {
     GuardLock lock(controllerMutex_);
-    receiversMap_[request.transferId] = receiver;
+    receiversMap_[identifier] = receiver;
     ++numReceivers_;
   }
   return OK;
 }
 
 ErrorCode WdtNamespaceController::createSender(
-    const WdtTransferRequest& request, SenderPtr& sender) {
-  const std::string& transferId = request.transferId;
+    const WdtTransferRequest &request, const string &identifier,
+    SenderPtr &sender) {
   sender = nullptr;
   {
     GuardLock lock(controllerMutex_);
     // Check for already existing
-    auto it = sendersMap_.find(transferId);
+    auto it = sendersMap_.find(identifier);
     if (it != sendersMap_.end()) {
-      LOG(WARNING) << "Sender already added for transfer " << transferId;
+      LOG(WARNING) << "Sender already added for transfer " << identifier;
       sender = it->second;
       return OK;
     }
@@ -99,20 +99,20 @@ ErrorCode WdtNamespaceController::createSender(
   sender->setThrottler(throttler_);
   {
     GuardLock lock(controllerMutex_);
-    sendersMap_[request.transferId] = sender;
+    sendersMap_[identifier] = sender;
     ++numSenders_;
   }
   return OK;
 }
 
 ErrorCode WdtNamespaceController::releaseReceiver(
-    const std::string& transferId) {
+    const std::string &identifier) {
   ReceiverPtr receiver = nullptr;
   {
     GuardLock lock(controllerMutex_);
-    auto it = receiversMap_.find(transferId);
+    auto it = receiversMap_.find(identifier);
     if (it == receiversMap_.end()) {
-      LOG(ERROR) << "Couldn't find receiver to release with id " << transferId
+      LOG(ERROR) << "Couldn't find receiver to release with id " << identifier
                  << " for " << controllerName_;
       return NOT_FOUND;
     }
@@ -125,13 +125,13 @@ ErrorCode WdtNamespaceController::releaseReceiver(
   return OK;
 }
 
-ErrorCode WdtNamespaceController::releaseSender(const std::string& transferId) {
+ErrorCode WdtNamespaceController::releaseSender(const std::string &identifier) {
   SenderPtr sender = nullptr;
   {
     GuardLock lock(controllerMutex_);
-    auto it = sendersMap_.find(transferId);
+    auto it = sendersMap_.find(identifier);
     if (it == sendersMap_.end()) {
-      LOG(ERROR) << "Couldn't find sender to release with id " << transferId
+      LOG(ERROR) << "Couldn't find sender to release with id " << identifier
                  << " for " << controllerName_;
       return NOT_FOUND;
     }
@@ -147,7 +147,7 @@ int64_t WdtNamespaceController::releaseAllSenders() {
   vector<SenderPtr> senders;
   {
     GuardLock lock(controllerMutex_);
-    for (auto& senderPair : sendersMap_) {
+    for (auto &senderPair : sendersMap_) {
       senders.push_back(std::move(senderPair.second));
     }
     sendersMap_.clear();
@@ -158,11 +158,33 @@ int64_t WdtNamespaceController::releaseAllSenders() {
   return numSenders;
 }
 
+vector<string> WdtNamespaceController::releaseStaleSenders() {
+  vector<SenderPtr> senders;
+  vector<string> erasedIds;
+  {
+    GuardLock lock(controllerMutex_);
+    for (auto it = sendersMap_.begin(); it != sendersMap_.end();) {
+      auto sender = it->second;
+      string identifier = it->first;
+      if (sender->isTransferFinished()) {
+        it = sendersMap_.erase(it);
+        erasedIds.push_back(identifier);
+        senders.push_back(std::move(sender));
+        --numSenders_;
+        continue;
+      }
+      it++;
+    }
+  }
+  LOG(INFO) << "Cleared " << senders.size() << " stale senders";
+  return erasedIds;
+}
+
 int64_t WdtNamespaceController::releaseAllReceivers() {
   vector<ReceiverPtr> receivers;
   {
     GuardLock lock(controllerMutex_);
-    for (auto& receiverPair : receiversMap_) {
+    for (auto &receiverPair : receiversMap_) {
       receivers.push_back(std::move(receiverPair.second));
     }
     receiversMap_.clear();
@@ -173,11 +195,33 @@ int64_t WdtNamespaceController::releaseAllReceivers() {
   return numReceivers;
 }
 
-SenderPtr WdtNamespaceController::getSender(const string& transferId) const {
+vector<string> WdtNamespaceController::releaseStaleReceivers() {
+  vector<ReceiverPtr> receivers;
+  vector<string> erasedIds;
+  {
+    GuardLock lock(controllerMutex_);
+    for (auto it = receiversMap_.begin(); it != receiversMap_.end();) {
+      auto receiver = it->second;
+      string identifier = it->first;
+      if (!receiver->hasPendingTransfer()) {
+        it = receiversMap_.erase(it);
+        erasedIds.push_back(identifier);
+        receivers.push_back(std::move(receiver));
+        --numReceivers_;
+        continue;
+      }
+      it++;
+    }
+  }
+  LOG(INFO) << "Cleared " << receivers.size() << "stale senders";
+  return erasedIds;
+}
+
+SenderPtr WdtNamespaceController::getSender(const string &identifier) const {
   GuardLock lock(controllerMutex_);
-  auto it = sendersMap_.find(transferId);
+  auto it = sendersMap_.find(identifier);
   if (it == sendersMap_.end()) {
-    LOG(ERROR) << "Couldn't find sender trasnfer-id " << transferId << " for "
+    LOG(ERROR) << "Couldn't find sender trasnfer-id " << identifier << " for "
                << controllerName_;
     return nullptr;
   }
@@ -185,11 +229,11 @@ SenderPtr WdtNamespaceController::getSender(const string& transferId) const {
 }
 
 ReceiverPtr WdtNamespaceController::getReceiver(
-    const string& transferId) const {
+    const string &identifier) const {
   GuardLock lock(controllerMutex_);
-  auto it = receiversMap_.find(transferId);
+  auto it = receiversMap_.find(identifier);
   if (it == receiversMap_.end()) {
-    LOG(ERROR) << "Couldn't find receiver transfer-id " << transferId << " for "
+    LOG(ERROR) << "Couldn't find receiver transfer-id " << identifier << " for "
                << controllerName_;
     return nullptr;
   }
@@ -199,7 +243,7 @@ ReceiverPtr WdtNamespaceController::getReceiver(
 vector<SenderPtr> WdtNamespaceController::getSenders() const {
   vector<SenderPtr> senders;
   GuardLock lock(controllerMutex_);
-  for (const auto& senderPair : sendersMap_) {
+  for (const auto &senderPair : sendersMap_) {
     senders.push_back(senderPair.second);
   }
   return senders;
@@ -208,7 +252,7 @@ vector<SenderPtr> WdtNamespaceController::getSenders() const {
 vector<ReceiverPtr> WdtNamespaceController::getReceivers() const {
   vector<ReceiverPtr> receivers;
   GuardLock lock(controllerMutex_);
-  for (const auto& receiverPair : receiversMap_) {
+  for (const auto &receiverPair : receiversMap_) {
     receivers.push_back(receiverPair.second);
   }
   return receivers;
@@ -225,7 +269,7 @@ WdtResourceController::WdtResourceController() : WdtControllerBase("Global") {
 void WdtResourceController::shutdown() {
   LOG(WARNING) << "Shutting down the controller";
   GuardLock lock(controllerMutex_);
-  for (auto& namespaceController : namespaceMap_) {
+  for (auto &namespaceController : namespaceMap_) {
     NamespaceControllerPtr controller = namespaceController.second;
     numSenders_ -= controller->releaseAllSenders();
     numReceivers_ -= controller->releaseAllReceivers();
@@ -240,8 +284,8 @@ WdtResourceController::~WdtResourceController() {
 }
 
 ErrorCode WdtResourceController::createSender(
-    const std::string& wdtNamespace,
-    const WdtTransferRequest& wdtOperationRequest, SenderPtr& sender) {
+    const std::string &wdtNamespace, const std::string &identifier,
+    const WdtTransferRequest &wdtOperationRequest, SenderPtr &sender) {
   NamespaceControllerPtr controller = nullptr;
   sender = nullptr;
   {
@@ -258,7 +302,8 @@ ErrorCode WdtResourceController::createSender(
     }
     ++numSenders_;
   }
-  ErrorCode code = controller->createSender(wdtOperationRequest, sender);
+  ErrorCode code =
+      controller->createSender(wdtOperationRequest, identifier, sender);
   if (!sender) {
     GuardLock lock(controllerMutex_);
     --numSenders_;
@@ -270,8 +315,8 @@ ErrorCode WdtResourceController::createSender(
 }
 
 ErrorCode WdtResourceController::createReceiver(
-    const std::string& wdtNamespace,
-    const WdtTransferRequest& wdtOperationRequest, ReceiverPtr& receiver) {
+    const std::string &wdtNamespace, const string &identifier,
+    const WdtTransferRequest &wdtOperationRequest, ReceiverPtr &receiver) {
   NamespaceControllerPtr controller = nullptr;
   receiver = nullptr;
   {
@@ -288,7 +333,8 @@ ErrorCode WdtResourceController::createReceiver(
     }
     ++numReceivers_;
   }
-  ErrorCode code = controller->createReceiver(wdtOperationRequest, receiver);
+  ErrorCode code =
+      controller->createReceiver(wdtOperationRequest, identifier, receiver);
   if (!receiver) {
     GuardLock lock(controllerMutex_);
     --numReceivers_;
@@ -299,8 +345,8 @@ ErrorCode WdtResourceController::createReceiver(
   return code;
 }
 
-ErrorCode WdtResourceController::releaseSender(const std::string& wdtNamespace,
-                                               const std::string& transferId) {
+ErrorCode WdtResourceController::releaseSender(const std::string &wdtNamespace,
+                                               const std::string &identifier) {
   NamespaceControllerPtr controller = nullptr;
   {
     controller = getNamespaceController(wdtNamespace, true);
@@ -309,18 +355,18 @@ ErrorCode WdtResourceController::releaseSender(const std::string& wdtNamespace,
       return ERROR;
     }
   }
-  if (controller->releaseSender(transferId) == OK) {
+  if (controller->releaseSender(identifier) == OK) {
     GuardLock lock(controllerMutex_);
     --numSenders_;
     return OK;
   }
-  LOG(ERROR) << "Couldn't release sender " << transferId << " for "
+  LOG(ERROR) << "Couldn't release sender " << identifier << " for "
              << wdtNamespace;
   return ERROR;
 }
 
 ErrorCode WdtResourceController::releaseAllSenders(
-    const std::string& wdtNamespace) {
+    const std::string &wdtNamespace) {
   NamespaceControllerPtr controller = nullptr;
   {
     controller = getNamespaceController(wdtNamespace, true);
@@ -338,7 +384,7 @@ ErrorCode WdtResourceController::releaseAllSenders(
 }
 
 ErrorCode WdtResourceController::releaseReceiver(
-    const std::string& wdtNamespace, const std::string& transferId) {
+    const std::string &wdtNamespace, const std::string &identifier) {
   NamespaceControllerPtr controller = nullptr;
   {
     controller = getNamespaceController(wdtNamespace, true);
@@ -347,19 +393,19 @@ ErrorCode WdtResourceController::releaseReceiver(
       return ERROR;
     }
   }
-  if (controller->releaseReceiver(transferId) == OK) {
+  if (controller->releaseReceiver(identifier) == OK) {
     GuardLock lock(controllerMutex_);
     --numReceivers_;
     return OK;
   }
-  LOG(ERROR) << "Couldn't release receiver " << transferId << " for "
+  LOG(ERROR) << "Couldn't release receiver " << identifier << " for "
              << wdtNamespace;
 
   return ERROR;
 }
 
 ErrorCode WdtResourceController::releaseAllReceivers(
-    const std::string& wdtNamespace) {
+    const std::string &wdtNamespace) {
   NamespaceControllerPtr controller = nullptr;
   {
     controller = getNamespaceController(wdtNamespace, true);
@@ -376,19 +422,19 @@ ErrorCode WdtResourceController::releaseAllReceivers(
   return OK;
 }
 
-SenderPtr WdtResourceController::getSender(const string& wdtNamespace,
-                                           const string& transferId) const {
+SenderPtr WdtResourceController::getSender(const string &wdtNamespace,
+                                           const string &identifier) const {
   NamespaceControllerPtr controller = nullptr;
   controller = getNamespaceController(wdtNamespace, true);
   if (!controller) {
     LOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
     return nullptr;
   }
-  return controller->getSender(transferId);
+  return controller->getSender(identifier);
 }
 
 vector<SenderPtr> WdtResourceController::getAllSenders(
-    const string& wdtNamespace) const {
+    const string &wdtNamespace) const {
   NamespaceControllerPtr controller = nullptr;
   controller = getNamespaceController(wdtNamespace, true);
   if (!controller) {
@@ -398,19 +444,35 @@ vector<SenderPtr> WdtResourceController::getAllSenders(
   return controller->getSenders();
 }
 
-ReceiverPtr WdtResourceController::getReceiver(const string& wdtNamespace,
-                                               const string& transferId) const {
+ErrorCode WdtResourceController::releaseStaleSenders(
+    const string &wdtNamespace, vector<string> &erasedIds) {
+  NamespaceControllerPtr controller = nullptr;
+  controller = getNamespaceController(wdtNamespace, true);
+  if (!controller) {
+    LOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
+    return NOT_FOUND;
+  }
+  erasedIds = controller->releaseStaleSenders();
+  if (erasedIds.size() > 0) {
+    GuardLock lock(controllerMutex_);
+    numSenders_ -= erasedIds.size();
+  }
+  return OK;
+}
+
+ReceiverPtr WdtResourceController::getReceiver(const string &wdtNamespace,
+                                               const string &identifier) const {
   NamespaceControllerPtr controller = nullptr;
   controller = getNamespaceController(wdtNamespace, true);
   if (!controller) {
     LOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
     return nullptr;
   }
-  return controller->getReceiver(transferId);
+  return controller->getReceiver(identifier);
 }
 
 vector<ReceiverPtr> WdtResourceController::getAllReceivers(
-    const string& wdtNamespace) const {
+    const string &wdtNamespace) const {
   NamespaceControllerPtr controller = nullptr;
   controller = getNamespaceController(wdtNamespace, true);
   if (!controller) {
@@ -420,8 +482,24 @@ vector<ReceiverPtr> WdtResourceController::getAllReceivers(
   return controller->getReceivers();
 }
 
+ErrorCode WdtResourceController::releaseStaleReceivers(
+    const string &wdtNamespace, vector<string> &erasedIds) {
+  NamespaceControllerPtr controller = nullptr;
+  controller = getNamespaceController(wdtNamespace, true);
+  if (!controller) {
+    LOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
+    return NOT_FOUND;
+  }
+  erasedIds = controller->releaseStaleReceivers();
+  if (erasedIds.size() > 0) {
+    GuardLock lock(controllerMutex_);
+    numReceivers_ -= erasedIds.size();
+  }
+  return OK;
+}
+
 ErrorCode WdtResourceController::registerWdtNamespace(
-    const std::string& wdtNamespace) {
+    const std::string &wdtNamespace) {
   GuardLock lock(controllerMutex_);
   if (getNamespaceController(wdtNamespace)) {
     LOG(INFO) << "Found existing controller for " << wdtNamespace;
@@ -433,7 +511,7 @@ ErrorCode WdtResourceController::registerWdtNamespace(
 }
 
 ErrorCode WdtResourceController::deRegisterWdtNamespace(
-    const std::string& wdtNamespace) {
+    const std::string &wdtNamespace) {
   NamespaceControllerPtr controller;
   {
     GuardLock lock(controllerMutex_);
@@ -465,7 +543,7 @@ ErrorCode WdtResourceController::deRegisterWdtNamespace(
 }
 
 void WdtResourceController::updateMaxReceiversLimit(
-    const std::string& wdtNamespace, int64_t maxNumReceivers) {
+    const std::string &wdtNamespace, int64_t maxNumReceivers) {
   auto controller = getNamespaceController(wdtNamespace, true);
   if (controller) {
     controller->updateMaxReceiversLimit(maxNumReceivers);
@@ -473,7 +551,7 @@ void WdtResourceController::updateMaxReceiversLimit(
 }
 
 void WdtResourceController::updateMaxSendersLimit(
-    const std::string& wdtNamespace, int64_t maxNumSenders) {
+    const std::string &wdtNamespace, int64_t maxNumSenders) {
   auto controller = getNamespaceController(wdtNamespace, true);
   if (controller) {
     controller->updateMaxSendersLimit(maxNumSenders);
@@ -481,7 +559,7 @@ void WdtResourceController::updateMaxSendersLimit(
 }
 
 shared_ptr<WdtNamespaceController>
-WdtResourceController::getNamespaceController(const string& wdtNamespace,
+WdtResourceController::getNamespaceController(const string &wdtNamespace,
                                               bool isLock) const {
   GuardLock lock(controllerMutex_, std::defer_lock);
   if (isLock) {

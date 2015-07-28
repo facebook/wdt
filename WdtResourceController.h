@@ -39,7 +39,7 @@ class WdtAbortChecker : public WdtBase::IAbortChecker {
 class WdtControllerBase {
  public:
   /// Constructor with a name for the controller
-  explicit WdtControllerBase(const std::string& controllerName);
+  explicit WdtControllerBase(const std::string &controllerName);
 
   /// Destructor
   virtual ~WdtControllerBase() {
@@ -88,20 +88,22 @@ class WdtControllerBase {
 class WdtNamespaceController : public WdtControllerBase {
  public:
   /// Constructor with a name for namespace
-  explicit WdtNamespaceController(const std::string& wdtNamespace);
+  explicit WdtNamespaceController(const std::string &wdtNamespace);
 
-  /// Add a receiver for this namespace
-  ErrorCode createReceiver(const WdtTransferRequest& request,
-                           ReceiverPtr& receiver);
+  /// Add a receiver for this namespace with identifier
+  ErrorCode createReceiver(const WdtTransferRequest &request,
+                           const std::string &identifier,
+                           ReceiverPtr &receiver);
 
-  /// Add a sender for this namespace
-  ErrorCode createSender(const WdtTransferRequest& request, SenderPtr& sender);
+  /// Add a sender for this namespace with identifier
+  ErrorCode createSender(const WdtTransferRequest &request,
+                         const std::string &identifier, SenderPtr &sender);
 
   /// Delete a receiver from this namespace
-  ErrorCode releaseReceiver(const std::string& transferId);
+  ErrorCode releaseReceiver(const std::string &identifier);
 
   /// Delete a sender from this namespace
-  ErrorCode releaseSender(const std::string& transferId);
+  ErrorCode releaseSender(const std::string &identifier);
 
   /// Releases all senders in this namespace
   int64_t releaseAllSenders();
@@ -109,11 +111,17 @@ class WdtNamespaceController : public WdtControllerBase {
   /// Releases all receivers in this namespace
   int64_t releaseAllReceivers();
 
-  /// Get the sender created for transfer id
-  SenderPtr getSender(const std::string& transferId) const;
+  /**
+   * Get the sender you created by the createSender API
+   * using the same identifier you mentioned before
+   */
+  SenderPtr getSender(const std::string &identifier) const;
 
-  /// Get the receiver created for transfer id
-  ReceiverPtr getReceiver(const std::string& transferId) const;
+  /**
+   * Get the receiver you created by the createReceiver API
+   * using the same identifier you mentioned before
+   */
+  ReceiverPtr getReceiver(const std::string &identifier) const;
 
   /// Get all senders
   std::vector<SenderPtr> getSenders() const;
@@ -121,14 +129,20 @@ class WdtNamespaceController : public WdtControllerBase {
   /// Get all receivers
   std::vector<ReceiverPtr> getReceivers() const;
 
+  /// Clear the senders that are not active anymore
+  std::vector<std::string> releaseStaleSenders();
+
+  /// Clear the receivers that are not active anymore
+  std::vector<std::string> releaseStaleReceivers();
+
   /// Destructor, clears the senders and receivers
   virtual ~WdtNamespaceController() override;
 
  private:
-  /// Map of receivers assosicated with transferId
+  /// Map of receivers assosicated with identifier
   std::unordered_map<std::string, ReceiverPtr> receiversMap_;
 
-  /// Map of senders assosciated with transferId
+  /// Map of senders assosciated with identifier
   std::unordered_map<std::string, SenderPtr> sendersMap_;
 };
 
@@ -141,61 +155,74 @@ class WdtResourceController : public WdtControllerBase {
  public:
   WdtResourceController();
 
-  /// Add a sender specified with namespace
-  ErrorCode createSender(const std::string& wdtNameSpace,
-                         const WdtTransferRequest& request, SenderPtr& sender);
+  /**
+   * Add a sender specified by namespace and a identifier.
+   * You can get this sender back by using the same identifier
+   */
+  ErrorCode createSender(const std::string &wdtNamespace,
+                         const std::string &identifier,
+                         const WdtTransferRequest &request, SenderPtr &sender);
 
-  /// Add a receiver specified with namespace
-  ErrorCode createReceiver(const std::string& wdtNameSpace,
-                           const WdtTransferRequest& request,
-                           ReceiverPtr& receiver);
+  /// Add a receiver specified with namespace and identifier
+  ErrorCode createReceiver(const std::string &wdtNamespace,
+                           const std::string &identifier,
+                           const WdtTransferRequest &request,
+                           ReceiverPtr &receiver);
 
   /// Release a sender specified with namespace and identifier
-  ErrorCode releaseSender(const std::string& wdtNamespace,
-                          const std::string& transferId);
+  ErrorCode releaseSender(const std::string &wdtNamespace,
+                          const std::string &identifier);
 
   /// Release a receiver specified with namespace and identifier
-  ErrorCode releaseReceiver(const std::string& wdtNamespace,
-                            const std::string& transferId);
+  ErrorCode releaseReceiver(const std::string &wdtNamespace,
+                            const std::string &identifier);
 
   /// Register a wdt namespace
-  ErrorCode registerWdtNamespace(const std::string& wdtNameSpace);
+  ErrorCode registerWdtNamespace(const std::string &wdtNamespace);
 
   /// De register a wdt namespace
-  ErrorCode deRegisterWdtNamespace(const std::string& wdtNameSpace);
+  ErrorCode deRegisterWdtNamespace(const std::string &wdtNamespace);
 
   /// Use the base class methods for global limits
   using WdtControllerBase::updateMaxReceiversLimit;
   using WdtControllerBase::updateMaxSendersLimit;
 
   /// Update max receivers limit of namespace
-  void updateMaxReceiversLimit(const std::string& wdtNamespace,
+  void updateMaxReceiversLimit(const std::string &wdtNamespace,
                                int64_t maxNumReceivers);
 
   /// Update max senders limit of namespace
-  void updateMaxSendersLimit(const std::string& wdtNamespace,
+  void updateMaxSendersLimit(const std::string &wdtNamespace,
                              int64_t maxNumSenders);
 
   /// Release all senders in the specified namespace
-  ErrorCode releaseAllSenders(const std::string& wdtNameSpace);
+  ErrorCode releaseAllSenders(const std::string &wdtNamespace);
 
   /// Releases all receivers in specified namespace
-  ErrorCode releaseAllReceivers(const std::string& wdtNamespace);
+  ErrorCode releaseAllReceivers(const std::string &wdtNamespace);
 
   /// Get a particular sender from a wdt namespace
-  SenderPtr getSender(const std::string& wdtNamespace,
-                      const std::string& transferId) const;
+  SenderPtr getSender(const std::string &wdtNamespace,
+                      const std::string &identifier) const;
 
   /// Get a particular receiver from a wdt namespace
-  ReceiverPtr getReceiver(const std::string& wdtNamespace,
-                          const std::string& transferId) const;
+  ReceiverPtr getReceiver(const std::string &wdtNamespace,
+                          const std::string &identifier) const;
 
   /// Get all senders in a namespace
-  std::vector<SenderPtr> getAllSenders(const std::string& wdtNamespace) const;
+  std::vector<SenderPtr> getAllSenders(const std::string &wdtNamespace) const;
 
   /// Get all receivers in a namespace
   std::vector<ReceiverPtr> getAllReceivers(
-      const std::string& wdtNamespace) const;
+      const std::string &wdtNamespace) const;
+
+  /// Clear the senders that are no longer active.
+  ErrorCode releaseStaleSenders(const std::string &wdtNamespace,
+                                std::vector<std::string> &erasedIds);
+
+  /// Clear the receivers that are no longer active
+  ErrorCode releaseStaleReceivers(const std::string &wdtNamespace,
+                                  std::vector<std::string> &erasedIds);
 
   /// Cleanly shuts down the controller
   void shutdown();
@@ -206,7 +233,7 @@ class WdtResourceController : public WdtControllerBase {
  protected:
   typedef std::shared_ptr<WdtNamespaceController> NamespaceControllerPtr;
   /// Get the namespace controller
-  NamespaceControllerPtr getNamespaceController(const std::string& wdtNamespace,
+  NamespaceControllerPtr getNamespaceController(const std::string &wdtNamespace,
                                                 bool isLock = false) const;
 
  private:
