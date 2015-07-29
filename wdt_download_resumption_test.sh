@@ -16,7 +16,7 @@ checkLastCmdStatusExpectingFailure() {
   if [ $LAST_STATUS -eq 0 ] ; then
     sudo iptables-restore < $DIR/iptable
     echo "expecting wdt failure, but transfer was successful, failing test"
-    exit 1 
+    exit 1
   fi
 }
 
@@ -165,7 +165,7 @@ TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Download resumption with network error test(3)"
 startNewTransfer
-sleep 10 
+sleep 10
 killCurrentTransfer
 STARTING_PORT=$((STARTING_PORT + threads))
 startNewTransfer

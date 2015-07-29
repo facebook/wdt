@@ -40,11 +40,10 @@ class WdtResourceControllerTest : public WdtResourceController {
   }
 
   WdtTransferRequest makeTransferRequest(const string &transferId) {
-    WdtTransferRequest request(startPort, numPorts);
+    WdtTransferRequest request(startPort, numPorts, directory);
     request.hostName = hostName;
     request.transferId = transferId;
     request.protocolVersion = protocolVersion;
-    request.directory = directory;
     return request;
   }
 };
@@ -356,7 +355,7 @@ void WdtResourceControllerTest::RequestSerializationTest() {
     EXPECT_EQ(dummy, transferRequest);
   }
   {
-    WdtTransferRequest transferRequest(0, 1);
+    WdtTransferRequest transferRequest(0, 1, "dir1/dir2");
     // Lets not populate anything else
     transferRequest.hostName = "localhost";
     string serializedString = transferRequest.generateUrl(true);
@@ -366,7 +365,7 @@ void WdtResourceControllerTest::RequestSerializationTest() {
     EXPECT_EQ(transferRequest, dummy);
   }
   {
-    WdtTransferRequest transferRequest(0, 8);
+    WdtTransferRequest transferRequest(0, 8, "/dir3/dir4");
     Receiver receiver(transferRequest);
     transferRequest = receiver.init();
     ASSERT_TRUE(!receiver.getTransferId().empty());

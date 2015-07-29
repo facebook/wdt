@@ -122,7 +122,9 @@ WdtTransferRequest::WdtTransferRequest(const vector<int32_t>& ports) {
   this->ports = ports;
 }
 
-WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts) {
+WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
+                                       const string& directory) {
+  this->directory = directory;
   int portNum = startPort;
   for (int i = 0; i < numPorts; i++) {
     ports.push_back(portNum);
@@ -147,7 +149,7 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
     errorCode = URI_PARSE_ERROR;
   }
   string portsStr(wdtUri.getQueryParam(PORTS_PARAM));
-  StringPiece portsList(portsStr); // pointers into portsStr
+  StringPiece portsList(portsStr);  // pointers into portsStr
   do {
     StringPiece portNum = portsList.split_step(',');
     int port;
@@ -262,6 +264,8 @@ void WdtBase::setTransferId(const std::string& transferId) {
 }
 
 void WdtBase::setProtocolVersion(int64_t protocolVersion) {
+  WDT_CHECK(protocolVersion > 0) << "Protocol version can't be <= 0 "
+                                 << protocolVersion;
   WDT_CHECK(Protocol::negotiateProtocol(protocolVersion) == protocolVersion)
       << "Can not support wdt version " << protocolVersion;
   protocolVersion_ = protocolVersion;

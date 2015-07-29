@@ -60,34 +60,28 @@ echo "done with setup"
 (cd $DIR/src ; touch a; ln -s doesntexist badlink; dd if=/dev/zero of=c bs=1024 count=1; mkdir d; ln -s ../d d/e; ln -s ../c d/a)
 (cd $DIR/extsrc; mkdir TestDir; mkdir TestDir/test; cd TestDir; echo "Text1" >> file1; cd test; echo "Text2" >> file1; ln -s $DIR/extsrc/TestDir; cp -R $DIR/extsrc/TestDir $DIR/src)
 
-# Can't have both client and server send to stdout in parallel or log lines
-# get mangled/are missing - so we redirect the server one
-echo "$WDTBIN -minloglevel=1 -directory $DIR/dst > $DIR/server.log 2>&1 &"
-$WDTBIN -minloglevel=1 -directory $DIR/dst > $DIR/server.log 2>&1 &
-# client now retries connects so no need wait for server to be up
-pidofreceiver=$!
-# To test only 1 socket (single threaded send/receive)
-#$WDTBIN -num_sockets=1 -directory $DIR/src -destination ::1
-# Normal
 
+CMD="$WDTBIN -minloglevel=1 -directory $DIR/dst 2> $DIR/server.log | head -1 | \
+    xargs -I URL time $WDTBIN -directory $DIR/src -connection_url URL 2>&1 | \
+    tee $DIR/client.log"
+echo "First transfer: $CMD"
+eval $CMD
+STATUS=$?
+# TODO check for $? / crash... though diff will indirectly find that case
 
-echo "$WDTBIN -directory $DIR/src -destination $HOSTNAME 2>&1 | tee $DIR/client.log"
-time $WDTBIN -directory $DIR/src -destination $HOSTNAME 2>&1 | tee $DIR/client.log
-
-# 2nd Receiver:
-echo "$WDTBIN -directory $DIR/dst_symlinks >> $DIR/server.log 2>&1 &"
-$WDTBIN -directory $DIR/dst_symlinks >> $DIR/server.log 2>&1 &
-
-
-echo "$WDTBIN -follow_symlinks -directory $DIR/src -destination $HOSTNAME 2>&1 | tee -a $DIR/client.log"
-time $WDTBIN -follow_symlinks -directory $DIR/src -destination $HOSTNAME 2>&1 | tee -a $DIR/client.log
+CMD="$WDTBIN -minloglevel=1 -directory $DIR/dst_symlinks 2>> $DIR/server.log |\
+    head -1 | xargs -I URL time $WDTBIN -follow_symlinks -directory $DIR/src \
+    -connection_url URL 2>&1 | tee $DIR/client.log"
+echo "Second transfer: $CMD"
+eval $CMD
+# TODO check for $? / crash... though diff will indirectly find that case
 
 
 if [ $DO_VERIFY -eq 1 ] ; then
     echo "Verifying for run without follow_symlinks"
     echo "Checking for difference `date`"
 
-    NUM_FILES=`(cd $DIR/dst ; ( find . -type f | wc -l))`
+    NUM_FILES=`(cd $DIR/dst && ( find . -type f | wc -l))`
     echo "Transfered `du -ks $DIR/dst` kbytes across $NUM_FILES files"
 
     (cd $DIR/src ; ( find . -type f -print0 | xargs -0 md5sum | sort ) \
@@ -103,7 +97,7 @@ if [ $DO_VERIFY -eq 1 ] ; then
     echo "Verifying for run with follow_symlinks"
     echo "Checking for difference `date`"
 
-    NUM_FILES=`(cd $DIR/dst_symlinks; ( find . -type f | wc -l))`
+    NUM_FILES=`(cd $DIR/dst_symlinks && ( find . -type f | wc -l))`
     echo "Transfered `du -ks $DIR/dst_symlinks` kbytes across $NUM_FILES files"
 
     (cd $DIR/src ; ( find -L . -type f -print0 | xargs -0 md5sum | sort ) \
@@ -117,10 +111,8 @@ if [ $DO_VERIFY -eq 1 ] ; then
     if [ $STATUS -eq 0 ] ; then
       STATUS=$SYMLINK_STATUS
     fi
-#(cd $DIR; ls -lR src/ dst/ )
 else
     echo "Skipping independant verification"
-    STATUS=0
 fi
 
 

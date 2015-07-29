@@ -40,14 +40,8 @@ class Receiver : public WdtBase {
   explicit Receiver(const WdtTransferRequest &transferRequest);
 
   /**
-   * Constructor that needs start port and number of ports.
+   * Constructor with start port, number of ports and directory to write to.
    * If the start port is specified as zero, it auto configures the ports
-   */
-  Receiver(int startPort, int numPorts);
-
-  /**
-   * Constructor which also takes the directory where receiver
-   * will be writing files to.
    */
   Receiver(int port, int numSockets, const std::string &destDir);
 

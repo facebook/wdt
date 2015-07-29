@@ -127,7 +127,7 @@ struct WdtTransferRequest {
    * Constructor with start port and num ports. Fills the vector with
    * ports from [startPort, startPort + numPorts)
    */
-  WdtTransferRequest(int startPort, int numPorts);
+  WdtTransferRequest(int startPort, int numPorts, const std::string& directory);
 
   /// Constructor to construct the request object from a url string
   explicit WdtTransferRequest(const std::string& uriString);

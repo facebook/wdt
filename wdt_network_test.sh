@@ -52,16 +52,17 @@ STARTING_PORT=22400
 ERROR_COUNT=25
 TEST_COUNT=0
 
+WDTBIN_BASE="_bin/wdt/wdt --transfer_id $$"
 WDTBIN_OPTS="-ipv4 -ipv6=false -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
 -progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
 -max_transfer_retries=5"
-WDTBIN="_bin/wdt/wdt -num_ports=$threads $WDTBIN_OPTS"
+WDTBIN="$WDTBIN_BASE -num_ports=$threads $WDTBIN_OPTS"
 WDTBIN_SERVER="$WDTBIN -protocol_version=$RECEIVER_PROTOCOL_VERSION"
 WDTBIN_CLIENT="$WDTBIN -protocol_version=$SENDER_PROTOCOL_VERSION"
-WDTBIN_MORE_THREADS="_bin/wdt/wdt -num_ports=$((threads + 1)) $WDTBIN_OPTS"
-WDTBIN_LESS_THREADS="_bin/wdt/wdt -num_ports=$((threads - 1)) $WDTBIN_OPTS"
+WDTBIN_MORE_THREADS="$WDTBIN_BASE -num_ports=$((threads + 1)) $WDTBIN_OPTS"
+WDTBIN_LESS_THREADS="$WDTBIN_BASE -num_ports=$((threads - 1)) $WDTBIN_OPTS"
 BASEDIR=/dev/shm/tmpWDT
 
 mkdir -p $BASEDIR
@@ -85,7 +86,8 @@ echo "Testing with different start ports in sender and receiver"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-_bin/wdt/wdt -ipv6=false -num_ports=$threads -start_port=$((STARTING_PORT + 1)) \
+$WDTBIN_BASE -ipv6=false -num_ports=$threads \
+-start_port=$((STARTING_PORT + 1)) \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
 checkLastCmdStatus
@@ -99,7 +101,8 @@ echo "Testing with less number of threads in client"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-_bin/wdt/wdt -ipv6=false -num_ports=$((threads - 1)) -start_port=$STARTING_PORT \
+$WDTBIN_BASE -ipv6=false -num_ports=$((threads - 1)) \
+-start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
 checkLastCmdStatus
@@ -112,7 +115,8 @@ echo "Testing with more number of threads in client"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-_bin/wdt/wdt -ipv6=false -num_ports=$((threads + 1)) -start_port=$STARTING_PORT \
+$WDTBIN_BASE -ipv6=false -num_ports=$((threads + 1)) \
+-start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
 checkLastCmdStatus
@@ -164,7 +168,7 @@ sleep 5
 sudo iptables-save > $DIR/iptable
 echo "blocking $STARTING_PORT"
 sudo iptables -A INPUT -p tcp --sport $STARTING_PORT -j DROP
-wait $pidofsender 
+wait $pidofsender
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
@@ -183,7 +187,7 @@ sleep 5
 sudo iptables-save > $DIR/iptable
 echo "blocking $STARTING_PORT"
 sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
-wait $pidofsender 
+wait $pidofsender
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
@@ -203,7 +207,7 @@ sleep 5
 sudo iptables-save > $DIR/iptable
 echo "blocking $STARTING_PORT"
 sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
-wait $pidofsender 
+wait $pidofsender
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
@@ -223,7 +227,7 @@ sleep 5
 sudo iptables-save > $DIR/iptable
 echo "blocking $STARTING_PORT"
 sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
-wait $pidofsender 
+wait $pidofsender
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus

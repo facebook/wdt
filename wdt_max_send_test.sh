@@ -34,10 +34,12 @@ fi
 REMOTE=::1
 SKIP_WRITES="true"
 
+# TODO: switch to url
+
 # Without throttling:
 #WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_sockets 13"
 # With, still gets almost same max (21G) with throttling set high enough
-WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_ports 13
+WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_ports 13 -transfer_id=$$
 --avg_mbytes_per_sec=26000 --max_mbytes_per_sec=26001 --enable_checksum=false"
 CLIENT_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
 %Mmax)k\n%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps\nCLIENT_PROFILE %U \

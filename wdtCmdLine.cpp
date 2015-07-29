@@ -8,6 +8,7 @@
  */
 #include "Sender.h"
 #include "Receiver.h"
+#include "Protocol.h"
 #include "WdtResourceController.h"
 #include <chrono>
 #include <future>
@@ -43,13 +44,16 @@ DEFINE_string(
 DEFINE_bool(parse_transfer_log, false,
             "If true, transfer log is parsed and fixed");
 
-DEFINE_string(transfer_id, "", "Transfer id (optional, should match");
+DEFINE_string(transfer_id, "",
+              "Transfer id. Receiver will generate one to be used (via URL) on"
+              " the sender if not set explictly");
 DEFINE_int32(
-    protocol_version, 0,
+    protocol_version, facebook::wdt::Protocol::protocol_version,
     "Protocol version to use, this is used to simulate protocol negotiation");
 
 DEFINE_string(connection_url, "",
-              "Provide the connection string to connect to receiver");
+              "Provide the connection string to connect to receiver"
+              " (incl. transfer_id and other parameters)");
 
 DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 
@@ -118,27 +122,37 @@ int main(int argc, char *argv[]) {
 
   LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
   ErrorCode retCode = OK;
+
+  // Odd ball case of log parsing
   if (FLAGS_parse_transfer_log) {
     // Log parsing mode
     TransferLogManager transferLogManager;
     transferLogManager.setRootDir(FLAGS_directory);
     if (!transferLogManager.parseAndPrint()) {
       LOG(ERROR) << "Transfer log parsing failed";
-      retCode = ERROR;
+      return ERROR;
     }
-  } else if (FLAGS_destination.empty() && FLAGS_connection_url.empty()) {
-    Receiver receiver(FLAGS_start_port, FLAGS_num_ports, FLAGS_directory);
-    receiver.setTransferId(FLAGS_transfer_id);
-    if (FLAGS_protocol_version > 0) {
-      receiver.setProtocolVersion(FLAGS_protocol_version);
-    }
-    WdtTransferRequest transferRequest = receiver.init();
-    if (transferRequest.errorCode == ERROR) {
+    return OK;
+  }
+
+  // General case : Sender or Receiver
+  const auto &options = WdtOptions::get();
+  WdtTransferRequest req(options.start_port, options.num_ports,
+                         FLAGS_directory);
+  req.transferId = FLAGS_transfer_id;
+  if (FLAGS_protocol_version > 0) {
+    req.protocolVersion = FLAGS_protocol_version;
+  }
+
+  if (FLAGS_destination.empty() && FLAGS_connection_url.empty()) {
+    Receiver receiver(req);
+    WdtTransferRequest augmentedReq = receiver.init();
+    if (augmentedReq.errorCode == ERROR) {
       LOG(ERROR) << "Error setting up receiver";
-      return transferRequest.errorCode;
+      return augmentedReq.errorCode;
     }
     LOG(INFO) << "Starting receiver with connection url ";
-    std::cout << transferRequest.generateUrl() << std::endl;
+    std::cout << augmentedReq.generateUrl() << std::endl;
     std::cout.flush();
     setUpAbort(receiver);
     if (!FLAGS_run_as_daemon) {
@@ -167,40 +181,23 @@ int main(int argc, char *argv[]) {
         fileInfo.emplace_back(fields[0], filesize);
       }
     }
-    std::vector<int32_t> ports;
-    const auto &options = WdtOptions::get();
-    for (int i = 0; i < options.num_ports; i++) {
-      ports.push_back(options.start_port + i);
+    req.hostName = FLAGS_destination;
+    if (!FLAGS_connection_url.empty()) {
+      LOG(INFO) << "Input url: " << FLAGS_connection_url;
+      // TODO: merge instead
+      req = WdtTransferRequest(FLAGS_connection_url);
+      req.directory = FLAGS_directory;  // re-set it for now
     }
-    std::unique_ptr<Sender> sender;
-    if (FLAGS_connection_url.empty()) {
-      sender.reset(
-          new Sender(FLAGS_destination, FLAGS_directory, ports, fileInfo));
-      if (FLAGS_protocol_version > 0) {
-        sender->setProtocolVersion(FLAGS_protocol_version);
-      }
-      sender->setTransferId(FLAGS_transfer_id);
-    } else {
-      // If you are using a connection url it is
-      // expected that you set protocol version, ports
-      // and transfer id in the url
-      WdtTransferRequest transferRequest(FLAGS_connection_url);
-      LOG(INFO) << transferRequest.generateUrl(true);
-      if (transferRequest.directory.empty()) {
-        transferRequest.directory = FLAGS_directory;
-      }
-      sender.reset(new Sender(transferRequest));
-    }
-    WdtTransferRequest processedRequest = sender->init();
+    Sender sender(req);
+    WdtTransferRequest processedRequest = sender.init();
     LOG(INFO) << "Starting sender with details "
               << processedRequest.generateUrl(true);
     ADDITIONAL_SENDER_SETUP
-    setUpAbort(*sender);
-    sender->setIncludeRegex(FLAGS_include_regex);
-    sender->setExcludeRegex(FLAGS_exclude_regex);
-    sender->setPruneDirRegex(FLAGS_prune_dir_regex);
-    // TODO fix that
-    std::unique_ptr<TransferReport> report = sender->transfer();
+    setUpAbort(sender);
+    sender.setIncludeRegex(FLAGS_include_regex);
+    sender.setExcludeRegex(FLAGS_exclude_regex);
+    sender.setPruneDirRegex(FLAGS_prune_dir_regex);
+    std::unique_ptr<TransferReport> report = sender.transfer();
     retCode = report->getSummary().getErrorCode();
   }
   cancelAbort();

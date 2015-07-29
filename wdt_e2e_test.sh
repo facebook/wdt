@@ -90,7 +90,8 @@ printf "(Sockets,Average rate, Max_rate, Save local?, Delay)=%s,%s,%s,%s,%s\n" "
 #WDTBIN_OPTS="-buffer_size=$BS -num_sockets=8 -minloglevel 2 -sleep_ms 1 -max_retries 999"
 WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
 "-avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate "\
-"-num_ports=$threads -throttler_log_time_millis=200 -enable_checksum=true"
+"-num_ports=$threads -throttler_log_time_millis=200 -enable_checksum=true "\
+"-transfer_id=$$"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/tmpWDT
@@ -107,6 +108,7 @@ mkdir $DIR/extsrc
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
 cp -R wdt folly /usr/bin /usr/lib $DIR/src
+#cp -R wdt folly /usr/bin $DIR/src
 #cp -R wdt folly $DIR/src
 # Removing symlinks which point to the same source tree
 for link in `find -L $DIR/src -xtype l`

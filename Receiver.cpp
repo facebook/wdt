@@ -128,13 +128,8 @@ Receiver::Receiver(const WdtTransferRequest &transferRequest) {
   }
 }
 
-Receiver::Receiver(int port, int numSockets)
-    : Receiver(WdtTransferRequest(port, numSockets)) {
-}
-
 Receiver::Receiver(int port, int numSockets, const std::string &destDir)
-    : Receiver(port, numSockets) {
-  setDir(destDir);
+    : Receiver(WdtTransferRequest(port, numSockets, destDir)) {
 }
 
 WdtTransferRequest Receiver::init() {
