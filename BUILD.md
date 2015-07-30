@@ -1,7 +1,7 @@
 WDT opensource build uses CMake 3.2.x or later
 
 This should build in a variety of environments (if it doesn't please open
-and issue or even better, contribute a patch)
+an issue or even better, contribute a patch)
 
 See also README.md Dependencies section
 (Inside facebook see https://our.intern.facebook.com/intern/wiki/WDT/OpenSource)
@@ -9,103 +9,131 @@ See also README.md Dependencies section
 
 Checkout the .travis.yml for build bootstrap without root/sudo requirement
 
-Notes:
+# Notes:
  On Ubuntu 14.04 - to get g++ 4.9
+ ```
  sudo add-apt-repository ppa:ubuntu-toolchain-r/test
  sudo apt-get upgrade
+ ```
 If using a vmware image/starting fresh
+```
  sudo vmware-config-tools.pl  # to setup shared folders
-
-# Cmake 3.2 or later
-
-See below for mac (Cmake 3.3/head on a mac is recommended for Xcode support)
-
+```
+# Build Instructions
+__Install Cmake 3.2 or greater.__
+*See directions below for Mac (Cmake 3.3/head on a Mac is recommended for Xcode support)*
+```
 wget http://www.cmake.org/files/v3.2/cmake-3.2.3.tar.gz
 tar xvfz cmake-3.2.3.tar.gz
 cd cmake-3.2.3
 ./bootstrap --prefix=/usr --parallel=16 && make -j && sudo make install
-
-# Get folly
+```
+__Install folly.__
+```
+mkdir deps/; cd deps
 git clone https://github.com/facebook/folly.git
-
-# Getting pre built dependencies: glog-dev (which adds gflags, libunwind)
-# boost system, double conversion
-sudo apt-get install libgoogle-glog-dev libboost-system-dev \
-     libdouble-conversion-dev # and optionally: libjemalloc-dev
-
-# OR
-
-# If double-conversion isn't available:
-
+```
+__Install glog-dev (includes gflags, libunwind), boost system, double conversion__
+*libjemalloc-dev dependency is optional*
+```
+sudo apt-get install libgoogle-glog-dev libboost-system-dev libdouble-conversion-dev libjemalloc-dev
+```
+*If double-conversion isn't available via apt-get:*
+```
 git clone https://github.com/floitsch/double-conversion.git
 cd double-conversion; cmake . ; make -j && sudo make install
+```
 
+__Build gflags and glog from source__
 
-# Get and install gflags and glog - it's important to build and configure
-# gflags correctly for glog to pick it up and avoid linking errors later
-# or getting a wdt without flags working
+*It's important to build and configure gflags correctly for glog to pick it up and avoid linking errors later or getting a wdt without flags working*
+```
 git clone https://github.com/schuhschuh/gflags.git
 mkdir gflags/build
 cd gflags/build
 cmake -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on ..
 make -j && sudo make install
-# Glog
+```
+
+```
 svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 cd glog
 ./configure # add --with-gflags=whereyouinstalledgflags
 # to avoid ERROR: unknown command line flag 'minloglevel' later
 make -j && sudo make install
+```
 
 
 
 
-# And finally Build wdt itself:
+__Build wdt from source__
+```
 cmake pathtowdtsrcdir -DBUILD_TESTING=on  # skip -D... if you don't want tests
 make -j
 make test
 sudo make install
+```
+# Install on Mac OS X
 
-# Macos
-
-Install Xcode 6 and the command line tools (so
+__Install Xcode 6 and the command line tools__ (so
 /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
 exists)
 
-## cmake
-# Until 3.3 is out we need the latest on a Mac to
-# get CXX 11 support: ( http://www.cmake.org/Bug/view.php?id=15355 )
+__Install Cmake__
 
+*Until 3.3 is out we need the latest on a Mac to get CXX 11 support: ( http://www.cmake.org/Bug/view.php?id=15355 )*
+```
 git clone http://cmake.org/cmake.git
 cd cmake
 ./bootstrap --prefix=/usr --parallel=16
 make -j && sudo make install
+cd ../
+```
+__Install homebrew (http://brew.sh/)__
 
-## Get homebrew at http://brew.sh/
-
-### Glog and gflags and boost
+__Install glog and gflags and boost__
+```
 brew update
 brew install glog gflags boost
-## Double conversion
+```
+__Install Double conversion__
+```
 git clone https://github.com/floitsch/double-conversion.git
-cd double-conversion; cmake . ; make -j && sudo make install
-
-### Get folly source tree
-As above
-
-## finally build wdt itself:
-mkdir wdt_mac
-cd wdt_mac
-# For Xcode:
+cd double-conversion; cmake . ; make -j && sudo make install;
+cd ../
+```
+__Build wdt from source__
+```
+mkdir wdt-mac
+cd wdt-mac
+```
+Get folly source for use during build
+```
+git clone https://github.com/facebook/folly.git
+```
+Fetch wdt source
+```
+git clone https://github.com/oblogic7/wdt.git
+```
+Using Xcode:
+```
 cmake pathtosrccode -G Xcode -DBUILD_TESTING=on
-# Using unix makefiles
+```
+
+Using Unix makefiles:
+```
 cmake pathtosrccode -G "Unix Makefiles" -DBUILD_TESTING=on
 make -j
 make test
 sudo make install
-# For Eclipse CDT
+```
+
+Using Eclipse CDT:
+
+*Follow instruction to import the project like on http://www.cmake.org/Wiki/Eclipse_CDT4_Generator*
+```
 cmake ../wdt -G "Eclipse CDT4 - Unix Makefiles" -DBUILD_TESTING=on
-# follow instruction to import the project like on
-# http://www.cmake.org/Wiki/Eclipse_CDT4_Generator
+```
 
 
 # Troubleshooting
