@@ -21,22 +21,26 @@ If using a vmware image/starting fresh
 ```
 # Build Instructions
 __Install Cmake 3.2 or greater.__
-*See directions below for Mac (Cmake 3.3/head on a Mac is recommended for Xcode support)*
+*See directions below for Mac
+(Cmake 3.3/head on a Mac is recommended for Xcode support)*
 ```
 wget http://www.cmake.org/files/v3.2/cmake-3.2.3.tar.gz
 tar xvfz cmake-3.2.3.tar.gz
 cd cmake-3.2.3
 ./bootstrap --prefix=/usr --parallel=16 && make -j && sudo make install
 ```
-__Install folly.__
+__Get folly source tree__
 ```
 mkdir deps/; cd deps
 git clone https://github.com/facebook/folly.git
 ```
-__Install glog-dev (includes gflags, libunwind), boost system, double conversion__
+__Install glog-dev (includes gflags, libunwind), boost system, double conversion
+if you can find a binary distrubution for your variant of linux:__
 *libjemalloc-dev dependency is optional*
+
 ```
-sudo apt-get install libgoogle-glog-dev libboost-system-dev libdouble-conversion-dev libjemalloc-dev
+sudo apt-get install libgoogle-glog-dev libboost-system-dev \
+libdouble-conversion-dev libjemalloc-dev
 ```
 *If double-conversion isn't available via apt-get:*
 ```
@@ -44,9 +48,10 @@ git clone https://github.com/floitsch/double-conversion.git
 cd double-conversion; cmake . ; make -j && sudo make install
 ```
 
-__Build gflags and glog from source__
+__Otherwise, Build gflags and glog from source__
 
-*It's important to build and configure gflags correctly for glog to pick it up and avoid linking errors later or getting a wdt without flags working*
+*It's important to build and configure gflags correctly for glog to pick it up
+and avoid linking errors later or getting a wdt without flags working*
 ```
 git clone https://github.com/schuhschuh/gflags.git
 mkdir gflags/build
@@ -81,7 +86,6 @@ exists)
 
 __Install Cmake__
 
-*Until 3.3 is out we need the latest on a Mac to get CXX 11 support: ( http://www.cmake.org/Bug/view.php?id=15355 )*
 ```
 git clone http://cmake.org/cmake.git
 cd cmake
@@ -113,7 +117,7 @@ git clone https://github.com/facebook/folly.git
 ```
 Fetch wdt source
 ```
-git clone https://github.com/oblogic7/wdt.git
+git clone https://github.com/facebook/wdt.git
 ```
 Using Xcode:
 ```
@@ -130,7 +134,8 @@ sudo make install
 
 Using Eclipse CDT:
 
-*Follow instruction to import the project like on http://www.cmake.org/Wiki/Eclipse_CDT4_Generator*
+*Follow instruction to import the project like on
+http://www.cmake.org/Wiki/Eclipse_CDT4_Generator*
 ```
 cmake ../wdt -G "Eclipse CDT4 - Unix Makefiles" -DBUILD_TESTING=on
 ```
