@@ -11,6 +11,11 @@ echo "Run from the cmake build dir (or ~/fbcode - or fbmake runtests)"
 # to 0 : fast for repeated benchmarking not for correctness
 DO_VERIFY=1
 
+if [ -z "$WDT_TEST_SYMLINKS" ] ; then
+  WDT_TEST_SYMLINKS=1
+fi;
+echo "WDT_TEST_SYMLINKS=$WDT_TEST_SYMLINKS"
+
 # Verbose / to debug failure:
 #WDTBIN="_bin/wdt/wdt -minloglevel 0 -v 99"
 # Normal:
@@ -18,6 +23,12 @@ WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
 "-avg_mbytes_per_sec=3000 -max_mbytes_per_sec=3500 "\
 "-num_ports=4 -throttler_log_time_millis=200 -enable_checksum=true"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
+MD5SUM=`which md5sum`
+STATUS=$?
+if [ $STATUS -ne 0 ] ; then
+  MD5SUM=`which md5`
+fi
+echo "Found md5sum as $MD5SUM"
 
 if [ -z "$HOSTNAME" ] ; then
     echo "HOSTNAME not set, will try with 'localhost'"
@@ -56,26 +67,29 @@ do
 done
 echo "done with setup"
 
-# test symlink issues
-(cd $DIR/src ; touch a; ln -s doesntexist badlink; dd if=/dev/zero of=c bs=1024 count=1; mkdir d; ln -s ../d d/e; ln -s ../c d/a)
-(cd $DIR/extsrc; mkdir TestDir; mkdir TestDir/test; cd TestDir; echo "Text1" >> file1; cd test; echo "Text2" >> file1; ln -s $DIR/extsrc/TestDir; cp -R $DIR/extsrc/TestDir $DIR/src)
+if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
+  # test symlink issues
+  (cd $DIR/src ; touch a; ln -s doesntexist badlink; dd if=/dev/zero of=c bs=1024 count=1; mkdir d; ln -s ../d d/e; ln -s ../c d/a)
+  (cd $DIR/extsrc; mkdir TestDir; mkdir TestDir/test; cd TestDir; echo "Text1" >> file1; cd test; echo "Text2" >> file1; ln -s $DIR/extsrc/TestDir; cp -R $DIR/extsrc/TestDir $DIR/src)
+fi
 
 
 CMD="$WDTBIN -minloglevel=1 -directory $DIR/dst 2> $DIR/server.log | head -1 | \
-    xargs -I URL time $WDTBIN -directory $DIR/src -connection_url URL 2>&1 | \
+    xargs -I URL $WDTBIN -directory $DIR/src -connection_url URL 2>&1 | \
     tee $DIR/client.log"
 echo "First transfer: $CMD"
 eval $CMD
 STATUS=$?
 # TODO check for $? / crash... though diff will indirectly find that case
 
-CMD="$WDTBIN -minloglevel=1 -directory $DIR/dst_symlinks 2>> $DIR/server.log |\
-    head -1 | xargs -I URL time $WDTBIN -follow_symlinks -directory $DIR/src \
+if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
+  CMD="$WDTBIN -minloglevel=1 -directory $DIR/dst_symlinks 2>> $DIR/server.log |\
+    head -1 | xargs -I URL $WDTBIN -follow_symlinks -directory $DIR/src \
     -connection_url URL 2>&1 | tee $DIR/client.log"
-echo "Second transfer: $CMD"
-eval $CMD
-# TODO check for $? / crash... though diff will indirectly find that case
-
+  echo "Second transfer: $CMD"
+  eval $CMD
+  # TODO check for $? / crash... though diff will indirectly find that case
+fi
 
 if [ $DO_VERIFY -eq 1 ] ; then
     echo "Verifying for run without follow_symlinks"
@@ -84,9 +98,9 @@ if [ $DO_VERIFY -eq 1 ] ; then
     NUM_FILES=`(cd $DIR/dst && ( find . -type f | wc -l))`
     echo "Transfered `du -ks $DIR/dst` kbytes across $NUM_FILES files"
 
-    (cd $DIR/src ; ( find . -type f -print0 | xargs -0 md5sum | sort ) \
+    (cd $DIR/src ; ( find . -type f -print0 | xargs -0 $MD5SUM | sort ) \
         > ../src.md5s )
-    (cd $DIR/dst ; ( find . -type f -print0 | xargs -0 md5sum | sort ) \
+    (cd $DIR/dst ; ( find . -type f -print0 | xargs -0 $MD5SUM | sort ) \
         > ../dst.md5s )
 
     echo "Should be no diff"
@@ -94,15 +108,16 @@ if [ $DO_VERIFY -eq 1 ] ; then
     STATUS=$?
 
 
+  if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
     echo "Verifying for run with follow_symlinks"
     echo "Checking for difference `date`"
 
     NUM_FILES=`(cd $DIR/dst_symlinks && ( find . -type f | wc -l))`
     echo "Transfered `du -ks $DIR/dst_symlinks` kbytes across $NUM_FILES files"
 
-    (cd $DIR/src ; ( find -L . -type f -print0 | xargs -0 md5sum | sort ) \
+    (cd $DIR/src ; ( find -L . -type f -print0 | xargs -0 $MD5SUM | sort ) \
         > ../src_symlinks.md5s )
-    (cd $DIR/dst_symlinks ; ( find . -type f -print0 | xargs -0 md5sum \
+    (cd $DIR/dst_symlinks ; ( find . -type f -print0 | xargs -0 $MD5SUM \
         | sort ) > ../dst_symlinks.md5s )
 
     echo "Should be no diff"
@@ -111,6 +126,7 @@ if [ $DO_VERIFY -eq 1 ] ; then
     if [ $STATUS -eq 0 ] ; then
       STATUS=$SYMLINK_STATUS
     fi
+  fi
 else
     echo "Skipping independant verification"
 fi

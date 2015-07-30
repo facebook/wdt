@@ -77,7 +77,7 @@
 #endif
 WDT_OPT(start_port, int32, "Starting port number for wdt");
 WDT_OPT(num_ports, int32, "Number of sockets");
-WDT_OPT(ipv6, bool, "use ipv4 only, takes precedence over -ipv6");
+WDT_OPT(ipv6, bool, "prefers ipv6");
 WDT_OPT(ipv4, bool, "use ipv4 only, takes precedence over -ipv6");
 WDT_OPT(ignore_open_errors, bool, "will continue despite open errors");
 WDT_OPT(two_phases, bool, "do directory discovery first/separately");

@@ -19,12 +19,19 @@
 #include <signal.h>
 #include <thread>
 
-#ifndef FLAGS_INCLUDE_FILE
-#define FLAGS_INCLUDE_FILE "WdtFlags.cpp.inc"
-#endif
-
 #ifndef ADDITIONAL_SENDER_SETUP
 #define ADDITIONAL_SENDER_SETUP
+#endif
+
+// Cmake/make depend doesn't understand the
+// include with variable/define so trick it
+// to know this file does depend on WdtFlags.cpp.inc
+#if 0
+#include "WdtFlags.cpp.inc"
+#endif
+
+#ifndef FLAGS_INCLUDE_FILE
+#define FLAGS_INCLUDE_FILE "WdtFlags.cpp.inc"
 #endif
 
 #define STANDALONE_APP

@@ -29,9 +29,11 @@ class WdtOptions {
    */
   static WdtOptions& getMutable();
   /**
-   * Use ipv6 while establishing connection
+   * Use ipv6 while establishing connection.
+   * When both ipv6 and ipv4 are false we will try both
+   * if the host name has both.
    */
-  bool ipv6{true};
+  bool ipv6{false};
   /**
    * Use ipv4, this takes precedence over ipv6
    */
