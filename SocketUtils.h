@@ -19,7 +19,18 @@ namespace wdt {
 class SocketUtils {
  public:
   static int getReceiveBufferSize(int fd);
-  static std::string getNameInfo(const struct sockaddr *sa, socklen_t salen);
+  /**
+   * Returns ip and port for a socket address
+   *
+   * @param sa      socket address
+   * @param salen   socket address length
+   * @param host    this is set to host name
+   * @param port    this is set to port
+   *
+   * @return        whether getnameinfo was successful or not
+   */
+  static bool getNameInfo(const struct sockaddr *sa, socklen_t salen,
+                          std::string &host, std::string &port);
   static void setReadTimeout(int fd);
   static void setWriteTimeout(int fd);
   /// @see ioWithAbortCheck

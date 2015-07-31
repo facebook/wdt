@@ -25,7 +25,7 @@ startNewTransfer() {
   -transfer_id=$RECEIVER_ID -protocol_version=$RECEIVER_PROTOCOL_VERSION \
   >> $DIR/server${TEST_COUNT}.log 2>&1 &
   pidofreceiver=$!
-  $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME \
+  $WDTBIN_CLIENT -directory $SRC_DIR -destination $HOSTNAME \
   -start_port=$STARTING_PORT -block_size_mbytes=$BLOCK_SIZE_MBYTES \
   -transfer_id=$SENDER_ID -protocol_version=$SENDER_PROTOCOL_VERSION \
   |& tee -a $DIR/client${TEST_COUNT}.log &
@@ -96,13 +96,12 @@ ERROR_COUNT=10
 SENDER_ID="123456"
 RECEIVER_ID="123456"
 
-WDTBIN_OPTS="-ipv4 -ipv6=false -num_ports=$threads \
+WDTBIN_OPTS="-ipv4 -num_ports=$threads \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
--enable_download_resumption=true -keep_transfer_log=false \
--progress_report_interval_millis=-1"
+-enable_download_resumption -keep_transfer_log=false"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
-WDTBIN_CLIENT=$WDTBIN
+WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
 
 BASEDIR=/dev/shm/tmpWDT
@@ -130,6 +129,7 @@ do
   done
 done
 cd -
+SRC_DIR=$DIR/src
 BLOCK_SIZE_MBYTES=10
 TEST_COUNT=0
 # Tests for which there is no need to verify source and destination md5s
@@ -278,8 +278,41 @@ TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
 STARTING_PORT=$((STARTING_PORT + threads))
 TEST_COUNT=$((TEST_COUNT + 1))
 
+# create another src directory full of files with the same name and size as the
+# actual src directory
+mkdir -p $DIR/src1
+cd $DIR/src1
+for ((i = 0; i < 4; i++))
+do
+  fallocate -l 16M sample${i}
+done
+for ((i = 0; i < 16; i++))
+do
+  fallocate -l 64M file${i}
+done
+cd -
+
+# list of tests for which we should compare destination with $DIR/src1
+USE_OTHER_SRC_DIR=()
+echo "Test hostname mismatch"
+# start first transfer
+startNewTransfer
+sleep 5
+killCurrentTransfer
+# change src directory and make the trnafser IPV6
+SRC_DIR=$DIR/src1
+WDTBIN_CLIENT+=" -ipv4=false -ipv6"
+WDTBIN_SERVER+=" -ipv4=false -ipv6"
+startNewTransfer
+waitForTransferEnd
+SRC_DIR=$DIR/src
+USE_OTHER_SRC_DIR+=($TEST_COUNT)
+TEST_COUNT=$((TEST_COUNT + 1))
+
+
 STATUS=0
 (cd $DIR/src ; ( find . -type f -print0 | xargs -0 md5sum | sort ) > ../src.md5s )
+(cd $DIR/src1 ; ( find . -type f -print0 | xargs -0 md5sum | sort ) > ../src1.md5s )
 for ((i = 0; i < TEST_COUNT; i++))
 do
   cat $DIR/server${i}.log
@@ -291,7 +324,12 @@ do
   ../dst${i}.md5s )
   echo "Verifying correctness for test $((i + 1))"
   echo "Should be no diff"
-  (cd $DIR; diff -u src.md5s dst${i}.md5s)
+  if [[ ${USE_OTHER_SRC_DIR[*]} =~ $i ]]; then
+    SRC_MD5=src1.md5s
+  else
+    SRC_MD5=src.md5s
+  fi
+  (cd $DIR; diff -u $SRC_MD5 dst${i}.md5s)
   CUR_STATUS=$?
   if [ $STATUS -eq 0 ] ; then
     STATUS=$CUR_STATUS

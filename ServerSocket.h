@@ -36,10 +36,13 @@ class ServerSocket {
   int read(char *buf, int nbyte, bool tryFull = true);
   /// tries to write nbyte data and periodically checks for abort
   int write(const char *buf, int nbyte, bool tryFull = true);
+  /// @return       peer ip
+  std::string getPeerIp() const;
+  /// @return       peer port
+  std::string getPeerPort() const;
   int getFd() const;
   int getListenFd() const;
   int closeCurrentConnection();
-  static std::string getNameInfo(const struct sockaddr *sa, socklen_t salen);
   int32_t getPort() const;
   int getBackLog() const;
   /// Destroy the active connection and the listening fd
@@ -51,6 +54,8 @@ class ServerSocket {
   const int backlog_;
   int listeningFd_;
   int fd_;
+  std::string peerIp_;
+  std::string peerPort_;
   struct addrinfo sa_;
   WdtBase::IAbortChecker const *abortChecker_;
 };

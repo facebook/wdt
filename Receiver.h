@@ -451,7 +451,7 @@ class Receiver : public WdtBase {
    * Start new transfer by incrementing transferStartedCount_
    * A thread must hold lock on mutex_ before calling this
    */
-  void startNewGlobalSession();
+  void startNewGlobalSession(ThreadData &data);
 
   /**
    * Returns whether the current session has finished or not.
@@ -533,9 +533,6 @@ class Receiver : public WdtBase {
 
   /// Transfer log manager
   TransferLogManager transferLogManager_;
-
-  /// Parsed log entries
-  std::vector<FileChunksInfo> parsedFileChunksInfo_;
 
   /// Enum representing status of file chunks transfer
   enum SendChunkStatus { NOT_STARTED, IN_PROGRESS, SENT };

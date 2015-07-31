@@ -67,6 +67,8 @@ DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 DEFINE_int32(abort_after_seconds, 0,
              "Abort transfer after given seconds. 0 means don't abort.");
 
+DEFINE_string(recovery_id, "", "Recovery-id to use for download resumption");
+
 using namespace facebook::wdt;
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
@@ -162,6 +164,10 @@ int main(int argc, char *argv[]) {
     std::cout << augmentedReq.generateUrl() << std::endl;
     std::cout.flush();
     setUpAbort(receiver);
+    if (!FLAGS_recovery_id.empty()) {
+      WdtOptions::getMutable().enable_download_resumption = true;
+      receiver.setRecoveryId(FLAGS_recovery_id);
+    }
     if (!FLAGS_run_as_daemon) {
       receiver.transferAsync();
       std::unique_ptr<TransferReport> report = receiver.finish();

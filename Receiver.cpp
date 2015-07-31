@@ -9,6 +9,7 @@
 #include "Receiver.h"
 #include "ServerSocket.h"
 #include "FileWriter.h"
+#include "SocketUtils.h"
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
@@ -311,7 +312,7 @@ ErrorCode Receiver::transferAsync() {
   if (options.enable_download_resumption) {
     WDT_CHECK(!options.skip_writes)
         << "Can not skip transfers with download resumption turned on";
-    parsedFileChunksInfo_ = transferLogManager_.parseAndMatch(recoveryId_);
+    transferLogManager_.parseAndMatch(recoveryId_);
   }
   start();
   return OK;
@@ -438,9 +439,6 @@ void Receiver::start() {
     std::thread trackerThread(&Receiver::progressTracker, this);
     progressTrackerThread_ = std::move(trackerThread);
   }
-  if (options.enable_download_resumption) {
-    transferLogManager_.openAndStartWriter();
-  }
 }
 
 bool Receiver::areAllThreadsFinished(bool checkpointAdded) {
@@ -490,8 +488,10 @@ bool Receiver::hasNewSessionStarted(ThreadData &data) {
   return started;
 }
 
-void Receiver::startNewGlobalSession() {
+void Receiver::startNewGlobalSession(ThreadData &data) {
   WDT_CHECK(transferStartedCount_ == transferFinishedCount_);
+  const auto &options = WdtOptions::get();
+  auto &socket = data.socket_;
   if (throttler_) {
     // If throttler is configured/set then register this session
     // in the throttler. This is guranteed to work in either of the
@@ -501,6 +501,11 @@ void Receiver::startNewGlobalSession() {
   }
   transferStartedCount_++;
   startTime_ = Clock::now();
+
+  if (options.enable_download_resumption) {
+    transferLogManager_.openAndStartWriter(socket.getPeerIp());
+  }
+
   LOG(INFO) << "New transfer started " << transferStartedCount_;
 }
 
@@ -598,7 +603,7 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!hasNewSessionStarted(data)) {
     // this thread has the first connection
-    startNewGlobalSession();
+    startNewGlobalSession(data);
   }
   startNewThreadSession(data);
   return READ_NEXT_CMD;
@@ -1115,9 +1120,11 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
           sendChunksStatus_ = NOT_STARTED;
           conditionFileChunksSent_.notify_one();
         });
+        const auto &parsedFileChunksInfo =
+            transferLogManager_.getParsedFileChunksInfo();
         int64_t off = 0;
         buf[off++] = Protocol::CHUNKS_CMD;
-        const int64_t numParsedChunksInfo = parsedFileChunksInfo_.size();
+        const int64_t numParsedChunksInfo = parsedFileChunksInfo.size();
         Protocol::encodeChunksCmd(buf, off, bufferSize, numParsedChunksInfo);
         written = socket.write(buf, off);
         if (written > 0) {
@@ -1136,7 +1143,7 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
         while (numEntriesWritten < numParsedChunksInfo) {
           off = sizeof(int32_t);
           int64_t numEntriesEncoded = Protocol::encodeFileChunksInfoList(
-              buf, off, bufferSize, numEntriesWritten, parsedFileChunksInfo_);
+              buf, off, bufferSize, numEntriesWritten, parsedFileChunksInfo);
           int32_t dataSize = folly::Endian::little(off - sizeof(int32_t));
           folly::storeUnaligned<int32_t>(buf, dataSize);
           written = socket.write(buf, off);
@@ -1165,12 +1172,10 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
         guard.dismiss();
         lock.lock();
         sendChunksStatus_ = SENT;
-        // no need to still store all the parsed data
-        parsedFileChunksInfo_.clear();
         // sender is aware of previous transferred chunks. logging can now be
         // enabled
         transferLogManager_.enableLogging();
-        transferLogManager_.addLogHeader(recoveryId_);
+        transferLogManager_.addLogHeader();
         conditionFileChunksSent_.notify_all();
         return READ_NEXT_CMD;
       }

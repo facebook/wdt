@@ -107,8 +107,9 @@ ErrorCode ServerSocket::listen() {
   }
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
-    VLOG(1) << "Will listen on "
-            << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
+    std::string host, port;
+    SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen, host, port);
+    VLOG(1) << "Will listen on " << host << " " << port;
     // TODO: set sock options : SO_REUSEADDR,...
     listeningFd_ =
         socket(info->ai_family, info->ai_socktype, info->ai_protocol);
@@ -192,18 +193,30 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis) {
     }
   }
 
-  struct sockaddr addr;
+  struct sockaddr_storage addr;
   socklen_t addrLen = sizeof(addr);
-  fd_ = accept(listeningFd_, &addr, &addrLen);
+  fd_ = accept(listeningFd_, (struct sockaddr *)&addr, &addrLen);
   if (fd_ < 0) {
     PLOG(ERROR) << "accept error";
     return CONN_ERROR;
   }
-  VLOG(1) << "New connection, fd : " << fd_ << " from "
-          << SocketUtils::getNameInfo(&addr, addrLen);
+  SocketUtils::getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_,
+                           peerPort_);
+  VLOG(1) << "New connection, fd : " << fd_ << " from " << peerIp_ << " "
+          << peerPort_;
   SocketUtils::setReadTimeout(fd_);
   SocketUtils::setWriteTimeout(fd_);
   return OK;
+}
+
+std::string ServerSocket::getPeerIp() const {
+  // we keep returning the peer ip for error printing
+  return peerIp_;
+}
+
+std::string ServerSocket::getPeerPort() const {
+  // we keep returning the peer port for error printing
+  return peerPort_;
 }
 
 int ServerSocket::read(char *buf, int nbyte, bool tryFull) {

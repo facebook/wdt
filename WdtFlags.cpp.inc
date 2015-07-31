@@ -163,3 +163,7 @@ WDT_OPT(enable_download_resumption, bool,
 WDT_OPT(keep_transfer_log, bool,
         "If true, transfer logs are not deleted at "
         "the end of the transfer");
+WDT_OPT(
+    disable_sender_verfication_during_resumption, bool,
+    "If true, sender-ip is not verified with the ip in transfer log. This is "
+    "useful if files can be downloaded from different hosts");

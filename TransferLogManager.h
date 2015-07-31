@@ -31,20 +31,19 @@ class TransferLogManager {
   /**
    * Opens the log for writing and also starts a writer thread
    *
+   * @param curSenderIp     current sender ip
+   *
    * @return          If successful, true, else false
    */
-  bool openAndStartWriter();
+  bool openAndStartWriter(const std::string &curSenderIp);
 
   /// enable logging
   void enableLogging();
 
   /**
    * Adds a log header
-   *
-   * @param recoveryId    An identifier that is same for transfers across
-   *                      resumptions
    */
-  void addLogHeader(const std::string &recoveryId);
+  void addLogHeader();
 
   /**
    * Adds a file creation entry to the log buffer
@@ -79,13 +78,19 @@ class TransferLogManager {
 
   /**
    * parses transfer log, does validation and fixes the log in case of partial
-   * writes from previous transfer
+   * writes from previous transfer. Also parsed info is cached for later use and
+   * can be accessed through getParsedFileChunksInfo
    *
    * @param recoveryId  recovery-id of the current transfer
    *
-   * @return            parsed info
+   * @return       Whether the parsing was successful or not
    */
-  std::vector<FileChunksInfo> parseAndMatch(const std::string &recoveryId);
+  bool parseAndMatch(const std::string &recoveryId);
+
+  /// @return     parsed files chunks info
+  const std::vector<FileChunksInfo> &getParsedFileChunksInfo() {
+    return parsedFileChunksInfo_;
+  }
 
   /**
    * Signals to the writer thread to finish. Waits for the writer thread to
@@ -165,7 +170,8 @@ class TransferLogManager {
 
   /// Parses log header
   bool parseLogHeader(char *buf, int16_t entrySize, int64_t &timestamp,
-                      int &version, std::string &recoveryId);
+                      int &version, std::string &recoveryId,
+                      std::string &senderIp);
 
   /// Parses file creation entry
   bool parseFileCreationEntry(char *buf, int16_t entrySize, int64_t &timestamp,
@@ -206,10 +212,16 @@ class TransferLogManager {
   int fd_{-1};
   /// root directory
   std::string rootDir_;
+  /// recovery id
+  std::string recoveryId_;
+  /// sender ip
+  std::string senderIp_;
   /// whether logging is enabled or not
   bool loggingEnabled_{false};
   /// Entry buffer
   std::vector<std::string> entries_;
+  /// Parsed log entries
+  std::vector<FileChunksInfo> parsedFileChunksInfo_;
   /// Flag to signal end to the writer thread
   bool finished_{false};
   /// Writer thread

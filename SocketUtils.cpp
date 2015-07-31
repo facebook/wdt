@@ -14,6 +14,7 @@
 #include <glog/logging.h>
 #include <folly/Conv.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <algorithm>
 
@@ -29,15 +30,18 @@ int SocketUtils::getReceiveBufferSize(int fd) {
 }
 
 /* static */
-std::string SocketUtils::getNameInfo(const struct sockaddr *sa,
-                                     socklen_t salen) {
-  char host[NI_MAXHOST], service[NI_MAXSERV];
-  int res = getnameinfo(sa, salen, host, sizeof(host), service, sizeof(service),
-                        NI_NUMERICHOST | NI_NUMERICSERV);
+bool SocketUtils::getNameInfo(const struct sockaddr *sa, socklen_t salen,
+                              std::string &host, std::string &port) {
+  char hostBuf[NI_MAXHOST], portBuf[NI_MAXSERV];
+  int res = getnameinfo(sa, salen, hostBuf, sizeof(hostBuf), portBuf,
+                        sizeof(portBuf), NI_NUMERICHOST | NI_NUMERICSERV);
   if (res) {
     LOG(ERROR) << "getnameinfo failed " << gai_strerror(res);
+    return false;
   }
-  return folly::to<std::string>(host, " ", service);
+  host = std::string(hostBuf);
+  port = std::string(portBuf);
+  return true;
 }
 
 /* static */

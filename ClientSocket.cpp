@@ -54,8 +54,9 @@ ErrorCode ClientSocket::connect() {
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
     ++count;
-    VLOG(2) << "will connect to "
-            << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
+    std::string host, port;
+    SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen, host, port);
+    VLOG(2) << "will connect to " << host << " " << port;
     fd_ = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd_ == -1) {
       PLOG(WARNING) << "Error making socket for port " << port_;
@@ -75,8 +76,7 @@ ErrorCode ClientSocket::connect() {
 
     if (::connect(fd_, info->ai_addr, info->ai_addrlen) != 0) {
       if (errno != EINPROGRESS) {
-        PLOG(INFO) << "Error connecting on "
-                   << SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen);
+        PLOG(INFO) << "Error connecting on " << host << " " << port;
         this->close();
         continue;
       }
@@ -123,8 +123,8 @@ ErrorCode ClientSocket::connect() {
         continue;
       }
       if (connectResult != 0) {
-        LOG(WARNING) << "connect did not succeed : "
-                     << strerrorStr(connectResult);
+        LOG(WARNING) << "connect did not succeed on " << host << " " << port
+                     << " : " << strerrorStr(connectResult);
         this->close();
         continue;
       }

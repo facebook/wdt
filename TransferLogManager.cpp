@@ -50,8 +50,22 @@ int TransferLogManager::open() {
   return fd;
 }
 
-bool TransferLogManager::openAndStartWriter() {
+bool TransferLogManager::openAndStartWriter(const std::string &curSenderIp) {
   WDT_CHECK(fd_ == -1) << "Trying to open wdt log multiple times";
+
+  const auto &options = WdtOptions::get();
+  if (!options.disable_sender_verfication_during_resumption) {
+    if (!senderIp_.empty() && senderIp_ != curSenderIp) {
+      LOG(ERROR) << "Current sender ip does not match ip in the "
+                    "transfer log " << curSenderIp << " " << senderIp_
+                 << ", ignoring transfer log";
+      parsedFileChunksInfo_.clear();
+      // remove the previous log
+      unlink();
+    }
+  }
+  senderIp_ = curSenderIp;
+
   fd_ = open();
   if (fd_ < 0) {
     return false;
@@ -89,11 +103,11 @@ std::string TransferLogManager::getFormattedTimestamp(int64_t timestampMicros) {
   return buf;
 }
 
-void TransferLogManager::addLogHeader(const std::string &recoveryId) {
+void TransferLogManager::addLogHeader() {
   if (!loggingEnabled_ || fd_ < 0) {
     return;
   }
-  VLOG(1) << "Adding log header " << LOG_VERSION << " " << recoveryId;
+  VLOG(1) << "Adding log header " << LOG_VERSION << " " << recoveryId_;
   char buf[kMaxEntryLength];
   // increment by 2 bytes to later store the total length
   char *ptr = buf + sizeof(int16_t);
@@ -101,7 +115,8 @@ void TransferLogManager::addLogHeader(const std::string &recoveryId) {
   ptr[size++] = HEADER;
   encodeInt(ptr, size, timestampInMicroseconds());
   encodeInt(ptr, size, LOG_VERSION);
-  encodeString(ptr, size, recoveryId);
+  encodeString(ptr, size, recoveryId_);
+  encodeString(ptr, size, senderIp_);
 
   folly::storeUnaligned<int16_t>(buf, size);
   std::lock_guard<std::mutex> lock(mutex_);
@@ -240,12 +255,16 @@ void TransferLogManager::writeEntriesToDisk() {
 
 bool TransferLogManager::parseLogHeader(char *buf, int16_t entrySize,
                                         int64_t &timestamp, int &version,
-                                        std::string &recoveryId) {
+                                        std::string &recoveryId,
+                                        std::string &senderIp) {
   folly::ByteRange br((uint8_t *)buf, entrySize);
   try {
     timestamp = decodeInt(br);
     version = decodeInt(br);
     if (!decodeString(br, buf, entrySize, recoveryId)) {
+      return false;
+    }
+    if (!decodeString(br, buf, entrySize, senderIp)) {
       return false;
     }
   } catch (const std::exception &ex) {
@@ -367,11 +386,9 @@ bool TransferLogManager::parseAndPrint() {
   return parseVerifyAndFix("", true, parsedInfo);
 }
 
-std::vector<FileChunksInfo> TransferLogManager::parseAndMatch(
-    const std::string &recoveryId) {
-  std::vector<FileChunksInfo> parsedInfo;
-  parseVerifyAndFix(recoveryId, false, parsedInfo);
-  return parsedInfo;
+bool TransferLogManager::parseAndMatch(const std::string &recoveryId) {
+  recoveryId_ = recoveryId;
+  return parseVerifyAndFix(recoveryId_, false, parsedFileChunksInfo_);
 }
 
 bool TransferLogManager::parseVerifyAndFix(
@@ -452,7 +469,7 @@ bool TransferLogManager::parseVerifyAndFix(
     switch (type) {
       case HEADER: {
         if (!parseLogHeader(entry + 1, entrySize - 1, timestamp, logVersion,
-                            logRecoveryId)) {
+                            logRecoveryId, senderIp_)) {
           return false;
         }
         if (logVersion != LOG_VERSION) {
@@ -466,10 +483,15 @@ bool TransferLogManager::parseVerifyAndFix(
               << recoveryId << " " << logRecoveryId;
           return false;
         }
+        if (senderIp_.empty()) {
+          LOG(ERROR) << "Log header has empty sender ip";
+          return false;
+        }
         if (parseOnly) {
           std::cout << getFormattedTimestamp(timestamp)
                     << " New transfer started, log-version " << logVersion
-                    << " recovery-id " << logRecoveryId << std::endl;
+                    << " recovery-id " << logRecoveryId << " sender-ip "
+                    << senderIp_ << std::endl;
         }
         break;
       }

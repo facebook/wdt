@@ -229,6 +229,11 @@ class WdtOptions {
   bool keep_transfer_log{true};
 
   /**
+   * If true, WDT does not verify sender ip during resumption
+   */
+  bool disable_sender_verfication_during_resumption{false};
+
+  /**
    * Since this is a singleton copy constructor
    * and assignment operator are deleted
    */
