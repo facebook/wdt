@@ -23,42 +23,21 @@ script:
   # Debug
   - date ; uname -a ; pwd ; ls -l ..; echo $HOSTNAME
   # Build
-  - mkdir build && cd build 
-  - cmake .. -DBUILD_TESTING=1 
+  - mkdir ../build && cd ../build 
+  - which cmake
+  - cmake --version
+  - echo $PATH; echo $LD_LIBRARY_PATH
+  - cmake ../wdt -DBUILD_TESTING=1 
   #- make -j 4 VERBOSE=1
   - make -j 4
-  - export WDT_TEST_SYMLINKS=0
-  - CTEST_OUTPUT_ON_FAILURE=1 make test
+  - WDT_TEST_SYMLINKS=0 CTEST_OUTPUT_ON_FAILURE=1 make test
   # to see the full output/debug:
   #- ../wdt_e2e_simple_test.sh
 
 before_install:
-  - mkdir $HOME/bin
-  - export PATH=$HOME/bin:$PATH
-  - export LD_LIBRARY_PATH=$HOME/lib:$LD_LIBRARY_PATH
-  - ln -s /usr/bin/g++-4.9 $HOME/bin/g++
-  - ln -s /usr/bin/gcc-4.9 $HOME/bin/gcc
-  #- export CC=gcc-4.9
-  #- export CXX=g++-4.9
-  #- dpkg -L g++-4.9
-  #- ls -l /usr/bin/g*
-  #- wget http://www.cmake.org/files/v3.2/cmake-3.2.3.tar.gz
-  #- tar xfz cmake-3.2.3.tar.gz
-  #- ( cd cmake-3.2.3 && ./bootstrap --prefix=$HOME --parallel=8 && make -j 4 && make install )
-  - cd ..
-  - wget http://www.cmake.org/files/v3.3/cmake-3.3.0-Linux-x86_64.sh
-  - sh cmake-3.3.0-Linux-x86_64.sh --prefix=$HOME --skip-license
-  - git clone https://github.com/floitsch/double-conversion.git
-  - (cd double-conversion; cmake -DCMAKE_INSTALL_PREFIX=$HOME .; make -j 4 && make install)
-  - git clone https://github.com/schuhschuh/gflags.git
-  - (mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on .. && make -j 4 && make install)
-  - svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
-  - ( cd glog && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
-  - git clone https://github.com/facebook/folly.git 
-  - pwd ; ls -l  
-  - cd wdt
-#  - sudo apt-get update -qq
-#  - sudo apt-get install -y glog gflags cmake-3.2
+  - echo "Travis os name $TRAVIS_OS_NAME"
+  # will change PATH so we find cmake,...
+  - source ./travis_${TRAVIS_OS_NAME}.sh
 
 language: cpp
 
