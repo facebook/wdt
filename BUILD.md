@@ -31,7 +31,6 @@ cd cmake-3.2.3
 ```
 __Get folly source tree__
 ```
-mkdir deps/; cd deps
 git clone https://github.com/facebook/folly.git
 ```
 __Install glog-dev (includes gflags, libunwind), boost system, double conversion
@@ -42,13 +41,8 @@ if you can find a binary distrubution for your variant of linux:__
 sudo apt-get install libgoogle-glog-dev libboost-system-dev \
 libdouble-conversion-dev libjemalloc-dev
 ```
-*If double-conversion isn't available via apt-get:*
-```
-git clone https://github.com/floitsch/double-conversion.git
-cd double-conversion; cmake . ; make -j && sudo make install
-```
 
-__Otherwise, Build gflags and glog from source__
+__Otherwise, Build double-conversion, gflags and glog from source__
 
 *It's important to build and configure gflags correctly for glog to pick it up
 and avoid linking errors later or getting a wdt without flags working*
@@ -68,14 +62,18 @@ cd glog
 make -j && sudo make install
 ```
 
-
+*If double-conversion isn't available via apt-get:*
+```
+git clone https://github.com/floitsch/double-conversion.git
+cd double-conversion; cmake . ; make -j && sudo make install
+```
 
 
 __Build wdt from source__
 ```
 cmake pathtowdtsrcdir -DBUILD_TESTING=on  # skip -D... if you don't want tests
 make -j
-make test
+CTEST_OUTPUT_ON_FAILURE=1 make test
 sudo make install
 ```
 # Install on Mac OS X
@@ -107,10 +105,6 @@ cd double-conversion; cmake . ; make -j && sudo make install;
 cd ../
 ```
 __Build wdt from source__
-```
-mkdir wdt-mac
-cd wdt-mac
-```
 Get folly source for use during build
 ```
 git clone https://github.com/facebook/folly.git
@@ -119,16 +113,22 @@ Fetch wdt source
 ```
 git clone https://github.com/facebook/wdt.git
 ```
+
+```
+mkdir wdt-mac
+cd wdt-mac
+```
 Using Xcode:
 ```
-cmake pathtosrccode -G Xcode -DBUILD_TESTING=on
+cmake ../wdt -G Xcode -DBUILD_TESTING=on
 ```
 
 Using Unix makefiles:
 ```
-cmake pathtosrccode -G "Unix Makefiles" -DBUILD_TESTING=on
+cmake ../wdt -G "Unix Makefiles" -DBUILD_TESTING=on
 make -j
-make test
+# Until Issue #30 is fixed:
+WDT_TEST_SYMLINKS=0 CTEST_OUTPUT_ON_FAILURE=1 make test
 sudo make install
 ```
 
@@ -145,3 +145,7 @@ cmake ../wdt -G "Eclipse CDT4 - Unix Makefiles" -DBUILD_TESTING=on
 
 You may get certificate errors getting gmock and need to permanently
 accept the certificate from the commandline
+
+```
+echo p | svn list https://googlemock.googlecode.com
+```
