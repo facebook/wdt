@@ -481,6 +481,7 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(const int port,
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
   if (errCode != OK) {
     LOG(ERROR) << "Unable to connect to " << destHost_ << " " << port
+               << ", where " << socket -> getFd()
                << " despite " << connectAttempts << " retries in "
                << elapsedSecsConn << " seconds.";
     errCode = CONN_ERROR;
