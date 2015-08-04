@@ -22,7 +22,7 @@ namespace facebook {
 namespace wdt {
 DirectorySourceQueue::DirectorySourceQueue(const std::string &rootDir)
     : rootDir_(rootDir), options_(WdtOptions::get()) {
-  CHECK(!rootDir_.empty());
+  WDT_CHECK(!rootDir.empty());
   if (rootDir_.back() != '/') {
     rootDir_.push_back('/');
   }

@@ -141,10 +141,6 @@ void WdtResourceControllerTest::AddObjectsWithLimitsTest() {
     registerWdtNamespace(wdtNamespace);
   }
 
-  updateMaxReceiversLimit(2);
-  updateMaxSendersLimit(2);
-  updateMaxReceiversLimit("test-namespace-1", 1);
-  updateMaxReceiversLimit("test-namespace-2", 1);
   int index = 0;
   {
     string wdtNamespace = "test-namespace-1";
@@ -223,7 +219,7 @@ void WdtResourceControllerTest::InvalidNamespaceTest() {
   ReceiverPtr receiverPtr;
   ErrorCode code = createReceiver(wdtNamespace, transferRequest.transferId,
                                   transferRequest, receiverPtr);
-  ASSERT_EQ(code, NOT_FOUND);
+  EXPECT_EQ(NOT_FOUND, code);
   /// Receiver should not be added
   ASSERT_TRUE(receiverPtr == nullptr);
   EXPECT_EQ(deRegisterWdtNamespace(wdtNamespace), ERROR);
@@ -236,8 +232,6 @@ void WdtResourceControllerTest::ReleaseStaleTest() {
     string wdtNamespace = "test-namespace-" + to_string(namespaceNum);
     registerWdtNamespace(wdtNamespace);
   }
-  updateMaxReceiversLimit(2);
-  updateMaxSendersLimit(2);
   int index = 0;
   {
     string wdtNamespace = "test-namespace-1";
@@ -368,8 +362,6 @@ void WdtResourceControllerTest::RequestSerializationTest() {
     WdtTransferRequest transferRequest(0, 8, "/dir3/dir4");
     Receiver receiver(transferRequest);
     transferRequest = receiver.init();
-    ASSERT_TRUE(!receiver.getTransferId().empty());
-    ASSERT_TRUE(!transferRequest.transferId.empty());
     EXPECT_EQ(transferRequest.errorCode, OK);
     ASSERT_TRUE(transferRequest.ports.size() != 0);
     for (auto port : transferRequest.ports) {
@@ -411,16 +403,24 @@ void WdtResourceControllerTest::RequestSerializationTest() {
 }
 
 TEST(WdtResourceController, AddObjectsWithNoLimits) {
+  auto &options = WdtOptions::getMutable();
+  options.namespace_receiver_limit = 0;
   WdtResourceControllerTest t;
   t.AddObjectsWithNoLimitsTest();
 }
 
 TEST(WdtResourceController, MultipleNamespacesTest) {
+  auto &options = WdtOptions::getMutable();
+  options.namespace_receiver_limit = 0;
   WdtResourceControllerTest t;
   t.MultipleNamespacesTest();
 }
 
 TEST(WdtResourceController, AddObjectsWithLimitsTest) {
+  auto &options = WdtOptions::getMutable();
+  options.global_sender_limit = 2;
+  options.global_receiver_limit = 2;
+  options.namespace_receiver_limit = 1;
   WdtResourceControllerTest t;
   t.AddObjectsWithLimitsTest();
 }
@@ -431,6 +431,9 @@ TEST(WdtResourceController, InvalidNamespaceTest) {
 }
 
 TEST(WdtResourceControllerTest, ReleaseStaleTest) {
+  auto &options = WdtOptions::getMutable();
+  options.global_sender_limit = 2;
+  options.global_receiver_limit = 2;
   WdtResourceControllerTest t;
   t.ReleaseStaleTest();
 }

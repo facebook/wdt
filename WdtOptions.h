@@ -234,6 +234,26 @@ class WdtOptions {
   bool disable_sender_verfication_during_resumption{false};
 
   /**
+   * Max number of senders allowed globally
+   */
+  int global_sender_limit{0};
+
+  /**
+   * Max number of receivers allowed globally
+   */
+  int global_receiver_limit{0};
+
+  /**
+   * Max number of senders allowed per namespace
+   */
+  int namespace_sender_limit{0};
+
+  /**
+   * Max number of receivers allowed per namespace
+   */
+  int namespace_receiver_limit{1};
+
+  /**
    * Since this is a singleton copy constructor
    * and assignment operator are deleted
    */

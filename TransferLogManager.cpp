@@ -57,7 +57,8 @@ bool TransferLogManager::openAndStartWriter(const std::string &curSenderIp) {
   if (!options.disable_sender_verfication_during_resumption) {
     if (!senderIp_.empty() && senderIp_ != curSenderIp) {
       LOG(ERROR) << "Current sender ip does not match ip in the "
-                    "transfer log " << curSenderIp << " " << senderIp_
+                    "transfer log "
+                 << curSenderIp << " " << senderIp_
                  << ", ignoring transfer log";
       parsedFileChunksInfo_.clear();
       // remove the previous log
@@ -84,7 +85,8 @@ void TransferLogManager::enableLogging() {
 int64_t TransferLogManager::timestampInMicroseconds() const {
   auto timestamp = Clock::now();
   return std::chrono::duration_cast<std::chrono::microseconds>(
-             timestamp.time_since_epoch()).count();
+             timestamp.time_since_epoch())
+      .count();
 }
 
 std::string TransferLogManager::getFormattedTimestamp(int64_t timestampMicros) {

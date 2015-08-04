@@ -129,10 +129,12 @@ void ThreadTransferHistory::markSourceAsFailed(
 }
 
 const Sender::StateFunction Sender::stateMap_[] = {
-    &Sender::connect, &Sender::readLocalCheckPoint, &Sender::sendSettings,
-    &Sender::sendBlocks, &Sender::sendDoneCmd, &Sender::sendSizeCmd,
-    &Sender::checkForAbort, &Sender::readFileChunks, &Sender::readReceiverCmd,
-    &Sender::processDoneCmd, &Sender::processWaitCmd, &Sender::processErrCmd,
+    &Sender::connect,         &Sender::readLocalCheckPoint,
+    &Sender::sendSettings,    &Sender::sendBlocks,
+    &Sender::sendDoneCmd,     &Sender::sendSizeCmd,
+    &Sender::checkForAbort,   &Sender::readFileChunks,
+    &Sender::readReceiverCmd, &Sender::processDoneCmd,
+    &Sender::processWaitCmd,  &Sender::processErrCmd,
     &Sender::processAbortCmd, &Sender::processVersionMismatch};
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
@@ -778,8 +780,8 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
       // fileChunksInfoList. Number of chunks we decode should match with the
       // number mentioned in the Chunks cmd.
       LOG(ERROR) << "Number of file chunks received is more than the number "
-                    "mentioned in CHUNKS_CMD " << numFileChunks << " "
-                 << numFiles;
+                    "mentioned in CHUNKS_CMD "
+                 << numFileChunks << " " << numFiles;
       threadStats.setErrorCode(PROTOCOL_ERROR);
       return END;
     }
@@ -1031,8 +1033,8 @@ Sender::SenderState Sender::processVersionMismatch(ThreadData &data) {
     auto &history = transferHistories_[i];
     if (history.getNumAcked() > 0) {
       LOG(ERROR) << "Even though the transfer aborted due to VERSION_MISMATCH, "
-                    "some blocks got acked by the receiver, port " << ports_[i]
-                 << " numAcked " << history.getNumAcked();
+                    "some blocks got acked by the receiver, port "
+                 << ports_[i] << " numAcked " << history.getNumAcked();
       return END;
     }
     history.returnUnackedSourcesToQueue();

@@ -19,6 +19,8 @@ namespace wdt {
 typedef std::shared_ptr<Receiver> ReceiverPtr;
 typedef std::shared_ptr<Sender> SenderPtr;
 
+const std::string kGlobalNamespace = "Global";
+
 /// A sample abort checker using std::atomic for abort
 class WdtAbortChecker : public WdtBase::IAbortChecker {
  public:
@@ -226,6 +228,9 @@ class WdtResourceController : public WdtControllerBase {
 
   /// Cleanly shuts down the controller
   void shutdown();
+
+  /// @return     Singleton instance of the controller
+  static WdtResourceController *get();
 
   /// Destructor for the global resource controller
   virtual ~WdtResourceController() override;

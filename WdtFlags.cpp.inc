@@ -167,3 +167,15 @@ WDT_OPT(
     disable_sender_verfication_during_resumption, bool,
     "If true, sender-ip is not verified with the ip in transfer log. This is "
     "useful if files can be downloaded from different hosts");
+WDT_OPT(global_sender_limit, int32,
+        "Max number of senders allowed globally. "
+        "A value of zero disables limits");
+WDT_OPT(global_receiver_limit, int32,
+        "Max number of receivers allowed globally. "
+        "A value of zero disables limits");
+WDT_OPT(namespace_sender_limit, int32,
+        "Max number of senders allowed per namespace. "
+        "A value of zero disables limits");
+WDT_OPT(namespace_receiver_limit, int32,
+        "Max number of receivers allowed per namespace. "
+        "A value of zero disables limits");

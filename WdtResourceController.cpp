@@ -43,6 +43,9 @@ WdtControllerBase::WdtControllerBase(const string &controllerName) {
 
 WdtNamespaceController::WdtNamespaceController(const string &wdtNamespace)
     : WdtControllerBase(wdtNamespace) {
+  auto &options = WdtOptions::get();
+  updateMaxSendersLimit(options.namespace_sender_limit);
+  updateMaxReceiversLimit(options.namespace_receiver_limit);
 }
 
 ErrorCode WdtNamespaceController::createReceiver(
@@ -263,7 +266,17 @@ WdtNamespaceController::~WdtNamespaceController() {
   releaseAllReceivers();
 }
 
-WdtResourceController::WdtResourceController() : WdtControllerBase("Global") {
+WdtResourceController::WdtResourceController()
+    : WdtControllerBase(kGlobalNamespace) {
+  // set global limits from options
+  auto &options = WdtOptions::get();
+  updateMaxSendersLimit(options.global_sender_limit);
+  updateMaxReceiversLimit(options.global_receiver_limit);
+}
+
+WdtResourceController *WdtResourceController::get() {
+  static WdtResourceController wdtController;
+  return &wdtController;
 }
 
 void WdtResourceController::shutdown() {
@@ -505,8 +518,8 @@ ErrorCode WdtResourceController::registerWdtNamespace(
     LOG(INFO) << "Found existing controller for " << wdtNamespace;
     return OK;
   }
-  namespaceMap_[wdtNamespace] =
-      make_shared<WdtNamespaceController>(wdtNamespace);
+  auto namespaceController = make_shared<WdtNamespaceController>(wdtNamespace);
+  namespaceMap_[wdtNamespace] = namespaceController;
   return OK;
 }
 
