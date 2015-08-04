@@ -6,6 +6,28 @@
 
 echo "Run from the cmake build dir (or ~/fbcode - or fbmake runtests)"
 
+BASEDIR=/tmp/wdtTest
+usage="
+The possible options to this script are
+-d base directory to use
+"
+
+if [ "$1" == "-h" ]; then
+  echo "$usage"
+  exit 0
+fi
+while getopts ":d:h:" opt; do
+  case $opt in
+    d) BASEDIR="$OPTARG"
+    ;;
+    h) echo "$usage"
+       exit
+    ;;
+    \?) echo "Invalid option -$OPTARG" >&2
+    ;;
+  esac
+done
+
 # Set DO_VERIFY:
 # to 1 : slow/expensive but checks correctness
 # to 0 : fast for repeated benchmarking not for correctness
@@ -20,7 +42,7 @@ echo "WDT_TEST_SYMLINKS=$WDT_TEST_SYMLINKS"
 #WDTBIN="_bin/wdt/wdt -minloglevel 0 -v 99"
 # Normal:
 WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
-"-avg_mbytes_per_sec=3000 -max_mbytes_per_sec=3500 "\
+"-avg_mbytes_per_sec=3000 -max_mbytes_per_sec=3500 -start_port=0 "\
 "-num_ports=4 -throttler_log_time_millis=200 -enable_checksum=true"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 MD5SUM=`which md5sum`
@@ -37,7 +59,6 @@ else
     echo "Will self connect to HOSTNAME=$HOSTNAME"
 fi
 
-BASEDIR=/tmp/wdtTest
 mkdir -p $BASEDIR
 DIR=`mktemp -d $BASEDIR/XXXXXX`
 echo "Testing in $DIR"
