@@ -185,7 +185,7 @@ target_link_libraries(wdt wdtlib_min)
 
 ### Install rules
 
-install(TARGETS wdt wdtlib wdtlib_min folly4wdt CONFIGURATIONS Release
+install(TARGETS wdt wdtlib wdtlib_min folly4wdt
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
