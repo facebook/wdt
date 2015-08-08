@@ -86,8 +86,8 @@ void setUpAbort(WdtBase &senderOrReceiver) {
     return;
   }
   static std::atomic<bool> abortTrigger{false};
-  static WdtAbortChecker chkr(abortTrigger);
-  senderOrReceiver.setAbortChecker(&chkr);
+  senderOrReceiver.setAbortChecker(
+      std::make_shared<WdtAbortChecker>(abortTrigger));
   auto lambda = [=] {
     LOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
     std::unique_lock<std::mutex> lk(abortMutex);

@@ -190,7 +190,7 @@ class WdtBase {
    * bool checkAbort() {return atomicBool->load();}
    * see wdtCmdLine.cpp for an example.
    */
-  void setAbortChecker(IAbortChecker const* checker);
+  void setAbortChecker(const std::shared_ptr<IAbortChecker>& checker);
 
   /// threads can call this method to find out
   /// whether transfer has been marked from abort
@@ -261,7 +261,7 @@ class WdtBase {
   /// Internal and default abort code
   ErrorCode abortCode_{OK};
   /// Additional external source of check for abort requested
-  IAbortChecker const* abortChecker_{nullptr};
+  std::shared_ptr<IAbortChecker> abortChecker_{nullptr};
 };
 }
 }  // namespace facebook::wdt

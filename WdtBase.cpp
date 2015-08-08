@@ -234,7 +234,7 @@ void WdtBase::clearAbort() {
   abortCode_ = OK;
 }
 
-void WdtBase::setAbortChecker(IAbortChecker const* checker) {
+void WdtBase::setAbortChecker(const std::shared_ptr<IAbortChecker>& checker) {
   abortChecker_ = checker;
 }
 

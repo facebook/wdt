@@ -216,7 +216,7 @@ TEST_COUNT=$((TEST_COUNT + 1))
 STARTING_PORT=$((STARTING_PORT + threads))
 
 # abort set-up
-ABORT_AFTER_SECONDS=2
+ABORT_AFTER_SECONDS=5
 ABORT_CHECK_INTERVAL_MILLIS=100
 ABORT_AFTER_MILLIS=$((ABORT_AFTER_SECONDS * 1000))
 EXPECTED_TRANSFER_DURATION_MILLIS=$((ABORT_AFTER_MILLIS + \
@@ -251,6 +251,9 @@ WDTBIN_SERVER_OLD=$WDTBIN_SERVER
 WDTBIN_SERVER+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
 -abort_after_seconds=$ABORT_AFTER_SECONDS"
 START_TIME_MILLIS=`date +%s%3N`
+# Block a port to at the begining
+sudo iptables-save > $DIR/iptable
+sudo iptables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
 startNewTransfer
 wait $pidofreceiver
 END_TIME_MILLIS=`date +%s%3N`
@@ -258,6 +261,7 @@ wait $pidofsender
 DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
 echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
 ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
+sudo iptables-restore < $DIR/iptable
 if [[ $DURATION -gt $EXPECTED_TRANSFER_DURATION_MILLIS ]]; then
   echo "Abort timing test failed, exiting"
   exit 1

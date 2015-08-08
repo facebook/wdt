@@ -481,8 +481,8 @@ void Receiver::endCurGlobalSession() {
 void Receiver::incrFailedThreadCountAndCheckForSessionEnd(ThreadData &data) {
   std::unique_lock<std::mutex> lock(mutex_);
   failedThreadCount_++;
-  // a new session may not have started when a thread failed
-  if (hasNewSessionStarted(data) && areAllThreadsFinished(false)) {
+  if (areAllThreadsFinished(false) &&
+      transferStartedCount_ > transferFinishedCount_) {
     endCurGlobalSession();
   }
 }
