@@ -147,7 +147,9 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   for (int i = 0; i < numSockets; i++) {
     ports_.push_back(port + i);
   }
-  dirQueue_.reset(new DirectorySourceQueue(srcDir_));
+  std::unique_ptr<IAbortChecker> queueAbortChecker =
+      folly::make_unique<QueueAbortChecker>(this);
+  dirQueue_.reset(new DirectorySourceQueue(srcDir_, queueAbortChecker));
   VLOG(3) << "Configuring the  directory queue";
   dirQueue_->setIncludePattern(options.include_regex);
   dirQueue_->setExcludePattern(options.exclude_regex);
@@ -273,7 +275,6 @@ std::unique_ptr<TransferReport> Sender::finish() {
   if (progressReportEnabled) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
-      transferFinished_ = true;
       conditionFinished_.notify_all();
     }
     progressReporterThread_.join();
@@ -712,16 +713,15 @@ Sender::SenderState Sender::checkForAbort(ThreadData &data) {
   }
   Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[0];
   if (cmd != Protocol::ABORT_CMD) {
-    LOG(ERROR) << "Unexpected result found while reading for abort";
-    threadStats.setErrorCode(PROTOCOL_ERROR);
-    return END;
+    VLOG(1) << "Unexpected result found while reading for abort " << buf[0];
+    return CONNECT;
   }
   threadStats.addHeaderBytes(1);
   return PROCESS_ABORT_CMD;
 }
 
 Sender::SenderState Sender::readFileChunks(ThreadData &data) {
-  LOG(INFO) << "entered READ_RECEIVER_CMD state " << data.threadIndex_;
+  LOG(INFO) << "entered READ_FILE_CHUNKS state " << data.threadIndex_;
   char *buf = data.buf_;
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;

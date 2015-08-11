@@ -52,8 +52,10 @@ waitForTransferEndExpectingFailure() {
 }
 
 killCurrentTransfer() {
-  kill -9 $pidofreceiver
   kill -9 $pidofsender
+  kill -9 $pidofreceiver
+  wait $pidofsender
+  wait $pidofreceiver
 }
 
 usage="
@@ -99,15 +101,15 @@ RECEIVER_ID="123456"
 WDTBIN_OPTS="-ipv4 -num_ports=$threads \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
--enable_download_resumption -keep_transfer_log=false"
+-enable_download_resumption -keep_transfer_log=false -treat_fewer_port_as_error"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
 
-BASEDIR=/dev/shm/tmpWDT
+BASEDIR=/tmp/wdtTest
 
 mkdir -p $BASEDIR
-DIR=`mktemp -d --tmpdir=$BASEDIR`
+DIR=`mktemp -d $BASEDIR/XXXXXX`
 echo "Testing in $DIR"
 
 #pkill -x wdt
@@ -141,7 +143,6 @@ sleep 5
 killCurrentTransfer
 # It takes a while for the ports to be available, so using different port the
 # second transfer
-STARTING_PORT=$((STARTING_PORT + threads))
 # rm a file to create an invalid log entry
 rm -f $DIR/dst${TEST_COUNT}/file0
 startNewTransfer
@@ -154,11 +155,9 @@ sleep 5
 killCurrentTransfer
 # change the file size in the receiver side
 fallocate -l 70M $DIR/dst${TEST_COUNT}/file0
-STARTING_PORT=$((STARTING_PORT + threads))
 startNewTransfer
 sleep 5
 killCurrentTransfer
-STARTING_PORT=$((STARTING_PORT + threads))
 startNewTransfer
 waitForTransferEnd
 TEST_COUNT=$((TEST_COUNT + 1))
@@ -167,7 +166,6 @@ echo "Download resumption with network error test(3)"
 startNewTransfer
 sleep 10
 killCurrentTransfer
-STARTING_PORT=$((STARTING_PORT + threads))
 startNewTransfer
 for ((i = 1; i <= ERROR_COUNT; i++))
 do
@@ -207,13 +205,11 @@ do
   sudo iptables-restore < $DIR/iptable
 done
 killCurrentTransfer
-STARTING_PORT=$((STARTING_PORT + threads))
 # change the block size for next transfer
 BLOCK_SIZE_MBYTES=8
 startNewTransfer
 waitForTransferEnd
 TEST_COUNT=$((TEST_COUNT + 1))
-STARTING_PORT=$((STARTING_PORT + threads))
 
 # abort set-up
 ABORT_AFTER_SECONDS=5
@@ -221,8 +217,9 @@ ABORT_CHECK_INTERVAL_MILLIS=100
 ABORT_AFTER_MILLIS=$((ABORT_AFTER_SECONDS * 1000))
 EXPECTED_TRANSFER_DURATION_MILLIS=$((ABORT_AFTER_MILLIS + \
 ABORT_CHECK_INTERVAL_MILLIS))
-# add 50ms overhead
-EXPECTED_TRANSFER_DURATION_MILLIS=$((EXPECTED_TRANSFER_DURATION_MILLIS + 50))
+# add 500ms overhead. We need this because we can not control timeouts for disk
+# writes
+EXPECTED_TRANSFER_DURATION_MILLIS=$((EXPECTED_TRANSFER_DURATION_MILLIS + 500))
 
 echo "Abort timing test(1) - Sender side abort"
 WDTBIN_CLIENT_OLD=$WDTBIN_CLIENT
@@ -236,22 +233,21 @@ wait $pidofreceiver
 DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
 echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
 ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
-if [[ $DURATION -gt $EXPECTED_TRANSFER_DURATION_MILLIS ]]; then
+if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
+  || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
   exit 1
 fi
 WDTBIN_CLIENT=$WDTBIN_CLIENT_OLD
 TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
-STARTING_PORT=$((STARTING_PORT + threads))
 TEST_COUNT=$((TEST_COUNT + 1))
-STARTING_PORT=$((STARTING_PORT + threads))
 
 echo "Abort timing test(2) - Receiver side abort"
 WDTBIN_SERVER_OLD=$WDTBIN_SERVER
 WDTBIN_SERVER+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
 -abort_after_seconds=$ABORT_AFTER_SECONDS"
 START_TIME_MILLIS=`date +%s%3N`
-# Block a port to at the begining
+# Block a port to the begining
 sudo iptables-save > $DIR/iptable
 sudo iptables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
 startNewTransfer
@@ -262,15 +258,14 @@ DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
 echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
 ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
 sudo iptables-restore < $DIR/iptable
-if [[ $DURATION -gt $EXPECTED_TRANSFER_DURATION_MILLIS ]]; then
+if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
+  || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
   exit 1
 fi
 WDTBIN_SERVER=$WDTBIN_SERVER_OLD
 TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
-STARTING_PORT=$((STARTING_PORT + threads))
 TEST_COUNT=$((TEST_COUNT + 1))
-STARTING_PORT=$((STARTING_PORT + threads))
 
 echo "Transfer-id mismatch test"
 SENDER_ID_OLD=$SENDER_ID
@@ -279,7 +274,6 @@ startNewTransfer
 waitForTransferEndExpectingFailure
 SENDER_ID=$SENDER_ID_OLD
 TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
-STARTING_PORT=$((STARTING_PORT + threads))
 TEST_COUNT=$((TEST_COUNT + 1))
 
 # create another src directory full of files with the same name and size as the

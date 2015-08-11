@@ -20,8 +20,12 @@
 #include <regex>
 namespace facebook {
 namespace wdt {
-DirectorySourceQueue::DirectorySourceQueue(const std::string &rootDir)
-    : rootDir_(rootDir), options_(WdtOptions::get()) {
+DirectorySourceQueue::DirectorySourceQueue(
+    const std::string &rootDir,
+    std::unique_ptr<WdtBase::IAbortChecker> &abortChecker)
+    : rootDir_(rootDir),
+      abortChecker_(std::move(abortChecker)),
+      options_(WdtOptions::get()) {
   WDT_CHECK(!rootDir.empty());
   if (rootDir_.back() != '/') {
     rootDir_.push_back('/');
@@ -148,6 +152,11 @@ bool DirectorySourceQueue::explore() {
   std::deque<std::string> todoList;
   todoList.push_back("");
   while (!todoList.empty()) {
+    if (abortChecker_->shouldAbort()) {
+      LOG(ERROR) << "Directory transfer thread aborted";
+      hasError = true;
+      break;
+    }
     // would be nice to do those 2 in 1 call...
     auto relativePath = todoList.front();
     todoList.pop_front();
@@ -165,6 +174,9 @@ bool DirectorySourceQueue::explore() {
     // nastyness of calculating correctly buffer size and race conditions there)
     struct dirent *dirEntryRes = nullptr;
     while (true) {
+      if (abortChecker_->shouldAbort()) {
+        break;
+      }
       errno = 0;  // yes that's right
       dirEntryRes = readdir(dirPtr);
       if (!dirEntryRes) {
@@ -437,6 +449,10 @@ std::vector<std::string> &DirectorySourceQueue::getFailedDirectories() {
 
 bool DirectorySourceQueue::enqueueFiles() {
   for (const auto &info : fileInfo_) {
+    if (abortChecker_->shouldAbort()) {
+      LOG(ERROR) << "Directory transfer thread aborted";
+      return false;
+    }
     const std::string fullPath = rootDir_ + info.first;
     int64_t filesize;
     if (info.second < 0) {

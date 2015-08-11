@@ -110,12 +110,16 @@ ErrorCode ServerSocket::listen() {
     std::string host, port;
     SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen, host, port);
     VLOG(1) << "Will listen on " << host << " " << port;
-    // TODO: set sock options : SO_REUSEADDR,...
     listeningFd_ =
         socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (listeningFd_ == -1) {
       PLOG(WARNING) << "Error making server socket";
       continue;
+    }
+    int optval = 1;
+    if (setsockopt(listeningFd_, SOL_SOCKET, SO_REUSEADDR, &optval,
+                   sizeof(optval)) != 0) {
+      PLOG(ERROR) << "Unable to set SO_REUSEADDR option " << port_;
     }
     if (bind(listeningFd_, info->ai_addr, info->ai_addrlen)) {
       PLOG(WARNING) << "Error binding " << port_;

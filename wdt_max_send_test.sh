@@ -31,7 +31,14 @@ if [ -z $TEST_COUNT ]; then
   TEST_COUNT=2
 fi
 
-REMOTE=::1
+if [ -z "$HOSTNAME" ] ; then
+    echo "HOSTNAME not set, will try with 'localhost'"
+    HOSTNAME=localhost
+else
+    echo "Will self connect to HOSTNAME=$HOSTNAME"
+fi
+
+REMOTE=$HOSTNAME
 SKIP_WRITES="true"
 
 # TODO: switch to url

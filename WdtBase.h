@@ -13,7 +13,6 @@
 #include "Reporting.h"
 #include "Throttler.h"
 #include "Protocol.h"
-#include "DirectorySourceQueue.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,6 +20,10 @@
 #include <unordered_map>
 namespace facebook {
 namespace wdt {
+
+/// filename-filesize pair. Negative filesize denotes the entire file.
+typedef std::pair<std::string, int64_t> FileInfo;
+
 /**
  * Basic Uri class to parse and get information from wdt url
  * This class can be used in two ways :

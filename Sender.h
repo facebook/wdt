@@ -229,6 +229,21 @@ class Sender : public WdtBase {
   void setSocketCreator(const SocketCreator socketCreator);
 
  private:
+  /// Abort checker passed to DirectoryQueue. If all the network threads finish,
+  /// directory discovery thread is also aborted
+  class QueueAbortChecker : public IAbortChecker {
+   public:
+    explicit QueueAbortChecker(Sender *sender) : sender_(sender) {
+    }
+
+    bool shouldAbort() const {
+      return sender_->isTransferFinished();
+    }
+
+   private:
+    Sender *sender_;
+  };
+
   /// state machine states
   enum SenderState {
     CONNECT,

@@ -23,12 +23,10 @@
 #include "WdtOptions.h"
 #include "FileByteSource.h"
 #include "Protocol.h"
+#include "WdtBase.h"
 
 namespace facebook {
 namespace wdt {
-
-/// filename-filesize pair. Negative filesize denotes the entire file.
-typedef std::pair<std::string, int64_t> FileInfo;
 
 /**
  * SourceQueue that returns all the regular files under a given directory
@@ -47,8 +45,10 @@ class DirectorySourceQueue : public SourceQueue {
    * to actually recurse over the root directory gather files and sizes.
    *
    * @param rootDir               root directory to recurse on
+   * @param abortChecker          abort checker
    */
-  explicit DirectorySourceQueue(const std::string &rootDir);
+  DirectorySourceQueue(const std::string &rootDir,
+                       std::unique_ptr<WdtBase::IAbortChecker> &abortChecker);
 
   /**
    * Recurse over given root directory, gather data about regular files and
@@ -316,11 +316,13 @@ class DirectorySourceQueue : public SourceQueue {
   /// A map from relative file name to previously received chunks
   std::unordered_map<std::string, FileChunksInfo> previouslyTransferredChunks_;
 
-  const WdtOptions &options_;
-
   /// Stores the time difference between the start and the end of the
   /// traversal of directory
   double directoryTime_{0};
+  /// abort checker
+  std::unique_ptr<WdtBase::IAbortChecker> abortChecker_;
+
+  const WdtOptions &options_;
 };
 }
 }

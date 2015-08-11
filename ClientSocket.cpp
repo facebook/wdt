@@ -84,30 +84,40 @@ ErrorCode ClientSocket::connect() {
       int connectTimeout = WdtOptions::get().connect_timeout_millis;
 
       while (true) {
+        // check for abort
+        if (abortChecker_->shouldAbort()) {
+          LOG(ERROR) << "Transfer aborted during connect " << port_ << " "
+                     << fd_;
+          this->close();
+          return ABORT;
+        }
         // we need this loop because poll() can return before any file handles
         // have changes or before timing out. In that case, we check whether it
         // is because of EINTR or not. If true, we have to try poll with
-        // reduced timeout
+        // reduced timeout. Also we set the poll timeout to be at max equal to
+        // abort check interval. This allows us to check for abort regularly.
         int timeElapsed = durationMillis(Clock::now() - startTime);
         if (timeElapsed >= connectTimeout) {
-          LOG(ERROR) << "connect() timed out";
+          LOG(ERROR) << "connect() timed out" << host << " " << port;
           this->close();
           return CONN_ERROR;
         }
-        int pollTimeout = connectTimeout - timeElapsed;
+        int pollTimeout =
+            std::min(connectTimeout - timeElapsed,
+                     WdtOptions::get().abort_check_interval_millis);
         struct pollfd pollFds[] = {{fd_, POLLOUT, 0}};
 
         int retValue;
         if ((retValue = poll(pollFds, 1, pollTimeout)) <= 0) {
           if (errno == EINTR) {
-            VLOG(1) << "poll() call interrupted. retrying...";
+            VLOG(1) << "poll() call interrupted. retrying... " << port_;
             continue;
           }
           if (retValue == 0) {
-            LOG(ERROR) << "poll() timed out " << port_;
-          } else {
-            PLOG(ERROR) << "poll() failed " << port_ << " " << fd_;
+            VLOG(1) << "poll() timed out " << host << " " << port;
+            continue;
           }
+          PLOG(ERROR) << "poll() failed " << host << " " << port << " " << fd_;
           this->close();
           return CONN_ERROR;
         }

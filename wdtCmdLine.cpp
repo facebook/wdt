@@ -69,6 +69,10 @@ DEFINE_int32(abort_after_seconds, 0,
 
 DEFINE_string(recovery_id, "", "Recovery-id to use for download resumption");
 
+DEFINE_bool(treat_fewer_port_as_error, false,
+            "If the receiver is unable to bind to all the ports, treat that as "
+            "an error.");
+
 using namespace facebook::wdt;
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
@@ -156,9 +160,14 @@ int main(int argc, char *argv[]) {
   if (FLAGS_destination.empty() && FLAGS_connection_url.empty()) {
     Receiver receiver(req);
     WdtTransferRequest augmentedReq = receiver.init();
+    if (FLAGS_treat_fewer_port_as_error &&
+        augmentedReq.errorCode == FEWER_PORTS) {
+      LOG(ERROR) << "Receiver could not bind to all the ports";
+      return FEWER_PORTS;
+    }
     if (augmentedReq.errorCode == ERROR) {
       LOG(ERROR) << "Error setting up receiver";
-      return augmentedReq.errorCode;
+      return ERROR;
     }
     LOG(INFO) << "Starting receiver with connection url ";
     std::cout << augmentedReq.generateUrl() << std::endl;
