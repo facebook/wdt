@@ -470,6 +470,7 @@ class PerfStatReport {
     FILE_READ,
     FILE_WRITE,
     SYNC_FILE_RANGE,
+    FSYNC,
     FILE_SEEK,
     THROTTLER_SLEEP,
     RECEIVER_WAIT_SLEEP,  // receiver sleep duration between sending wait cmd to

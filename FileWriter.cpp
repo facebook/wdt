@@ -84,6 +84,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
             << " for file " << blockDetails_->fileName;
     bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
     if (options.enable_download_resumption && finished) {
+      START_PERF_TIMER
       if (fsync(fd_) != 0) {
         PLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
                     << " offset " << blockDetails_->offset << " file-size "
@@ -91,6 +92,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
                     << " data-size  << blockDetails_->dataSize";
         return FILE_WRITE_ERROR;
       }
+      RECORD_PERF_RESULT(PerfStatReport::FSYNC)
     } else {
       syncFileRange(count, finished);
     }
