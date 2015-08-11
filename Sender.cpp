@@ -353,6 +353,7 @@ std::unique_ptr<TransferReport> Sender::transfer() {
 
 ErrorCode Sender::start() {
   areThreadsJoined_ = false;
+  transferFinished_ = false;
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
   WDT_CHECK(!(twoPhases && options.enable_download_resumption))
@@ -387,7 +388,6 @@ ErrorCode Sender::start() {
   perfReports_.resize(numPorts);
   negotiatedProtocolVersions_.resize(numPorts, 0);
   numActiveThreads_ = numPorts;
-  transferFinished_ = false;
   for (int64_t i = 0; i < numPorts; i++) {
     globalThreadStats_[i].setId(folly::to<std::string>(i));
     senderThreads_.emplace_back(&Sender::sendOne, this, i);
