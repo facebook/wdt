@@ -26,5 +26,5 @@ git clone https://github.com/facebook/folly.git
 pwd ; ls -l  
 cd wdt
 
-set +e
+#set +e
 set +x

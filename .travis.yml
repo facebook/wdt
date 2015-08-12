@@ -1,5 +1,7 @@
 sudo: false
 
+language: cpp
+
 os:
   - linux
   - osx
@@ -15,18 +17,17 @@ addons:
       - ubuntu-toolchain-r-test
     packages:
       - g++-4.9
+      - clang-3.7
       - libboost-system1.55-dev
-      #- libgoogle-glog-dev 
-      #- libdouble-conversion-dev
 
 script:
   # Debug
   - date ; uname -a ; pwd ; ls -l ..; echo $HOSTNAME
   # Build
   - mkdir ../build && cd ../build 
-  - which cmake
-  - cmake --version
   - echo $PATH; echo $LD_LIBRARY_PATH
+  - which clang++
+  - ls -l /usr/bin/clang*
   - cmake ../wdt -DBUILD_TESTING=1 
   #- make -j 4 VERBOSE=1
   - make -j 4
