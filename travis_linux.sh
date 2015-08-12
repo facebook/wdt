@@ -9,8 +9,12 @@ echo $HOSTNAME
 mkdir $HOME/bin || true
 export PATH=$HOME/bin:$PATH
 export LD_LIBRARY_PATH=$HOME/lib:$LD_LIBRARY_PATH
-ln -s /usr/bin/g++-4.9 $HOME/bin/g++
-ln -s /usr/bin/gcc-4.9 $HOME/bin/gcc
+if [[ "$CXX" == "clang++" ]] ; then
+  export CXX=clang++-3.6
+else
+  ln -s /usr/bin/g++-4.9 $HOME/bin/g++
+  ln -s /usr/bin/gcc-4.9 $HOME/bin/gcc
+fi
 cd ..
 wget http://www.cmake.org/files/v3.3/cmake-3.3.0-Linux-x86_64.sh
 sh cmake-3.3.0-Linux-x86_64.sh --prefix=$HOME --skip-license
