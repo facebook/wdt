@@ -15,10 +15,10 @@ addons:
     sources:
       - boost-latest
       - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise
+      - llvm-toolchain-precise-3.6
     packages:
       - g++-4.9
-      - clang-3.7
+      - clang-3.6
       - libboost-system1.55-dev
 
 script:
@@ -28,7 +28,7 @@ script:
   - mkdir ../build && cd ../build 
   - echo $PATH; echo $LD_LIBRARY_PATH
   - which clang++
-  - ls -l /usr/bin/clang*
+  - ls -ld /usr/local/clang*
   - cmake ../wdt -DBUILD_TESTING=1 
   #- make -j 4 VERBOSE=1
   - make -j 4
