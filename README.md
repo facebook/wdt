@@ -70,7 +70,7 @@ but we do plan on optimizing for disks as well in the future.
 
 ## Dependencies
 
-CMake for building WDT - See BUILD.txt
+CMake for building WDT - See [BUILD.md](BUILD.md)
 
 gflags (google flags library) but only for the command line,  the library
 doesn't depend on that
@@ -102,9 +102,9 @@ Benchmark generation tools
 
 ### Main files
 
-* CMakeLists.txt, BUILD.txt
+* CMakeLists.txt, BUILD.md, .travis.yml, travis_linux.sh, travis_osx.sh
 Build definition file - use CMake to generate a Makefile or a project file for
-your favorite IDE - details in BUILD.txt
+your favorite IDE - details in [BUILD.md](BUILD.md)
 
 * wdtCmdline.cpp
 
