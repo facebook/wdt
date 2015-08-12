@@ -23,3 +23,6 @@ svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 git clone https://github.com/facebook/folly.git 
 pwd ; ls -l  
 cd wdt
+
+set +e
+set +x

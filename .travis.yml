@@ -5,7 +5,7 @@ os:
   - osx
 
 compiler:
-#  - clang
+  - clang
   - gcc
 
 addons:
