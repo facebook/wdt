@@ -28,7 +28,7 @@ script:
   - mkdir ../build && cd ../build 
   - echo $PATH; echo $LD_LIBRARY_PATH
   - which clang++
-  - ls -ld /usr/local/clang*
+  - ls -ld /usr/local/clang* /usr/bin/clang* /usr/clang* || true
   - cmake ../wdt -DBUILD_TESTING=1 
   #- make -j 4 VERBOSE=1
   - make -j 4
