@@ -138,6 +138,7 @@ const Sender::StateFunction Sender::stateMap_[] = {
     &Sender::processAbortCmd, &Sender::processVersionMismatch};
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
+  LOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   destHost_ = destHost;
   srcDir_ = srcDir;
   transferFinished_ = true;

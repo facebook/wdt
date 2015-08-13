@@ -133,7 +133,6 @@ int main(int argc, char *argv[]) {
 #define ASSIGN_OPT
 #include FLAGS_INCLUDE_FILE  //nolint
 
-  LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
   ErrorCode retCode = OK;
 
   // Odd ball case of log parsing

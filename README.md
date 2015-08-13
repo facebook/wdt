@@ -268,7 +268,7 @@ wdt_max_send_test.sh
 (facebook only:)
 Make sure to do the following, before "arc diff":
 ```
- (cd wdt ; ./clangformat.sh )
+ (cd wdt ; ./clangformat.sh ; ./version_update.tcl )
 
  fbconfig  --clang --with-project-version clang:dev -r  wdt
 

@@ -123,6 +123,7 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
 }
 
 Receiver::Receiver(const WdtTransferRequest &transferRequest) {
+  LOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
   transferId_ = transferRequest.transferId;
   if (transferId_.empty()) {
     transferId_ = WdtBase::generateTransferId();
