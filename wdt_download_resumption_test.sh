@@ -137,6 +137,26 @@ TEST_COUNT=0
 # Tests for which there is no need to verify source and destination md5s
 TESTS_SKIP_VERIFICATION=()
 
+echo "Testing that connection failure results in failed transfer"
+# first create a deep directory structure
+# this is done so that directory thread gets aborted before discovering any
+# file
+CURDIR=`pwd`
+cd $DIR
+for ((i = 0; i < 100; i++))
+do
+  mkdir d
+  cd d
+done
+touch file
+cd $CURDIR
+# start the sender without starting receiver and set connect retries to 1
+_bin/wdt/wdt -directory $DIR/d -destination $HOSTNAME -max_retries 1 \
+-start_port $STARTING_PORT -num_ports $threads
+checkLastCmdStatusExpectingFailure
+TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+TEST_COUNT=$((TEST_COUNT + 1))
+
 echo "Download resumption test(1)"
 startNewTransfer
 sleep 5
