@@ -29,7 +29,6 @@
 #if 0
 #include "WdtFlags.cpp.inc"
 #endif
-
 #ifndef FLAGS_INCLUDE_FILE
 #define FLAGS_INCLUDE_FILE "WdtFlags.cpp.inc"
 #endif
@@ -201,6 +200,7 @@ int main(int argc, char *argv[]) {
             fields.size() > 1 ? folly::to<int64_t>(fields[1]) : -1;
         fileInfo.emplace_back(fields[0], filesize);
       }
+      req.fileInfo = fileInfo;
     }
     req.hostName = FLAGS_destination;
     if (!FLAGS_connection_url.empty()) {

@@ -18,11 +18,38 @@
 
 #include <folly/Memory.h>
 #include <regex>
+#include <fcntl.h>
 namespace facebook {
 namespace wdt {
+FileInfo::FileInfo(const std::string &name, int64_t size)
+    : fileName(name), fileSize(size) {
+  oFlags = O_RDONLY;
+  const auto &options = WdtOptions::get();
+  if (options.odirect_reads) {
+    oFlags |= O_DIRECT;
+  }
+}
+
+void FileInfo::verifyAndFixFlags() {
+#ifndef HAS_POSIX_MEMALIGN
+  bool hasOdirect = oFlags & O_DIRECT;
+  if (hasOdirect) {
+    LOG(WARNING) << "Can't read " << fileName << " in O_DIRECT"
+                 << ". Memalign not found, turning O_DIRECT flag"
+                 << " off for this file";
+    oFlags &= ~(O_DIRECT);
+  }
+#endif
+  if (oFlags & ~(O_DIRECT | O_RDONLY)) {
+    LOG(WARNING) << "Flags apart from O_RDONLY and O_DIRECT "
+                 << "provided, for " << fileName
+                 << ". Wdt will ignore the extra flags";
+    oFlags = (O_RDONLY | O_DIRECT);
+  }
+}
+
 DirectorySourceQueue::DirectorySourceQueue(
-    const std::string &rootDir,
-    std::unique_ptr<WdtBase::IAbortChecker> &abortChecker)
+    const std::string &rootDir, std::unique_ptr<IAbortChecker> &abortChecker)
     : rootDir_(rootDir),
       abortChecker_(std::move(abortChecker)),
       options_(WdtOptions::get()) {
@@ -85,12 +112,12 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
   while (!sourceQueue_.empty()) {
     sourceQueue_.pop();
   }
-  std::vector<SourceMetaData *> discoveredFileInfo = std::move(sharedFileData_);
+  std::vector<SourceMetaData *> discoveredFileData = std::move(sharedFileData_);
   // recreate the queue
-  for (const auto fileInfo : discoveredFileInfo) {
-    createIntoQueue(fileInfo->fullPath, fileInfo->relPath, fileInfo->size,
-                    true);
-    delete fileInfo;
+  for (const auto fileData : discoveredFileData) {
+    FileInfo fileInfo(fileData->relPath, fileData->size);
+    createIntoQueue(fileData->fullPath, fileInfo, true);
+    delete fileData;
   }
 }
 
@@ -278,8 +305,8 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          createIntoQueue(newFullPath, newRelativePath, fileStat.st_size,
-                          false);
+          FileInfo fileInfo(newRelativePath, fileStat.st_size);
+          createIntoQueue(newFullPath, fileInfo, false);
           continue;
         }
       }
@@ -346,8 +373,7 @@ void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
 }
 
 void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
-                                           const std::string &relPath,
-                                           const int64_t fileSize,
+                                           FileInfo &fileInfo,
                                            bool alreadyLocked) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
@@ -358,6 +384,9 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   // b) if filesize > blocksize, we can use send filename only in the first
   // block and use a shorter header for subsequent blocks. Also, we can remove
   // block size once negotiated, since blocksize is sort of fixed.
+  fileInfo.verifyAndFixFlags();
+  auto &fileSize = fileInfo.fileSize;
+  auto &relPath = fileInfo.fileName;
   int64_t blockSizeBytes = options_.block_size_mbytes * 1024 * 1024;
   bool enableBlockTransfer = blockSizeBytes > 0;
   if (!enableBlockTransfer) {
@@ -371,7 +400,6 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   if (!alreadyLocked) {
     lock.lock();
   }
-
   std::vector<Interval> remainingChunks;
   int64_t seqId;
   FileAllocationStatus allocationStatus;
@@ -406,12 +434,11 @@ void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
   metadata->fullPath = fullPath;
   metadata->relPath = relPath;
   metadata->seqId = seqId;
+  metadata->oFlags = fileInfo.oFlags;
   metadata->size = fileSize;
   metadata->allocationStatus = allocationStatus;
   metadata->prevSeqId = prevSeqId;
-
   sharedFileData_.emplace_back(metadata);
-
   for (const auto &chunk : remainingChunks) {
     int64_t offset = chunk.start_;
     int64_t remainingBytes = chunk.size();
@@ -448,24 +475,21 @@ std::vector<std::string> &DirectorySourceQueue::getFailedDirectories() {
 }
 
 bool DirectorySourceQueue::enqueueFiles() {
-  for (const auto &info : fileInfo_) {
+  for (auto &info : fileInfo_) {
     if (abortChecker_->shouldAbort()) {
       LOG(ERROR) << "Directory transfer thread aborted";
       return false;
     }
-    const std::string fullPath = rootDir_ + info.first;
-    int64_t filesize;
-    if (info.second < 0) {
+    std::string fullPath = rootDir_ + info.fileName;
+    if (info.fileSize < 0) {
       struct stat fileStat;
       if (stat(fullPath.c_str(), &fileStat) != 0) {
         PLOG(ERROR) << "stat failed on path " << fullPath;
         return false;
       }
-      filesize = fileStat.st_size;
-    } else {
-      filesize = info.second;
+      info.fileSize = fileStat.st_size;
     }
-    createIntoQueue(fullPath, info.first, filesize, false);
+    createIntoQueue(fullPath, info, false);
   }
   return true;
 }

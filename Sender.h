@@ -9,13 +9,8 @@
 #pragma once
 
 #include "WdtBase.h"
-#include "DirectorySourceQueue.h"
-#include "ErrorCodes.h"
-#include "Throttler.h"
 #include "ClientSocket.h"
 #include "WdtOptions.h"
-#include "Reporting.h"
-#include "Protocol.h"
 
 #include <folly/SpinLock.h>
 
@@ -219,7 +214,7 @@ class Sender : public WdtBase {
 
   typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
       const std::string &dest, const std::string &port,
-      WdtBase::IAbortChecker const *abortChecker);
+      IAbortChecker const *abortChecker);
 
   /**
    * Sets socket creator

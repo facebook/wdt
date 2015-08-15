@@ -23,10 +23,33 @@
 #include "WdtOptions.h"
 #include "FileByteSource.h"
 #include "Protocol.h"
-#include "WdtBase.h"
-
+#include "AbortChecker.h"
 namespace facebook {
 namespace wdt {
+/**
+ * Users of wdt apis can provide a list of info
+ * for files. A info represents a file name with
+ * information such as size, and flags
+ * to read the file with
+ */
+struct FileInfo {
+  /**
+   * Name of the file to be read, generally as relative oath
+   */
+  std::string fileName;
+  /// Size of the file to be read, default is -1
+  int64_t fileSize;
+  /**
+   * Flags to read the file with, wdt supports only
+   * O_RDONLY, and O_DIRECT no matter what flags are provided
+   */
+  int oFlags;
+  /// Constructor for file info with name and size
+  explicit FileInfo(const std::string &name, int64_t size = -1);
+  /// Verify that we can align for reading in O_DIRECT and
+  /// the flags make sense
+  void verifyAndFixFlags();
+};
 
 /**
  * SourceQueue that returns all the regular files under a given directory
@@ -48,7 +71,7 @@ class DirectorySourceQueue : public SourceQueue {
    * @param abortChecker          abort checker
    */
   DirectorySourceQueue(const std::string &rootDir,
-                       std::unique_ptr<WdtBase::IAbortChecker> &abortChecker);
+                       std::unique_ptr<IAbortChecker> &abortChecker);
 
   /**
    * Recurse over given root directory, gather data about regular files and
@@ -204,13 +227,12 @@ class DirectorySourceQueue : public SourceQueue {
    * numentries inside the lock, doesn't check for fail retries
    *
    * @param fullPath             full path of the file to be added
-   * @param relPath              file path relative to root dir
-   * @param fileSize             size of the file
+   * @param fileInfo             Information about file
    * @param alreadyLocked        whether lock has already been acquired by the
    *                             calling method
    */
-  void createIntoQueue(const std::string &fullPath, const std::string &relPath,
-                       const int64_t fileSize, bool alreadyLocked);
+  void createIntoQueue(const std::string &fullPath, FileInfo &fileInfo,
+                       bool alreadyLocked);
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple
@@ -320,7 +342,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// traversal of directory
   double directoryTime_{0};
   /// abort checker
-  std::unique_ptr<WdtBase::IAbortChecker> abortChecker_;
+  std::unique_ptr<IAbortChecker> abortChecker_;
 
   const WdtOptions &options_;
 };

@@ -254,6 +254,11 @@ class WdtOptions {
   int namespace_receiver_limit{1};
 
   /**
+   * Read files in O_DIRECT
+   */
+  bool odirect_reads{false};
+
+  /**
    * Since this is a singleton copy constructor
    * and assignment operator are deleted
    */

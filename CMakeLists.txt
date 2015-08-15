@@ -153,6 +153,7 @@ int main(int argc, char** argv) {
 # For WDT itself:
 check_function_exists(posix_fallocate HAS_POSIX_FALLOCATE)
 check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
+check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
 # Now record all this :
 # Folly's:
 configure_file(folly-config.h.in folly/folly-config.h)
@@ -249,6 +250,10 @@ if (BUILD_TESTING)
   add_executable(resource_controller_test  WdtResourceControllerTest.cpp)
   target_link_libraries(resource_controller_test wdt4tests)
   add_test(NAME ResourceControllerTests COMMAND resource_controller_test)
+
+  add_executable(file_reader_test  FileReaderTest.cpp)
+  target_link_libraries(file_reader_test wdt4tests)
+  add_test(NAME FileReaderTests COMMAND file_reader_test)
 
   add_test(NAME WdtRandGenTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_rand_gen_test.sh")

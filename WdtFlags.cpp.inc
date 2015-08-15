@@ -179,3 +179,13 @@ WDT_OPT(namespace_sender_limit, int32,
 WDT_OPT(namespace_receiver_limit, int32,
         "Max number of receivers allowed per namespace. "
         "A value of zero disables limits");
+
+#ifdef HAS_POSIX_MEMALIGN
+WDT_OPT(odirect_reads, bool, 
+        "Wdt can read files in O_DIRECT mode, set this flag to true"
+        " to make sender read all files in O_DIRECT");
+#else
+WDT_OPT(odirect_reads, bool, 
+        "Wdt can read files in O_DIRECT but posix_memalign is not "
+        "supported on this OS");
+#endif

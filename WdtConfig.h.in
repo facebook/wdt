@@ -18,3 +18,4 @@
 
 #cmakedefine HAS_POSIX_FALLOCATE 1
 #cmakedefine HAS_SYNC_FILE_RANGE 1
+#cmakedefine HAS_POSIX_MEMALIGN 1

@@ -14,7 +14,6 @@
 #include <glog/logging.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
 namespace facebook {
 namespace wdt {
 
@@ -33,24 +32,29 @@ FileByteSource::FileByteSource(SourceMetaData *metadata, int64_t size,
 ErrorCode FileByteSource::open() {
   bytesRead_ = 0;
   this->close();
-
+  bool isOdirect = (metadata_->oFlags & O_DIRECT);
+  int oFlags = O_RDONLY;
+  if (isOdirect) {
+    oFlags |= O_DIRECT;
+  }
   ErrorCode errCode = OK;
-  if (!buffer_ || bufferSize_ > buffer_->size_) {
-    buffer_.reset(new Buffer(bufferSize_));
+  bool hasValidBuffer = (buffer_ && bufferSize_ <= buffer_->size_);
+  if (!hasValidBuffer || (isOdirect && !buffer_->isMemAligned_)) {
+    buffer_.reset(new Buffer(bufferSize_, isOdirect));
   }
   const std::string &fullPath = metadata_->fullPath;
   START_PERF_TIMER
-  fd_ = ::open(fullPath.c_str(), O_RDONLY);
+  fd_ = ::open(fullPath.c_str(), oFlags);
   if (fd_ < 0) {
     errCode = BYTE_SOURCE_READ_ERROR;
-    PLOG(ERROR) << "error opening file " << fullPath;
+    PLOG(ERROR) << "Error opening file " << fullPath;
   } else {
     RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
     if (offset_ > 0) {
       START_PERF_TIMER
       if (lseek(fd_, offset_, SEEK_SET) < 0) {
         errCode = BYTE_SOURCE_READ_ERROR;
-        PLOG(ERROR) << "error seeking file " << fullPath;
+        PLOG(ERROR) << "Error seeking file " << fullPath;
       } else {
         RECORD_PERF_RESULT(PerfStatReport::FILE_SEEK)
       }
@@ -65,9 +69,19 @@ char *FileByteSource::read(int64_t &size) {
   if (hasError() || finished()) {
     return nullptr;
   }
-  START_PERF_TIMER
-  int64_t toRead =
+  int64_t expectedRead =
       (int64_t)std::min<int64_t>(buffer_->size_, size_ - bytesRead_);
+  int64_t toRead = expectedRead;
+  bool isOdirect = (metadata_->oFlags & O_DIRECT);
+  if (isOdirect) {
+    toRead =
+        ((expectedRead + kDiskBlockSize - 1) / kDiskBlockSize) * kDiskBlockSize;
+  }
+  // actualRead is guranteed to be <= buffer_->size_
+  WDT_CHECK(toRead <= buffer_->size_) << "Attempting to read " << toRead
+                                      << " while buffer size is "
+                                      << buffer_->size_;
+  START_PERF_TIMER
   int64_t numRead = ::read(fd_, buffer_->data_, toRead);
   if (numRead < 0) {
     PLOG(ERROR) << "failure while reading file " << metadata_->fullPath;
@@ -80,6 +94,15 @@ char *FileByteSource::read(int64_t &size) {
     return nullptr;
   }
   RECORD_PERF_RESULT(PerfStatReport::FILE_READ)
+  // Can only happen in case of O_DIRECT and when
+  // we are trying to read the last chunk of file
+  // or we are reading in multiples of disk block size
+  // from a sub block of the file smaller than disk block
+  // size
+  if (numRead > expectedRead) {
+    WDT_CHECK(isOdirect);
+    numRead = expectedRead;
+  }
   bytesRead_ += numRead;
   size = numRead;
   return buffer_->data_;
