@@ -37,6 +37,12 @@ ErrorCode FileByteSource::open() {
   if (isOdirect) {
     oFlags |= O_DIRECT;
   }
+#ifdef WDT_SIMULATED_ODIRECT
+  if (isOdirect) {
+    oFlags &= ~(O_DIRECT);
+  }
+#endif
+  VLOG(1) << "Reading with O_DIRECT " << ((oFlags & O_DIRECT) > 0);
   ErrorCode errCode = OK;
   bool hasValidBuffer = (buffer_ && bufferSize_ <= buffer_->size_);
   if (!hasValidBuffer || (isOdirect && !buffer_->isMemAligned_)) {
@@ -49,6 +55,23 @@ ErrorCode FileByteSource::open() {
     errCode = BYTE_SOURCE_READ_ERROR;
     PLOG(ERROR) << "Error opening file " << fullPath;
   } else {
+#ifdef WDT_SIMULATED_ODIRECT
+#ifdef F_NOCACHE
+    if (isOdirect) {
+      LOG(WARNING) << "O_DIRECT not found, using F_NOCACHE instead "
+                   << "for " << getIdentifier();
+      int ret = fcntl(fd_, F_NOCACHE, 1);
+      if (ret) {
+        PLOG(ERROR) << "Not able to do F_NOCACHE";
+      }
+    }
+#else
+    if (isOdirect) {
+      LOG(ERROR) << "O_DIRECT requested but this OS doesn't support "
+                 << "O_DIRECT or F_NOCACHE";
+    }
+#endif
+#endif
     RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
     if (offset_ > 0) {
       START_PERF_TIMER

@@ -18,7 +18,6 @@
 #include <iostream>
 #include <signal.h>
 #include <thread>
-
 #ifndef ADDITIONAL_SENDER_SETUP
 #define ADDITIONAL_SENDER_SETUP
 #endif

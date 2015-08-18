@@ -121,7 +121,7 @@ class FileByteSource : public ByteSource {
         data_ = new char[size + 1];
         return;
       }
-#ifdef HAS_POSIX_MEMALIGN
+#ifdef WDT_SUPPORTS_ODIRECT
       const int64_t remainder = size_ % kDiskBlockSize;
       if (remainder != 0) {
         // Making size the next multiple of disk block size

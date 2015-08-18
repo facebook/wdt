@@ -127,6 +127,10 @@ include(CheckIncludeFileCXX)
 include(CheckFunctionExists)
 include(CheckLibraryExists)
 include(CheckCXXSourceCompiles)
+# For WDT itself:
+check_function_exists(posix_fallocate HAS_POSIX_FALLOCATE)
+check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
+check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
 # C based check (which fail with the c++ setting thereafter...)
 check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
 set(SAVE_CMRL ${CMAKE_REQUIRED_LIBRARIES}) #globals are evil/ugly
@@ -134,6 +138,9 @@ set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 check_function_exists(pthread_atfork FOLLY_HAVE_PTHREAD_ATFORK)
 set(CMAKE_REQUIRED_LIBRARIES ${SAVE_CMRL}) #globals are evil/ugly
 # Needed until Cmake issue #15361 is addressed
+# All the check_function_exists should be before this line
+# or else they will not work'
+
 set(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
 check_include_file_cxx(malloc.h FOLLY_HAVE_MALLOC_H)
 check_include_file_cxx(features.h FOLLY_HAVE_FEATURES_H)
@@ -150,10 +157,6 @@ check_cxx_source_compiles(
 int main(int argc, char** argv) {
   return (cmkcheckweak) ? 1 : 0 ;
 }" FOLLY_HAVE_WEAK_SYMBOLS)
-# For WDT itself:
-check_function_exists(posix_fallocate HAS_POSIX_FALLOCATE)
-check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
-check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
 # Now record all this :
 # Folly's:
 configure_file(folly-config.h.in folly/folly-config.h)

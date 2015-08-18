@@ -72,6 +72,13 @@ class RandomFile {
   SourceMetaData* metaData_{nullptr};
 };
 
+bool canSupportODirect() {
+#ifdef WDT_SUPPORTS_ODIRECT
+  return true;
+#endif
+  return false;
+}
+
 void testReadSize(int64_t fileSize, ByteSource& byteSource) {
   int64_t totalSizeRead = 0;
   while (true) {
@@ -85,22 +92,36 @@ void testReadSize(int64_t fileSize, ByteSource& byteSource) {
   EXPECT_EQ(totalSizeRead, fileSize);
 }
 
+void testBufferSize(int64_t originalBufferSize, int oFlags,
+                    ByteSource& byteSource) {
+  auto newBufferSize = originalBufferSize;
+  auto remainder = newBufferSize % kDiskBlockSize;
+  bool isOdirect = oFlags & O_DIRECT;
+  if (canSupportODirect() && isOdirect && remainder != 0) {
+    newBufferSize += (kDiskBlockSize - remainder);
+  }
+  if (canSupportODirect() && (oFlags & O_DIRECT)) {
+    EXPECT_EQ(byteSource.getBufferSize() % kDiskBlockSize, 0);
+  }
+  EXPECT_EQ(byteSource.getBufferSize(), newBufferSize);
+}
+
 void testFileRead(int64_t fileSize, int64_t bufferSize, int oflags) {
   RandomFile file(fileSize);
   auto metaData = file.getMetaData();
   metaData->oFlags = oflags;
   FileByteSource byteSource(metaData, metaData->size, 0, bufferSize);
   ErrorCode code = byteSource.open();
-  if (oflags & O_DIRECT) {
-    EXPECT_EQ(byteSource.getBufferSize() % kDiskBlockSize, 0);
-  } else {
-    EXPECT_EQ(byteSource.getBufferSize(), bufferSize);
-  }
   EXPECT_EQ(code, OK);
+  testBufferSize(bufferSize, oflags, byteSource);
   testReadSize(file.getSize(), byteSource);
 }
 
 TEST(FileByteSource, ODIRECT_NONMULTIPLE) {
+  if (!canSupportODirect()) {
+    LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
+    return;
+  }
   int64_t fileSize = kDiskBlockSize * 100 + 10;
   int64_t bufferSize = 511;
   std::thread t(&testFileRead, fileSize, bufferSize, O_RDONLY | O_DIRECT);
@@ -108,6 +129,10 @@ TEST(FileByteSource, ODIRECT_NONMULTIPLE) {
 }
 
 TEST(FileByteSource, SMALL_MULTIPLE_ODIRECT) {
+  if (!canSupportODirect()) {
+    LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
+    return;
+  }
   int64_t fileSize = 512;
   int64_t bufferSize = 11;
   std::thread t(&testFileRead, fileSize, bufferSize, O_RDONLY | O_DIRECT);
@@ -115,6 +140,10 @@ TEST(FileByteSource, SMALL_MULTIPLE_ODIRECT) {
 }
 
 TEST(FileByteSource, SMALL_NONMULTIPLE_ODIRECT) {
+  if (!canSupportODirect()) {
+    LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
+    return;
+  }
   int64_t fileSize = 1;
   int64_t bufferSize = 11;
   std::thread t(&testFileRead, fileSize, bufferSize, O_RDONLY | O_DIRECT);
@@ -179,11 +208,10 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
       if (!byteSource) {
         break;
       }
-      fileNumber++;
       EXPECT_EQ(byteSource->open(), OK);
-      EXPECT_EQ(byteSource->getBufferSize() % kDiskBlockSize, 0);
-      EXPECT_EQ(byteSource->getBufferSize(), 256 * 1024);
+      testBufferSize(originalBufferSize, files[fileNumber].oFlags, *byteSource);
       testReadSize(sizeToRead, *byteSource);
+      ++fileNumber;
     }
     EXPECT_EQ(fileNumber, numFiles);
   });
@@ -208,7 +236,7 @@ TEST(FileByteSource, MIXED_FILES) {
   std::vector<FileInfo> filesInfo;
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);
-    if (fileNum % 2 != 0) {
+    if (canSupportODirect() && fileNum % 2 != 0) {
       info.oFlags |= O_DIRECT;
     }
     fileNum++;
@@ -220,7 +248,7 @@ TEST(FileByteSource, MIXED_FILES) {
     ByteSource* byteSource = new FileByteSource(metaData, filesInfo[i].fileSize,
                                                 0, originalBufferSize);
     EXPECT_EQ(byteSource->open(), OK);
-    if (i == 0) {
+    if (!canSupportODirect() || i == 0) {
       // First file is regular
       EXPECT_EQ(byteSource->getBufferSize(), originalBufferSize);
     } else {

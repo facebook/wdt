@@ -35,7 +35,13 @@ FileInfo::FileInfo(const string &name, int64_t size)
 }
 
 void FileInfo::verifyAndFixFlags() {
-#ifndef HAS_POSIX_MEMALIGN
+  if (oFlags & ~(O_DIRECT | O_RDONLY)) {
+    LOG(WARNING) << "Flags apart from O_RDONLY and O_DIRECT "
+                 << "provided, for " << fileName
+                 << ". Wdt will ignore the extra flags";
+    oFlags &= (O_RDONLY | O_DIRECT);
+  }
+#ifndef WDT_SUPPORTS_ODIRECT
   bool hasOdirect = oFlags & O_DIRECT;
   if (hasOdirect) {
     LOG(WARNING) << "Can't read " << fileName << " in O_DIRECT"
@@ -44,12 +50,6 @@ void FileInfo::verifyAndFixFlags() {
     oFlags &= ~(O_DIRECT);
   }
 #endif
-  if (oFlags & ~(O_DIRECT | O_RDONLY)) {
-    LOG(WARNING) << "Flags apart from O_RDONLY and O_DIRECT "
-                 << "provided, for " << fileName
-                 << ". Wdt will ignore the extra flags";
-    oFlags = (O_RDONLY | O_DIRECT);
-  }
 }
 
 DirectorySourceQueue::DirectorySourceQueue(
