@@ -8,7 +8,9 @@
  */
 #pragma once
 #include <wdt/WdtConfig.h>
-#include <folly/String.h>
+#include <cstdint>
+#include <string>
+#include <unistd.h>
 namespace facebook {
 namespace wdt {
 /**

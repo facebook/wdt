@@ -10,6 +10,7 @@
 #include "Receiver.h"
 #include "Protocol.h"
 #include "WdtResourceController.h"
+#include "WdtFlags.h"
 #include <chrono>
 #include <future>
 #include <folly/String.h>
@@ -22,18 +23,9 @@
 #define ADDITIONAL_SENDER_SETUP
 #endif
 
-// Cmake/make depend doesn't understand the
-// include with variable/define so trick it
-// to know this file does depend on WdtFlags.cpp.inc
-#if 0
-#include "WdtFlags.cpp.inc"
+#ifndef FLAGS
+#define FLAGS WdtFlags
 #endif
-#ifndef FLAGS_INCLUDE_FILE
-#define FLAGS_INCLUDE_FILE "WdtFlags.cpp.inc"
-#endif
-
-#define STANDALONE_APP
-#include FLAGS_INCLUDE_FILE
 
 // Flags not already in WdtOptions.h/WdtFlags.cpp.inc
 DEFINE_bool(run_as_daemon, false,
@@ -127,9 +119,7 @@ int main(int argc, char *argv[]) {
   google::InitGoogleLogging(argv[0]);
   signal(SIGPIPE, SIG_IGN);
 
-#define STANDALONE_APP
-#define ASSIGN_OPT
-#include FLAGS_INCLUDE_FILE  //nolint
+  FLAGS::initializeFromFlags();
 
   ErrorCode retCode = OK;
 
@@ -214,9 +204,6 @@ int main(int argc, char *argv[]) {
               << processedRequest.generateUrl(true);
     ADDITIONAL_SENDER_SETUP
     setUpAbort(sender);
-    sender.setIncludeRegex(FLAGS_include_regex);
-    sender.setExcludeRegex(FLAGS_exclude_regex);
-    sender.setPruneDirRegex(FLAGS_prune_dir_regex);
     std::unique_ptr<TransferReport> report = sender.transfer();
     retCode = report->getSummary().getErrorCode();
   }

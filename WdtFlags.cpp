@@ -8,6 +8,7 @@
  */
 #include "WdtFlags.h"
 #include "WdtFlags.cpp.inc"
+#include <glog/logging.h>
 #include "Protocol.h"
 
 namespace facebook {

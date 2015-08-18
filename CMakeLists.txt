@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.16.1508140)
+project("WDT" LANGUAGES C CXX VERSION 1.16.1508180)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -183,7 +183,8 @@ include_directories(${FOLLY_SOURCE_DIR})
 include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
 
-add_executable(wdt wdtCmdLine.cpp)
+add_executable(wdt wdtCmdLine.cpp WdtFlags.cpp)
+set_target_properties(wdt PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
 
 target_link_libraries(wdt wdtlib_min)
 

@@ -17,6 +17,7 @@
 #include <folly/Range.h>
 #include <folly/ScopeGuard.h>
 #include <folly/Bits.h>
+#include <folly/String.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <map>
