@@ -77,6 +77,9 @@ class FileByteSource : public ByteSource {
   /// @see ByteSource.h
   virtual char *read(int64_t &size) override;
 
+  /// @see ByteSource.h
+  virtual void advanceOffset(int64_t numBytes) override;
+
   /// open the source for reading
   virtual ErrorCode open() override;
 
@@ -159,13 +162,13 @@ class FileByteSource : public ByteSource {
   SourceMetaData *metadata_;
 
   /// filesize
-  const int64_t size_;
+  int64_t size_;
 
   /// open file descriptor for file (set to < 0 on error)
   int fd_{-1};
 
   /// block offset
-  const int64_t offset_;
+  int64_t offset_;
 
   /// number of bytes read so far from file
   int64_t bytesRead_;

@@ -19,9 +19,22 @@
 namespace facebook {
 namespace wdt {
 
-/// checkpoint is a pair of port number and number of successfully transferred
-/// blocks
-typedef std::pair<int32_t, int64_t> Checkpoint;
+/// Checkpoint consists of port number, number of successfully transferred
+/// blocks and number of bytes received for the last block
+struct Checkpoint {
+  int32_t port{0};
+  int64_t numBlocks{0};
+  int64_t lastBlockReceivedBytes{0};
+
+  Checkpoint() {
+  }
+
+  Checkpoint(int32_t port, int64_t numBlocks, int64_t lastBlockReceivedBytes) {
+    this->port = port;
+    this->numBlocks = numBlocks;
+    this->lastBlockReceivedBytes = lastBlockReceivedBytes;
+  }
+};
 
 /// structure representing a single chunk of a file
 struct Interval {
@@ -195,6 +208,8 @@ class Protocol {
   static const int SETTINGS_FLAG_VERSION;
   /// version from which flags and prevSeqId are sent with header cmd
   static const int HEADER_FLAG_AND_PREV_SEQ_ID_VERSION;
+  /// version from which checkpoint started including file offset
+  static const int CHECKPOINT_OFFSET_VERSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
@@ -220,10 +235,10 @@ class Protocol {
   /// min number of bytes that must be send to unblock receiver
   static const int64_t kMinBufLength = 256;
   /// max size of local checkpoint encoding
-  static const int64_t kMaxLocalCheckpoint = 10 + 2 * 10;
+  static const int64_t kMaxLocalCheckpoint = 10 + 3 * 10;
   /// max size of done command encoding(1 byte for cmd, 1 for status, 10 for
-  /// number of blocks)
-  static const int64_t kMaxDone = 2 + 10;
+  /// number of blocks, 10 for number of bytes sent)
+  static const int64_t kMaxDone = 2 + 2 * 10;
   /// max length of the size cmd encoding
   static const int64_t kMaxSize = 1 + 10;
   /// max size of settings command encoding
@@ -274,26 +289,28 @@ class Protocol {
   /// encodes checkpoints into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeCheckpoints(char *dest, int64_t &off, int64_t max,
+  static void encodeCheckpoints(int protocolVersion, char *dest, int64_t &off,
+                                int64_t max,
                                 const std::vector<Checkpoint> &checkpoints);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets checkpoints
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeCheckpoints(char *src, int64_t &off, int64_t max,
+  static bool decodeCheckpoints(int protocolVersion, char *src, int64_t &off,
+                                int64_t max,
                                 std::vector<Checkpoint> &checkpoints);
 
-  /// encodes numBlocks into dest+off
+  /// encodes numBlocks, totalBytes into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeDone(char *dest, int64_t &off, int64_t max,
-                         int64_t numBlocks);
+  static void encodeDone(int protocolVersion, char *dest, int64_t &off,
+                         int64_t max, int64_t numBlocks, int64_t totalBytes);
 
   /// decodes from src+off and consumes/moves off but not past max
-  /// sets numBlocks
+  /// sets numBlocks, totalBytes
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeDone(char *src, int64_t &off, int64_t max,
-                         int64_t &numBlocks);
+  static bool decodeDone(int protocolVersion, char *src, int64_t &off,
+                         int64_t max, int64_t &numBlocks, int64_t &totalBytes);
 
   /// encodes settings into dest+off
   /// moves the off into dest pointer, not going past max

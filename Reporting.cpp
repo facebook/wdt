@@ -109,6 +109,12 @@ TransferReport::TransferReport(
       }
     }
   }
+  if (summary_.getEffectiveDataBytes() != totalFileSize_) {
+    // sender did not send all the bytes
+    LOG(INFO) << "Could not send all the bytes " << totalFileSize_ << " "
+              << summary_.getEffectiveDataBytes();
+    summary_.setErrorCode(ERROR);
+  }
   std::set<std::string> failedFilesSet;
   for (auto& stats : failedSourceStats_) {
     failedFilesSet.insert(stats.getId());

@@ -64,6 +64,11 @@ ErrorCode FileByteSource::open() {
   return errCode;
 }
 
+void FileByteSource::advanceOffset(int64_t numBytes) {
+  offset_ += numBytes;
+  size_ -= numBytes;
+}
+
 char *FileByteSource::read(int64_t &size) {
   size = 0;
   if (hasError() || finished()) {

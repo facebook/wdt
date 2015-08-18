@@ -98,7 +98,7 @@ ERROR_COUNT=10
 SENDER_ID="123456"
 RECEIVER_ID="123456"
 
-WDTBIN_OPTS="-ipv4 -num_ports=$threads \
+WDTBIN_OPTS="-ipv4 -num_ports=$threads -full_reporting \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -keep_transfer_log=false -treat_fewer_port_as_error"

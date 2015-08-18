@@ -83,6 +83,9 @@ class ByteSource {
    */
   virtual char *read(int64_t &size) = 0;
 
+  /// Advances ByteSource offet by numBytes
+  virtual void advanceOffset(int64_t numBytes) = 0;
+
   /// open the source for reading
   virtual ErrorCode open() = 0;
 
