@@ -261,5 +261,8 @@ if (BUILD_TESTING)
   add_test(NAME WdtBasicE2E COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_simple_test.sh")
 
+  add_test(NAME WdtBasicE2Exfs COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_xfs_test.sh")
+
 
 endif(BUILD_TESTING)

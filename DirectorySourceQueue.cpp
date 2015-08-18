@@ -19,9 +19,13 @@
 #include <folly/Memory.h>
 #include <regex>
 #include <fcntl.h>
+
 namespace facebook {
 namespace wdt {
-FileInfo::FileInfo(const std::string &name, int64_t size)
+
+using std::string;
+
+FileInfo::FileInfo(const string &name, int64_t size)
     : fileName(name), fileSize(size) {
   oFlags = O_RDONLY;
   const auto &options = WdtOptions::get();
@@ -49,29 +53,21 @@ void FileInfo::verifyAndFixFlags() {
 }
 
 DirectorySourceQueue::DirectorySourceQueue(
-    const std::string &rootDir, std::unique_ptr<IAbortChecker> &abortChecker)
-    : rootDir_(rootDir),
-      abortChecker_(std::move(abortChecker)),
-      options_(WdtOptions::get()) {
-  WDT_CHECK(!rootDir.empty());
-  if (rootDir_.back() != '/') {
-    rootDir_.push_back('/');
-  }
+    const string &rootDir, std::unique_ptr<IAbortChecker> &abortChecker)
+    : abortChecker_(std::move(abortChecker)), options_(WdtOptions::get()) {
+  setRootDir(rootDir);
   fileSourceBufferSize_ = options_.buffer_size;
 };
 
-void DirectorySourceQueue::setIncludePattern(
-    const std::string &includePattern) {
+void DirectorySourceQueue::setIncludePattern(const string &includePattern) {
   includePattern_ = includePattern;
 }
 
-void DirectorySourceQueue::setExcludePattern(
-    const std::string &excludePattern) {
+void DirectorySourceQueue::setExcludePattern(const string &excludePattern) {
   excludePattern_ = excludePattern;
 }
 
-void DirectorySourceQueue::setPruneDirPattern(
-    const std::string &pruneDirPattern) {
+void DirectorySourceQueue::setPruneDirPattern(const string &pruneDirPattern) {
   pruneDirPattern_ = pruneDirPattern;
 }
 
@@ -91,6 +87,35 @@ const std::vector<FileInfo> &DirectorySourceQueue::getFileInfo() const {
 
 void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   followSymlinks_ = followSymlinks;
+  if (followSymlinks_) {
+    setRootDir(rootDir_);
+  }
+}
+
+// const ref string param but first thing we do is make a copy because
+// of logging original input vs resolved one
+bool DirectorySourceQueue::setRootDir(const string &newRootDir) {
+  if (newRootDir.empty()) {
+    LOG(ERROR) << "Invalid empty root dir!";
+    return false;
+  }
+  string dir(newRootDir);
+  if (followSymlinks_) {
+    dir.assign(resolvePath(newRootDir));
+    if (dir.empty()) {
+      // error already logged
+      return false;
+    }
+    LOG(INFO) << "Following symlinks " << newRootDir << " -> " << dir;
+  }
+  if (dir.back() != '/') {
+    dir.push_back('/');
+  }
+  if ( dir != rootDir_ ) {
+    rootDir_.assign(dir);
+    LOG(INFO) << "Root dir now " << rootDir_;
+  }
+  return true;
 }
 
 void DirectorySourceQueue::setPreviouslyReceivedChunks(
@@ -166,17 +191,37 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
   return res;
 }
 
+// TODO: move this and a bunch of stuff into FileUtil and/or System class
+string DirectorySourceQueue::resolvePath(const string &path) {
+  // Use realpath() as it resolves to a nice canonicalized
+  // full path we can used for the stat() call later,
+  // readlink could still give us a relative path
+  // and making sure the output buffer is sized appropriately
+  // can be ugly
+  string result;
+  char *resolvedPath = realpath(path.c_str(), nullptr);
+  if (!resolvedPath) {
+    PLOG(ERROR) << "Couldn't resolve " << path;
+    return result; // empty string == error
+  }
+  result.assign(resolvedPath);
+  free(resolvedPath);
+  VLOG(3) << "resolvePath(\"" << path << "\") -> " << result;
+  return result;
+}
+
 bool DirectorySourceQueue::explore() {
   LOG(INFO) << "Exploring root dir " << rootDir_
             << " include_pattern : " << includePattern_
             << " exclude_pattern : " << excludePattern_
             << " prune_dir_pattern : " << pruneDirPattern_;
+  WDT_CHECK(!rootDir_.empty());
   bool hasError = false;
-  std::set<std::string> visited;
+  std::set<string> visited;
   std::regex includeRegex(includePattern_);
   std::regex excludeRegex(excludePattern_);
   std::regex pruneDirRegex(pruneDirPattern_);
-  std::deque<std::string> todoList;
+  std::deque<string> todoList;
   todoList.push_back("");
   while (!todoList.empty()) {
     if (abortChecker_->shouldAbort()) {
@@ -187,7 +232,7 @@ bool DirectorySourceQueue::explore() {
     // would be nice to do those 2 in 1 call...
     auto relativePath = todoList.front();
     todoList.pop_front();
-    const std::string fullPath = rootDir_ + relativePath;
+    const string fullPath = rootDir_ + relativePath;
     VLOG(1) << "Processing directory " << fullPath;
     DIR *dirPtr = opendir(fullPath.c_str());
     if (!dirPtr) {
@@ -242,52 +287,36 @@ bool DirectorySourceQueue::explore() {
         VLOG(3) << "Ignoring entry type " << (int)(dType);
         continue;
       }
-      std::string newRelativePath =
-          relativePath + std::string(dirEntryRes->d_name);
-      std::string newFullPath = rootDir_ + newRelativePath;
+      string newRelativePath = relativePath + string(dirEntryRes->d_name);
+      string newFullPath = rootDir_ + newRelativePath;
       if (!isDir) {
         // DT_REG, DT_LNK or DT_UNKNOWN cases
         struct stat fileStat;
-        // Use stat since we can also have symlinks
-        if (stat(newFullPath.c_str(), &fileStat) != 0) {
-          PLOG(ERROR) << "stat() failed on path " << newFullPath;
+        // On XFS we don't know yet if this is a symlink, so check
+        // if following symlinks is ok we will do stat() too
+        if (lstat(newFullPath.c_str(), &fileStat) != 0) {
+          PLOG(ERROR) << "lstat() failed on path " << newFullPath;
           hasError = true;
           continue;
         }
-
-        if (followSymlinks_) {
-          std::string pathToResolve = newFullPath;
-          if (dType == DT_UNKNOWN) {
-            // Use lstat because we are checking the file itself
-            // and not what it points to (if it is a link)
-            struct stat linkStat;
-            if (lstat(pathToResolve.c_str(), &linkStat) != 0) {
-              PLOG(ERROR) << "lstat() failed on path " << pathToResolve;
-              hasError = true;
-              continue;
-            }
-            if (S_ISLNK(linkStat.st_mode)) {
-              // Let's resolve it below
-              isLink = true;
-            }
+        isLink = S_ISLNK(fileStat.st_mode);
+        VLOG(2) << "lstat for " << newFullPath << " is link ? " << isLink;
+        if (followSymlinks_ && isLink) {
+          // Use stat to see if the pointed file is of the right type
+          // (overrides previous stat call result)
+          if (stat(newFullPath.c_str(), &fileStat) != 0) {
+            PLOG(ERROR) << "stat() failed on path " << newFullPath;
+            hasError = true;
+            continue;
           }
-          if (isLink) {
-            // Use realpath() as it resolves to a nice canonicalized
-            // full path we can used for the stat() call later,
-            // readlink could still give us a relative path
-            // and making sure the output buffer is sized appropriately
-            // can be ugly
-            char *resolvedPath = realpath(pathToResolve.c_str(), nullptr);
-            if (!resolvedPath) {
-              hasError = true;
-              PLOG(ERROR) << "Couldn't resolve " << pathToResolve.c_str();
-              continue;
-            }
-            newFullPath.assign(resolvedPath);
-            free(resolvedPath);
-            VLOG(2) << "Resolved symlink " << dirEntryRes->d_name << " to "
-                    << newFullPath;
+          newFullPath = resolvePath(newFullPath);
+          if (newFullPath.empty()) {
+            // already logged error
+            hasError = true;
+            continue;
           }
+          VLOG(2) << "Resolved symlink " << dirEntryRes->d_name << " to "
+                  << newFullPath;
         }
 
         // could dcheck that if DT_REG we better be !isDir
@@ -372,7 +401,7 @@ void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
   returnToQueue(sources);
 }
 
-void DirectorySourceQueue::createIntoQueue(const std::string &fullPath,
+void DirectorySourceQueue::createIntoQueue(const string &fullPath,
                                            FileInfo &fileInfo,
                                            bool alreadyLocked) {
   // TODO: currently we are treating small files(size less than blocksize) as
@@ -470,7 +499,7 @@ std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
   return failedSourceStats_;
 }
 
-std::vector<std::string> &DirectorySourceQueue::getFailedDirectories() {
+std::vector<string> &DirectorySourceQueue::getFailedDirectories() {
   return failedDirectories_;
 }
 
@@ -480,7 +509,7 @@ bool DirectorySourceQueue::enqueueFiles() {
       LOG(ERROR) << "Directory transfer thread aborted";
       return false;
     }
-    std::string fullPath = rootDir_ + info.fileName;
+    string fullPath = rootDir_ + info.fileName;
     if (info.fileSize < 0) {
       struct stat fileStat;
       if (stat(fullPath.c_str(), &fileStat) != 0) {

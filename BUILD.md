@@ -82,6 +82,21 @@ __Install Xcode 6 and the command line tools__ (so
 /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
 exists)
 
+
+## Using the contbuild script locally
+
+```sh
+source travis_osx.sh
+mkdir ../build && cd ../build
+cmake ../wdt -DBUILD_TESTING=1
+make -j
+CTEST_OUTPUT_ON_FAILURE=1 make test
+# optionally
+make install
+```
+
+## Or manual/step by step
+
 __Install Cmake__
 
 ```
@@ -94,7 +109,7 @@ cd ../
 __Install homebrew (http://brew.sh/)__
 
 __Install glog and gflags and boost__
-```
+```sh
 brew update
 brew install glog gflags boost
 ```
@@ -128,8 +143,7 @@ Using Unix makefiles:
 ```
 cmake ../wdt -G "Unix Makefiles" -DBUILD_TESTING=on
 make -j
-# Until Issue #30 is fixed:
-WDT_TEST_SYMLINKS=0 CTEST_OUTPUT_ON_FAILURE=1 make test
+CTEST_OUTPUT_ON_FAILURE=1 make test
 sudo make install
 ```
 

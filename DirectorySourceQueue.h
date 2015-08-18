@@ -208,7 +208,23 @@ class DirectorySourceQueue : public SourceQueue {
     return directoryTime_;
   }
 
+  /**
+   * Allows to change the root directory, must not be empty, trailing
+   * slash is automatically added if missing. Can be relative.
+   * if follow symlink is set the directory will be resolved as absolute
+   * path.
+   * @return    true if succesfull, false on error (logged)
+   */
+  bool setRootDir(const std::string &newRootDir);
+
  private:
+  /**
+   * Resolves a symlink.
+   *
+   * @return                realpath or empty string on error (logged)
+   */
+  std::string resolvePath(const std::string &path);
+
   /**
    * Traverse rootDir_ to gather files and sizes to enqueue
    *

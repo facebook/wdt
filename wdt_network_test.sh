@@ -63,7 +63,7 @@ WDTBIN_SERVER="$WDTBIN -protocol_version=$RECEIVER_PROTOCOL_VERSION"
 WDTBIN_CLIENT="$WDTBIN -protocol_version=$SENDER_PROTOCOL_VERSION"
 WDTBIN_MORE_THREADS="$WDTBIN_BASE -num_ports=$((threads + 1)) $WDTBIN_OPTS"
 WDTBIN_LESS_THREADS="$WDTBIN_BASE -num_ports=$((threads - 1)) $WDTBIN_OPTS"
-BASEDIR=/dev/shm/tmpWDT
+BASEDIR=/dev/shm/wdtTest_$USER
 
 mkdir -p $BASEDIR
 DIR=`mktemp -d --tmpdir=$BASEDIR`

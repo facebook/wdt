@@ -4,11 +4,11 @@ namespace facebook {
 namespace wdt {
 /// Interface for external abort checks (pull mode)
 class IAbortChecker {
-   public:
-    virtual bool shouldAbort() const = 0;
-    virtual ~IAbortChecker() {
-    }
-  };
+ public:
+  virtual bool shouldAbort() const = 0;
+  virtual ~IAbortChecker() {
+  }
+};
 
 /// A sample abort checker using std::atomic for abort
 class WdtAbortChecker : public IAbortChecker {
@@ -23,5 +23,5 @@ class WdtAbortChecker : public IAbortChecker {
  private:
   std::atomic<bool> const *abortTriggerPtr_;
 };
-
-}}
+}
+}

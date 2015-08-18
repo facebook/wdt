@@ -106,7 +106,7 @@ WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
 
-BASEDIR=/tmp/wdtTest
+BASEDIR=/tmp/wdtTest_$USER
 
 mkdir -p $BASEDIR
 DIR=`mktemp -d $BASEDIR/XXXXXX`

@@ -21,7 +21,6 @@ typedef std::shared_ptr<Sender> SenderPtr;
 
 const std::string kGlobalNamespace = "Global";
 
-
 /**
  * Base class for both wdt global and namespace controller
  */

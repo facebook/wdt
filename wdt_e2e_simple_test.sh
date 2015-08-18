@@ -6,10 +6,10 @@
 
 echo "Run from the cmake build dir (or ~/fbcode - or fbmake runtests)"
 
-BASEDIR=/tmp/wdtTest
+BASEDIR=/tmp/wdtTest_$USER
 usage="
 The possible options to this script are
--d base directory to use
+-d base directory to use (defaults to $BASEDIR)
 "
 
 if [ "$1" == "-h" ]; then
@@ -95,18 +95,18 @@ if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
 fi
 
 
-CMD="$WDTBIN -minloglevel=1 -directory $DIR/dst 2> $DIR/server.log | head -1 | \
+CMD="$WDTBIN -minloglevel=0 -directory $DIR/dst 2> $DIR/server.log | head -1 | \
     xargs -I URL $WDTBIN -directory $DIR/src -connection_url URL 2>&1 | \
-    tee $DIR/client.log"
+    tee $DIR/client1.log"
 echo "First transfer: $CMD"
 eval $CMD
 STATUS=$?
 # TODO check for $? / crash... though diff will indirectly find that case
 
 if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
-  CMD="$WDTBIN -minloglevel=1 -directory $DIR/dst_symlinks 2>> $DIR/server.log |\
+  CMD="$WDTBIN -minloglevel=0 -directory $DIR/dst_symlinks 2>> $DIR/server.log |\
     head -1 | xargs -I URL $WDTBIN -follow_symlinks -directory $DIR/src \
-    -connection_url URL 2>&1 | tee $DIR/client.log"
+    -connection_url URL 2>&1 | tee $DIR/client2.log"
   echo "Second transfer: $CMD"
   eval $CMD
   # TODO check for $? / crash... though diff will indirectly find that case
