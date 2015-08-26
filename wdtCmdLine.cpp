@@ -62,6 +62,10 @@ DEFINE_string(recovery_id, "", "Recovery-id to use for download resumption");
 DEFINE_bool(treat_fewer_port_as_error, false,
             "If the receiver is unable to bind to all the ports, treat that as "
             "an error.");
+DEFINE_bool(print_options, false,
+            "If true, wdt prints the option values and exits. Option values "
+            "printed take into account option type and other command line "
+            "flags specified.");
 
 using namespace facebook::wdt;
 template <typename T>
@@ -120,6 +124,10 @@ int main(int argc, char *argv[]) {
   signal(SIGPIPE, SIG_IGN);
 
   FLAGS::initializeFromFlags();
+  if (FLAGS_print_options) {
+    FLAGS::printOptions();
+    return 0;
+  }
 
   ErrorCode retCode = OK;
 
