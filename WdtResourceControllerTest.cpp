@@ -94,6 +94,7 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
 
   erasedIds.clear();
   code = releaseStaleReceivers(wdtNamespace, erasedIds);
+  EXPECT_EQ(code, OK);
   sort(erasedIds.begin(), erasedIds.end());
   EXPECT_EQ(erasedIds, expectedErasedIds);
 }

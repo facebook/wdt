@@ -83,7 +83,8 @@ void testReadSize(int64_t fileSize, ByteSource& byteSource) {
   int64_t totalSizeRead = 0;
   while (true) {
     int64_t size;
-    char* data = byteSource.read(size);
+    char *data = byteSource.read(size);
+    VLOG(2) << "byteSource.read(" << size << ") returned " << (void*)data;
     if (size <= 0) {
       break;
     }
