@@ -103,7 +103,7 @@ WDT_OPT(transfer_log_write_interval_ms, int32,
         "Interval in milliseconds after which transfer log is written to disk."
         " written to disk");
 WDT_OPT(enable_download_resumption, bool,
-        "If true, wdt supports download resumption for immutable files");
+        "If true, wdt supports download resumption for append-only files");
 WDT_OPT(keep_transfer_log, bool,
         "If true, transfer logs are not deleted at "
         "the end of the transfer");

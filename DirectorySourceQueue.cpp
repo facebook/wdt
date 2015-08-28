@@ -439,24 +439,25 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
     remainingChunks.emplace_back(0, fileSize);
     seqId = nextSeqId_++;
     allocationStatus = NOT_EXISTS;
-  } else if (it->second.getFileSize() != fileSize) {
+  } else if (it->second.getFileSize() > fileSize) {
     // file size is greater on the receiver side
     remainingChunks.emplace_back(0, fileSize);
     seqId = nextSeqId_++;
-    LOG(INFO) << "File size is different in the receiver side " << relPath
-              << " " << fileSize << " " << it->second.getFileSize();
-    allocationStatus = it->second.getFileSize() > fileSize ? EXISTS_TOO_LARGE
-                                                           : EXISTS_TOO_SMALL;
+    LOG(INFO) << "File size is greater in the receiver side " << relPath << " "
+              << fileSize << " " << it->second.getFileSize();
+    allocationStatus = EXISTS_TOO_LARGE;
     prevSeqId = it->second.getSeqId();
   } else {
     auto &fileChunksInfo = it->second;
-    remainingChunks = fileChunksInfo.getRemainingChunks();
+    remainingChunks = fileChunksInfo.getRemainingChunks(fileSize);
     if (remainingChunks.empty()) {
       LOG(INFO) << relPath << " completely sent in previous transfer";
       return;
     }
     seqId = fileChunksInfo.getSeqId();
-    allocationStatus = EXISTS_CORRECT_SIZE;
+    allocationStatus = it->second.getFileSize() < fileSize
+                           ? EXISTS_TOO_SMALL
+                           : EXISTS_CORRECT_SIZE;
   }
 
   SourceMetaData *metadata = new SourceMetaData();

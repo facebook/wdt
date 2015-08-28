@@ -127,7 +127,7 @@ class FileChunksInfo {
   void mergeChunks();
 
   /// @return   list of chunks which are not part of the chunks-list
-  std::vector<Interval> getRemainingChunks();
+  std::vector<Interval> getRemainingChunks(int64_t curFileSize);
 
   bool operator==(const FileChunksInfo &fileChunksInfo) const {
     return this->seqId_ == fileChunksInfo.seqId_ &&
