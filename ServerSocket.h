@@ -9,7 +9,7 @@
 #pragma once
 
 #include "ErrorCodes.h"
-#include "WdtBase.h"
+#include "AbortChecker.h"
 
 #include <string>
 #include <sys/types.h>
@@ -22,8 +22,7 @@ class ServerSocket {
  public:
   ServerSocket(ServerSocket &&that) noexcept;
   ServerSocket(const ServerSocket &that) = delete;
-  ServerSocket(int32_t port, int backlog,
-               WdtBase::IAbortChecker const *abortChecker);
+  ServerSocket(int32_t port, int backlog, IAbortChecker const *abortChecker);
   ServerSocket &operator=(const ServerSocket &that) = delete;
   ServerSocket &operator=(ServerSocket &&that);
   virtual ~ServerSocket();
@@ -57,7 +56,7 @@ class ServerSocket {
   std::string peerIp_;
   std::string peerPort_;
   struct addrinfo sa_;
-  WdtBase::IAbortChecker const *abortChecker_;
+  IAbortChecker const *abortChecker_;
 };
 }
 }  // namespace facebook::wdt

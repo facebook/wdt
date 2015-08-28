@@ -9,6 +9,8 @@
 #pragma once
 
 #include "ErrorCodes.h"
+#include "AbortChecker.h"
+#include "DirectorySourceQueue.h"
 #include "WdtOptions.h"
 #include "Reporting.h"
 #include "Throttler.h"
@@ -20,9 +22,6 @@
 #include <unordered_map>
 namespace facebook {
 namespace wdt {
-
-/// filename-filesize pair. Negative filesize denotes the entire file.
-typedef std::pair<std::string, int64_t> FileInfo;
 
 /**
  * Basic Uri class to parse and get information from wdt url
@@ -157,14 +156,6 @@ struct WdtTransferRequest {
  */
 class WdtBase {
  public:
-  /// Interface for external abort checks (pull mode)
-  class IAbortChecker {
-   public:
-    virtual bool shouldAbort() const = 0;
-    virtual ~IAbortChecker() {
-    }
-  };
-
   /// Constructor
   WdtBase();
 

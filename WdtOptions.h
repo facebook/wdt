@@ -8,7 +8,10 @@
  */
 #pragma once
 #include <wdt/WdtConfig.h>
-#include <folly/String.h>
+#include <cstdint>
+#include <string>
+#include <unistd.h>
+#include <set>
 namespace facebook {
 namespace wdt {
 /**
@@ -18,6 +21,10 @@ namespace wdt {
  */
 class WdtOptions {
  public:
+  // WDT option types
+  static const std::string FLASH_OPTION_TYPE;
+  static const std::string DISK_OPTION_TYPE;
+
   /**
    * A static method that can be called to create
    * the singleton copy of WdtOptions through the lifetime
@@ -28,6 +35,17 @@ class WdtOptions {
    * Method to get mutable copy of the singleton
    */
   static WdtOptions& getMutable();
+
+  /**
+   * Modifies options based on the type specified
+   *
+   * @param optionType           option type
+   * @param userSpecifiedOptions options specified by user, this options are not
+   *                             changed
+   */
+  virtual void modifyOptions(const std::string& optionType,
+                             const std::set<std::string>& userSpecifiedOptions);
+
   /**
    * Use ipv6 while establishing connection.
    * When both ipv6 and ipv4 are false we will try both
@@ -252,6 +270,11 @@ class WdtOptions {
    * Max number of receivers allowed per namespace
    */
   int namespace_receiver_limit{1};
+
+  /**
+   * Read files in O_DIRECT
+   */
+  bool odirect_reads{false};
 
   /**
    * Since this is a singleton copy constructor

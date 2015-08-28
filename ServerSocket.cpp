@@ -7,6 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include "ServerSocket.h"
+#include "Reporting.h"
 #include "SocketUtils.h"
 #include "WdtOptions.h"
 #include <glog/logging.h>
@@ -21,7 +22,7 @@ using std::swap;
 using std::string;
 
 ServerSocket::ServerSocket(int32_t port, int backlog,
-                           WdtBase::IAbortChecker const *abortChecker)
+                           IAbortChecker const *abortChecker)
     : port_(port),
       backlog_(backlog),
       listeningFd_(-1),

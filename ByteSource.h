@@ -37,6 +37,8 @@ struct SourceMetaData {
   FileAllocationStatus allocationStatus;
   /// if there is a size mismatch, this is the previous sequence id
   int64_t prevSeqId;
+  /// Read the file with these flags
+  int oFlags;
 };
 
 class ByteSource {
@@ -49,6 +51,9 @@ class ByteSource {
 
   /// @return number of bytes in this source
   virtual int64_t getSize() const = 0;
+
+  /// @return size of buffer
+  virtual int64_t getBufferSize() const = 0;
 
   /// @return offset from which to start reading
   virtual int64_t getOffset() const = 0;
@@ -77,6 +82,9 @@ class ByteSource {
    *                  the two cases
    */
   virtual char *read(int64_t &size) = 0;
+
+  /// Advances ByteSource offet by numBytes
+  virtual void advanceOffset(int64_t numBytes) = 0;
 
   /// open the source for reading
   virtual ErrorCode open() = 0;

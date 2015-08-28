@@ -7,6 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include "ClientSocket.h"
+#include "Reporting.h"
 #include "SocketUtils.h"
 #include "WdtOptions.h"
 #include <glog/logging.h>
@@ -20,7 +21,7 @@ namespace wdt {
 using std::string;
 
 ClientSocket::ClientSocket(const string &dest, const string &port,
-                           WdtBase::IAbortChecker const *abortChecker)
+                           IAbortChecker const *abortChecker)
     : dest_(dest), port_(port), fd_(-1), abortChecker_(abortChecker) {
   memset(&sa_, 0, sizeof(sa_));
   const auto &options = WdtOptions::get();

@@ -83,9 +83,9 @@ int SocketUtils::getTimeout(int networkTimeout) {
   return std::min(networkTimeout, abortInterval);
 }
 
-int64_t SocketUtils::readWithAbortCheck(
-    int fd, char *buf, int64_t nbyte,
-    WdtBase::IAbortChecker const *abortChecker, bool tryFull) {
+int64_t SocketUtils::readWithAbortCheck(int fd, char *buf, int64_t nbyte,
+                                        IAbortChecker const *abortChecker,
+                                        bool tryFull) {
   const auto &options = WdtOptions::get();
   START_PERF_TIMER
   int64_t numRead = ioWithAbortCheck(read, fd, buf, nbyte, abortChecker,
@@ -94,9 +94,9 @@ int64_t SocketUtils::readWithAbortCheck(
   return numRead;
 }
 
-int64_t SocketUtils::writeWithAbortCheck(
-    int fd, const char *buf, int64_t nbyte,
-    WdtBase::IAbortChecker const *abortChecker, bool tryFull) {
+int64_t SocketUtils::writeWithAbortCheck(int fd, const char *buf, int64_t nbyte,
+                                         IAbortChecker const *abortChecker,
+                                         bool tryFull) {
   const auto &options = WdtOptions::get();
   START_PERF_TIMER
   int64_t written = ioWithAbortCheck(write, fd, buf, nbyte, abortChecker,
@@ -106,9 +106,10 @@ int64_t SocketUtils::writeWithAbortCheck(
 }
 
 template <typename F, typename T>
-int64_t SocketUtils::ioWithAbortCheck(
-    F readOrWrite, int fd, T tbuf, int64_t numBytes,
-    WdtBase::IAbortChecker const *abortChecker, int timeoutMs, bool tryFull) {
+int64_t SocketUtils::ioWithAbortCheck(F readOrWrite, int fd, T tbuf,
+                                      int64_t numBytes,
+                                      IAbortChecker const *abortChecker,
+                                      int timeoutMs, bool tryFull) {
   WDT_CHECK(abortChecker != nullptr) << "abort checker can not be null";
   const auto &options = WdtOptions::get();
   bool checkAbort = (options.abort_check_interval_millis > 0);

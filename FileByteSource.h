@@ -16,6 +16,7 @@
 
 namespace facebook {
 namespace wdt {
+const int64_t kDiskBlockSize = 4 * 1024;
 
 /**
  * ByteSource that reads data from a file. The buffer used is thread-local
@@ -76,6 +77,9 @@ class FileByteSource : public ByteSource {
   /// @see ByteSource.h
   virtual char *read(int64_t &size) override;
 
+  /// @see ByteSource.h
+  virtual void advanceOffset(int64_t numBytes) override;
+
   /// open the source for reading
   virtual ErrorCode open() override;
 
@@ -102,16 +106,47 @@ class FileByteSource : public ByteSource {
     transferStats_ += stats;
   }
 
+  int64_t getBufferSize() const override {
+    if (!buffer_) {
+      return 0;
+    }
+    return buffer_->size_;
+  }
+
  private:
   struct Buffer {
-    explicit Buffer(int64_t size) : size_(size) {
-      data_ = new char[size + 1];
+    explicit Buffer(int64_t size, bool isMemAligned) : size_(size) {
+      isMemAligned_ = false;
+      if (!isMemAligned) {
+        data_ = new char[size + 1];
+        return;
+      }
+#ifdef WDT_SUPPORTS_ODIRECT
+      const int64_t remainder = size_ % kDiskBlockSize;
+      if (remainder != 0) {
+        // Making size the next multiple of disk block size
+        size_ = (size_ - remainder) + kDiskBlockSize;
+        LOG(INFO) << "Changing the buffer size to multiple "
+                  << "of " << kDiskBlockSize << ". New size " << size_
+                  << " old size " << size;
+      }
+      VLOG(1) << "Posix memaligned buffer, size = " << size_;
+      int ret = posix_memalign((void **)&data_, kDiskBlockSize, size_);
+      if (ret) {
+        LOG(ERROR) << "Memalign memory failed " << strerrorStr(ret);
+      }
+      isMemAligned_ = true;
+#endif
     }
 
     ~Buffer() {
+      if (isMemAligned_) {
+        free(data_);
+        return;
+      }
       delete[] data_;
     }
-
+    bool isMemAligned_;
     char *data_;
     int64_t size_;
   };
@@ -127,13 +162,13 @@ class FileByteSource : public ByteSource {
   SourceMetaData *metadata_;
 
   /// filesize
-  const int64_t size_;
+  int64_t size_;
 
   /// open file descriptor for file (set to < 0 on error)
   int fd_{-1};
 
   /// block offset
-  const int64_t offset_;
+  int64_t offset_;
 
   /// number of bytes read so far from file
   int64_t bytesRead_;

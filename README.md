@@ -2,6 +2,8 @@
 `WDT` Warp speed Data Transfer
 ------------------------------
 
+[![Join the chat at https://gitter.im/facebook/wdt](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/facebook/wdt?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 ## Design philosophy/Overview
 
 Goal:
@@ -268,11 +270,11 @@ wdt_max_send_test.sh
 (facebook only:)
 Make sure to do the following, before "arc diff":
 ```
- (cd wdt ; ./clangformat.sh )
+ (cd wdt ; ./clangformat.sh ; ./version_update.tcl )
 
  fbconfig  --clang --with-project-version clang:dev -r  wdt
 
- fbmake runtests
+ fbmake runtests --extended-tests
  fbmake runtests_opt
  fbmake opt
 

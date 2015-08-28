@@ -25,12 +25,6 @@
 namespace facebook {
 namespace wdt {
 
-// Constants for different calculations
-/*
- * If you change any of the multipliers be
- * sure to replace them in the description above.
- */
-
 ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue &queue,
                                              TransferStats &threadStats)
     : queue_(queue), threadStats_(threadStats) {
@@ -55,7 +49,8 @@ bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
     // already received an error for this thread
     VLOG(1) << "adding source after global checkpoint is received. returning "
                "the source to the queue";
-    markSourceAsFailed(source);
+    markSourceAsFailed(source, lastBlockReceivedBytes_);
+    lastBlockReceivedBytes_ = 0;
     queue_.returnToQueue(source);
     return false;
   }
@@ -64,7 +59,8 @@ bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
 }
 
 int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
-    int64_t numReceivedSources, bool globalCheckpoint) {
+    int64_t numReceivedSources, int64_t lastBlockReceivedBytes,
+    bool globalCheckpoint) {
   folly::SpinLockGuard guard(lock_);
   const int64_t historySize = history_.size();
   if (numReceivedSources > historySize) {
@@ -78,14 +74,24 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
                << numAcknowledged_ << " " << numReceivedSources;
     return -1;
   }
+  int64_t numFailedSources = historySize - numReceivedSources;
+  if (numFailedSources == 0 && lastBlockReceivedBytes > 0) {
+    if (!globalCheckpoint) {
+      LOG(ERROR) << "Invalid local checkpoint " << numFailedSources << " "
+                 << lastBlockReceivedBytes;
+      return -1;
+    }
+    lastBlockReceivedBytes_ = lastBlockReceivedBytes;
+  }
   globalCheckpoint_ |= globalCheckpoint;
   numAcknowledged_ = numReceivedSources;
-  int64_t numFailedSources = historySize - numReceivedSources;
   std::vector<std::unique_ptr<ByteSource>> sourcesToReturn;
   for (int64_t i = 0; i < numFailedSources; i++) {
     std::unique_ptr<ByteSource> source = std::move(history_.back());
     history_.pop_back();
-    markSourceAsFailed(source);
+    int64_t receivedBytes =
+        (i == numFailedSources - 1 ? lastBlockReceivedBytes : 0);
+    markSourceAsFailed(source, receivedBytes);
     sourcesToReturn.emplace_back(std::move(source));
   }
   queue_.returnToQueue(sourcesToReturn);
@@ -110,22 +116,30 @@ void ThreadTransferHistory::markAllAcknowledged() {
 }
 
 int64_t ThreadTransferHistory::returnUnackedSourcesToQueue() {
-  return setCheckpointAndReturnToQueue(numAcknowledged_, false);
+  return setCheckpointAndReturnToQueue(numAcknowledged_, 0, false);
 }
 
 void ThreadTransferHistory::markSourceAsFailed(
-    std::unique_ptr<ByteSource> &source) {
+    std::unique_ptr<ByteSource> &source, int64_t receivedBytes) {
   TransferStats &sourceStats = source->getTransferStats();
-  auto dataBytes = sourceStats.getEffectiveDataBytes();
-  auto headerBytes = sourceStats.getEffectiveHeaderBytes();
-  sourceStats.subtractEffectiveBytes(headerBytes, dataBytes);
-  sourceStats.decrNumBlocks();
-  sourceStats.setErrorCode(SOCKET_WRITE_ERROR);
-  sourceStats.incrFailedAttempts();
+  if (sourceStats.getErrorCode() != OK) {
+    // already marked as failed
+    sourceStats.addEffectiveBytes(0, receivedBytes);
+    threadStats_.addEffectiveBytes(0, receivedBytes);
+  } else {
+    auto dataBytes = source->getSize();
+    auto headerBytes = sourceStats.getEffectiveHeaderBytes();
+    int64_t wastedBytes = dataBytes - receivedBytes;
+    sourceStats.subtractEffectiveBytes(headerBytes, wastedBytes);
+    sourceStats.decrNumBlocks();
+    sourceStats.setErrorCode(SOCKET_WRITE_ERROR);
+    sourceStats.incrFailedAttempts();
 
-  threadStats_.subtractEffectiveBytes(headerBytes, dataBytes);
-  threadStats_.decrNumBlocks();
-  threadStats_.incrFailedAttempts();
+    threadStats_.subtractEffectiveBytes(headerBytes, wastedBytes);
+    threadStats_.decrNumBlocks();
+    threadStats_.incrFailedAttempts();
+  }
+  source->advanceOffset(receivedBytes);
 }
 
 const Sender::StateFunction Sender::stateMap_[] = {
@@ -138,6 +152,7 @@ const Sender::StateFunction Sender::stateMap_[] = {
     &Sender::processAbortCmd, &Sender::processVersionMismatch};
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir) {
+  LOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   destHost_ = destHost;
   srcDir_ = srcDir;
   transferFinished_ = true;
@@ -544,31 +559,34 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return CONNECT;
   }
-  if (!Protocol::decodeCheckpoints(
-          buf, decodeOffset, Protocol::kMaxLocalCheckpoint, checkpoints)) {
+  if (!Protocol::decodeCheckpoints(protocolVersion_, buf, decodeOffset,
+                                   Protocol::kMaxLocalCheckpoint,
+                                   checkpoints)) {
     LOG(ERROR) << "checkpoint decode failure "
                << folly::humanify(
                       std::string(buf, Protocol::kMaxLocalCheckpoint));
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  if (checkpoints.size() != 1 || checkpoints[0].first != port) {
+  if (checkpoints.size() != 1 || checkpoints[0].port != port) {
     LOG(ERROR) << "illegal local checkpoint "
                << folly::humanify(
                       std::string(buf, Protocol::kMaxLocalCheckpoint));
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  auto checkpoint = checkpoints[0].second;
-  VLOG(1) << "received local checkpoint " << port << " " << checkpoint;
+  auto numBlocks = checkpoints[0].numBlocks;
+  int64_t lastBlockReceivedBytes = checkpoints[0].lastBlockReceivedBytes;
+  VLOG(1) << "received local checkpoint " << port << " " << numBlocks << " "
+          << lastBlockReceivedBytes;
 
-  if (checkpoint == -1) {
+  if (numBlocks == -1) {
     // Receiver failed while sending DONE cmd
     return READ_RECEIVER_CMD;
   }
 
-  auto numReturned =
-      transferHistory.setCheckpointAndReturnToQueue(checkpoint, false);
+  auto numReturned = transferHistory.setCheckpointAndReturnToQueue(
+      numBlocks, lastBlockReceivedBytes, false);
   if (numReturned == -1) {
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
@@ -637,16 +655,15 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
   threadStats += transferStats;
   source->addTransferStats(transferStats);
   source->close();
-  if (transferStats.getErrorCode() == OK) {
-    if (!transferHistory.addSource(source)) {
-      // global checkpoint received for this thread. no point in
-      // continuing
-      LOG(ERROR) << "global checkpoint received, no point in continuing";
-      threadStats.setErrorCode(CONN_ERROR);
-      return END;
-    }
-  } else {
-    dirQueue_->returnToQueue(source);
+  if (!transferHistory.addSource(source)) {
+    // global checkpoint received for this thread. no point in
+    // continuing
+    LOG(ERROR) << "global checkpoint received, no point in continuing";
+    threadStats.setErrorCode(CONN_ERROR);
+    return END;
+  }
+
+  if (transferStats.getErrorCode() != OK) {
     return CHECK_FOR_ABORT;
   }
   return SEND_BLOCKS;
@@ -686,7 +703,8 @@ Sender::SenderState Sender::sendDoneCmd(ThreadData &data) {
   ErrorCode transferStatus = pair.second;
   buf[off++] = transferStatus;
 
-  Protocol::encodeDone(buf, off, Protocol::kMaxDone, numBlocksDiscovered);
+  Protocol::encodeDone(protocolVersion_, buf, off, Protocol::kMaxDone,
+                       numBlocksDiscovered, dirQueue_->getTotalSize());
 
   int toWrite = Protocol::kMinBufLength;
   int64_t written = socket->write(buf, toWrite);
@@ -924,8 +942,8 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
 
   std::vector<Checkpoint> checkpoints;
   int64_t decodeOffset = 0;
-  if (!Protocol::decodeCheckpoints(checkpointBuf, decodeOffset, checkpointsLen,
-                                   checkpoints)) {
+  if (!Protocol::decodeCheckpoints(protocolVersion_, checkpointBuf,
+                                   decodeOffset, checkpointsLen, checkpoints)) {
     LOG(ERROR) << "checkpoint decode failure "
                << folly::humanify(std::string(checkpointBuf, checkpointsLen));
     threadStats.setErrorCode(PROTOCOL_ERROR);
@@ -933,8 +951,9 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
   }
   transferHistory.markAllAcknowledged();
   for (auto &checkpoint : checkpoints) {
-    auto errPort = checkpoint.first;
-    auto errPoint = checkpoint.second;
+    auto errPort = checkpoint.port;
+    auto errPoint = checkpoint.numBlocks;
+    auto lastBlockReceivedBytes = checkpoint.lastBlockReceivedBytes;
     auto it = std::find(ports_.begin(), ports_.end(), errPort);
     if (it == ports_.end()) {
       LOG(ERROR) << "Invalid checkpoint " << errPoint
@@ -942,8 +961,10 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
       continue;
     }
     auto errThread = it - ports_.begin();
-    VLOG(1) << "received global checkpoint " << errThread << " -> " << errPoint;
-    transferHistories[errThread].setCheckpointAndReturnToQueue(errPoint, true);
+    VLOG(1) << "received global checkpoint " << errThread << " -> " << errPoint
+            << ", " << lastBlockReceivedBytes;
+    transferHistories[errThread].setCheckpointAndReturnToQueue(
+        errPoint, lastBlockReceivedBytes, true);
   }
   return SEND_BLOCKS;
 }
@@ -1133,7 +1154,7 @@ TransferStats Sender::sendOneByteSource(
   blockDetails.seqId = metadata.seqId;
   blockDetails.fileSize = metadata.size;
   blockDetails.offset = source->getOffset();
-  blockDetails.dataSize = source->getSize();
+  blockDetails.dataSize = expectedSize;
   blockDetails.allocationStatus = metadata.allocationStatus;
   blockDetails.prevSeqId = metadata.prevSeqId;
 

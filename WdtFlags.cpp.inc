@@ -18,63 +18,7 @@
  * the first time through WdtFlags.h and second time in the method
  * initializeFromFlags()
  */
-#ifdef GENMACRO_X
-#undef GENMACRO_X
-#endif
-#ifdef GENMACRO
-#undef GENMACRO
-#endif
-
-#ifndef OPTIONS
-#define OPTIONS WdtOptions
-#endif
-
-#ifndef STANDALONE_APP
-#define PREFIX(argument) wdt_##argument
-#else
-#define PREFIX(argument) argument
-#endif
-#define VALUE(A) facebook::wdt::OPTIONS::get().A
-
-#ifdef DECLARE_ONLY
-#define GENMACRO_X(type, argument, value, description) DECLARE_##type(argument);
-#else
-#define GENMACRO_X(type, argument, value, description) \
-  DEFINE_##type(argument, VALUE(value), description);
-#endif
-
-#ifdef STANDALONE_APP
-#define GENMACRO(type, argument, description) \
-  GENMACRO_X(type, argument, argument, description)
-#else
-#define GENMACRO(type, argument, description) \
-  GENMACRO_X(type, wdt_##argument, argument, description)
-#endif
-
-#ifndef WDT_OPT
-#define WDT_OPT(argument, type, description) \
-  GENMACRO(type, argument, description)
-#endif
-
-#define VALUE_X(argument) FLAGS_##argument
-#define CAT(argument) VALUE_X(argument)
-#define FLAG_VALUE(argument) CAT(PREFIX(argument))
-
-#ifdef ASSIGN_OPT
-#ifdef WDT_OPT
-#undef WDT_OPT
-#endif
-#define WDT_OPT(argument, type, description) \
-  facebook::wdt::OPTIONS::getMutable().argument = FLAG_VALUE(argument);
-#endif
-
-#ifdef PRINT_OPT
-#ifdef WDT_OPT
-#undef WDT_OPT
-#endif
-#define WDT_OPT(argument, type, description) \
-  LOG(INFO) << #argument << " " << facebook::wdt::OPTIONS::get().argument;
-#endif
+#include "WdtFlagsMacros.h"
 WDT_OPT(start_port, int32, "Starting port number for wdt");
 WDT_OPT(num_ports, int32, "Number of sockets");
 WDT_OPT(ipv6, bool, "prefers ipv6");
@@ -179,3 +123,13 @@ WDT_OPT(namespace_sender_limit, int32,
 WDT_OPT(namespace_receiver_limit, int32,
         "Max number of receivers allowed per namespace. "
         "A value of zero disables limits");
+
+#ifdef WDT_SUPPORTS_ODIRECT
+WDT_OPT(odirect_reads, bool, 
+        "Wdt can read files in O_DIRECT mode, set this flag to true"
+        " to make sender read all files in O_DIRECT");
+#else
+WDT_OPT(odirect_reads, bool, 
+        "Wdt can't handle O_DIRCT one or more of O_DIRECT, "
+        "posix_memalign, or F_NOCACHE was not found on this OS");
+#endif

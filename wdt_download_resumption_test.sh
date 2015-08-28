@@ -98,7 +98,7 @@ ERROR_COUNT=10
 SENDER_ID="123456"
 RECEIVER_ID="123456"
 
-WDTBIN_OPTS="-ipv4 -num_ports=$threads \
+WDTBIN_OPTS="-ipv4 -num_ports=$threads -full_reporting \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -keep_transfer_log=false -treat_fewer_port_as_error"
@@ -106,7 +106,7 @@ WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
 
-BASEDIR=/tmp/wdtTest
+BASEDIR=/tmp/wdtTest_$USER
 
 mkdir -p $BASEDIR
 DIR=`mktemp -d $BASEDIR/XXXXXX`
@@ -136,6 +136,26 @@ BLOCK_SIZE_MBYTES=10
 TEST_COUNT=0
 # Tests for which there is no need to verify source and destination md5s
 TESTS_SKIP_VERIFICATION=()
+
+echo "Testing that connection failure results in failed transfer"
+# first create a deep directory structure
+# this is done so that directory thread gets aborted before discovering any
+# file
+CURDIR=`pwd`
+cd $DIR
+for ((i = 0; i < 100; i++))
+do
+  mkdir d
+  cd d
+done
+touch file
+cd $CURDIR
+# start the sender without starting receiver and set connect retries to 1
+_bin/wdt/wdt -directory $DIR/d -destination $HOSTNAME -max_retries 1 \
+-start_port $STARTING_PORT -num_ports $threads
+checkLastCmdStatusExpectingFailure
+TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Download resumption test(1)"
 startNewTransfer

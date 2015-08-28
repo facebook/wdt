@@ -4,13 +4,17 @@
 // (to change the protocol_version for instance)
 #pragma once
 
+#include <fcntl.h>
+
 #define WDT_VERSION_MAJOR 1
-#define WDT_VERSION_MINOR 15
-#define WDT_VERSION_BUILD 1507290
+#define WDT_VERSION_MINOR 16
+#define WDT_VERSION_BUILD 1508210
 // Add -fbcode to version str
-#define WDT_VERSION_STR "1.15.1507290-fbcode"
+#define WDT_VERSION_STR "1.16.1508210-fbcode"
 // Tie minor and proto version
 #define WDT_PROTOCOL_VERSION WDT_VERSION_MINOR
 
 #define HAS_POSIX_FALLOCATE 1
 #define HAS_SYNC_FILE_RANGE 1
+#define HAS_POSIX_MEMALIGN 1
+#define WDT_SUPPORTS_ODIRECT 1

@@ -29,6 +29,7 @@ const int Protocol::DOWNLOAD_RESUMPTION_VERSION = 13;
 
 const int Protocol::SETTINGS_FLAG_VERSION = 12;
 const int Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION = 13;
+const int Protocol::CHECKPOINT_OFFSET_VERSION = 16;
 
 const std::string Protocol::getFullVersion() {
   std::string fullVersion(WDT_VERSION_STR);
@@ -150,31 +151,39 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
   return !checkForOverflow(off, max);
 }
 
-void Protocol::encodeCheckpoints(char *dest, int64_t &off, int64_t max,
+void Protocol::encodeCheckpoints(int protocolVersion, char *dest, int64_t &off,
+                                 int64_t max,
                                  const std::vector<Checkpoint> &checkpoints) {
   encodeInt(dest, off, checkpoints.size());
   for (auto &checkpoint : checkpoints) {
-    encodeInt(dest, off, checkpoint.first);
-    encodeInt(dest, off, checkpoint.second);
+    encodeInt(dest, off, checkpoint.port);
+    encodeInt(dest, off, checkpoint.numBlocks);
+    if (protocolVersion >= CHECKPOINT_OFFSET_VERSION) {
+      encodeInt(dest, off, checkpoint.lastBlockReceivedBytes);
+    }
   }
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeCheckpoints(char *src, int64_t &off, int64_t max,
+bool Protocol::decodeCheckpoints(int protocolVersion, char *src, int64_t &off,
+                                 int64_t max,
                                  std::vector<Checkpoint> &checkpoints) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
     int64_t len;
     len = decodeInt(br);
     for (int64_t i = 0; i < len; i++) {
-      int64_t port, numReceivedSources;
-      port = decodeInt(br);
-      numReceivedSources = decodeInt(br);
+      Checkpoint checkpoint;
+      checkpoint.port = decodeInt(br);
+      checkpoint.numBlocks = decodeInt(br);
+      if (protocolVersion >= CHECKPOINT_OFFSET_VERSION) {
+        checkpoint.lastBlockReceivedBytes = decodeInt(br);
+      }
       off = br.start() - (uint8_t *)src;
       if (checkForOverflow(off, max)) {
         return false;
       }
-      checkpoints.emplace_back(port, numReceivedSources);
+      checkpoints.emplace_back(checkpoint);
     }
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
@@ -183,17 +192,23 @@ bool Protocol::decodeCheckpoints(char *src, int64_t &off, int64_t max,
   return true;
 }
 
-void Protocol::encodeDone(char *dest, int64_t &off, int64_t max,
-                          int64_t numBlocks) {
+void Protocol::encodeDone(int protocolVersion, char *dest, int64_t &off,
+                          int64_t max, int64_t numBlocks, int64_t bytesSent) {
   encodeInt(dest, off, numBlocks);
+  if (protocolVersion >= CHECKPOINT_OFFSET_VERSION) {
+    encodeInt(dest, off, bytesSent);
+  }
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
-bool Protocol::decodeDone(char *src, int64_t &off, int64_t max,
-                          int64_t &numBlocks) {
+bool Protocol::decodeDone(int protocolVersion, char *src, int64_t &off,
+                          int64_t max, int64_t &numBlocks, int64_t &bytesSent) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
     numBlocks = decodeInt(br);
+    if (protocolVersion >= CHECKPOINT_OFFSET_VERSION) {
+      bytesSent = decodeInt(br);
+    }
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;

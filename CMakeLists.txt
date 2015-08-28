@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.15.1507290)
+project("WDT" LANGUAGES C CXX VERSION 1.16.1508210)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -127,6 +127,10 @@ include(CheckIncludeFileCXX)
 include(CheckFunctionExists)
 include(CheckLibraryExists)
 include(CheckCXXSourceCompiles)
+# For WDT itself:
+check_function_exists(posix_fallocate HAS_POSIX_FALLOCATE)
+check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
+check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
 # C based check (which fail with the c++ setting thereafter...)
 check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
 set(SAVE_CMRL ${CMAKE_REQUIRED_LIBRARIES}) #globals are evil/ugly
@@ -134,6 +138,9 @@ set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 check_function_exists(pthread_atfork FOLLY_HAVE_PTHREAD_ATFORK)
 set(CMAKE_REQUIRED_LIBRARIES ${SAVE_CMRL}) #globals are evil/ugly
 # Needed until Cmake issue #15361 is addressed
+# All the check_function_exists should be before this line
+# or else they will not work'
+
 set(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
 check_include_file_cxx(malloc.h FOLLY_HAVE_MALLOC_H)
 check_include_file_cxx(features.h FOLLY_HAVE_FEATURES_H)
@@ -150,9 +157,6 @@ check_cxx_source_compiles(
 int main(int argc, char** argv) {
   return (cmkcheckweak) ? 1 : 0 ;
 }" FOLLY_HAVE_WEAK_SYMBOLS)
-# For WDT itself:
-check_function_exists(posix_fallocate HAS_POSIX_FALLOCATE)
-check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
 # Now record all this :
 # Folly's:
 configure_file(folly-config.h.in folly/folly-config.h)
@@ -179,7 +183,8 @@ include_directories(${FOLLY_SOURCE_DIR})
 include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
 
-add_executable(wdt wdtCmdLine.cpp)
+add_executable(wdt wdtCmdLine.cpp WdtFlags.cpp)
+set_target_properties(wdt PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
 
 target_link_libraries(wdt wdtlib_min)
 
@@ -250,11 +255,18 @@ if (BUILD_TESTING)
   target_link_libraries(resource_controller_test wdt4tests)
   add_test(NAME ResourceControllerTests COMMAND resource_controller_test)
 
+  add_executable(file_reader_test  FileReaderTest.cpp)
+  target_link_libraries(file_reader_test wdt4tests)
+  add_test(NAME FileReaderTests COMMAND file_reader_test)
+
   add_test(NAME WdtRandGenTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_rand_gen_test.sh")
 
   add_test(NAME WdtBasicE2E COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_simple_test.sh")
+
+  add_test(NAME WdtBasicE2Exfs COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_xfs_test.sh")
 
 
 endif(BUILD_TESTING)

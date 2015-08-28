@@ -164,6 +164,9 @@ class Receiver : public WdtBase {
     int64_t off_{0};
     int64_t oldOffset_{0};
 
+    /// Number of bytes written for the current block
+    int64_t curBlockWrittenBytes_{0};
+
     /// number of checkpoints already transferred
     int checkpointIndex_{0};
 

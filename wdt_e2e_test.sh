@@ -94,7 +94,7 @@ WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
 "-transfer_id=$$"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
-BASEDIR=/dev/shm/tmpWDT
+BASEDIR=/dev/shm/wdtTest_$USER
 #BASEDIR=/data/wdt/tmpWDT
 mkdir -p $BASEDIR
 DIR=`mktemp -d --tmpdir=$BASEDIR`

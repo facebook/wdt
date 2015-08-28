@@ -9,13 +9,8 @@
 #pragma once
 
 #include "WdtBase.h"
-#include "DirectorySourceQueue.h"
-#include "ErrorCodes.h"
-#include "Throttler.h"
 #include "ClientSocket.h"
 #include "WdtOptions.h"
-#include "Reporting.h"
-#include "Protocol.h"
 
 #include <folly/SpinLock.h>
 
@@ -60,12 +55,14 @@ class ThreadTransferHistory {
   /**
    * Sets checkpoint. Also, returns unacked sources to queue
    *
-   * @param numReceivedSources    number of sources acked by the receiver
-   * @param globalCheckpoint      global or local checkpoint
-   * @return                      number of sources returned to queue, -1 in
-   *                              case of error
+   * @param numReceivedSources     number of sources acked by the receiver
+   * @param lastBlockReceivedBytes number of bytes received for the last block
+   * @param globalCheckpoint       global or local checkpoint
+   * @return                       number of sources returned to queue, -1 in
+   *                               case of error
    */
   int64_t setCheckpointAndReturnToQueue(int64_t numReceivedSources,
+                                        int64_t lastBlockReceivedBytes,
                                         bool globalCheckpoint);
 
   /**
@@ -91,7 +88,8 @@ class ThreadTransferHistory {
   }
 
  private:
-  void markSourceAsFailed(std::unique_ptr<ByteSource> &source);
+  void markSourceAsFailed(std::unique_ptr<ByteSource> &source,
+                          int64_t receivedBytes);
 
   /// reference to global queue
   DirectorySourceQueue &queue_;
@@ -103,6 +101,8 @@ class ThreadTransferHistory {
   bool globalCheckpoint_{false};
   /// number of sources acked by the receiver thread
   int64_t numAcknowledged_{0};
+  /// number of bytes received for the last block
+  int64_t lastBlockReceivedBytes_{0};
   folly::SpinLock lock_;
 };
 
@@ -219,7 +219,7 @@ class Sender : public WdtBase {
 
   typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
       const std::string &dest, const std::string &port,
-      WdtBase::IAbortChecker const *abortChecker);
+      IAbortChecker const *abortChecker);
 
   /**
    * Sets socket creator

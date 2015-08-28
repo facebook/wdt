@@ -19,7 +19,7 @@ echo "Run from ~fbcode (wdt's parent dir). Skip writes is $SKIP_WRITES"
 WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_ports 16"
 #WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_sockets 16 -ipv4=true"
 
-BASEDIR=/dev/shm/tmpWDT
+BASEDIR=/dev/shm/wdtTest_$USER
 
 
 # Version with profiler:

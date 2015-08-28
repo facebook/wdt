@@ -12,15 +12,15 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include "AbortChecker.h"
 #include "ErrorCodes.h"
-#include "WdtBase.h"
 
 namespace facebook {
 namespace wdt {
 class ClientSocket {
  public:
   ClientSocket(const std::string &dest, const std::string &port,
-               WdtBase::IAbortChecker const *abortChecker);
+               IAbortChecker const *abortChecker);
   virtual ErrorCode connect();
   /// tries to read nbyte data and periodically checks for abort
   virtual int read(char *buf, int nbyte, bool tryFull = true);
@@ -37,7 +37,7 @@ class ClientSocket {
   const std::string port_;
   int fd_;
   struct addrinfo sa_;
-  WdtBase::IAbortChecker const *abortChecker_;
+  IAbortChecker const *abortChecker_;
 };
 }
 }  // namespace facebook::wdt

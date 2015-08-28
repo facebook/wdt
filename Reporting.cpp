@@ -98,10 +98,22 @@ TransferReport::TransferReport(
   for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
-  if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
+  summary_.setErrorCode(ERROR);
+  if (failedSourceStats_.empty() && failedDirectories_.empty()) {
+    // none of the files or directories failed
+    for (auto& stats : threadStats_) {
+      if (stats.getCombinedErrorCode() == OK) {
+        // one thread finished successfully
+        summary_.setErrorCode(OK);
+        break;
+      }
+    }
+  }
+  if (summary_.getEffectiveDataBytes() != totalFileSize_) {
+    // sender did not send all the bytes
+    LOG(INFO) << "Could not send all the bytes " << totalFileSize_ << " "
+              << summary_.getEffectiveDataBytes();
     summary_.setErrorCode(ERROR);
-  } else {
-    summary_.setErrorCode(OK);
   }
   std::set<std::string> failedFilesSet;
   for (auto& stats : failedSourceStats_) {

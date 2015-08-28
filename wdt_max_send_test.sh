@@ -18,7 +18,7 @@ else
 fi
 
 if [ -z "$2" ]; then
-    BASEDIR=/dev/shm/tmpWDT$USER
+    BASEDIR=/dev/shm/wdtTest_$USER
 else
     BASEDIR=$2
 fi

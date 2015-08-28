@@ -10,6 +10,7 @@
 #include "Receiver.h"
 #include "Protocol.h"
 #include "WdtResourceController.h"
+#include "WdtFlags.h"
 #include <chrono>
 #include <future>
 #include <folly/String.h>
@@ -18,24 +19,13 @@
 #include <iostream>
 #include <signal.h>
 #include <thread>
-
 #ifndef ADDITIONAL_SENDER_SETUP
 #define ADDITIONAL_SENDER_SETUP
 #endif
 
-// Cmake/make depend doesn't understand the
-// include with variable/define so trick it
-// to know this file does depend on WdtFlags.cpp.inc
-#if 0
-#include "WdtFlags.cpp.inc"
+#ifndef FLAGS
+#define FLAGS WdtFlags
 #endif
-
-#ifndef FLAGS_INCLUDE_FILE
-#define FLAGS_INCLUDE_FILE "WdtFlags.cpp.inc"
-#endif
-
-#define STANDALONE_APP
-#include FLAGS_INCLUDE_FILE
 
 // Flags not already in WdtOptions.h/WdtFlags.cpp.inc
 DEFINE_bool(run_as_daemon, false,
@@ -72,6 +62,10 @@ DEFINE_string(recovery_id, "", "Recovery-id to use for download resumption");
 DEFINE_bool(treat_fewer_port_as_error, false,
             "If the receiver is unable to bind to all the ports, treat that as "
             "an error.");
+DEFINE_bool(print_options, false,
+            "If true, wdt prints the option values and exits. Option values "
+            "printed take into account option type and other command line "
+            "flags specified.");
 
 using namespace facebook::wdt;
 template <typename T>
@@ -129,11 +123,12 @@ int main(int argc, char *argv[]) {
   google::InitGoogleLogging(argv[0]);
   signal(SIGPIPE, SIG_IGN);
 
-#define STANDALONE_APP
-#define ASSIGN_OPT
-#include FLAGS_INCLUDE_FILE  //nolint
+  FLAGS::initializeFromFlags();
+  if (FLAGS_print_options) {
+    FLAGS::printOptions();
+    return 0;
+  }
 
-  LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
   ErrorCode retCode = OK;
 
   // Odd ball case of log parsing
@@ -202,6 +197,7 @@ int main(int argc, char *argv[]) {
             fields.size() > 1 ? folly::to<int64_t>(fields[1]) : -1;
         fileInfo.emplace_back(fields[0], filesize);
       }
+      req.fileInfo = fileInfo;
     }
     req.hostName = FLAGS_destination;
     if (!FLAGS_connection_url.empty()) {
@@ -216,9 +212,6 @@ int main(int argc, char *argv[]) {
               << processedRequest.generateUrl(true);
     ADDITIONAL_SENDER_SETUP
     setUpAbort(sender);
-    sender.setIncludeRegex(FLAGS_include_regex);
-    sender.setExcludeRegex(FLAGS_exclude_regex);
-    sender.setPruneDirRegex(FLAGS_prune_dir_regex);
     std::unique_ptr<TransferReport> report = sender.transfer();
     retCode = report->getSummary().getErrorCode();
   }
