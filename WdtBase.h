@@ -15,6 +15,7 @@
 #include "Reporting.h"
 #include "Throttler.h"
 #include "Protocol.h"
+#include "System.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -249,6 +250,9 @@ class WdtBase {
 
   /// abort checker passed to socket functions
   AbortChecker abortCheckerCallback_;
+
+  /// System to use
+  System* sys_{nullptr};
 
  private:
   folly::RWSpinLock abortCodeLock_;

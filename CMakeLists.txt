@@ -87,6 +87,7 @@ WdtOptions.cpp
 FileWriter.cpp
 TransferLogManager.cpp
 SerializationUtil.cpp
+SystemPosix.cpp
 WdtBase.cpp
 WdtResourceController.cpp
 )

@@ -277,6 +277,13 @@ class WdtOptions {
   bool odirect_reads{false};
 
   /**
+   * Transmits/applies file mode information.
+   * Will send and/or try to apply mtime, atime, file mode, user and gid
+   * (if possible on the receiver side depending on permissions)
+   */
+  bool preserve_attributes{false};
+
+  /**
    * Since this is a singleton copy constructor
    * and assignment operator are deleted
    */

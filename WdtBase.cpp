@@ -206,11 +206,12 @@ bool WdtTransferRequest::operator==(const WdtTransferRequest& that) const {
   return result;
 }
 
-WdtBase::WdtBase() : abortCheckerCallback_(this) {
+WdtBase::WdtBase() : abortCheckerCallback_(this), sys_(&System::getDefault()) {
 }
 
 WdtBase::~WdtBase() {
   abortChecker_ = nullptr;
+  sys_ = nullptr;
 }
 
 void WdtBase::abort(const ErrorCode abortCode) {
