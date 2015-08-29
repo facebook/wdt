@@ -43,7 +43,7 @@ DEFINE_bool(parse_transfer_log, false,
 
 DEFINE_string(transfer_id, "",
               "Transfer id. Receiver will generate one to be used (via URL) on"
-              " the sender if not set explictly");
+              " the sender if not set explicitly");
 DEFINE_int32(
     protocol_version, facebook::wdt::Protocol::protocol_version,
     "Protocol version to use, this is used to simulate protocol negotiation");

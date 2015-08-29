@@ -213,7 +213,7 @@ class DirectorySourceQueue : public SourceQueue {
    * slash is automatically added if missing. Can be relative.
    * if follow symlink is set the directory will be resolved as absolute
    * path.
-   * @return    true if succesfull, false on error (logged)
+   * @return    true if successful, false on error (logged)
    */
   bool setRootDir(const std::string &newRootDir);
 
@@ -252,7 +252,7 @@ class DirectorySourceQueue : public SourceQueue {
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple
-   * times or notify_all once. depending on number of added sources, this
+   * times or notify_all once. Depending on number of added sources, this
    * function uses either notify_one or notify_all
    *
    * @param addedSource     number of sources added
@@ -347,7 +347,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// Whether to follow symlinks or not
   bool followSymlinks_{false};
 
-  /// shared file data. this are used during transfer to add blocks
+  /// shared file data. This are used during transfer to add blocks
   /// contribution
   std::vector<SourceMetaData *> sharedFileData_;
 

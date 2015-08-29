@@ -95,7 +95,7 @@ WDT_OPT(throughput_update_interval_millis, int32,
         "Intervals in millis after which progress reporter updates current"
         " throughput");
 WDT_OPT(enable_checksum, bool,
-        "If true, blocks are checksumed during transfer");
+        "If true, blocks are checksummed during transfer");
 WDT_OPT(
     enable_perf_stat_collection, bool,
     "If true, perf stats are collected and reported at the end of transfer");
@@ -108,7 +108,7 @@ WDT_OPT(keep_transfer_log, bool,
         "If true, transfer logs are not deleted at "
         "the end of the transfer");
 WDT_OPT(
-    disable_sender_verfication_during_resumption, bool,
+    disable_sender_verification_during_resumption, bool,
     "If true, sender-ip is not verified with the ip in transfer log. This is "
     "useful if files can be downloaded from different hosts");
 WDT_OPT(global_sender_limit, int32,

@@ -55,7 +55,7 @@ bool TransferLogManager::openAndStartWriter(const std::string &curSenderIp) {
   WDT_CHECK(fd_ == -1) << "Trying to open wdt log multiple times";
 
   const auto &options = WdtOptions::get();
-  if (!options.disable_sender_verfication_during_resumption) {
+  if (!options.disable_sender_verification_during_resumption) {
     if (!senderIp_.empty() && senderIp_ != curSenderIp) {
       LOG(ERROR) << "Current sender ip does not match ip in the "
                     "transfer log "

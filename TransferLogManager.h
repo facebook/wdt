@@ -115,7 +115,7 @@ class TransferLogManager {
    */
   bool unlink();
 
-  /// @rootDir        root directory of the receiver
+  /// @param rootDir        root directory of the receiver
   void setRootDir(const std::string &rootDir);
 
  private:
@@ -162,7 +162,7 @@ class TransferLogManager {
   void writeEntriesToDisk();
 
   /**
-   * Enocodes invalidation entry
+   * Encodes invalidation entry
    *
    * @param dest    buffer to encode into
    * @param off     offset in the buffer, this moved to end of the encoding
@@ -201,14 +201,14 @@ class TransferLogManager {
                               int64_t &seqId);
 
   /**
-   * Parses the transfer log. Veifies if all the file exists or not(This is
+   * Parses the transfer log. Verifies if all the file exists or not(This is
    * done to verify whether directory entries were synced to disk before or
    * not). Also writes invalidation entries for files with verification failure.
    *
    * @param recoveryId        recovery-id, this is verified against the logged
-   *                          recovey-id
+   *                          recovery-id
    * @param parseOnly         If true, all parsed entries are logged, and the
-   *                          log is not midified or verified
+   *                          log is not modified or verified
    * @param parsedInfo        vector to populate with parsed data, only
    *                          populated if parseOnly is false
    *

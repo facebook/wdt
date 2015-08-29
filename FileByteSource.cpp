@@ -105,7 +105,7 @@ char *FileByteSource::read(int64_t &size) {
     toRead =
         ((expectedRead + kDiskBlockSize - 1) / kDiskBlockSize) * kDiskBlockSize;
   }
-  // actualRead is guranteed to be <= buffer_->size_
+  // actualRead is guaranteed to be <= buffer_->size_
   WDT_CHECK(toRead <= buffer_->size_) << "Attempting to read " << toRead
                                       << " while buffer size is "
                                       << buffer_->size_;

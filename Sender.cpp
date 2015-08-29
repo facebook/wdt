@@ -47,7 +47,7 @@ bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
   folly::SpinLockGuard guard(lock_);
   if (globalCheckpoint_) {
     // already received an error for this thread
-    VLOG(1) << "adding source after global checkpoint is received. returning "
+    VLOG(1) << "adding source after global checkpoint is received. Returning "
                "the source to the queue";
     markSourceAsFailed(source, lastBlockReceivedBytes_);
     lastBlockReceivedBytes_ = 0;
@@ -65,7 +65,7 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
   const int64_t historySize = history_.size();
   if (numReceivedSources > historySize) {
     LOG(ERROR)
-        << "checkpoint is greater than total number of sources transfereed "
+        << "checkpoint is greater than total number of sources transfered "
         << history_.size() << " " << numReceivedSources;
     return -1;
   }
@@ -352,7 +352,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
             << transferReport->getThroughputMBps() << " Mbytes/sec ("
             << transferReport->getSummary().getEffectiveTotalBytes() /
                    (totalTime - directoryTime) / kMbToB
-            << " Mbytes/sec pure transf rate)";
+            << " Mbytes/sec pure transfer rate)";
   areThreadsJoined_ = true;
   return transferReport;
 }
@@ -390,8 +390,8 @@ ErrorCode Sender::start() {
     configureThrottler();
   }
 
-  // WARNING: Do not MERGE the follwing two loops. ThreadTransferHistory keeps a
-  // reference of TransferStats. And, any emplace operation on a vector
+  // WARNING: Do not MERGE the following two loops. ThreadTransferHistory keeps
+  // a reference of TransferStats. And, any emplace operation on a vector
   // invalidates all its references
   const int64_t numPorts = ports_.size();
   for (int64_t i = 0; i < numPorts; i++) {
@@ -533,8 +533,8 @@ Sender::SenderState Sender::connect(ThreadData &data) {
     threadStats.setErrorCode(code);
     return END;
   }
-  // clearing the totalSizeSent_ flag. This way if anything breaks, we resendthe
-  // total size.
+  // clearing the totalSizeSent_ flag. This way if anything breaks, we resend
+  // the total size.
   data.totalSizeSent_ = false;
   auto nextState =
       threadStats.getErrorCode() == OK ? SEND_SETTINGS : READ_LOCAL_CHECKPOINT;

@@ -243,7 +243,7 @@ bool DirectorySourceQueue::explore() {
     }
     // http://elliotth.blogspot.com/2012/10/how-not-to-use-readdirr3.html
     // tl;dr readdir is actually better than readdir_r ! (because of the
-    // nastyness of calculating correctly buffer size and race conditions there)
+    // nastiness of calculating correctly buffer size and race conditions there)
     struct dirent *dirEntryRes = nullptr;
     while (true) {
       if (abortChecker_->shouldAbort()) {

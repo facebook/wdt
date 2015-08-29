@@ -88,8 +88,8 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
       if (fsync(fd_) != 0) {
         PLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
                     << " offset " << blockDetails_->offset << " file-size "
-                    << blockDetails_->fileSize
-                    << " data-size  << blockDetails_->dataSize";
+                    << blockDetails_->fileSize << " data-size "
+                    << blockDetails_->dataSize;
         return FILE_WRITE_ERROR;
       }
       RECORD_PERF_RESULT(PerfStatReport::FSYNC)

@@ -18,7 +18,7 @@ namespace wdt {
  * Attempts to limit the rate in two ways.
  * 1. Limit average rate by calling averageThrottler()
  * 2. Limit the peak rate by calling limitByTokenBucket
- * Generally average throttler would be mainting the rate to avgRate_
+ * Generally average throttler would be maintaining the rate to avgRate_
  * although at times the actual rate might fall behind and in those
  * circumstances the rate at which you will catch up is limited
  * with respect to the peak rate and the bucket limit using the
@@ -100,7 +100,7 @@ class Throttler {
   /// Get the bucket rate in bytes per sec
   double getPeakRateBytesPerSec();
 
-  /// Get the bucket limit in byttes
+  /// Get the bucket limit in bytes
   double getBucketLimitBytes();
 
   /// Get the throttler logging time period in millis
@@ -125,9 +125,9 @@ class Throttler {
   /**
    * This method periodically prints logs.
    * The period is defined by FLAGS_peak_log_time_ms
-   * @params deltaProgress      Progress since last call to limit()
-   * @params now                The time point caller has
-   * @params sleepTimeSeconds   Duration of sleep caused by limit()
+   * @param deltaProgress      Progress since last call to limit()
+   * @param now                The time point caller has
+   * @param sleepTimeSeconds   Duration of sleep caused by limit()
    */
   void printPeriodicLogs(const Clock::time_point& now, double deltaProgress);
   /// Records the time the throttler was started

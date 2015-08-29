@@ -127,10 +127,10 @@ class WdtNamespaceController : public WdtControllerBase {
   virtual ~WdtNamespaceController() override;
 
  private:
-  /// Map of receivers assosicated with identifier
+  /// Map of receivers associated with identifier
   std::unordered_map<std::string, ReceiverPtr> receiversMap_;
 
-  /// Map of senders assosciated with identifier
+  /// Map of senders associated with identifier
   std::unordered_map<std::string, SenderPtr> sendersMap_;
 };
 

@@ -32,7 +32,7 @@ namespace wdt {
  * accepts connections, receives the files and writes to the destination
  * directory. Receiver has two modes of operation : You can spawn a receiver
  * for one transfer or alternatively it can also be used in a long running
- * mode where it accepts subsequent transfers and runs in an infinte loop.
+ * mode where it accepts subsequent transfers and runs in an infinite loop.
  */
 class Receiver : public WdtBase {
  public:
@@ -106,8 +106,8 @@ class Receiver : public WdtBase {
 
   /**
    * Wdt receiver has logic to maintain the consistency of the
-   * the transfers through connection errors. All threads are run by the logic
-   * defined as a state machine. These are the all the stataes in that
+   * transfers through connection errors. All threads are run by the logic
+   * defined as a state machine. These are the all the states in that
    * state machine
    */
   enum ReceiverState {
@@ -171,8 +171,8 @@ class Receiver : public WdtBase {
     int checkpointIndex_{0};
 
     /**
-     * Pending value of checkpoint count. since write call success does not
-     * gurantee actual transfer, we do not apply checkpoint count update after
+     * Pending value of checkpoint count. Since write call success does not
+     * guarantee actual transfer, we do not apply checkpoint count update after
      * the write. Only after receiving next cmd from sender, we apply the
      * update
      */
@@ -289,7 +289,7 @@ class Receiver : public WdtBase {
    */
   ReceiverState sendLocalCheckpoint(ThreadData &data);
   /**
-   * Reads next cmd and transistions to the state accordingly.
+   * Reads next cmd and transitions to the state accordingly.
    * Previous states : SEND_LOCAL_CHECKPOINT,
    *                   ACCEPT_FIRST_CONNECTION,
    *                   ACCEPT_WITH_TIMEOUT,

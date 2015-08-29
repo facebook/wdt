@@ -36,7 +36,7 @@ void testHeader() {
                          off, sizeof(buf), bd);
   EXPECT_EQ(off,
             bd.fileName.size() + 1 + 1 + 1 + 1 + 1 +
-                1);  // 1 byte varint for seqId, len, size, offset and filesize
+                1);  // 1 byte variant for seqId, len, size, offset and filesize
   BlockDetails nbd;
   int64_t noff = 0;
   bool success =
@@ -77,7 +77,7 @@ void testHeader() {
                          off, sizeof(buf), bd);
   EXPECT_EQ(off,
             bd.fileName.size() + 1 + 1 + 6 + 1 + 2 + 1 +
-                1);  // 1 byte varint for id len and size
+                1);  // 1 byte variant for id len and size
   noff = 0;
   success =
       Protocol::decodeHeader(Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf,
