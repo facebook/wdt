@@ -64,6 +64,14 @@ class TransferLogManager {
   void addBlockWriteEntry(int64_t seqId, int64_t offset, int64_t blockSize);
 
   /**
+   * Adds a file resize entry to the log buffer
+   *
+   * @param seqId     seq-id of the file
+   * @param fileSize  size of the file
+   */
+  void addFileResizeEntry(int64_t seqId, int64_t fileSize);
+
+  /**
    * Adds an invalidation entry to the log buffer
    *
    * @param seqId     seq-id of the file
@@ -107,7 +115,7 @@ class TransferLogManager {
    */
   bool unlink();
 
-  /// @rootDir        root directory of the receiver
+  /// @param rootDir        root directory of the receiver
   void setRootDir(const std::string &rootDir);
 
  private:
@@ -118,10 +126,11 @@ class TransferLogManager {
   /// bytes for seq-id, 10 bytes for file-size, 10 bytes for timestamp
   static const int64_t kMaxEntryLength = 2 + 1 + 10 + PATH_MAX + 2 * 10;
   enum EntryType {
-    HEADER,             // log header
-    FILE_CREATION,      // File created and space allocated
-    BLOCK_WRITE,        // Complete block fsynced to disk
-    ENTRY_INVALIDATION  // Missing file
+    HEADER,              // log header
+    FILE_CREATION,       // File created and space allocated
+    BLOCK_WRITE,         // Complete block fsynced to disk
+    ENTRY_INVALIDATION,  // Missing file
+    FILE_RESIZE,         // File Resized
   };
 
   /**
@@ -153,7 +162,7 @@ class TransferLogManager {
   void writeEntriesToDisk();
 
   /**
-   * Enocodes invalidation entry
+   * Encodes invalidation entry
    *
    * @param dest    buffer to encode into
    * @param off     offset in the buffer, this moved to end of the encoding
@@ -183,19 +192,23 @@ class TransferLogManager {
                             int64_t &seqId, int64_t &offset,
                             int64_t &blockSize);
 
+  /// Parses file resize entry
+  bool parseFileResizeEntry(char *buf, int16_t entrySize, int64_t &timestamp,
+                            int64_t &seqId, int64_t &fileSize);
+
   /// Parses invalidation entry
   bool parseInvalidationEntry(char *buf, int16_t entrySize, int64_t &timestamp,
                               int64_t &seqId);
 
   /**
-   * Parses the transfer log. Veifies if all the file exists or not(This is
+   * Parses the transfer log. Verifies if all the file exists or not(This is
    * done to verify whether directory entries were synced to disk before or
    * not). Also writes invalidation entries for files with verification failure.
    *
    * @param recoveryId        recovery-id, this is verified against the logged
-   *                          recovey-id
+   *                          recovery-id
    * @param parseOnly         If true, all parsed entries are logged, and the
-   *                          log is not midified or verified
+   *                          log is not modified or verified
    * @param parsedInfo        vector to populate with parsed data, only
    *                          populated if parseOnly is false
    *

@@ -474,7 +474,7 @@ class PerfStatReport {
     FILE_SEEK,
     THROTTLER_SLEEP,
     RECEIVER_WAIT_SLEEP,  // receiver sleep duration between sending wait cmd to
-                          // sender. A high sum for this suggestes threads
+                          // sender. A high sum for this suggests threads
                           // were not properly load balanced
     END
   };
@@ -483,7 +483,7 @@ class PerfStatReport {
 
   /**
    * @param statType      stat-type
-   * @param timeInMicros  time taken by the operatin in microseconds
+   * @param timeInMicros  time taken by the operation in microseconds
    */
   void addPerfStat(StatType statType, int64_t timeInMicros);
 

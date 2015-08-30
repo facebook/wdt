@@ -71,7 +71,7 @@ void FileChunksInfo::mergeChunks() {
   chunks_ = mergedChunks;
 }
 
-std::vector<Interval> FileChunksInfo::getRemainingChunks() {
+std::vector<Interval> FileChunksInfo::getRemainingChunks(int64_t curFileSize) {
   std::vector<Interval> remainingChunks;
   int64_t curStart = 0;
   for (const auto &chunk : chunks_) {
@@ -80,8 +80,8 @@ std::vector<Interval> FileChunksInfo::getRemainingChunks() {
     }
     curStart = chunk.end_;
   }
-  if (curStart < fileSize_) {
-    remainingChunks.emplace_back(curStart, fileSize_);
+  if (curStart < curFileSize) {
+    remainingChunks.emplace_back(curStart, curFileSize);
   }
   return remainingChunks;
 }

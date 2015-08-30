@@ -249,7 +249,7 @@ class WdtOptions {
   /**
    * If true, WDT does not verify sender ip during resumption
    */
-  bool disable_sender_verfication_during_resumption{false};
+  bool disable_sender_verification_during_resumption{false};
 
   /**
    * Max number of senders allowed globally

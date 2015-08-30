@@ -114,7 +114,7 @@ class FileCreator {
    * @param fd        file descriptor
    * @param fileSize  size of the file
    *
-   * @return          true for suzzess, false otherwise
+   * @return          true for success, false otherwise
    */
   bool setFileSize(int fd, int64_t fileSize);
 
@@ -142,7 +142,7 @@ class FileCreator {
    *
    * @param dir         dir to create recursively, should end with
    *                    '/' and not start with '/'
-   * @parm force        whether to force trying to create/skip
+   * @param force       whether to force trying to create/skip
    *                    checking the cache
    *
    * @return            true iff successful

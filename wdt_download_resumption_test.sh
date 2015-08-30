@@ -161,8 +161,6 @@ echo "Download resumption test(1)"
 startNewTransfer
 sleep 5
 killCurrentTransfer
-# It takes a while for the ports to be available, so using different port the
-# second transfer
 # rm a file to create an invalid log entry
 rm -f $DIR/dst${TEST_COUNT}/file0
 startNewTransfer
@@ -227,6 +225,22 @@ done
 killCurrentTransfer
 # change the block size for next transfer
 BLOCK_SIZE_MBYTES=8
+startNewTransfer
+waitForTransferEnd
+TEST_COUNT=$((TEST_COUNT + 1))
+
+echo "Download resumption test for append-only file(5)"
+# truncate file0
+cp $DIR/src/file0 $DIR/file0.bak
+truncate -s 10M $DIR/src/file0
+startNewTransfer
+sleep 5
+killCurrentTransfer
+# restore file0
+mv $DIR/file0.bak $DIR/src/file0
+startNewTransfer
+sleep 5
+killCurrentTransfer
 startNewTransfer
 waitForTransferEnd
 TEST_COUNT=$((TEST_COUNT + 1))

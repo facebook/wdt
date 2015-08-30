@@ -90,7 +90,7 @@ void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
   folly::SpinLockGuard lock(throttlerMutex_);
   if (refCount_ > 0 && avgRateBytesPerSec < avgRateBytesPerSec_) {
     LOG(INFO) << "new avg rate : " << avgRateBytesPerSec
-              << " curr avg rate : " << avgRateBytesPerSec_
+              << " cur avg rate : " << avgRateBytesPerSec_
               << " Average throttler rate can't be "
               << "lowered mid transfer. Ignoring the new value";
     avgRateBytesPerSec = avgRateBytesPerSec_;
@@ -133,7 +133,7 @@ double Throttler::calculateSleep(double deltaProgress,
   if (willSleep) {
     return avgThrottlerSleep;
   }
-  // we stilll hold the lock if peak throttler can come into effect
+  // we still hold the lock if peak throttler can come into effect
   if ((bucketRateBytesPerSec_ > 0) && (bytesTokenBucketLimit_ > 0)) {
     std::chrono::duration<double> elapsedDuration = now - lastFillTime_;
     lastFillTime_ = now;

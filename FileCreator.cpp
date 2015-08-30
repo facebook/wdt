@@ -56,15 +56,21 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
     return -1;
   }
   if (options.enable_download_resumption) {
-    if (blockDetails->allocationStatus == EXISTS_TOO_SMALL ||
-        blockDetails->allocationStatus == EXISTS_TOO_LARGE) {
-      LOG(INFO) << "File size mismatch in the sender side "
-                << blockDetails->fileName
-                << ", marking previous transferred chunks as invalid";
+    if (blockDetails->allocationStatus == EXISTS_TOO_LARGE) {
+      LOG(WARNING) << "File size smaller in the sender side "
+                   << blockDetails->fileName
+                   << ", marking previous transferred chunks as invalid";
       transferLogManager_.addInvalidationEntry(blockDetails->prevSeqId);
     }
-    transferLogManager_.addFileCreationEntry(
-        blockDetails->fileName, blockDetails->seqId, blockDetails->fileSize);
+    if (blockDetails->allocationStatus == EXISTS_TOO_LARGE ||
+        blockDetails->allocationStatus == NOT_EXISTS) {
+      transferLogManager_.addFileCreationEntry(
+          blockDetails->fileName, blockDetails->seqId, blockDetails->fileSize);
+    } else {
+      WDT_CHECK(blockDetails->allocationStatus == EXISTS_TOO_SMALL);
+      transferLogManager_.addFileResizeEntry(blockDetails->seqId,
+                                             blockDetails->fileSize);
+    }
   }
   return fd;
 }

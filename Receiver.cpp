@@ -508,7 +508,7 @@ void Receiver::startNewGlobalSession(ThreadData &data) {
   auto &socket = data.socket_;
   if (throttler_) {
     // If throttler is configured/set then register this session
-    // in the throttler. This is guranteed to work in either of the
+    // in the throttler. This is guaranteed to work in either of the
     // modes long running or not. We will de register from the throttler
     // when the current session ends
     throttler_->registerTransfer();
@@ -603,7 +603,7 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
                  << " connection. Num attempts " << acceptAttempts;
       // Even though there is a transition FAILED here
       // getCurAbortCode() is going to be checked again in the receiveOne.
-      // So this is pretty much irrelavant
+      // So this is pretty much irrelevant
       return FAILED;
     }
 
@@ -636,7 +636,7 @@ Receiver::ReceiverState Receiver::acceptWithTimeout(ThreadData &data) {
 
   auto timeout = options.accept_window_millis;
   if (senderReadTimeout > 0) {
-    // transfer is in progress and we have alreay got sender settings
+    // transfer is in progress and we have already got sender settings
     timeout =
         std::max(senderReadTimeout, senderWriteTimeout) + kTimeoutBufferMillis;
   }
@@ -982,7 +982,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     // if we need to read more anyway, let's move the data
     numRead = remainingData;
     if ((remainingData < Protocol::kMaxHeader) && (off > (bufferSize / 2))) {
-      // rare so inneficient is ok
+      // rare so inefficient is ok
       VLOG(3) << "copying extra " << remainingData << " leftover bytes @ "
               << off;
       memmove(/* dst      */ buf,
