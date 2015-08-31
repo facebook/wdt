@@ -25,8 +25,9 @@
 #else
 #ifdef PRINT_OPT
 // print options
-#define WDT_OPT(argument, type, description) \
-  LOG(INFO) << #argument << " " << facebook::wdt::OPTIONS::get().argument;
+#define WDT_OPT(argument, type, description)                        \
+  out << #argument << " " << facebook::wdt::OPTIONS::get().argument \
+      << std::endl;
 #else
 
 #define FLAG_DECLARATION(type, argument) DECLARE_##type(argument);
