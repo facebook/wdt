@@ -11,6 +11,8 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "WdtFlagsMacros.h"
+
 /*
  * Tests in this file can not be run in the same process. That is because we
  * rely on is_default property of gflags to determine whether a flag has been
@@ -24,12 +26,9 @@
 namespace facebook {
 namespace wdt {
 
-const std::string NUM_PORTS_FLAG =
-    WdtFlags::getFlagNameFromOptionName("num_ports");
-const std::string BLOCK_SIZE_FLAG =
-    WdtFlags::getFlagNameFromOptionName("block_size_mbytes");
-const std::string OPTION_TYPE_FLAG =
-    WdtFlags::getFlagNameFromOptionName("option_type");
+const std::string NUM_PORTS_FLAG = WDT_FLAG_STR(num_ports);
+const std::string BLOCK_SIZE_FLAG = WDT_FLAG_STR(block_size_mbytes);
+const std::string OPTION_TYPE_FLAG = WDT_FLAG_STR(option_type);
 
 void overrideTest1(const std::string &optionType) {
   const auto &options = WdtOptions::get();

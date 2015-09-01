@@ -111,7 +111,7 @@ bool DirectorySourceQueue::setRootDir(const string &newRootDir) {
   if (dir.back() != '/') {
     dir.push_back('/');
   }
-  if ( dir != rootDir_ ) {
+  if (dir != rootDir_) {
     rootDir_.assign(dir);
     LOG(INFO) << "Root dir now " << rootDir_;
   }
@@ -202,7 +202,7 @@ string DirectorySourceQueue::resolvePath(const string &path) {
   char *resolvedPath = realpath(path.c_str(), nullptr);
   if (!resolvedPath) {
     PLOG(ERROR) << "Couldn't resolve " << path;
-    return result; // empty string == error
+    return result;  // empty string == error
   }
   result.assign(resolvedPath);
   free(resolvedPath);

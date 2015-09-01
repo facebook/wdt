@@ -7,38 +7,30 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include "WdtFlags.h"
-#include "WdtFlags.cpp.inc"
-#include <glog/logging.h>
-#include "Protocol.h"
-#include <folly/Conv.h>
+#include "WdtOptions.h"
 
-FLAG_DEFINITION(string, PREFIX(option_type),
-                facebook::wdt::WdtOptions::FLASH_OPTION_TYPE,
-                "WDT option type. Options are initialized to different values "
-                "depending on the type. Individual options can still be "
-                "changed using specific flags.")
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <iostream>
+#include "Protocol.h"
+
+#include "WdtFlags.cpp.inc"
+
+WDT_FLAG_DEFINITION(
+    string, WDT_FLAG_SYM(option_type),
+    facebook::wdt::WdtOptions::FLASH_OPTION_TYPE,
+    "WDT option type. Options are initialized to different values "
+    "depending on the type. Individual options can still be changed using "
+    "specific flags. Use -" WDT_FLAG_STR(print_options) " to see values")
 
 namespace facebook {
 namespace wdt {
 
-const std::string FLAGS_PREFIX = "wdt_";
+const std::string FLAGS_PREFIX = WDT_TOSTR(WDT_LONG_PREFIX);
 
-void WdtFlags::initializeFromFlags() {
-  LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
-#define ASSIGN_OPT
-#include "WdtFlags.cpp.inc"  //nolint
-#undef ASSIGN_OPT
-  std::set<std::string> userSpecifiedFlags = getUserSpecifiedOptions();
-  WdtOptions::getMutable().modifyOptions(FLAGS_OPTION_TYPE, userSpecifiedFlags);
-}
+// Internal utilities
 
-void WdtFlags::printOptions() {
-#define PRINT_OPT
-#include "WdtFlags.cpp.inc"  //nolint
-#undef PRINT_OPT
-}
-
-std::string WdtFlags::getOptionNameFromFlagName(const std::string &flagName) {
+std::string getOptionNameFromFlagName(const std::string &flagName) {
 #ifndef STANDALONE_APP
   // extra wdt_ prefix is added in this case
   if (flagName.compare(0, FLAGS_PREFIX.size(), FLAGS_PREFIX) == 0) {
@@ -49,17 +41,9 @@ std::string WdtFlags::getOptionNameFromFlagName(const std::string &flagName) {
   return flagName;
 }
 
-std::string WdtFlags::getFlagNameFromOptionName(const std::string &optionName) {
-#ifndef STANDALONE_APP
-  // extra wdt_ prefix has to be added
-  std::string flagName;
-  folly::toAppend(FLAGS_PREFIX, optionName, &flagName);
-  return flagName;
-#endif
-  return optionName;
-}
+// getFlagNameFromOptionName is WDT_FLAG_STR()
 
-std::set<std::string> WdtFlags::getUserSpecifiedOptions() {
+std::set<std::string> getUserSpecifiedOptions() {
   std::set<std::string> userSpecifiedFlags;
   std::vector<google::CommandLineFlagInfo> allFlags;
   google::GetAllFlags(&allFlags);
@@ -74,6 +58,23 @@ std::set<std::string> WdtFlags::getUserSpecifiedOptions() {
     }
   }
   return userSpecifiedFlags;
+}
+
+void WdtFlags::initializeFromFlags() {
+  LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
+#define ASSIGN_OPT
+#include "WdtFlags.cpp.inc"  //nolint
+#undef ASSIGN_OPT
+  std::set<std::string> userSpecifiedFlags = getUserSpecifiedOptions();
+  WdtOptions::getMutable().modifyOptions(WDT_FLAG_VAR(option_type),
+                                         userSpecifiedFlags);
+}
+
+void WdtFlags::printOptions(std::ostream &out) {
+  out << "Options current value:" << std::endl;
+#define PRINT_OPT
+#include "WdtFlags.cpp.inc"  //nolint
+#undef PRINT_OPT
 }
 }
 }

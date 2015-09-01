@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 # Tests for option types can not be run in the same process because gflags
 # can not be reset to default condition. This script runs all the tests one by

@@ -23,6 +23,7 @@
 #define ADDITIONAL_SENDER_SETUP
 #endif
 
+// This can be the fbonly version (extended flags/options)
 #ifndef FLAGS
 #define FLAGS WdtFlags
 #endif
@@ -117,7 +118,7 @@ int main(int argc, char *argv[]) {
   usage.append(google::ProgramInvocationShortName());
   usage.append(" # for a server/receiver\n\t");
   usage.append(google::ProgramInvocationShortName());
-  usage.append(" -destination host # for a sender");
+  usage.append(" -connection_url url_produced_by_receiver # for a sender");
   google::SetUsageMessage(usage);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
@@ -125,7 +126,7 @@ int main(int argc, char *argv[]) {
 
   FLAGS::initializeFromFlags();
   if (FLAGS_print_options) {
-    FLAGS::printOptions();
+    FLAGS::printOptions(std::cout);
     return 0;
   }
 
