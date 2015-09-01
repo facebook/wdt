@@ -162,5 +162,6 @@ You may get certificate errors getting gmock and need to permanently
 accept the certificate from the commandline
 
 ```
-echo p | svn list https://googlemock.googlecode.com
+svn list https://googlemock.googlecode.com
+# type "p", then ignore the output and make again
 ```
