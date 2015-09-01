@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.16.1508210)
+project("WDT" LANGUAGES C CXX VERSION 1.16.1508310)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -206,7 +206,7 @@ if (BUILD_TESTING)
   enable_testing()
 
   # Extra code that we use in tests
-  add_library(wdt4tests
+  add_library(wdt4tests_min
     "${FOLLY_SOURCE_DIR}/folly/FileUtil.cpp" # used by Random used by tests
     "${FOLLY_SOURCE_DIR}/folly/Random.cpp" # used indirectly by tests
   )
@@ -238,14 +238,20 @@ if (BUILD_TESTING)
   #   ${GMOCK_PREFIX}/src/gmock/gmock-all.cc
   #   ${GMOCK_PREFIX}/src/gmock/gmock_main.cc)
 
-  add_dependencies(wdt4tests gmock)
+  add_dependencies(wdt4tests_min gmock)
 
   # ${BINARY_DIR}/libgmock.a works everywhere except xcode...
 # so ugly weird hack generating warnings about unknown dir for now:
-  target_link_libraries(wdt4tests
+  target_link_libraries(wdt4tests_min
     "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
-    wdtlib
+    wdtlib_min
   )
+
+  add_library(wdt4tests
+    WdtFlags.cpp
+  )
+  target_link_libraries(wdt4tests wdt4tests_min)
+
 
   add_executable(protocol_test ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
@@ -259,6 +265,15 @@ if (BUILD_TESTING)
   target_link_libraries(file_reader_test wdt4tests)
   add_test(NAME FileReaderTests COMMAND file_reader_test)
 
+  add_executable(option_type_test_long_flags OptionTypeTest.cpp)
+  target_link_libraries(option_type_test_long_flags wdt4tests)
+
+  add_executable(option_type_test_short_flags OptionTypeTest.cpp WdtFlags.cpp)
+  set_target_properties(option_type_test_short_flags PROPERTIES
+    COMPILE_DEFINITIONS "STANDALONE_APP")
+  target_link_libraries(option_type_test_short_flags wdt4tests_min)
+
+
   add_test(NAME WdtRandGenTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_rand_gen_test.sh")
 
@@ -268,5 +283,7 @@ if (BUILD_TESTING)
   add_test(NAME WdtBasicE2Exfs COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_xfs_test.sh")
 
+  add_test(NAME WdtOptionsTypeTests COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_option_type_test.sh")
 
 endif(BUILD_TESTING)
