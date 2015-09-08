@@ -16,7 +16,6 @@ namespace wdt {
     option = value;                                               \
   }
 
-WdtOptions* WdtOptions::instance_ = nullptr;
 const std::string WdtOptions::FLASH_OPTION_TYPE = "flash";
 const std::string WdtOptions::DISK_OPTION_TYPE = "disk";
 
@@ -40,10 +39,8 @@ const WdtOptions& WdtOptions::get() {
 }
 
 WdtOptions& WdtOptions::getMutable() {
-  if (instance_ == nullptr) {
-    instance_ = new WdtOptions();
-  }
-  return *instance_;
+  static WdtOptions opt;
+  return opt;
 }
 }
 }

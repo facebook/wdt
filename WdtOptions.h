@@ -43,8 +43,8 @@ class WdtOptions {
    * @param userSpecifiedOptions options specified by user, this options are not
    *                             changed
    */
-  virtual void modifyOptions(const std::string& optionType,
-                             const std::set<std::string>& userSpecifiedOptions);
+  void modifyOptions(const std::string& optionType,
+                     const std::set<std::string>& userSpecifiedOptions);
 
   /**
    * Use ipv6 while establishing connection.
@@ -282,15 +282,12 @@ class WdtOptions {
    */
   WdtOptions(const WdtOptions&) = delete;
   WdtOptions& operator=(const WdtOptions&) = delete;
+
   WdtOptions() {
   }
-
-  virtual ~WdtOptions() {
+  ~WdtOptions() {
   }
 
- protected:
-  /// singleton options instance
-  static WdtOptions* instance_;
 };
 }
 }
