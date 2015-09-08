@@ -85,7 +85,7 @@ class WdtUri {
   /// Prefix of the wdt url
   const std::string WDT_URL_PREFIX{"wdt://"};
 
-  /// Hostname where the receiever is running
+  /// Hostname where the receiver is running
   std::string hostName_{""};
 
   /// Error code that reflects that status of parsing url
@@ -119,7 +119,7 @@ struct WdtTransferRequest {
   /// Only required for the sender
   std::vector<FileInfo> fileInfo;
 
-  /// Any error assosciated with this transfer request upon processing
+  /// Any error associated with this transfer request upon processing
   ErrorCode errorCode{OK};
 
   /// Constructor with list of ports
@@ -216,7 +216,7 @@ class WdtBase {
   /// Basic setup for throttler using options
   void configureThrottler();
 
-  /// Utility to generate a random transer id
+  /// Utility to generate a random transfer id
   static std::string generateTransferId();
 
  protected:

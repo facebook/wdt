@@ -55,7 +55,7 @@ bool TransferLogManager::openAndStartWriter(const std::string &curSenderIp) {
   WDT_CHECK(fd_ == -1) << "Trying to open wdt log multiple times";
 
   const auto &options = WdtOptions::get();
-  if (!options.disable_sender_verfication_during_resumption) {
+  if (!options.disable_sender_verification_during_resumption) {
     if (!senderIp_.empty() && senderIp_ != curSenderIp) {
       LOG(ERROR) << "Current sender ip does not match ip in the "
                     "transfer log "
@@ -164,6 +164,25 @@ void TransferLogManager::addBlockWriteEntry(int64_t seqId, int64_t offset,
   encodeInt(ptr, size, seqId);
   encodeInt(ptr, size, offset);
   encodeInt(ptr, size, blockSize);
+
+  folly::storeUnaligned<int16_t>(buf, size);
+  std::lock_guard<std::mutex> lock(mutex_);
+  entries_.emplace_back(buf, size + sizeof(int16_t));
+}
+
+void TransferLogManager::addFileResizeEntry(int64_t seqId, int64_t fileSize) {
+  if (!loggingEnabled_ || fd_ < 0) {
+    return;
+  }
+  VLOG(1) << "Adding file resize entry to log " << seqId << " " << fileSize;
+  char buf[kMaxEntryLength];
+  // increment by 2 bytes to later store the total length
+  char *ptr = buf + sizeof(int16_t);
+  int64_t size = 0;
+  ptr[size++] = FILE_RESIZE;
+  encodeInt(ptr, size, timestampInMicroseconds());
+  encodeInt(ptr, size, seqId);
+  encodeInt(ptr, size, fileSize);
 
   folly::storeUnaligned<int16_t>(buf, size);
   std::lock_guard<std::mutex> lock(mutex_);
@@ -307,6 +326,22 @@ bool TransferLogManager::parseBlockWriteEntry(char *buf, int16_t entrySize,
     seqId = decodeInt(br);
     offset = decodeInt(br);
     blockSize = decodeInt(br);
+  } catch (const std::exception &ex) {
+    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    return false;
+  }
+  return !checkForOverflow(br.start() - (uint8_t *)buf, entrySize);
+}
+
+bool TransferLogManager::parseFileResizeEntry(char *buf, int16_t entrySize,
+                                              int64_t &timestamp,
+                                              int64_t &seqId,
+                                              int64_t &fileSize) {
+  folly::ByteRange br((uint8_t *)buf, entrySize);
+  try {
+    timestamp = decodeInt(br);
+    seqId = decodeInt(br);
+    fileSize = decodeInt(br);
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
@@ -513,7 +548,10 @@ bool TransferLogManager::parseVerifyAndFix(
           std::cout << getFormattedTimestamp(timestamp) << " File created "
                     << fileName << " seq-id " << seqId << " file-size "
                     << fileSize << std::endl;
-          fileInfoMap.emplace(seqId, FileChunksInfo(seqId, fileName, fileSize));
+          seqIdToSizeMap.emplace(seqId, fileSize);
+          // for parsing, we will not be using the disk file size. So, setting
+          // it to -1
+          fileInfoMap.emplace(seqId, FileChunksInfo(seqId, fileName, -1));
           break;
         }
         // verify size
@@ -523,20 +561,60 @@ bool TransferLogManager::parseVerifyAndFix(
           PLOG(ERROR) << "stat failed for " << fileName;
         } else {
 #ifdef HAS_POSIX_FALLOCATE
-          sizeVerificationSuccess = (buffer.st_size == fileSize);
+          sizeVerificationSuccess = (buffer.st_size >= fileSize);
 #else
-          sizeVerificationSuccess = (buffer.st_size <= fileSize);
+          sizeVerificationSuccess = true;
 #endif
         }
 
         if (sizeVerificationSuccess) {
-          fileInfoMap.emplace(seqId, FileChunksInfo(seqId, fileName, fileSize));
-          seqIdToSizeMap.emplace(seqId, buffer.st_size);
+          fileInfoMap.emplace(seqId,
+                              FileChunksInfo(seqId, fileName, buffer.st_size));
+          seqIdToSizeMap.emplace(seqId, fileSize);
         } else {
           LOG(INFO) << "Sanity check failed for " << fileName << " seq-id "
                     << seqId << " file-size " << fileSize;
           invalidSeqIds.insert(seqId);
         }
+        break;
+      }
+      case FILE_RESIZE: {
+        if (!parseFileResizeEntry(entry + 1, entrySize - 1, timestamp, seqId,
+                                  fileSize)) {
+          return false;
+        }
+        auto it = fileInfoMap.find(seqId);
+        if (it == fileInfoMap.end()) {
+          LOG(ERROR) << "File resize entry for unknown sequence-id " << seqId
+                     << " " << fileSize;
+          return false;
+        }
+        FileChunksInfo &chunksInfo = it->second;
+        auto sizeIt = seqIdToSizeMap.find(seqId);
+        WDT_CHECK(sizeIt != seqIdToSizeMap.end());
+        if (fileSize < sizeIt->second) {
+          LOG(ERROR) << "File size can not reduce during resizing " << fileName
+                     << " " << seqId << " " << fileSize << " "
+                     << sizeIt->second;
+          return false;
+        }
+
+        if (parseOnly) {
+          std::cout << getFormattedTimestamp(timestamp) << " File resized "
+                    << chunksInfo.getFileName() << " seq-id " << seqId
+                    << " old file-size " << sizeIt->second << " new file-size "
+                    << fileSize << std::endl;
+        }
+#ifdef HAS_POSIX_FALLOCATE
+        else if (fileSize > chunksInfo.getFileSize()) {
+          LOG(ERROR) << "Size on the disk is less than the resized size for "
+                     << fileName << " seq-id " << seqId << " disk-size "
+                     << chunksInfo.getFileSize() << " resized-size "
+                     << fileSize;
+          return false;
+        }
+#endif
+        sizeIt->second = fileSize;
         break;
       }
       case BLOCK_WRITE: {
@@ -562,13 +640,12 @@ bool TransferLogManager::parseVerifyAndFix(
                     << " offset " << offset << " block-size " << blockSize
                     << std::endl;
         } else {
-          auto sizeIt = seqIdToSizeMap.find(seqId);
-          WDT_CHECK(sizeIt != seqIdToSizeMap.end());
-          if (offset + blockSize > sizeIt->second) {
+          // check whether the block is within disk size
+          if (offset + blockSize > chunksInfo.getFileSize()) {
             LOG(ERROR) << "Block end point is greater than file size in disk "
                        << chunksInfo.getFileName() << " seq-id " << seqId
                        << " offset " << offset << " block-size " << blockSize
-                       << " file size in disk " << sizeIt->second;
+                       << " file size in disk " << chunksInfo.getFileSize();
             return false;
           }
         }

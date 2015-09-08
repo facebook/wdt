@@ -214,7 +214,7 @@ class Sender : public WdtBase {
    */
   void setProgressReportIntervalMillis(const int progressReportIntervalMillis);
 
-  /// @retun    minimal transfer report using transfer stats of the thread
+  /// @return    minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
 
   typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
@@ -405,7 +405,7 @@ class Sender : public WdtBase {
    * due to version mismatch. Also performs various sanity checks.
    * Previous states : Almost all threads, abort flags is checked between every
    *                   state transition
-   * Next states : CONNECT(Abort was due to version kismatch),
+   * Next states : CONNECT(Abort was due to version mismatch),
    *               END(if abort was not due to version mismatch or some sanity
    *               check failed)
    */

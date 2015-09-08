@@ -23,6 +23,7 @@
 #define ADDITIONAL_SENDER_SETUP
 #endif
 
+// This can be the fbonly version (extended flags/options)
 #ifndef FLAGS
 #define FLAGS WdtFlags
 #endif
@@ -43,7 +44,7 @@ DEFINE_bool(parse_transfer_log, false,
 
 DEFINE_string(transfer_id, "",
               "Transfer id. Receiver will generate one to be used (via URL) on"
-              " the sender if not set explictly");
+              " the sender if not set explicitly");
 DEFINE_int32(
     protocol_version, facebook::wdt::Protocol::protocol_version,
     "Protocol version to use, this is used to simulate protocol negotiation");
@@ -117,7 +118,7 @@ int main(int argc, char *argv[]) {
   usage.append(google::ProgramInvocationShortName());
   usage.append(" # for a server/receiver\n\t");
   usage.append(google::ProgramInvocationShortName());
-  usage.append(" -destination host # for a sender");
+  usage.append(" -connection_url url_produced_by_receiver # for a sender");
   google::SetUsageMessage(usage);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
@@ -125,7 +126,7 @@ int main(int argc, char *argv[]) {
 
   FLAGS::initializeFromFlags();
   if (FLAGS_print_options) {
-    FLAGS::printOptions();
+    FLAGS::printOptions(std::cout);
     return 0;
   }
 

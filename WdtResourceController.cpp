@@ -224,7 +224,7 @@ SenderPtr WdtNamespaceController::getSender(const string &identifier) const {
   GuardLock lock(controllerMutex_);
   auto it = sendersMap_.find(identifier);
   if (it == sendersMap_.end()) {
-    LOG(ERROR) << "Couldn't find sender trasnfer-id " << identifier << " for "
+    LOG(ERROR) << "Couldn't find sender transfer-id " << identifier << " for "
                << controllerName_;
     return nullptr;
   }
