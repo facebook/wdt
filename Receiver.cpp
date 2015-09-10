@@ -578,6 +578,7 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
   const auto &options = WdtOptions::get();
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
+  auto &curConnectionVerified = data.curConnectionVerified_;
 
   data.reset();
   socket.closeCurrentConnection();
@@ -607,7 +608,8 @@ Receiver::ReceiverState Receiver::acceptFirstConnection(ThreadData &data) {
       return FAILED;
     }
 
-    ErrorCode code = socket.acceptNextConnection(timeout);
+    ErrorCode code =
+        socket.acceptNextConnection(timeout, curConnectionVerified);
     if (code == OK) {
       break;
     }
@@ -632,6 +634,7 @@ Receiver::ReceiverState Receiver::acceptWithTimeout(ThreadData &data) {
   auto &senderReadTimeout = data.senderReadTimeout_;
   auto &senderWriteTimeout = data.senderWriteTimeout_;
   auto &doneSendFailure = data.doneSendFailure_;
+  auto &curConnectionVerified = data.curConnectionVerified_;
   socket.closeCurrentConnection();
 
   auto timeout = options.accept_window_millis;
@@ -641,7 +644,8 @@ Receiver::ReceiverState Receiver::acceptWithTimeout(ThreadData &data) {
         std::max(senderReadTimeout, senderWriteTimeout) + kTimeoutBufferMillis;
   }
 
-  ErrorCode code = socket.acceptNextConnection(timeout);
+  ErrorCode code = socket.acceptNextConnection(timeout, curConnectionVerified);
+  curConnectionVerified = false;
   if (code != OK) {
     LOG(ERROR) << "accept() failed with timeout " << timeout;
     threadStats.setErrorCode(code);
@@ -771,6 +775,7 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   auto &threadStats = data.threadStats_;
   auto &enableChecksum = data.enableChecksum_;
   auto &threadProtocolVersion = data.threadProtocolVersion_;
+  auto &curConnectionVerified = data.curConnectionVerified_;
   Settings settings;
   int senderProtocolVersion;
 
@@ -820,6 +825,7 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   senderReadTimeout = settings.readTimeoutMillis;
   senderWriteTimeout = settings.writeTimeoutMillis;
   enableChecksum = settings.enableChecksum;
+  curConnectionVerified = true;
   if (settings.sendFileChunks) {
     // We only move to SEND_FILE_CHUNKS state, if download resumption is enabled
     // in the sender side

@@ -203,6 +203,11 @@ class Receiver : public WdtBase {
     /// Checkpoints that have not been sent back to the sender
     std::vector<Checkpoint> newCheckpoints_;
 
+    /// whether settings has been received and verified for the current
+    /// connection. This is used to determine round robin order for polling in
+    /// the server socket
+    bool curConnectionVerified_{false};
+
     /// Constructor for thread data
     ThreadData(int threadIndex, ServerSocket &socket,
                TransferStats &threadStats, int protocolVersion,
@@ -224,6 +229,7 @@ class Receiver : public WdtBase {
       checkpointIndex_ = pendingCheckpointIndex_ = 0;
       doneSendFailure_ = false;
       senderReadTimeout_ = senderWriteTimeout_ = -1;
+      curConnectionVerified_ = false;
       threadStats_.reset();
     }
 
