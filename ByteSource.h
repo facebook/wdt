@@ -30,15 +30,15 @@ struct SourceMetaData {
    * of using full path of the file, we can use this to identify the
    * file.
    */
-  int64_t seqId;
+  int64_t seqId{0};
   /// size of the entire source
-  int64_t size;
+  int64_t size{0};
   /// file allocation status in the receiver side
-  FileAllocationStatus allocationStatus;
+  FileAllocationStatus allocationStatus{NOT_EXISTS};
   /// if there is a size mismatch, this is the previous sequence id
-  int64_t prevSeqId;
+  int64_t prevSeqId{0};
   /// Read the file with these flags
-  int oFlags;
+  int oFlags{0};
 };
 
 class ByteSource {

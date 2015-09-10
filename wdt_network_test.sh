@@ -4,11 +4,24 @@
 # tee. source : http://petereisentraut.blogspot.com/2010/11/pipefail.html
 set -o pipefail
 
+restoreIptable() {
+  if [ -e "$DIR/ip6table" ]; then
+    # try to restore only if iptable was modified
+    sudo ip6tables-restore < $DIR/ip6table
+  fi
+}
+
+printServerLog() {
+  echo "Server log($DIR/server${TEST_COUNT}.log):"
+  cat $DIR/server${TEST_COUNT}.log
+}
+
 checkLastCmdStatus() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -ne 0 ] ; then
-    sudo ip6tables-restore < $DIR/ip6table
+    restoreIptable
     echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
+    printServerLog
     exit $LAST_STATUS
   fi
 }

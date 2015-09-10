@@ -67,7 +67,8 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
       transferLogManager_.addFileCreationEntry(
           blockDetails->fileName, blockDetails->seqId, blockDetails->fileSize);
     } else {
-      WDT_CHECK(blockDetails->allocationStatus == EXISTS_TOO_SMALL);
+      WDT_CHECK(blockDetails->allocationStatus == EXISTS_TOO_SMALL)
+          << blockDetails->allocationStatus;
       transferLogManager_.addFileResizeEntry(blockDetails->seqId,
                                              blockDetails->fileSize);
     }

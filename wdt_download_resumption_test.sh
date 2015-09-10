@@ -2,11 +2,24 @@
 
 set -o pipefail
 
+restoreIptable() {
+  if [ -e "$DIR/ip6table" ]; then
+    # try to restore only if iptable was modified
+    sudo ip6tables-restore < $DIR/ip6table
+  fi
+}
+
+printServerLog() {
+  echo "Server log($DIR/server${TEST_COUNT}.log):"
+  cat $DIR/server${TEST_COUNT}.log
+}
+
 checkLastCmdStatus() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -ne 0 ] ; then
-    sudo ip6tables-restore < $DIR/ip6table
+    restoreIptable
     echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
+    printServerLog
     exit $LAST_STATUS
   fi
 }
@@ -14,8 +27,9 @@ checkLastCmdStatus() {
 checkLastCmdStatusExpectingFailure() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -eq 0 ] ; then
-    sudo ip6tables-restore < $DIR/ip6table
+    restoreIptable
     echo "expecting wdt failure, but transfer was successful, failing test"
+    printServerLog
     exit 1
   fi
 }
