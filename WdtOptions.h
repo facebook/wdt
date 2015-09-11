@@ -287,7 +287,6 @@ class WdtOptions {
   }
   ~WdtOptions() {
   }
-
 };
 }
 }
