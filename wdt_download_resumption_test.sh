@@ -149,7 +149,7 @@ WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -keep_transfer_log=false \
 -treat_fewer_port_as_error -disable_preallocation=$DISABLE_PREALLOCATION \
--resume_using_dir_tree=$RESUME_USING_DIR_TREE"
+-resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
@@ -300,9 +300,9 @@ ABORT_CHECK_INTERVAL_MILLIS=100
 ABORT_AFTER_MILLIS=$((ABORT_AFTER_SECONDS * 1000))
 EXPECTED_TRANSFER_DURATION_MILLIS=$((ABORT_AFTER_MILLIS + \
 ABORT_CHECK_INTERVAL_MILLIS))
-# add 500ms overhead. We need this because we can not control timeouts for disk
+# add 800ms overhead. We need this because we can not control timeouts for disk
 # writes
-EXPECTED_TRANSFER_DURATION_MILLIS=$((EXPECTED_TRANSFER_DURATION_MILLIS + 500))
+EXPECTED_TRANSFER_DURATION_MILLIS=$((EXPECTED_TRANSFER_DURATION_MILLIS + 800))
 
 echo "Abort timing test(1) - Sender side abort"
 WDTBIN_CLIENT_OLD=$WDTBIN_CLIENT
@@ -330,10 +330,10 @@ echo "Abort timing test(2) - Receiver side abort"
 WDTBIN_SERVER_OLD=$WDTBIN_SERVER
 WDTBIN_SERVER+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
 -abort_after_seconds=$ABORT_AFTER_SECONDS"
-START_TIME_MILLIS=`date +%s%3N`
 # Block a port to the beginning
 sudo ip6tables-save > $DIR/ip6table
 sudo ip6tables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
+START_TIME_MILLIS=`date +%s%3N`
 startNewTransfer
 wait $pidofreceiver
 END_TIME_MILLIS=`date +%s%3N`
