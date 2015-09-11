@@ -284,6 +284,7 @@ ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
 if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
+  printServerLog
   exit 1
 fi
 WDTBIN_CLIENT=$WDTBIN_CLIENT_OLD
@@ -309,6 +310,7 @@ sudo ip6tables-restore < $DIR/ip6table
 if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
+  printServerLog
   exit 1
 fi
 WDTBIN_SERVER=$WDTBIN_SERVER_OLD
@@ -366,7 +368,6 @@ STATUS=0
 (cd $DIR/src1 ; ( find . -type f -print0 | xargs -0 md5sum | sort ) > ../src1.md5s )
 for ((i = 0; i < TEST_COUNT; i++))
 do
-  cat $DIR/server${i}.log
   if [[ ${TESTS_SKIP_VERIFICATION[*]} =~ $i ]]; then
     echo "Skipping verification for test $i"
     continue
@@ -382,6 +383,9 @@ do
   fi
   (cd $DIR; diff -u $SRC_MD5 dst${i}.md5s)
   CUR_STATUS=$?
+  if [ $CUR_STATUS -ne 0 ]; then
+    cat $DIR/server${i}.log
+  fi
   if [ $STATUS -eq 0 ] ; then
     STATUS=$CUR_STATUS
   fi

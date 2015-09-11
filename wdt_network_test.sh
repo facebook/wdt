@@ -320,13 +320,15 @@ do
   echo "Should be no diff"
   (cd $DIR; diff -u src.md5s dst${i}.md5s)
   CUR_STATUS=$?
+  if [ $CUR_STATUS -ne 0 ]; then
+    cat $DIR/server${i}.log
+  fi
   if [ $STATUS -eq 0 ] ; then
     STATUS=$CUR_STATUS
   fi
   # treating PROTOCOL_ERROR as errors
   cd $DIR; grep "PROTOCOL_ERROR" server${i}.log > /dev/null && STATUS=1
   cd $DIR; grep "PROTOCOL_ERROR" client${i}.log > /dev/null && STATUS=1
-  cat $DIR/server${i}.log
 done
 
 if [ $STATUS -eq 0 ] ; then
