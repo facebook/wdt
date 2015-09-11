@@ -277,6 +277,35 @@ class WdtOptions {
   bool odirect_reads{false};
 
   /**
+   * If true, files are not pre-allocated using posix_fallocate.
+   * This flag should not be used directly by wdt code. It should be accessed
+   * through shouldPreallocateFiles method.
+   */
+  bool disable_preallocation{false};
+
+  /**
+   * If true, destination directory tree is trusted during resumption. So, only
+   * the remaining portion of the files are transferred. This is only supported
+   * if preallocation and block mode is disabled.
+   */
+  bool resume_using_dir_tree{false};
+
+  /**
+   * @return    whether files should be pre-allocated or not
+   */
+  bool shouldPreallocateFiles() const;
+
+  /**
+   * @return    whether transfer log based resumption is enabled
+   */
+  bool isLogBasedResumption() const;
+
+  /**
+   * @return    whether directory tree based resumption is enabled
+   */
+  bool isDirectoryTreeBasedResumption() const;
+
+  /**
    * Since this is a singleton copy constructor
    * and assignment operator are deleted
    */

@@ -52,16 +52,28 @@ int TransferLogManager::open() {
 }
 
 bool TransferLogManager::openAndStartWriter(const std::string &curSenderIp) {
+  bool verifySuccessful = verifySenderIpAndOpen(curSenderIp);
+  if (fd_ >= 0) {
+    // start the writer thread only if log open was successful
+    writerThread_ =
+        std::move(std::thread(&TransferLogManager::writeEntriesToDisk, this));
+    LOG(INFO) << "Log writer thread started " << fd_;
+  }
+  return verifySuccessful;
+}
+
+bool TransferLogManager::verifySenderIpAndOpen(const std::string &curSenderIp) {
   WDT_CHECK(fd_ == -1) << "Trying to open wdt log multiple times";
 
   const auto &options = WdtOptions::get();
+  bool verifySuccessful = true;
   if (!options.disable_sender_verification_during_resumption) {
     if (!senderIp_.empty() && senderIp_ != curSenderIp) {
       LOG(ERROR) << "Current sender ip does not match ip in the "
                     "transfer log "
                  << curSenderIp << " " << senderIp_
                  << ", ignoring transfer log";
-      parsedFileChunksInfo_.clear();
+      verifySuccessful = false;
       // remove the previous log
       unlink();
     }
@@ -69,18 +81,7 @@ bool TransferLogManager::openAndStartWriter(const std::string &curSenderIp) {
   senderIp_ = curSenderIp;
 
   fd_ = open();
-  if (fd_ < 0) {
-    return false;
-  } else {
-    writerThread_ =
-        std::move(std::thread(&TransferLogManager::writeEntriesToDisk, this));
-    LOG(INFO) << "Log writer thread started " << fd_;
-    return true;
-  }
-}
-
-void TransferLogManager::enableLogging() {
-  loggingEnabled_ = true;
+  return verifySuccessful;
 }
 
 int64_t TransferLogManager::timestampInMicroseconds() const {
@@ -106,24 +107,52 @@ std::string TransferLogManager::getFormattedTimestamp(int64_t timestampMicros) {
   return buf;
 }
 
-void TransferLogManager::addLogHeader() {
-  if (!loggingEnabled_ || fd_ < 0) {
-    return;
-  }
-  VLOG(1) << "Adding log header " << LOG_VERSION << " " << recoveryId_;
-  char buf[kMaxEntryLength];
+void TransferLogManager::encodeLogHeader(char *dest, int64_t &off,
+                                         int64_t config) {
   // increment by 2 bytes to later store the total length
-  char *ptr = buf + sizeof(int16_t);
+  char *ptr = dest + sizeof(int16_t);
   int64_t size = 0;
   ptr[size++] = HEADER;
   encodeInt(ptr, size, timestampInMicroseconds());
   encodeInt(ptr, size, LOG_VERSION);
   encodeString(ptr, size, recoveryId_);
   encodeString(ptr, size, senderIp_);
+  encodeInt(ptr, size, config);
 
-  folly::storeUnaligned<int16_t>(buf, size);
+  folly::storeUnaligned<int16_t>(dest, size);
+  off += (size + sizeof(int16_t));
+}
+
+void TransferLogManager::addLogHeader(int64_t config) {
+  if (fd_ < 0) {
+    return;
+  }
+  loggingEnabled_ = true;
+  VLOG(1) << "Adding log header " << LOG_VERSION << " " << recoveryId_;
+  char buf[kMaxEntryLength];
+  int64_t size = 0;
+  encodeLogHeader(buf, size, config);
+
   std::lock_guard<std::mutex> lock(mutex_);
-  entries_.emplace_back(buf, size + sizeof(int16_t));
+  entries_.emplace_back(buf, size);
+}
+
+bool TransferLogManager::writeLogHeader(int64_t config) {
+  if (fd_ < 0) {
+    return false;
+  }
+  VLOG(1) << "Writing log header " << LOG_VERSION << " " << recoveryId_;
+  char buf[kMaxEntryLength];
+  int64_t size = 0;
+  encodeLogHeader(buf, size, config);
+
+  int64_t written = ::write(fd_, buf, size);
+  if (written != size) {
+    PLOG(ERROR) << "Disk write error while writing log header " << written
+                << " " << size;
+    return false;
+  }
+  return true;
 }
 
 void TransferLogManager::addFileCreationEntry(const std::string &fileName,
@@ -216,6 +245,7 @@ bool TransferLogManager::close() {
 }
 
 bool TransferLogManager::unlink() {
+  close();
   std::string fullLogName = getFullPath(LOG_NAME);
   if (::unlink(fullLogName.c_str()) != 0) {
     PLOG(ERROR) << "Could not unlink " << fullLogName;
@@ -278,7 +308,8 @@ void TransferLogManager::writeEntriesToDisk() {
 bool TransferLogManager::parseLogHeader(char *buf, int16_t entrySize,
                                         int64_t &timestamp, int &version,
                                         std::string &recoveryId,
-                                        std::string &senderIp) {
+                                        std::string &senderIp,
+                                        int64_t &config) {
   folly::ByteRange br((uint8_t *)buf, entrySize);
   try {
     timestamp = decodeInt(br);
@@ -289,6 +320,7 @@ bool TransferLogManager::parseLogHeader(char *buf, int16_t entrySize,
     if (!decodeString(br, buf, entrySize, senderIp)) {
       return false;
     }
+    config = decodeInt(br);
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
@@ -419,20 +451,32 @@ bool TransferLogManager::truncateExtraBytesAtEnd(int fd, int extraBytes) {
   return true;
 }
 
-bool TransferLogManager::parseAndPrint() {
-  std::vector<FileChunksInfo> parsedInfo;
-  return parseVerifyAndFix("", true, parsedInfo);
+bool TransferLogManager::renameBuggyLog() {
+  if (::rename(getFullPath(LOG_NAME).c_str(),
+               getFullPath(BUGGY_LOG_NAME).c_str()) != 0) {
+    PLOG(ERROR) << "log rename failed " << LOG_NAME << " " << BUGGY_LOG_NAME;
+    return false;
+  }
+  return true;
 }
 
-bool TransferLogManager::parseAndMatch(const std::string &recoveryId) {
+bool TransferLogManager::parseAndPrint() {
+  std::vector<FileChunksInfo> parsedInfo;
+  return parseVerifyAndFix("", 0, true, parsedInfo);
+}
+
+bool TransferLogManager::parseAndMatch(
+    const std::string &recoveryId, int64_t config,
+    std::vector<FileChunksInfo> &fileChunksInfo) {
   recoveryId_ = recoveryId;
-  return parseVerifyAndFix(recoveryId_, false, parsedFileChunksInfo_);
+  return parseVerifyAndFix(recoveryId_, config, false, fileChunksInfo);
 }
 
 bool TransferLogManager::parseVerifyAndFix(
-    const std::string &recoveryId, bool parseOnly,
+    const std::string &recoveryId, int64_t config, bool parseOnly,
     std::vector<FileChunksInfo> &parsedInfo) {
-  WDT_CHECK(parsedInfo.empty()) << "parsedInfo vector must be empty";
+  parsedInfo.clear();
+  auto &options = WdtOptions::get();
   std::string fullLogName = getFullPath(LOG_NAME);
   int logFd = ::open(fullLogName.c_str(), O_RDONLY);
   if (logFd < 0) {
@@ -444,20 +488,19 @@ bool TransferLogManager::parseVerifyAndFix(
       ::close(logFd);
     }
     if (!parseOnly) {
-      if (::rename(getFullPath(LOG_NAME).c_str(),
-                   getFullPath(BUGGY_LOG_NAME).c_str()) != 0) {
-        PLOG(ERROR) << "log rename failed " << LOG_NAME << " "
-                    << BUGGY_LOG_NAME;
-      }
+      renameBuggyLog();
     }
   });
   std::map<int64_t, FileChunksInfo> fileInfoMap;
   std::map<int64_t, int64_t> seqIdToSizeMap;
   std::string fileName, logRecoveryId;
-  int64_t timestamp, seqId, fileSize, offset, blockSize;
+  int64_t timestamp, seqId, fileSize, offset, blockSize, logConfig;
   int logVersion;
   std::set<int64_t> invalidSeqIds;
   char entry[kMaxEntryLength];
+
+  // log is valid only if it has a valid header
+  bool headerParsed = false;
 
   while (true) {
     int16_t entrySize;
@@ -507,7 +550,7 @@ bool TransferLogManager::parseVerifyAndFix(
     switch (type) {
       case HEADER: {
         if (!parseLogHeader(entry + 1, entrySize - 1, timestamp, logVersion,
-                            logRecoveryId, senderIp_)) {
+                            logRecoveryId, senderIp_, logConfig)) {
           return false;
         }
         if (logVersion != LOG_VERSION) {
@@ -525,12 +568,18 @@ bool TransferLogManager::parseVerifyAndFix(
           LOG(ERROR) << "Log header has empty sender ip";
           return false;
         }
+        if (!parseOnly && config != logConfig) {
+          LOG(ERROR) << "Current config does not match with log config "
+                     << config << " " << logConfig;
+          return false;
+        }
         if (parseOnly) {
           std::cout << getFormattedTimestamp(timestamp)
                     << " New transfer started, log-version " << logVersion
                     << " recovery-id " << logRecoveryId << " sender-ip "
-                    << senderIp_ << std::endl;
+                    << senderIp_ << " config " << logConfig << std::endl;
         }
+        headerParsed = true;
         break;
       }
       case FILE_CREATION: {
@@ -560,11 +609,11 @@ bool TransferLogManager::parseVerifyAndFix(
         if (stat(getFullPath(fileName).c_str(), &buffer) != 0) {
           PLOG(ERROR) << "stat failed for " << fileName;
         } else {
-#ifdef HAS_POSIX_FALLOCATE
-          sizeVerificationSuccess = (buffer.st_size >= fileSize);
-#else
-          sizeVerificationSuccess = true;
-#endif
+          if (options.shouldPreallocateFiles()) {
+            sizeVerificationSuccess = (buffer.st_size >= fileSize);
+          } else {
+            sizeVerificationSuccess = true;
+          }
         }
 
         if (sizeVerificationSuccess) {
@@ -604,16 +653,14 @@ bool TransferLogManager::parseVerifyAndFix(
                     << chunksInfo.getFileName() << " seq-id " << seqId
                     << " old file-size " << sizeIt->second << " new file-size "
                     << fileSize << std::endl;
-        }
-#ifdef HAS_POSIX_FALLOCATE
-        else if (fileSize > chunksInfo.getFileSize()) {
+        } else if (options.shouldPreallocateFiles() &&
+                   fileSize > chunksInfo.getFileSize()) {
           LOG(ERROR) << "Size on the disk is less than the resized size for "
                      << fileName << " seq-id " << seqId << " disk-size "
                      << chunksInfo.getFileSize() << " resized-size "
                      << fileSize;
           return false;
         }
-#endif
         sizeIt->second = fileSize;
         break;
       }
@@ -679,7 +726,7 @@ bool TransferLogManager::parseVerifyAndFix(
   }
   if (parseOnly) {
     // no need to add invalidation entries in case of invocation from cmd line
-    return true;
+    return headerParsed;
   }
   if (::close(logFd) != 0) {
     PLOG(ERROR) << "close() failed for fd " << logFd;
@@ -696,7 +743,7 @@ bool TransferLogManager::parseVerifyAndFix(
     fileInfo.mergeChunks();
     parsedInfo.emplace_back(std::move(fileInfo));
   }
-  return true;
+  return headerParsed;
 }
 }
 }

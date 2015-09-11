@@ -25,23 +25,27 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
     PLOG(ERROR) << "fstat() failed for " << fd;
     return false;
   }
+  auto &options = WdtOptions::get();
   if (fileStat.st_size > fileSize) {
     // existing file is larger than required
-    if (ftruncate(fd, fileSize) != 0) {
-      PLOG(ERROR) << "ftruncate() failed for " << fd;
+    int64_t sizeToTruncate = (options.shouldPreallocateFiles() ? fileSize : 0);
+    if (ftruncate(fd, sizeToTruncate) != 0) {
+      PLOG(ERROR) << "ftruncate() failed for " << fd << " " << sizeToTruncate;
       return false;
     }
   }
   if (fileSize == 0) {
     return true;
   }
-#ifdef HAS_POSIX_FALLOCATE
+  if (!options.shouldPreallocateFiles()) {
+    // pre-allocation is disabled
+    return true;
+  }
   int status = posix_fallocate(fd, 0, fileSize);
   if (status != 0) {
     LOG(ERROR) << "fallocate() failed " << strerrorStr(status);
     return false;
   }
-#endif
   return true;
 }
 
@@ -55,7 +59,7 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
     close(fd);
     return -1;
   }
-  if (options.enable_download_resumption) {
+  if (options.isLogBasedResumption()) {
     if (blockDetails->allocationStatus == EXISTS_TOO_LARGE) {
       LOG(WARNING) << "File size smaller in the sender side "
                    << blockDetails->fileName

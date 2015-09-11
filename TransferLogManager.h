@@ -37,13 +37,30 @@ class TransferLogManager {
    */
   bool openAndStartWriter(const std::string &curSenderIp);
 
-  /// enable logging
-  void enableLogging();
+  /**
+   * Verifies sender ip and opens the log for writing
+   *
+   * @param curSenderIp     current sender ip
+   *
+   * @return         whether sender-ip matched log ip
+   */
+  bool verifySenderIpAndOpen(const std::string &curSenderIp);
 
   /**
-   * Adds a log header
+   * Adds a log header to the buffer
+   *
+   * @param config    transfer config encoded as int
    */
-  void addLogHeader();
+  void addLogHeader(int64_t config);
+
+  /**
+   * Writes log header to the transfer log
+   *
+   * @param config    transfer config encoded as int
+   *
+   * @return    whether the write was successful
+   */
+  bool writeLogHeader(int64_t config);
 
   /**
    * Adds a file creation entry to the log buffer
@@ -89,16 +106,14 @@ class TransferLogManager {
    * writes from previous transfer. Also parsed info is cached for later use and
    * can be accessed through getParsedFileChunksInfo
    *
-   * @param recoveryId  recovery-id of the current transfer
+   * @param recoveryId      recovery-id of the current transfer
+   * @param config          transfer config encoded as int
+   * @param fileChunksInfo  this vector is populated with parsed chunks info
    *
    * @return       Whether the parsing was successful or not
    */
-  bool parseAndMatch(const std::string &recoveryId);
-
-  /// @return     parsed files chunks info
-  const std::vector<FileChunksInfo> &getParsedFileChunksInfo() {
-    return parsedFileChunksInfo_;
-  }
+  bool parseAndMatch(const std::string &recoveryId, int64_t config,
+                     std::vector<FileChunksInfo> &fileChunksInfo);
 
   /**
    * Signals to the writer thread to finish. Waits for the writer thread to
@@ -108,6 +123,9 @@ class TransferLogManager {
    */
   bool closeAndStopWriter();
 
+  /// @return   whether the log was successfully closed or not
+  bool close();
+
   /**
    * Unlinks wdt transfer log
    *
@@ -115,11 +133,18 @@ class TransferLogManager {
    */
   bool unlink();
 
+  /**
+   * Rename the log to BUGGY_LOG_NAME
+   *
+   * @return          If successful, true, else false
+   */
+  bool renameBuggyLog();
+
   /// @param rootDir        root directory of the receiver
   void setRootDir(const std::string &rootDir);
 
  private:
-  const int LOG_VERSION = 1;
+  const int LOG_VERSION = 2;
   const std::string LOG_NAME = ".wdt.log";
   const std::string BUGGY_LOG_NAME = ".wdt.log.bug";
   /// 2 bytes for entry size, 1 byte for entry-type, PATH_MAX for file-name, 10
@@ -140,9 +165,6 @@ class TransferLogManager {
    */
   int open();
 
-  /// @return   whether the log was successfully closed or not
-  bool close();
-
   /**
    * Truncates the log
    *
@@ -162,10 +184,19 @@ class TransferLogManager {
   void writeEntriesToDisk();
 
   /**
+   * Encodes log header
+   *
+   * @param dest    buffer to encode into
+   * @param off     offset in the buffer, this is moved to end of the encoding
+   * @param config  transfer config encoded as int
+   */
+  void encodeLogHeader(char *dest, int64_t &off, int64_t config);
+
+  /**
    * Encodes invalidation entry
    *
    * @param dest    buffer to encode into
-   * @param off     offset in the buffer, this moved to end of the encoding
+   * @param off     offset in the buffer, this is moved to end of the encoding
    * @param seqId   sequence-id
    */
   void encodeInvalidationEntry(char *dest, int64_t &off, int64_t seqId);
@@ -180,7 +211,7 @@ class TransferLogManager {
   /// Parses log header
   bool parseLogHeader(char *buf, int16_t entrySize, int64_t &timestamp,
                       int &version, std::string &recoveryId,
-                      std::string &senderIp);
+                      std::string &senderIp, int64_t &config);
 
   /// Parses file creation entry
   bool parseFileCreationEntry(char *buf, int16_t entrySize, int64_t &timestamp,
@@ -207,6 +238,7 @@ class TransferLogManager {
    *
    * @param recoveryId        recovery-id, this is verified against the logged
    *                          recovery-id
+   * @param config            config of the current transfer
    * @param parseOnly         If true, all parsed entries are logged, and the
    *                          log is not modified or verified
    * @param parsedInfo        vector to populate with parsed data, only
@@ -214,7 +246,8 @@ class TransferLogManager {
    *
    * @return                  If successful, true, else false
    */
-  bool parseVerifyAndFix(const std::string &recoveryId, bool parseOnly,
+  bool parseVerifyAndFix(const std::string &recoveryId, int64_t config,
+                         bool parseOnly,
                          std::vector<FileChunksInfo> &parsedInfo);
 
   int64_t timestampInMicroseconds() const;
@@ -233,8 +266,6 @@ class TransferLogManager {
   bool loggingEnabled_{false};
   /// Entry buffer
   std::vector<std::string> entries_;
-  /// Parsed log entries
-  std::vector<FileChunksInfo> parsedFileChunksInfo_;
   /// Flag to signal end to the writer thread
   bool finished_{false};
   /// Writer thread

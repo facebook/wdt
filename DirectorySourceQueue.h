@@ -71,7 +71,7 @@ class DirectorySourceQueue : public SourceQueue {
    * @param abortChecker          abort checker
    */
   DirectorySourceQueue(const std::string &rootDir,
-                       std::unique_ptr<IAbortChecker> &abortChecker);
+                       IAbortChecker const *abortChecker);
 
   /**
    * Recurse over given root directory, gather data about regular files and
@@ -155,6 +155,9 @@ class DirectorySourceQueue : public SourceQueue {
    */
   void setFileInfo(const std::vector<FileInfo> &fileInfo);
 
+  /// @param blockSizeMbytes    block size in mbytes
+  void setBlockSizeMbytes(int64_t blockSizeMbytes);
+
   /// Get the file info in this directory queue
   const std::vector<FileInfo> &getFileInfo() const;
 
@@ -202,6 +205,9 @@ class DirectorySourceQueue : public SourceQueue {
   std::vector<std::string> &getFailedDirectories();
 
   virtual ~DirectorySourceQueue();
+
+  /// @return   discovered files metadata
+  std::vector<SourceMetaData *> &getDiscoveredFilesMetaData();
 
   /// Returns the time it took to traverse the directory tree
   double getDirectoryTime() const {
@@ -270,6 +276,9 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// regex representing files to exclude
   std::string excludePattern_;
+
+  /// Block size in mb
+  int64_t blockSizeMbytes_{0};
 
   /**
    * buffer size to use when creating individual FileByteSource objects
@@ -358,7 +367,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// traversal of directory
   double directoryTime_{0};
   /// abort checker
-  std::unique_ptr<IAbortChecker> abortChecker_;
+  IAbortChecker const *abortChecker_;
 
   const WdtOptions &options_;
 };

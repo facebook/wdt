@@ -188,6 +188,8 @@ struct Settings {
   bool enableChecksum{0};
   /// whether sender wants to read previously transferred chunks or not
   bool sendFileChunks{0};
+  /// whether block mode is disabled
+  bool blockModeDisabled{false};
 };
 
 class Protocol {

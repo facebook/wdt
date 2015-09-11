@@ -156,9 +156,8 @@ TEST(FileByteSource, FILEINFO_ODIRECT) {
   LOG(INFO) << "File size " << fileSize << "Size to read " << sizeToRead;
   RandomFile file(fileSize);
   std::atomic<bool> shouldAbort{false};
-  std::unique_ptr<IAbortChecker> queueAbortChecker =
-      folly::make_unique<WdtAbortChecker>(shouldAbort);
-  DirectorySourceQueue Q("/tmp", queueAbortChecker);
+  WdtAbortChecker queueAbortChecker(shouldAbort);
+  DirectorySourceQueue Q("/tmp", &queueAbortChecker);
   std::vector<FileInfo> files;
   FileInfo info(file.getShortName(), sizeToRead);
   info.oFlags |= (O_DIRECT | O_RDWR);
@@ -189,9 +188,8 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
     randFiles.emplace_back(fileSize);
   }
   std::atomic<bool> shouldAbort{false};
-  std::unique_ptr<IAbortChecker> queueAbortChecker =
-      folly::make_unique<WdtAbortChecker>(shouldAbort);
-  DirectorySourceQueue Q("/tmp", queueAbortChecker);
+  WdtAbortChecker queueAbortChecker(shouldAbort);
+  DirectorySourceQueue Q("/tmp", &queueAbortChecker);
   std::vector<FileInfo> files;
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);
@@ -278,9 +276,8 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
     randFiles.emplace_back(fileSize);
   }
   std::atomic<bool> shouldAbort{false};
-  std::unique_ptr<IAbortChecker> queueAbortChecker =
-      folly::make_unique<WdtAbortChecker>(shouldAbort);
-  DirectorySourceQueue Q("/tmp", queueAbortChecker);
+  WdtAbortChecker queueAbortChecker(shouldAbort);
+  DirectorySourceQueue Q("/tmp", &queueAbortChecker);
   std::vector<FileInfo> files;
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);

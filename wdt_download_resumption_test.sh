@@ -76,6 +76,12 @@ usage="
 The possible options to this script are
 -s sender protocol version
 -r receiver protocol version
+-c combination of options to run. Valid values are 1, 2 and 3.
+   1. pre-allocation and block-mode enabled, resumption done using transfer log
+   2. pre-allocation disabled, block-mode enabled, resumption done using
+      directory tree. This effectively disables resumption.
+   3. pre-allocation and block-mode disabled, resumption done using directory
+      tree
 "
 
 #protocol versions, used to check version verification
@@ -83,15 +89,41 @@ The possible options to this script are
 SENDER_PROTOCOL_VERSION=0
 RECEIVER_PROTOCOL_VERSION=0
 
+DISABLE_PREALLOCATION=false
+BLOCK_SIZE_MBYTES=10
+RESUME_USING_DIR_TREE=false
+
 if [ "$1" == "-h" ]; then
   echo "$usage"
   exit 0
 fi
-while getopts ":s:r:h:" opt; do
+while getopts ":c:s:r:h:" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
     r) RECEIVER_PROTOCOL_VERSION="$OPTARG"
+    ;;
+    c)
+      case $OPTARG in
+        1) echo "pre-allocation and block-mode enabled, resumption using \
+transfer log"
+        # no need to change anything, settings are initialized for this case
+        ;;
+        2) echo "pre-allocation disabled, block-mode enabled, resumption done \
+using directory tree, resumption is effectively disabled"
+           DISABLE_PREALLOCATION=true
+           RESUME_USING_DIR_TREE=true
+        ;;
+        3) echo "pre-allocation and block-mode disabled, resumption done \
+using directory tree"
+           BLOCK_SIZE_MBYTES=0
+           DISABLE_PREALLOCATION=true
+           RESUME_USING_DIR_TREE=true
+        ;;
+        *) echo "Invalid combination, valid values are 1, 2 and 3"
+           exit 1
+        ;;
+      esac
     ;;
     h) echo "$usage"
        exit
@@ -115,7 +147,9 @@ RECEIVER_ID="123456"
 WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
--enable_download_resumption -keep_transfer_log=false -treat_fewer_port_as_error"
+-enable_download_resumption -keep_transfer_log=false \
+-treat_fewer_port_as_error -disable_preallocation=$DISABLE_PREALLOCATION \
+-resume_using_dir_tree=$RESUME_USING_DIR_TREE"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
@@ -146,7 +180,6 @@ do
 done
 cd -
 SRC_DIR=$DIR/src
-BLOCK_SIZE_MBYTES=10
 TEST_COUNT=0
 # Tests for which there is no need to verify source and destination md5s
 TESTS_SKIP_VERIFICATION=()
@@ -238,9 +271,11 @@ do
 done
 killCurrentTransfer
 # change the block size for next transfer
+PRE_BLOCK_SIZE=$BLOCK_SIZE_MBYTES
 BLOCK_SIZE_MBYTES=8
 startNewTransfer
 waitForTransferEnd
+BLOCK_SIZE_MBYTES=$PRE_BLOCK_SIZE
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Download resumption test for append-only file(5)"
@@ -355,6 +390,7 @@ killCurrentTransfer
 # change it back to IPV6
 WDTBIN_CLIENT=$PREV_WDT_CLIENT
 WDTBIN_SERVER=$PREV_WDT_SERVER
+# change src directory and make the transfer IPV6
 SRC_DIR=$DIR/src1
 startNewTransfer
 waitForTransferEnd

@@ -397,6 +397,9 @@ void Protocol::encodeSettings(int senderProtocolVersion, char *dest,
     if (settings.sendFileChunks) {
       flags |= (1 << 1);
     }
+    if (settings.blockModeDisabled) {
+      flags |= (1 << 2);
+    }
     dest[off++] = flags;
   }
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
@@ -429,6 +432,7 @@ bool Protocol::decodeSettings(int protocolVersion, char *src, int64_t &off,
       uint8_t flags = br.front();
       settings.enableChecksum = flags & 1;
       settings.sendFileChunks = flags & (1 << 1);
+      settings.blockModeDisabled = flags & (1 << 2);
       br.pop_front();
     }
   } catch (const std::exception &ex) {

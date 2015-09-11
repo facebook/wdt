@@ -151,7 +151,8 @@ const Sender::StateFunction Sender::stateMap_[] = {
     &Sender::processWaitCmd,  &Sender::processErrCmd,
     &Sender::processAbortCmd, &Sender::processVersionMismatch};
 
-Sender::Sender(const std::string &destHost, const std::string &srcDir) {
+Sender::Sender(const std::string &destHost, const std::string &srcDir)
+    : queueAbortChecker_(this) {
   LOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   destHost_ = destHost;
   srcDir_ = srcDir;
@@ -162,14 +163,13 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   for (int i = 0; i < numSockets; i++) {
     ports_.push_back(port + i);
   }
-  std::unique_ptr<IAbortChecker> queueAbortChecker =
-      folly::make_unique<QueueAbortChecker>(this);
-  dirQueue_.reset(new DirectorySourceQueue(srcDir_, queueAbortChecker));
+  dirQueue_.reset(new DirectorySourceQueue(srcDir_, &queueAbortChecker_));
   VLOG(3) << "Configuring the  directory queue";
   dirQueue_->setIncludePattern(options.include_regex);
   dirQueue_->setExcludePattern(options.exclude_regex);
   dirQueue_->setPruneDirPattern(options.prune_dir_regex);
   dirQueue_->setFollowSymlinks(options.follow_symlinks);
+  dirQueue_->setBlockSizeMbytes(options.block_size_mbytes);
   progressReportIntervalMillis_ = options.progress_report_interval_millis;
   progressReporter_ = folly::make_unique<ProgressReporter>();
 }
@@ -620,6 +620,7 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   settings.transferId = transferId_;
   settings.enableChecksum = options.enable_checksum;
   settings.sendFileChunks = sendFileChunks;
+  settings.blockModeDisabled = (options.block_size_mbytes <= 0);
   Protocol::encodeSettings(protocolVersion_, buf, off, Protocol::kMaxSettings,
                            settings);
   int64_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
