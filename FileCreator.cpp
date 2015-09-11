@@ -41,12 +41,16 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
     // pre-allocation is disabled
     return true;
   }
+#ifdef HAS_POSIX_FALLOCATE
   int status = posix_fallocate(fd, 0, fileSize);
   if (status != 0) {
     LOG(ERROR) << "fallocate() failed " << strerrorStr(status);
     return false;
   }
   return true;
+#else
+  WDT_CHECK(false) << "Should never reach here";
+#endif
 }
 
 int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
