@@ -48,6 +48,7 @@ int TransferLogManager::open() {
   if (fd < 0) {
     PLOG(ERROR) << "Could not open wdt log";
   }
+  unlinked_ = false;
   return fd;
 }
 
@@ -245,12 +246,17 @@ bool TransferLogManager::close() {
 }
 
 bool TransferLogManager::unlink() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (unlinked_) {
+    return false;
+  }
   close();
   std::string fullLogName = getFullPath(LOG_NAME);
   if (::unlink(fullLogName.c_str()) != 0) {
     PLOG(ERROR) << "Could not unlink " << fullLogName;
     return false;
   }
+  unlinked_ = true;
   return true;
 }
 

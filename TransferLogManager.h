@@ -258,6 +258,8 @@ class TransferLogManager {
   int fd_{-1};
   /// root directory
   std::string rootDir_;
+  /// whether the log has been unlinked or not
+  bool unlinked_{true};
   /// recovery id
   std::string recoveryId_;
   /// sender ip
