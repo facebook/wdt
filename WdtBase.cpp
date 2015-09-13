@@ -7,6 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include "WdtBase.h"
+#include "SocketUtils.h"
 #include <folly/Conv.h>
 #include <folly/Range.h>
 #include <ctime>
@@ -117,9 +118,12 @@ const string WdtTransferRequest::TRANSFER_ID_PARAM{"id"};
 const string WdtTransferRequest::PROTOCOL_VERSION_PARAM{"protocol"};
 const string WdtTransferRequest::DIRECTORY_PARAM{"dir"};
 const string WdtTransferRequest::PORTS_PARAM{"ports"};
+const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
+const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
 
 WdtTransferRequest::WdtTransferRequest(const vector<int32_t>& ports) {
   this->ports = ports;
+  sort(this->ports.begin(), this->ports.end());
 }
 
 WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
@@ -138,6 +142,9 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   WdtUri wdtUri(uriString);
   errorCode = wdtUri.getErrorCode();
   hostName = wdtUri.getHostName();
+  if (hostName.size() > 0 && hostName[0] == '[' && hostName[hostName.size() -1] == ']') {
+    hostName = hostName.substr(1, hostName.size() - 2);
+  }
   transferId = wdtUri.getQueryParam(TRANSFER_ID_PARAM);
   directory = wdtUri.getQueryParam(DIRECTORY_PARAM);
   try {
@@ -163,6 +170,24 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
       }
     }
   } while (!portsList.empty());
+  string startPortStr = wdtUri.getQueryParam(START_PORT_PARAM);
+  string numPortsStr = wdtUri.getQueryParam(NUM_PORTS_PARAM);
+  if (!startPortStr.empty() && !numPortsStr.empty()) {
+    int32_t startPort = folly::to<int32_t>(startPortStr);
+    int numPorts = folly::to<int>(numPortsStr);
+    for (int i = 0; i < numPorts; i++) {
+      ports.push_back(startPort + i);
+    } 
+  }
+  if (ports.empty()) {
+    // Default to the options
+    const auto& options = WdtOptions::get();
+    int32_t startPort = options.start_port;
+    int32_t numPorts = options.num_ports;
+    for (int i = 0; i < numPorts; i++) {
+      ports.push_back(startPort + i);
+    }
+  }
 }
 
 string WdtTransferRequest::generateUrl(bool genFull) const {
@@ -171,15 +196,39 @@ string WdtTransferRequest::generateUrl(bool genFull) const {
     return errorCodeToStr(errorCode);
   }
   WdtUri wdtUri;
-  wdtUri.setHostName(hostName);
+  string modifiedHostName = hostName;
+  if (SocketUtils::getaddrfamily(hostName.c_str()) == AF_INET6) {
+    modifiedHostName = "[" + hostName + "]";
+  }
+  wdtUri.setHostName(modifiedHostName);
   wdtUri.setQueryParam(TRANSFER_ID_PARAM, transferId);
   wdtUri.setQueryParam(PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
-  wdtUri.setQueryParam(PORTS_PARAM, getSerializedPortsList());
+  serializePorts(wdtUri);
   if (genFull) {
     wdtUri.setQueryParam(DIRECTORY_PARAM, directory);
   }
   return wdtUri.generateUrl();
+}
+
+void WdtTransferRequest::serializePorts(WdtUri& wdtUri) const {
+  if (ports.size() == 0) {
+    return;
+  }
+  int32_t startPort = ports[0];
+  bool hasHoles = false;
+  for (size_t i = 0; i < ports.size(); i++) {
+    if (ports[i] != startPort +i) {
+      hasHoles = true;
+      break;
+    }
+  }
+  if (hasHoles) {
+    wdtUri.setQueryParam(PORTS_PARAM, getSerializedPortsList());
+  } else {
+    wdtUri.setQueryParam(START_PORT_PARAM, folly::to<string>(startPort));
+    wdtUri.setQueryParam(NUM_PORTS_PARAM, folly::to<string>(ports.size()));
+  }
 }
 
 string WdtTransferRequest::getSerializedPortsList() const {

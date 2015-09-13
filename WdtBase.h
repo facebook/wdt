@@ -137,6 +137,9 @@ struct WdtTransferRequest {
   /// Serialize this structure into a url string containing all fields
   std::string generateUrl(bool genFull = false) const;
 
+  /// Serialize the ports into uri
+  void serializePorts(WdtUri& wdtUri) const;
+
   /// Get stringified port list
   std::string getSerializedPortsList() const;
 
@@ -148,6 +151,8 @@ struct WdtTransferRequest {
   const static std::string PROTOCOL_VERSION_PARAM;
   const static std::string DIRECTORY_PARAM;
   const static std::string PORTS_PARAM;
+  const static std::string START_PORT_PARAM;
+  const static std::string NUM_PORTS_PARAM;
 };
 
 /**
