@@ -2,11 +2,24 @@
 
 set -o pipefail
 
+restoreIptable() {
+  if [ -e "$DIR/ip6table" ]; then
+    # try to restore only if iptable was modified
+    sudo ip6tables-restore < $DIR/ip6table
+  fi
+}
+
+printServerLog() {
+  echo "Server log($DIR/server${TEST_COUNT}.log):"
+  cat $DIR/server${TEST_COUNT}.log
+}
+
 checkLastCmdStatus() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -ne 0 ] ; then
-    sudo ip6tables-restore < $DIR/ip6table
+    restoreIptable
     echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
+    printServerLog
     exit $LAST_STATUS
   fi
 }
@@ -14,8 +27,9 @@ checkLastCmdStatus() {
 checkLastCmdStatusExpectingFailure() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -eq 0 ] ; then
-    sudo ip6tables-restore < $DIR/ip6table
+    restoreIptable
     echo "expecting wdt failure, but transfer was successful, failing test"
+    printServerLog
     exit 1
   fi
 }
@@ -62,6 +76,12 @@ usage="
 The possible options to this script are
 -s sender protocol version
 -r receiver protocol version
+-c combination of options to run. Valid values are 1, 2 and 3.
+   1. pre-allocation and block-mode enabled, resumption done using transfer log
+   2. pre-allocation disabled, block-mode enabled, resumption done using
+      directory tree. This effectively disables resumption.
+   3. pre-allocation and block-mode disabled, resumption done using directory
+      tree
 "
 
 #protocol versions, used to check version verification
@@ -69,15 +89,41 @@ The possible options to this script are
 SENDER_PROTOCOL_VERSION=0
 RECEIVER_PROTOCOL_VERSION=0
 
+DISABLE_PREALLOCATION=false
+BLOCK_SIZE_MBYTES=10
+RESUME_USING_DIR_TREE=false
+
 if [ "$1" == "-h" ]; then
   echo "$usage"
   exit 0
 fi
-while getopts ":s:r:h:" opt; do
+while getopts ":c:s:r:h:" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
     r) RECEIVER_PROTOCOL_VERSION="$OPTARG"
+    ;;
+    c)
+      case $OPTARG in
+        1) echo "pre-allocation and block-mode enabled, resumption using \
+transfer log"
+        # no need to change anything, settings are initialized for this case
+        ;;
+        2) echo "pre-allocation disabled, block-mode enabled, resumption done \
+using directory tree, resumption is effectively disabled"
+           DISABLE_PREALLOCATION=true
+           RESUME_USING_DIR_TREE=true
+        ;;
+        3) echo "pre-allocation and block-mode disabled, resumption done \
+using directory tree"
+           BLOCK_SIZE_MBYTES=0
+           DISABLE_PREALLOCATION=true
+           RESUME_USING_DIR_TREE=true
+        ;;
+        *) echo "Invalid combination, valid values are 1, 2 and 3"
+           exit 1
+        ;;
+      esac
     ;;
     h) echo "$usage"
        exit
@@ -101,7 +147,9 @@ RECEIVER_ID="123456"
 WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
--enable_download_resumption -keep_transfer_log=false -treat_fewer_port_as_error"
+-enable_download_resumption -keep_transfer_log=false \
+-treat_fewer_port_as_error -disable_preallocation=$DISABLE_PREALLOCATION \
+-resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
@@ -132,7 +180,6 @@ do
 done
 cd -
 SRC_DIR=$DIR/src
-BLOCK_SIZE_MBYTES=10
 TEST_COUNT=0
 # Tests for which there is no need to verify source and destination md5s
 TESTS_SKIP_VERIFICATION=()
@@ -224,9 +271,11 @@ do
 done
 killCurrentTransfer
 # change the block size for next transfer
+PRE_BLOCK_SIZE=$BLOCK_SIZE_MBYTES
 BLOCK_SIZE_MBYTES=8
 startNewTransfer
 waitForTransferEnd
+BLOCK_SIZE_MBYTES=$PRE_BLOCK_SIZE
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Download resumption test for append-only file(5)"
@@ -251,9 +300,9 @@ ABORT_CHECK_INTERVAL_MILLIS=100
 ABORT_AFTER_MILLIS=$((ABORT_AFTER_SECONDS * 1000))
 EXPECTED_TRANSFER_DURATION_MILLIS=$((ABORT_AFTER_MILLIS + \
 ABORT_CHECK_INTERVAL_MILLIS))
-# add 500ms overhead. We need this because we can not control timeouts for disk
+# add 800ms overhead. We need this because we can not control timeouts for disk
 # writes
-EXPECTED_TRANSFER_DURATION_MILLIS=$((EXPECTED_TRANSFER_DURATION_MILLIS + 500))
+EXPECTED_TRANSFER_DURATION_MILLIS=$((EXPECTED_TRANSFER_DURATION_MILLIS + 800))
 
 echo "Abort timing test(1) - Sender side abort"
 WDTBIN_CLIENT_OLD=$WDTBIN_CLIENT
@@ -270,6 +319,7 @@ ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
 if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
+  printServerLog
   exit 1
 fi
 WDTBIN_CLIENT=$WDTBIN_CLIENT_OLD
@@ -280,10 +330,10 @@ echo "Abort timing test(2) - Receiver side abort"
 WDTBIN_SERVER_OLD=$WDTBIN_SERVER
 WDTBIN_SERVER+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
 -abort_after_seconds=$ABORT_AFTER_SECONDS"
-START_TIME_MILLIS=`date +%s%3N`
 # Block a port to the beginning
 sudo ip6tables-save > $DIR/ip6table
 sudo ip6tables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
+START_TIME_MILLIS=`date +%s%3N`
 startNewTransfer
 wait $pidofreceiver
 END_TIME_MILLIS=`date +%s%3N`
@@ -295,6 +345,7 @@ sudo ip6tables-restore < $DIR/ip6table
 if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
+  printServerLog
   exit 1
 fi
 WDTBIN_SERVER=$WDTBIN_SERVER_OLD
@@ -339,6 +390,7 @@ killCurrentTransfer
 # change it back to IPV6
 WDTBIN_CLIENT=$PREV_WDT_CLIENT
 WDTBIN_SERVER=$PREV_WDT_SERVER
+# change src directory and make the transfer IPV6
 SRC_DIR=$DIR/src1
 startNewTransfer
 waitForTransferEnd
@@ -352,7 +404,6 @@ STATUS=0
 (cd $DIR/src1 ; ( find . -type f -print0 | xargs -0 md5sum | sort ) > ../src1.md5s )
 for ((i = 0; i < TEST_COUNT; i++))
 do
-  cat $DIR/server${i}.log
   if [[ ${TESTS_SKIP_VERIFICATION[*]} =~ $i ]]; then
     echo "Skipping verification for test $i"
     continue
@@ -368,6 +419,9 @@ do
   fi
   (cd $DIR; diff -u $SRC_MD5 dst${i}.md5s)
   CUR_STATUS=$?
+  if [ $CUR_STATUS -ne 0 ]; then
+    cat $DIR/server${i}.log
+  fi
   if [ $STATUS -eq 0 ] ; then
     STATUS=$CUR_STATUS
   fi

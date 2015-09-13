@@ -10,6 +10,7 @@
 #include "ServerSocket.h"
 #include "FileWriter.h"
 #include "SocketUtils.h"
+#include "DirectorySourceQueue.h"
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
@@ -141,6 +142,20 @@ Receiver::Receiver(int port, int numSockets, const std::string &destDir)
     : Receiver(WdtTransferRequest(port, numSockets, destDir)) {
 }
 
+void Receiver::traverseDestinationDir(
+    std::vector<FileChunksInfo> &fileChunksInfo) {
+  DirectorySourceQueue dirQueue(destDir_, &abortCheckerCallback_);
+  dirQueue.buildQueueSynchronously();
+  auto &discoveredFilesInfo = dirQueue.getDiscoveredFilesMetaData();
+  for (auto &fileInfo : discoveredFilesInfo) {
+    FileChunksInfo chunkInfo(fileInfo->seqId, fileInfo->relPath,
+                             fileInfo->size);
+    chunkInfo.addChunk(Interval(0, fileInfo->size));
+    fileChunksInfo.emplace_back(std::move(chunkInfo));
+  }
+  return;
+}
+
 WdtTransferRequest Receiver::init() {
   vector<ServerSocket> successfulSockets;
   for (size_t i = 0; i < threadServerSockets_.size(); i++) {
@@ -216,6 +231,18 @@ vector<int32_t> Receiver::getPorts() const {
   return ports;
 }
 
+int64_t Receiver::getTransferConfig() const {
+  auto &options = WdtOptions::get();
+  int64_t config = 0;
+  if (options.shouldPreallocateFiles()) {
+    config = 1;
+  }
+  if (options.resume_using_dir_tree) {
+    config |= (1 << 1);
+  }
+  return config;
+}
+
 bool Receiver::hasPendingTransfer() {
   std::unique_lock<std::mutex> lock(mutex_);
   return !transferFinished_;
@@ -255,8 +282,10 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     // Make sure to join the progress thread.
     progressTrackerThread_.join();
   }
-  if (options.enable_download_resumption) {
+  if (options.isLogBasedResumption()) {
     transferLogManager_.closeAndStopWriter();
+  } else if (options.isDirectoryTreeBasedResumption()) {
+    transferLogManager_.close();
   }
 
   std::unique_ptr<TransferReport> report = getTransferReport();
@@ -326,7 +355,23 @@ ErrorCode Receiver::transferAsync() {
   if (options.enable_download_resumption) {
     WDT_CHECK(!options.skip_writes)
         << "Can not skip transfers with download resumption turned on";
-    transferLogManager_.parseAndMatch(recoveryId_);
+    if (options.resume_using_dir_tree) {
+      WDT_CHECK(!options.shouldPreallocateFiles())
+          << "Can not resume using directory tree if preallocation is enabled";
+    }
+    bool success = transferLogManager_.parseAndMatch(
+        recoveryId_, getTransferConfig(), fileChunksInfo_);
+    if (success && options.resume_using_dir_tree) {
+      if (!fileChunksInfo_.empty()) {
+        LOG(ERROR)
+            << "Should not have any block entry in the transfer log in "
+               "case of resumption using directory tree. Ignoring the log.";
+        transferLogManager_.renameBuggyLog();
+        fileChunksInfo_.clear();
+      } else {
+        traverseDestinationDir(fileChunksInfo_);
+      }
+    }
   }
   start();
   return OK;
@@ -517,7 +562,17 @@ void Receiver::startNewGlobalSession(ThreadData &data) {
   startTime_ = Clock::now();
 
   if (options.enable_download_resumption) {
-    transferLogManager_.openAndStartWriter(socket.getPeerIp());
+    bool verifySuccessful;
+    if (options.resume_using_dir_tree) {
+      verifySuccessful =
+          transferLogManager_.verifySenderIpAndOpen(socket.getPeerIp());
+    } else {
+      verifySuccessful =
+          transferLogManager_.openAndStartWriter(socket.getPeerIp());
+    }
+    if (!verifySuccessful) {
+      fileChunksInfo_.clear();
+    }
   }
 
   LOG(INFO) << "New transfer started " << transferStartedCount_;
@@ -766,6 +821,7 @@ Receiver::ReceiverState Receiver::processExitCmd(ThreadData &data) {
 /***PROCESS_SETTINGS_CMD***/
 Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   VLOG(1) << data << " entered PROCESS_SETTINGS_CMD state ";
+  auto &options = WdtOptions::get();
   char *buf = data.getBuf();
   auto &off = data.off_;
   auto &oldOffset = data.oldOffset_;
@@ -826,6 +882,15 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   senderWriteTimeout = settings.writeTimeoutMillis;
   enableChecksum = settings.enableChecksum;
   curConnectionVerified = true;
+
+  if (options.isDirectoryTreeBasedResumption()) {
+    if (!settings.blockModeDisabled) {
+      LOG(ERROR)
+          << "Can not support block mode when resuming using directory tree";
+      transferLogManager_.unlink();
+    }
+  }
+
   if (settings.sendFileChunks) {
     // We only move to SEND_FILE_CHUNKS state, if download resumption is enabled
     // in the sender side
@@ -1038,7 +1103,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     int64_t msgLen = off - oldOffset;
     numRead -= msgLen;
   }
-  if (options.enable_download_resumption) {
+  if (options.isLogBasedResumption()) {
     transferLogManager_.addBlockWriteEntry(
         blockDetails.seqId, blockDetails.offset, blockDetails.dataSize);
   }
@@ -1108,6 +1173,7 @@ Receiver::ReceiverState Receiver::processSizeCmd(ThreadData &data) {
 
 Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
   LOG(INFO) << data << " entered SEND_FILE_CHUNKS state ";
+  auto &options = WdtOptions::get();
   char *buf = data.getBuf();
   auto bufferSize = data.bufferSize_;
   auto &socket = data.socket_;
@@ -1158,11 +1224,9 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
           sendChunksStatus_ = NOT_STARTED;
           conditionFileChunksSent_.notify_one();
         });
-        const auto &parsedFileChunksInfo =
-            transferLogManager_.getParsedFileChunksInfo();
         int64_t off = 0;
         buf[off++] = Protocol::CHUNKS_CMD;
-        const int64_t numParsedChunksInfo = parsedFileChunksInfo.size();
+        const int64_t numParsedChunksInfo = fileChunksInfo_.size();
         Protocol::encodeChunksCmd(buf, off, bufferSize, numParsedChunksInfo);
         written = socket.write(buf, off);
         if (written > 0) {
@@ -1181,7 +1245,7 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
         while (numEntriesWritten < numParsedChunksInfo) {
           off = sizeof(int32_t);
           int64_t numEntriesEncoded = Protocol::encodeFileChunksInfoList(
-              buf, off, bufferSize, numEntriesWritten, parsedFileChunksInfo);
+              buf, off, bufferSize, numEntriesWritten, fileChunksInfo_);
           int32_t dataSize = folly::Endian::little(off - sizeof(int32_t));
           folly::storeUnaligned<int32_t>(buf, dataSize);
           written = socket.write(buf, off);
@@ -1210,10 +1274,11 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
         guard.dismiss();
         lock.lock();
         sendChunksStatus_ = SENT;
-        // sender is aware of previous transferred chunks. logging can now be
-        // enabled
-        transferLogManager_.enableLogging();
-        transferLogManager_.addLogHeader();
+        if (options.isDirectoryTreeBasedResumption()) {
+          transferLogManager_.writeLogHeader(getTransferConfig());
+        } else if (options.isLogBasedResumption()) {
+          transferLogManager_.addLogHeader(getTransferConfig());
+        }
         conditionFileChunksSent_.notify_all();
         return READ_NEXT_CMD;
       }

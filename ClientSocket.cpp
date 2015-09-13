@@ -99,9 +99,9 @@ ErrorCode ClientSocket::connect() {
         // abort check interval. This allows us to check for abort regularly.
         int timeElapsed = durationMillis(Clock::now() - startTime);
         if (timeElapsed >= connectTimeout) {
-          LOG(ERROR) << "connect() timed out" << host << " " << port;
+          VLOG(1) << "connect() timed out" << host << " " << port;
           this->close();
-          return CONN_ERROR;
+          return CONN_ERROR_RETRYABLE;
         }
         int pollTimeout =
             std::min(connectTimeout - timeElapsed,

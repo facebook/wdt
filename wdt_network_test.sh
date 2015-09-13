@@ -4,11 +4,24 @@
 # tee. source : http://petereisentraut.blogspot.com/2010/11/pipefail.html
 set -o pipefail
 
+restoreIptable() {
+  if [ -e "$DIR/ip6table" ]; then
+    # try to restore only if iptable was modified
+    sudo ip6tables-restore < $DIR/ip6table
+  fi
+}
+
+printServerLog() {
+  echo "Server log($DIR/server${TEST_COUNT}.log):"
+  cat $DIR/server${TEST_COUNT}.log
+}
+
 checkLastCmdStatus() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -ne 0 ] ; then
-    sudo ip6tables-restore < $DIR/ip6table
+    restoreIptable
     echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
+    printServerLog
     exit $LAST_STATUS
   fi
 }
@@ -307,13 +320,15 @@ do
   echo "Should be no diff"
   (cd $DIR; diff -u src.md5s dst${i}.md5s)
   CUR_STATUS=$?
+  if [ $CUR_STATUS -ne 0 ]; then
+    cat $DIR/server${i}.log
+  fi
   if [ $STATUS -eq 0 ] ; then
     STATUS=$CUR_STATUS
   fi
   # treating PROTOCOL_ERROR as errors
   cd $DIR; grep "PROTOCOL_ERROR" server${i}.log > /dev/null && STATUS=1
   cd $DIR; grep "PROTOCOL_ERROR" client${i}.log > /dev/null && STATUS=1
-  cat $DIR/server${i}.log
 done
 
 if [ $STATUS -eq 0 ] ; then
