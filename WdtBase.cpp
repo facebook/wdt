@@ -142,7 +142,8 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   WdtUri wdtUri(uriString);
   errorCode = wdtUri.getErrorCode();
   hostName = wdtUri.getHostName();
-  if (hostName.size() > 0 && hostName[0] == '[' && hostName[hostName.size() -1] == ']') {
+  if (hostName.size() > 0 && hostName[0] == '[' &&
+      hostName[hostName.size() - 1] == ']') {
     hostName = hostName.substr(1, hostName.size() - 2);
   }
   transferId = wdtUri.getQueryParam(TRANSFER_ID_PARAM);
@@ -177,7 +178,7 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
     int numPorts = folly::to<int>(numPortsStr);
     for (int i = 0; i < numPorts; i++) {
       ports.push_back(startPort + i);
-    } 
+    }
   }
   if (ports.empty()) {
     // Default to the options
@@ -218,7 +219,7 @@ void WdtTransferRequest::serializePorts(WdtUri& wdtUri) const {
   int32_t startPort = ports[0];
   bool hasHoles = false;
   for (size_t i = 0; i < ports.size(); i++) {
-    if (ports[i] != startPort +i) {
+    if (ports[i] != startPort + i) {
       hasHoles = true;
       break;
     }
