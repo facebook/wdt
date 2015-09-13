@@ -283,6 +283,7 @@ void WdtResourceControllerTest::ReleaseStaleTest() {
 }
 
 void WdtResourceControllerTest::RequestSerializationTest() {
+  const auto &options = WdtOptions::get();
   {
     WdtUri uri("wdt://blah.com?k1=v1&k2=v2&k3=v3.1,v3.2");
     EXPECT_EQ(uri.getErrorCode(), OK);
@@ -337,6 +338,54 @@ void WdtResourceControllerTest::RequestSerializationTest() {
     }
   }
   {
+    // ipv6 uri test
+    WdtUri uri("wdt://[::1]:22356?k1=v1");
+    EXPECT_EQ(uri.getErrorCode(), OK);
+    EXPECT_EQ(uri.getHostName(), "::1");
+    EXPECT_EQ(uri.getPort(), 22356);
+
+    uri = "wdt://[12::12:1]:1";
+    EXPECT_EQ(uri.getErrorCode(), OK);
+    EXPECT_EQ(uri.getHostName(), "12::12:1");
+    EXPECT_EQ(uri.getPort(), 1);
+
+    uri = "wdt://[1]:1";
+    EXPECT_EQ(uri.getErrorCode(), URI_PARSE_ERROR);
+    ASSERT_TRUE(uri.getHostName().empty());
+
+    uri = "wdt://123.4.5.6:22356";
+    EXPECT_EQ(uri.getErrorCode(), OK);
+    EXPECT_EQ(uri.getHostName(), "123.4.5.6");
+    EXPECT_EQ(uri.getPort(), 22356);
+
+    {
+      uri = "wdt://[::1]:24689";
+      EXPECT_EQ(uri.getPort(), 24689);
+      WdtTransferRequest transferRequest(uri.generateUrl());
+      EXPECT_EQ(uri.getErrorCode(), OK);
+      EXPECT_EQ(transferRequest.hostName, "::1");
+      EXPECT_EQ(transferRequest.ports,
+                WdtBase::genPortsVector(24689, options.num_ports));
+    }
+    {
+      uri = "wdt://[::1]?num_ports=10";
+      WdtTransferRequest transferRequest(uri.generateUrl());
+      EXPECT_EQ(uri.getErrorCode(), OK);
+      EXPECT_EQ(transferRequest.hostName, "::1");
+      EXPECT_EQ(transferRequest.ports,
+                WdtBase::genPortsVector(options.start_port, 10));
+    } 
+    {
+      uri = "wdt://[::1]:24689?start_port=22356&ports=1,2,3,4";
+      WdtTransferRequest transferRequest(uri.generateUrl());
+      EXPECT_EQ(uri.getErrorCode(), OK);
+      EXPECT_EQ(transferRequest.hostName, "::1");
+      EXPECT_EQ(transferRequest.ports,
+                WdtBase::genPortsVector(1, 4));
+    
+    }
+  }
+  {
     int index = 0;
     string wdtNamespace = "test-namespace-1";
     string transferPrefix = "invalid-namespace";
@@ -349,7 +398,7 @@ void WdtResourceControllerTest::RequestSerializationTest() {
     EXPECT_EQ(dummy, transferRequest);
   }
   {
-    WdtTransferRequest transferRequest(0, 1, "dir1/dir2");
+    WdtTransferRequest transferRequest(24689, 1, "dir1/dir2");
     // Lets not populate anything else
     transferRequest.hostName = "localhost";
     string serializedString = transferRequest.generateUrl(true);
@@ -390,6 +439,14 @@ void WdtResourceControllerTest::RequestSerializationTest() {
         "wdt://localhost?ports=123*,*,*,*&dir=test&protocol=100&id=111";
     WdtTransferRequest transferRequest(uri);
     vector<int32_t> expectedPorts;
+    // transfer request will fill ports according to the
+    // default values in the wdt options
+    const auto &options = WdtOptions::get();
+    int32_t startPort = options.start_port;
+    int32_t numPorts = options.num_ports;
+    for (int32_t i = 0; i < numPorts; i++) {
+      expectedPorts.push_back(startPort + i);
+    }
     EXPECT_EQ(transferRequest.ports, expectedPorts);
     EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
     EXPECT_EQ(transferRequest.generateUrl(), "URI_PARSE_ERROR");
