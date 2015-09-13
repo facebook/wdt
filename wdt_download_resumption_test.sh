@@ -5,7 +5,7 @@ set -o pipefail
 checkLastCmdStatus() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -ne 0 ] ; then
-    sudo iptables-restore < $DIR/iptable
+    sudo ip6tables-restore < $DIR/ip6table
     echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
     exit $LAST_STATUS
   fi
@@ -14,7 +14,7 @@ checkLastCmdStatus() {
 checkLastCmdStatusExpectingFailure() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -eq 0 ] ; then
-    sudo iptables-restore < $DIR/iptable
+    sudo ip6tables-restore < $DIR/ip6table
     echo "expecting wdt failure, but transfer was successful, failing test"
     exit 1
   fi
@@ -73,7 +73,7 @@ if [ "$1" == "-h" ]; then
   echo "$usage"
   exit 0
 fi
-while getopts ":s:r:" opt; do
+while getopts ":s:r:h:" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
@@ -98,7 +98,7 @@ ERROR_COUNT=10
 SENDER_ID="123456"
 RECEIVER_ID="123456"
 
-WDTBIN_OPTS="-ipv4 -num_ports=$threads -full_reporting \
+WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
 -avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -keep_transfer_log=false -treat_fewer_port_as_error"
@@ -190,16 +190,16 @@ do
   sleep 0.3 # sleep for 300ms
   port=$((STARTING_PORT + RANDOM % threads))
   echo "blocking $port"
-  sudo iptables-save > $DIR/iptable
+  sudo ip6tables-save > $DIR/ip6table
   if [ $(($i % 2)) -eq 0 ]; then
-    sudo iptables -A INPUT -p tcp --sport $port -j DROP
+    sudo ip6tables -A INPUT -p tcp --sport $port -j DROP
   else
-    sudo iptables -A INPUT -p tcp --dport $port -j DROP
+    sudo ip6tables -A INPUT -p tcp --dport $port -j DROP
   fi
   sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep more
             # than that
   echo "unblocking $port"
-  sudo iptables-restore < $DIR/iptable
+  sudo ip6tables-restore < $DIR/ip6table
 done
 waitForTransferEnd
 TEST_COUNT=$((TEST_COUNT + 1))
@@ -211,16 +211,16 @@ do
   sleep 0.3 # sleep for 300ms
   port=$((STARTING_PORT + RANDOM % threads))
   echo "blocking $port"
-  sudo iptables-save > $DIR/iptable
+  sudo ip6tables-save > $DIR/ip6table
   if [ $(($i % 2)) -eq 0 ]; then
-    sudo iptables -A INPUT -p tcp --sport $port -j DROP
+    sudo ip6tables -A INPUT -p tcp --sport $port -j DROP
   else
-    sudo iptables -A INPUT -p tcp --dport $port -j DROP
+    sudo ip6tables -A INPUT -p tcp --dport $port -j DROP
   fi
   sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep more
             # than that
   echo "unblocking $port"
-  sudo iptables-restore < $DIR/iptable
+  sudo ip6tables-restore < $DIR/ip6table
 done
 killCurrentTransfer
 # change the block size for next transfer
@@ -281,9 +281,9 @@ WDTBIN_SERVER_OLD=$WDTBIN_SERVER
 WDTBIN_SERVER+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
 -abort_after_seconds=$ABORT_AFTER_SECONDS"
 START_TIME_MILLIS=`date +%s%3N`
-# Block a port to the begining
-sudo iptables-save > $DIR/iptable
-sudo iptables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
+# Block a port to the beginning
+sudo ip6tables-save > $DIR/ip6table
+sudo ip6tables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
 startNewTransfer
 wait $pidofreceiver
 END_TIME_MILLIS=`date +%s%3N`
@@ -291,7 +291,7 @@ wait $pidofsender
 DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
 echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
 ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
-sudo iptables-restore < $DIR/iptable
+sudo ip6tables-restore < $DIR/ip6table
 if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
@@ -328,13 +328,18 @@ cd -
 USE_OTHER_SRC_DIR=()
 echo "Test hostname mismatch"
 # start first transfer
+# change src directory and make the transfer IPV4
+PREV_WDT_CLIENT=$WDTBIN_CLIENT
+PREV_WDT_SERVER=$WDTBIN_SERVER
+WDTBIN_CLIENT+=" -ipv6=false -ipv4"
+WDTBIN_SERVER+=" -ipv6=false -ipv4"
 startNewTransfer
 sleep 5
 killCurrentTransfer
-# change src directory and make the trnafser IPV6
+# change it back to IPV6
+WDTBIN_CLIENT=$PREV_WDT_CLIENT
+WDTBIN_SERVER=$PREV_WDT_SERVER
 SRC_DIR=$DIR/src1
-WDTBIN_CLIENT+=" -ipv4=false -ipv6"
-WDTBIN_SERVER+=" -ipv4=false -ipv6"
 startNewTransfer
 waitForTransferEnd
 SRC_DIR=$DIR/src

@@ -7,7 +7,7 @@ set -o pipefail
 checkLastCmdStatus() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -ne 0 ] ; then
-    sudo iptables-restore < $DIR/iptable
+    sudo ip6tables-restore < $DIR/ip6table
     echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
     exit $LAST_STATUS
   fi
@@ -28,7 +28,7 @@ if [ "$1" == "-h" ]; then
   echo "$usage"
   exit 0
 fi
-while getopts ":s:r:" opt; do
+while getopts ":s:r:h:" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
@@ -53,7 +53,7 @@ ERROR_COUNT=25
 TEST_COUNT=0
 
 WDTBIN_BASE="_bin/wdt/wdt --transfer_id $$"
-WDTBIN_OPTS="-ipv4 -ipv6=false -start_port=$STARTING_PORT \
+WDTBIN_OPTS="-ipv6 -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
 -progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
@@ -86,7 +86,7 @@ echo "Testing with different start ports in sender and receiver"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-$WDTBIN_BASE -ipv6=false -num_ports=$threads \
+$WDTBIN_BASE -ipv6 -num_ports=$threads \
 -start_port=$((STARTING_PORT + 1)) \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
@@ -101,7 +101,7 @@ echo "Testing with less number of threads in client"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-$WDTBIN_BASE -ipv6=false -num_ports=$((threads - 1)) \
+$WDTBIN_BASE -ipv6 -num_ports=$((threads - 1)) \
 -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
@@ -115,7 +115,7 @@ echo "Testing with more number of threads in client"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
-$WDTBIN_BASE -ipv6=false -num_ports=$((threads + 1)) \
+$WDTBIN_BASE -ipv6 -num_ports=$((threads + 1)) \
 -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
@@ -126,8 +126,8 @@ TEST_COUNT=$((TEST_COUNT + 1))
 
 
 # Blocking sender port before transfer by
-sudo iptables-save > $DIR/iptable
-sudo iptables -A INPUT -p tcp --sport $STARTING_PORT -j DROP
+sudo ip6tables-save > $DIR/ip6table
+sudo ip6tables -A INPUT -p tcp --sport $STARTING_PORT -j DROP
 echo "Testing with port blocked before transfer(1)"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
@@ -137,12 +137,12 @@ $DIR/client${TEST_COUNT}.log
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
-sudo iptables-restore < $DIR/iptable
+sudo ip6tables-restore < $DIR/ip6table
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
-sudo iptables-save > $DIR/iptable
-sudo iptables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
+sudo ip6tables-save > $DIR/ip6table
+sudo ip6tables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
 echo "Testing with port blocked before transfer(2)"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
@@ -152,7 +152,7 @@ $DIR/client${TEST_COUNT}.log
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
-sudo iptables-restore < $DIR/iptable
+sudo ip6tables-restore < $DIR/ip6table
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
@@ -165,14 +165,14 @@ $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 sleep 5
-sudo iptables-save > $DIR/iptable
+sudo ip6tables-save > $DIR/ip6table
 echo "blocking $STARTING_PORT"
-sudo iptables -A INPUT -p tcp --sport $STARTING_PORT -j DROP
+sudo ip6tables -A INPUT -p tcp --sport $STARTING_PORT -j DROP
 wait $pidofsender
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
-sudo iptables-restore < $DIR/iptable
+sudo ip6tables-restore < $DIR/ip6table
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
@@ -184,14 +184,14 @@ $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 sleep 5
-sudo iptables-save > $DIR/iptable
+sudo ip6tables-save > $DIR/ip6table
 echo "blocking $STARTING_PORT"
-sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
+sudo ip6tables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
 wait $pidofsender
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
-sudo iptables-restore < $DIR/iptable
+sudo ip6tables-restore < $DIR/ip6table
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
@@ -204,14 +204,14 @@ $WDTBIN_MORE_THREADS -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 sleep 5
-sudo iptables-save > $DIR/iptable
+sudo ip6tables-save > $DIR/ip6table
 echo "blocking $STARTING_PORT"
-sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
+sudo ip6tables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
 wait $pidofsender
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
-sudo iptables-restore < $DIR/iptable
+sudo ip6tables-restore < $DIR/ip6table
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
@@ -224,14 +224,14 @@ $WDTBIN_LESS_THREADS -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 sleep 5
-sudo iptables-save > $DIR/iptable
+sudo ip6tables-save > $DIR/ip6table
 echo "blocking $STARTING_PORT"
-sudo iptables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
+sudo ip6tables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
 wait $pidofsender
 checkLastCmdStatus
 wait $pidofreceiver
 checkLastCmdStatus
-sudo iptables-restore < $DIR/iptable
+sudo ip6tables-restore < $DIR/ip6table
 TEST_COUNT=$((TEST_COUNT + 1))
 
 
@@ -248,16 +248,16 @@ do
   sleep 0.3 # sleep for 300ms
   port=$((STARTING_PORT + RANDOM % threads))
   echo "blocking $port"
-  sudo iptables-save > $DIR/iptable
+  sudo ip6tables-save > $DIR/ip6table
   if [ $(($i % 2)) -eq 0 ]; then
-    sudo iptables -A INPUT -p tcp --sport $port -j REJECT
+    sudo ip6tables -A INPUT -p tcp --sport $port -j REJECT
   else
-    sudo iptables -A INPUT -p tcp --dport $port -j REJECT
+    sudo ip6tables -A INPUT -p tcp --dport $port -j REJECT
   fi
   sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep more
             # than that
   echo "unblocking $port"
-  sudo iptables-restore < $DIR/iptable
+  sudo ip6tables-restore < $DIR/ip6table
 done
 wait $pidofsender # wait for the sender to finish
 checkLastCmdStatus
@@ -279,16 +279,16 @@ do
   sleep 0.3 # sleep for 300ms
   port=$((STARTING_PORT + RANDOM % threads))
   echo "blocking $port"
-  sudo iptables-save > $DIR/iptable
+  sudo ip6tables-save > $DIR/ip6table
   if [ $(($i % 2)) -eq 0 ]; then
-    sudo iptables -A INPUT -p tcp --sport $port -j DROP
+    sudo ip6tables -A INPUT -p tcp --sport $port -j DROP
   else
-    sudo iptables -A INPUT -p tcp --dport $port -j DROP
+    sudo ip6tables -A INPUT -p tcp --dport $port -j DROP
   fi
   sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep more
             # than that
   echo "unblocking $port"
-  sudo iptables-restore < $DIR/iptable
+  sudo ip6tables-restore < $DIR/ip6table
 done
 wait $pidofsender # wait for the sender to finish
 checkLastCmdStatus

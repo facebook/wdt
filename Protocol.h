@@ -224,6 +224,12 @@ class Protocol {
     EXIT_CMD = 0x65,      // e)xit
     SIZE_CMD = 0x5A,      // Si(Z)e
     FOOTER_CMD = 0x46,    // F)ooter
+    LOCAL_CHECKPOINT_CMD =
+        0x01,  // Local checkpoint cmd. This is a hack to ensure backward
+               // compatibility. Since, the format of checkpoints is
+               // <num_checkpoints><checkpoint1><checkpoint2>..., and since the
+               // number of checkpoints for local checkpoint is 1, we can treat
+               // 0x01 to be a separate cmd
   };
 
   /// Max size of sender or receiver id

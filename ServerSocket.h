@@ -12,12 +12,16 @@
 #include "AbortChecker.h"
 
 #include <string>
+#include <vector>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 
 namespace facebook {
 namespace wdt {
+
+typedef struct addrinfo *addrInfoList;
+
 class ServerSocket {
  public:
   ServerSocket(ServerSocket &&that) noexcept;
@@ -30,7 +34,10 @@ class ServerSocket {
   /// on flag)).
   ErrorCode listen();
   /// will accept next (/only) incoming connection
-  ErrorCode acceptNextConnection(int timeoutMillis);
+  /// @param timeoutMillis        accept timeout in millis
+  /// @param tryCurAddressFirst   if this is true, current address is tried
+  ///                             first during poll round-robin
+  ErrorCode acceptNextConnection(int timeoutMillis, bool tryCurAddressFirst);
   /// tries to read nbyte data and periodically checks for abort
   int read(char *buf, int nbyte, bool tryFull = true);
   /// tries to write nbyte data and periodically checks for abort
@@ -40,7 +47,6 @@ class ServerSocket {
   /// @return       peer port
   std::string getPeerPort() const;
   int getFd() const;
-  int getListenFd() const;
   int closeCurrentConnection();
   int32_t getPort() const;
   int getBackLog() const;
@@ -51,12 +57,39 @@ class ServerSocket {
  private:
   int32_t port_;
   const int backlog_;
-  int listeningFd_;
+  std::vector<int> listeningFds_;
   int fd_;
+  /// index of the poll-fd last checked. This is used to not try the same fd
+  /// every-time. We use round-robin policy to avoid accepting from a single fd
+  int lastCheckedPollIndex_{0};
   std::string peerIp_;
   std::string peerPort_;
-  struct addrinfo sa_;
   IAbortChecker const *abortChecker_;
+
+  /**
+   * Tries to listen to addr provided
+   *
+   * @param info    address to listen to
+   * @param host    ip address
+   *                selection, this will be set
+   *
+   * @return        socket fd, -1 in case of error
+   */
+  int listenInternal(struct addrinfo *info, const std::string &host);
+
+  /**
+   * Returns the selected port and new address list to use
+   *
+   * @param listeningFd     socket fd
+   * @param sa              socket address
+   * @param host            ip address
+   * @param infoList        this is set to the new address list
+   *
+   * @return                selected port if successful, -1 otherwise
+   */
+  int getSelectedPortAndNewAddress(int listeningFd, struct addrinfo &sa,
+                                   const std::string &host,
+                                   addrInfoList &infoList);
 };
 }
 }  // namespace facebook::wdt

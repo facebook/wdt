@@ -35,7 +35,7 @@ DO_VERIFY=1
 
 if [ -z "$WDT_TEST_SYMLINKS" ] ; then
   WDT_TEST_SYMLINKS=1
-fi;
+fi
 echo "WDT_TEST_SYMLINKS=$WDT_TEST_SYMLINKS"
 
 # Verbose / to debug failure:
