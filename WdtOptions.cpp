@@ -16,7 +16,6 @@ namespace wdt {
     option = value;                                               \
   }
 
-WdtOptions* WdtOptions::instance_ = nullptr;
 const std::string WdtOptions::FLASH_OPTION_TYPE = "flash";
 const std::string WdtOptions::DISK_OPTION_TYPE = "disk";
 
@@ -26,6 +25,8 @@ void WdtOptions::modifyOptions(
   if (optionType == DISK_OPTION_TYPE) {
     CHANGE_IF_NOT_SPECIFIED(num_ports, userSpecifiedOptions, 1)
     CHANGE_IF_NOT_SPECIFIED(block_size_mbytes, userSpecifiedOptions, -1)
+    CHANGE_IF_NOT_SPECIFIED(disable_preallocation, userSpecifiedOptions, true)
+    CHANGE_IF_NOT_SPECIFIED(resume_using_dir_tree, userSpecifiedOptions, true)
     return;
   }
   if (optionType != FLASH_OPTION_TYPE) {
@@ -35,15 +36,29 @@ void WdtOptions::modifyOptions(
   // options are initialized for flash. So, no need to change anything
 }
 
+bool WdtOptions::shouldPreallocateFiles() const {
+#ifdef HAS_POSIX_FALLOCATE
+  return !disable_preallocation;
+#else
+  return false;
+#endif
+}
+
+bool WdtOptions::isLogBasedResumption() const {
+  return enable_download_resumption && !resume_using_dir_tree;
+}
+
+bool WdtOptions::isDirectoryTreeBasedResumption() const {
+  return enable_download_resumption && resume_using_dir_tree;
+}
+
 const WdtOptions& WdtOptions::get() {
   return getMutable();
 }
 
 WdtOptions& WdtOptions::getMutable() {
-  if (instance_ == nullptr) {
-    instance_ = new WdtOptions();
-  }
-  return *instance_;
+  static WdtOptions opt;
+  return opt;
 }
 }
 }

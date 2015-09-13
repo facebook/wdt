@@ -244,6 +244,8 @@ class Sender : public WdtBase {
     Sender *sender_;
   };
 
+  QueueAbortChecker queueAbortChecker_;
+
   /// state machine states
   enum SenderState {
     CONNECT,

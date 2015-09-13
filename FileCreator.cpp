@@ -25,14 +25,20 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
     PLOG(ERROR) << "fstat() failed for " << fd;
     return false;
   }
+  auto &options = WdtOptions::get();
   if (fileStat.st_size > fileSize) {
     // existing file is larger than required
-    if (ftruncate(fd, fileSize) != 0) {
-      PLOG(ERROR) << "ftruncate() failed for " << fd;
+    int64_t sizeToTruncate = (options.shouldPreallocateFiles() ? fileSize : 0);
+    if (ftruncate(fd, sizeToTruncate) != 0) {
+      PLOG(ERROR) << "ftruncate() failed for " << fd << " " << sizeToTruncate;
       return false;
     }
   }
   if (fileSize == 0) {
+    return true;
+  }
+  if (!options.shouldPreallocateFiles()) {
+    // pre-allocation is disabled
     return true;
   }
 #ifdef HAS_POSIX_FALLOCATE
@@ -41,8 +47,10 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
     LOG(ERROR) << "fallocate() failed " << strerrorStr(status);
     return false;
   }
-#endif
   return true;
+#else
+  WDT_CHECK(false) << "Should never reach here";
+#endif
 }
 
 int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
@@ -55,7 +63,7 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
     close(fd);
     return -1;
   }
-  if (options.enable_download_resumption) {
+  if (options.isLogBasedResumption()) {
     if (blockDetails->allocationStatus == EXISTS_TOO_LARGE) {
       LOG(WARNING) << "File size smaller in the sender side "
                    << blockDetails->fileName
@@ -67,7 +75,8 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
       transferLogManager_.addFileCreationEntry(
           blockDetails->fileName, blockDetails->seqId, blockDetails->fileSize);
     } else {
-      WDT_CHECK(blockDetails->allocationStatus == EXISTS_TOO_SMALL);
+      WDT_CHECK(blockDetails->allocationStatus == EXISTS_TOO_SMALL)
+          << blockDetails->allocationStatus;
       transferLogManager_.addFileResizeEntry(blockDetails->seqId,
                                              blockDetails->fileSize);
     }

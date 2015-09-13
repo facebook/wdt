@@ -52,12 +52,12 @@ void FileInfo::verifyAndFixFlags() {
 #endif
 }
 
-DirectorySourceQueue::DirectorySourceQueue(
-    const string &rootDir, std::unique_ptr<IAbortChecker> &abortChecker)
-    : abortChecker_(std::move(abortChecker)), options_(WdtOptions::get()) {
+DirectorySourceQueue::DirectorySourceQueue(const string &rootDir,
+                                           IAbortChecker const *abortChecker)
+    : abortChecker_(abortChecker), options_(WdtOptions::get()) {
   setRootDir(rootDir);
   fileSourceBufferSize_ = options_.buffer_size;
-};
+}
 
 void DirectorySourceQueue::setIncludePattern(const string &includePattern) {
   includePattern_ = includePattern;
@@ -77,6 +77,10 @@ void DirectorySourceQueue::setFileSourceBufferSize(
   CHECK(fileSourceBufferSize_ > 0);
 }
 
+void DirectorySourceQueue::setBlockSizeMbytes(int64_t blockSizeMbytes) {
+  blockSizeMbytes_ = blockSizeMbytes;
+}
+
 void DirectorySourceQueue::setFileInfo(const std::vector<FileInfo> &fileInfo) {
   fileInfo_ = fileInfo;
 }
@@ -90,6 +94,11 @@ void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   if (followSymlinks_) {
     setRootDir(rootDir_);
   }
+}
+
+std::vector<SourceMetaData *>
+    &DirectorySourceQueue::getDiscoveredFilesMetaData() {
+  return sharedFileData_;
 }
 
 // const ref string param but first thing we do is make a copy because
@@ -416,7 +425,7 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   fileInfo.verifyAndFixFlags();
   auto &fileSize = fileInfo.fileSize;
   auto &relPath = fileInfo.fileName;
-  int64_t blockSizeBytes = options_.block_size_mbytes * 1024 * 1024;
+  int64_t blockSizeBytes = blockSizeMbytes_ * 1024 * 1024;
   bool enableBlockTransfer = blockSizeBytes > 0;
   if (!enableBlockTransfer) {
     VLOG(2) << "Block transfer disabled for this transfer";

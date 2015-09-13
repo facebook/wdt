@@ -98,11 +98,18 @@ class Receiver : public WdtBase {
    */
   std::vector<int32_t> getPorts() const;
 
- protected:
+ private:
   /**
    * @param isFinished         Mark transfer active/inactive
    */
   void markTransferFinished(bool isFinished);
+
+  /**
+   * Traverses root directory and returns discovered file information
+   *
+   * @param fileChunksInfo     discovered file info
+   */
+  void traverseDestinationDir(std::vector<FileChunksInfo> &fileChunksInfo);
 
   /**
    * Wdt receiver has logic to maintain the consistency of the
@@ -203,6 +210,11 @@ class Receiver : public WdtBase {
     /// Checkpoints that have not been sent back to the sender
     std::vector<Checkpoint> newCheckpoints_;
 
+    /// whether settings has been received and verified for the current
+    /// connection. This is used to determine round robin order for polling in
+    /// the server socket
+    bool curConnectionVerified_{false};
+
     /// Constructor for thread data
     ThreadData(int threadIndex, ServerSocket &socket,
                TransferStats &threadStats, int protocolVersion,
@@ -224,6 +236,7 @@ class Receiver : public WdtBase {
       checkpointIndex_ = pendingCheckpointIndex_ = 0;
       doneSendFailure_ = false;
       senderReadTimeout_ = senderWriteTimeout_ = -1;
+      curConnectionVerified_ = false;
       threadStats_.reset();
     }
 
@@ -477,6 +490,9 @@ class Receiver : public WdtBase {
    */
   std::unique_ptr<TransferReport> getTransferReport();
 
+  /// @return     transfer config encoded as int
+  int64_t getTransferConfig() const;
+
   /// The thread that is responsible for calling running the progress tracker
   std::thread progressTrackerThread_;
   /**
@@ -575,6 +591,9 @@ class Receiver : public WdtBase {
 
   /// Start time of the session
   std::chrono::time_point<Clock> startTime_;
+
+  /// already transferred file chunks
+  std::vector<FileChunksInfo> fileChunksInfo_;
 
   /// Mutex to guard all the shared variables
   mutable std::mutex mutex_;

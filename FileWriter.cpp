@@ -83,7 +83,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
     VLOG(1) << "Successfully written " << count << " bytes to fd " << fd_
             << " for file " << blockDetails_->fileName;
     bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
-    if (options.enable_download_resumption && finished) {
+    if (options.isLogBasedResumption() && finished) {
       START_PERF_TIMER
       if (fsync(fd_) != 0) {
         PLOG(ERROR) << "fsync failed for " << blockDetails_->fileName

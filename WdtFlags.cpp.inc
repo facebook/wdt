@@ -129,7 +129,20 @@ WDT_OPT(odirect_reads, bool,
         "Wdt can read files in O_DIRECT mode, set this flag to true"
         " to make sender read all files in O_DIRECT");
 #else
-WDT_OPT(odirect_reads, bool, 
-        "Wdt can't handle O_DIRCT one or more of O_DIRECT, "
+WDT_OPT(odirect_reads, bool,
+        "Ignored: Wdt can't handle O_DIRECT one or more of O_DIRECT, "
         "posix_memalign, or F_NOCACHE was not found on this OS");
 #endif
+
+#ifdef HAS_POSIX_FALLOCATE
+WDT_OPT(disable_preallocation, bool,
+        "If true, files are not pre-allocated using posix_fallocate");
+#else
+WDT_OPT(disable_preallocation, bool,
+        "Ignored: posix_fallocate does not exist in this system. So, files "
+        "won't be pre-allocated.");
+#endif
+WDT_OPT(resume_using_dir_tree, bool,
+        "If true, destination directory tree is trusted during resumption. So, "
+        "only the remaining portion of the files are transferred. This is only "
+        "supported if preallocation and block mode are disabled");

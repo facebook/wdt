@@ -132,6 +132,7 @@ void testSettings() {
   settings.transferId = "abc";
   settings.enableChecksum = true;
   settings.sendFileChunks = true;
+  settings.blockModeDisabled = true;
 
   char buf[128];
   int64_t off = 0;
@@ -154,6 +155,7 @@ void testSettings() {
   EXPECT_EQ(nsettings.transferId, settings.transferId);
   EXPECT_EQ(nsettings.enableChecksum, settings.enableChecksum);
   EXPECT_EQ(nsettings.sendFileChunks, settings.sendFileChunks);
+  EXPECT_EQ(nsettings.blockModeDisabled, settings.blockModeDisabled);
 }
 
 TEST(Protocol, Simple) {

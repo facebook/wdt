@@ -158,10 +158,19 @@ cmake ../wdt -G "Eclipse CDT4 - Unix Makefiles" -DBUILD_TESTING=on
 
 # Troubleshooting
 
+## gmock build problem
 You may get certificate errors getting gmock and need to permanently
 accept the certificate from the commandline
 
 ```
 svn list https://googlemock.googlecode.com
 # type "p", then ignore the output and make again
+```
+
+## IPv6 DNS entry missing
+If the host you are running the tests on does not have an IPv6 address (either
+missing a AAAA record or not having any IPv6 address) some tests will fail
+(like port_block_test) if that is the case disable IPv6 related tests using:
+```
+WDT_TEST_IPV6_CLIENT=0 CTEST_OUTPUT_ON_FAILURE=1 make test
 ```

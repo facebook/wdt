@@ -141,11 +141,11 @@ class FileChunksInfo {
 
  private:
   /// seq-id of the file
-  int64_t seqId_;
+  int64_t seqId_{0};
   /// name of the file
   std::string fileName_;
   /// size of the file
-  int64_t fileSize_;
+  int64_t fileSize_{0};
   /// list of chunk info
   std::vector<Interval> chunks_;
 };
@@ -163,31 +163,33 @@ struct BlockDetails {
   /// name of the file
   std::string fileName;
   /// sequence-id of the file
-  int64_t seqId;
+  int64_t seqId{0};
   /// size of the file
-  int64_t fileSize;
+  int64_t fileSize{0};
   /// offset of the block from the start of the file
-  int64_t offset;
+  int64_t offset{0};
   /// size of the block
-  int64_t dataSize;
+  int64_t dataSize{0};
   /// receiver side file allocation status
-  FileAllocationStatus allocationStatus;
+  FileAllocationStatus allocationStatus{NOT_EXISTS};
   /// seq-id of previous transfer, only valid if there is a size mismatch
-  int64_t prevSeqId;
+  int64_t prevSeqId{0};
 };
 
 /// structure representing settings cmd
 struct Settings {
   /// sender side read timeout
-  int readTimeoutMillis;
+  int readTimeoutMillis{0};
   /// sender side write timeout
-  int writeTimeoutMillis;
+  int writeTimeoutMillis{0};
   /// transfer-id
-  std::string transferId;
+  std::string transferId{0};
   /// whether checksum in enabled or not
-  bool enableChecksum;
+  bool enableChecksum{0};
   /// whether sender wants to read previously transferred chunks or not
-  bool sendFileChunks;
+  bool sendFileChunks{0};
+  /// whether block mode is disabled
+  bool blockModeDisabled{false};
 };
 
 class Protocol {
@@ -224,6 +226,12 @@ class Protocol {
     EXIT_CMD = 0x65,      // e)xit
     SIZE_CMD = 0x5A,      // Si(Z)e
     FOOTER_CMD = 0x46,    // F)ooter
+    LOCAL_CHECKPOINT_CMD =
+        0x01,  // Local checkpoint cmd. This is a hack to ensure backward
+               // compatibility. Since, the format of checkpoints is
+               // <num_checkpoints><checkpoint1><checkpoint2>..., and since the
+               // number of checkpoints for local checkpoint is 1, we can treat
+               // 0x01 to be a separate cmd
   };
 
   /// Max size of sender or receiver id

@@ -151,7 +151,8 @@ const Sender::StateFunction Sender::stateMap_[] = {
     &Sender::processWaitCmd,  &Sender::processErrCmd,
     &Sender::processAbortCmd, &Sender::processVersionMismatch};
 
-Sender::Sender(const std::string &destHost, const std::string &srcDir) {
+Sender::Sender(const std::string &destHost, const std::string &srcDir)
+    : queueAbortChecker_(this) {
   LOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   destHost_ = destHost;
   srcDir_ = srcDir;
@@ -162,14 +163,13 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir) {
   for (int i = 0; i < numSockets; i++) {
     ports_.push_back(port + i);
   }
-  std::unique_ptr<IAbortChecker> queueAbortChecker =
-      folly::make_unique<QueueAbortChecker>(this);
-  dirQueue_.reset(new DirectorySourceQueue(srcDir_, queueAbortChecker));
+  dirQueue_.reset(new DirectorySourceQueue(srcDir_, &queueAbortChecker_));
   VLOG(3) << "Configuring the  directory queue";
   dirQueue_->setIncludePattern(options.include_regex);
   dirQueue_->setExcludePattern(options.exclude_regex);
   dirQueue_->setPruneDirPattern(options.prune_dir_regex);
   dirQueue_->setFollowSymlinks(options.follow_symlinks);
+  dirQueue_->setBlockSizeMbytes(options.block_size_mbytes);
   progressReportIntervalMillis_ = options.progress_report_interval_millis;
   progressReporter_ = folly::make_unique<ProgressReporter>();
 }
@@ -620,6 +620,7 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   settings.transferId = transferId_;
   settings.enableChecksum = options.enable_checksum;
   settings.sendFileChunks = sendFileChunks;
+  settings.blockModeDisabled = (options.block_size_mbytes <= 0);
   Protocol::encodeSettings(protocolVersion_, buf, off, Protocol::kMaxSettings,
                            settings);
   int64_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
@@ -856,6 +857,7 @@ Sender::SenderState Sender::readFileChunks(ThreadData &data) {
 
 Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
   VLOG(1) << "entered READ_RECEIVER_CMD state " << data.threadIndex_;
+  int port = ports_[data.threadIndex_];
   TransferStats &threadStats = data.threadStats_;
   char *buf = data.buf_;
   int64_t numRead = data.socket_->read(buf, 1);
@@ -877,6 +879,37 @@ Sender::SenderState Sender::readReceiverCmd(ThreadData &data) {
   if (cmd == Protocol::ABORT_CMD) {
     return PROCESS_ABORT_CMD;
   }
+  if (cmd == Protocol::LOCAL_CHECKPOINT_CMD) {
+    int64_t toRead = Protocol::kMaxLocalCheckpoint - 1;
+    numRead = data.socket_->read(buf + 1, toRead);
+    if (numRead != toRead) {
+      LOG(ERROR) << "Could not read possible local checkpoint " << toRead << " "
+                 << numRead << " " << port;
+      threadStats.setErrorCode(SOCKET_READ_ERROR);
+      return CONNECT;
+    }
+    int64_t offset = 0;
+    std::vector<Checkpoint> checkpoints;
+    if (Protocol::decodeCheckpoints(protocolVersion_, buf, offset,
+                                    Protocol::kMaxLocalCheckpoint,
+                                    checkpoints)) {
+      if (checkpoints.size() == 1 && checkpoints[0].port == port &&
+          checkpoints[0].numBlocks == 0 &&
+          checkpoints[0].lastBlockReceivedBytes == 0) {
+        // In a spurious local checkpoint, number of blocks and offset must both
+        // be zero
+        // Ignore the checkpoint
+        LOG(WARNING)
+            << "Received valid but unexpected local checkpoint, ignoring "
+            << port;
+        return READ_RECEIVER_CMD;
+      }
+    }
+    LOG(ERROR) << "Failed to verify spurious local checkpoint, port " << port;
+    threadStats.setErrorCode(PROTOCOL_ERROR);
+    return END;
+  }
+  LOG(ERROR) << "Read unexpected receiver cmd " << cmd << " port " << port;
   threadStats.setErrorCode(PROTOCOL_ERROR);
   return END;
 }
