@@ -390,6 +390,14 @@ void WdtResourceControllerTest::RequestSerializationTest() {
         "wdt://localhost?ports=123*,*,*,*&dir=test&protocol=100&id=111";
     WdtTransferRequest transferRequest(uri);
     vector<int32_t> expectedPorts;
+    // transfer request will fill ports according to the 
+    // default values in the wdt options
+    const auto& options = WdtOptions::get();
+    int32_t startPort = options.start_port;
+    int32_t numPorts = options.num_ports;
+    for (int32_t i = 0; i < numPorts; i++) {
+      expectedPorts.push_back(startPort + i);
+    }
     EXPECT_EQ(transferRequest.ports, expectedPorts);
     EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
     EXPECT_EQ(transferRequest.generateUrl(), "URI_PARSE_ERROR");
