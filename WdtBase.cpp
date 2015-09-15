@@ -198,7 +198,7 @@ string WdtTransferRequest::generateUrl(bool genFull) const {
   }
   WdtUri wdtUri;
   string modifiedHostName = hostName;
-  if (SocketUtils::getaddrfamily(hostName.c_str()) == AF_INET6) {
+  if (SocketUtils::getAddrFamily(hostName.c_str()) == AF_INET6) {
     modifiedHostName = "[" + hostName + "]";
   }
   wdtUri.setHostName(modifiedHostName);
