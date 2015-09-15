@@ -203,7 +203,7 @@ class WdtOptions {
   /**
    * timeout for socket connect
    */
-  int32_t connect_timeout_millis{100};
+  int32_t connect_timeout_millis{1000};
 
   /**
    * interval in ms between abort checks

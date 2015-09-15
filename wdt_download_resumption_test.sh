@@ -149,7 +149,8 @@ WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -keep_transfer_log=false \
 -treat_fewer_port_as_error -disable_preallocation=$DISABLE_PREALLOCATION \
--resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection"
+-resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection \
+-connect_timeout_millis 100"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
