@@ -180,6 +180,7 @@ add_library(folly4wdt ${FOLLY_CPP_SRC})
 # Order is important - inside fb we want the above
 # folly-config.h to be picked up instead of the fbcode one
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${FOLLY_SOURCE_DIR})
 include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
@@ -253,7 +254,7 @@ if (BUILD_TESTING)
   )
   target_link_libraries(wdt4tests wdt4tests_min)
 
-
+# TODO macro/function so it doesn't take 3 lines to add 1 new test binary ?
   add_executable(protocol_test ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
   add_test(NAME AllTestsInProtocolTest COMMAND protocol_test)
@@ -265,6 +266,10 @@ if (BUILD_TESTING)
   add_executable(file_reader_test  FileReaderTest.cpp)
   target_link_libraries(file_reader_test wdt4tests)
   add_test(NAME FileReaderTests COMMAND file_reader_test)
+
+  add_executable(system_test  tests/SystemTest.cpp)
+  target_link_libraries(system_test wdt4tests)
+  add_test(NAME SystemTests COMMAND system_test)
 
   add_executable(option_type_test_long_flags OptionTypeTest.cpp)
   target_link_libraries(option_type_test_long_flags wdt4tests)
