@@ -31,7 +31,6 @@ class SocketUtils {
    */
   static bool getNameInfo(const struct sockaddr *sa, socklen_t salen,
                           std::string &host, std::string &port);
-
   static void setReadTimeout(int fd);
 
   static void setWriteTimeout(int fd);
