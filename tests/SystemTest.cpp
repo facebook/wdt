@@ -18,7 +18,8 @@ namespace wdt {
 using std::string;
 
 void test1() {
-  EXPECT_EQ("expected", "actual");
+  string actual = "expected";
+  EXPECT_EQ("expected", actual);
 }
 
 TEST(System, Simple1) {
