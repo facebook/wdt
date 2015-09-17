@@ -289,4 +289,7 @@ if (BUILD_TESTING)
   add_test(NAME WdtPortBlockTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_port_block_test.py")
 
+  add_test(NAME WdtProtocolNegotiationTest COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_protocol_negotiation_test.py")
+
 endif(BUILD_TESTING)
