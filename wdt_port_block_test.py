@@ -35,10 +35,19 @@ def main():
                                         stdout=subprocess.PIPE)
 
     connection_url = receiver_process.stdout.readline().strip()
-    url_match = re.search('\?.*ports=([0-9]+).*', connection_url)
-    rest_of_url = url_match.group(0)
-    port_to_block = url_match.group(1)
-
+    print(connection_url)
+    url_match = re.search('\?(.*&)?ports=([0-9]+).*', connection_url)
+    if not url_match:
+      print("didnt match")
+      url_match = re.search(':([0-9]+)(\?.*)', connection_url)
+      rest_of_url = url_match.group(2)
+      port_to_block = url_match.group(1)
+      start_port = ":" + port_to_block
+    else: 
+      rest_of_url = url_match.group(0)
+      start_port = ""
+      port_to_block = url_match.group(2)
+    print(rest_of_url + " " + port_to_block) 
     # this sleep is needed to allow receiver to start listening. Otherwise,
     # nc will not be able to connect and the port will not be blocked
     sleep(0.5)
@@ -53,8 +62,8 @@ def main():
     sender_cmd = ("(sleep 20 | nc -4 localhost {0}) &> /dev/null & "
                   "(sleep 20 | nc -4 localhost {0}) &> /dev/null & "
                   "sleep 1; _bin/wdt/wdt -directory wdt/ -ipv6 "
-                  "-connection_url wdt://::1\"{1}\"").format(
-                          port_to_block, rest_of_url)
+                  "-connection_url \"wdt://[::1]{1}{2}\"").format(
+                          port_to_block, start_port, rest_of_url)
     print(sender_cmd)
     status = os.system(sender_cmd)
     sender_end_time = time()

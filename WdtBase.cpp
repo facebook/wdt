@@ -7,6 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include "WdtBase.h"
+#include "SocketUtils.h"
 #include <folly/Conv.h>
 #include <folly/Range.h>
 #include <ctime>
@@ -21,6 +22,14 @@ WdtUri::WdtUri(const string& url) {
 
 void WdtUri::setHostName(const string& hostName) {
   hostName_ = hostName;
+  if (hostName.find(":") != string::npos) {
+    // Having a : means its an ipv6 address
+    hostName_ = "[" + hostName + "]";
+  }
+}
+
+void WdtUri::setPort(int32_t port) {
+  port_ = std::to_string(port);
 }
 
 void WdtUri::setQueryParam(const string& key, const string& value) {
@@ -34,6 +43,9 @@ ErrorCode WdtUri::getErrorCode() const {
 string WdtUri::generateUrl() const {
   string url;
   folly::toAppend(WDT_URL_PREFIX, hostName_, &url);
+  if (getPort() > 0) {
+    folly::toAppend(":", port_, &url);
+  }
   char prefix = '?';
   for (const auto& pair : queryParams_) {
     folly::toAppend(prefix, pair.first, "=", pair.second, &url);
@@ -59,10 +71,49 @@ ErrorCode WdtUri::process(const string& url) {
     paramsIndex = urlPiece.size();
   }
   ErrorCode status = OK;
-  hostName_.assign(urlPiece.data(), paramsIndex);
-  if (hostName_.size() == 0) {
+  StringPiece hostNamePiece(urlPiece, 0, paramsIndex);
+  if (hostNamePiece.empty()) {
     LOG(ERROR) << "URL doesn't have a valid host name " << url;
     status = URI_PARSE_ERROR;
+  } else {
+    bool isIpv6 = false;
+    size_t addrEndIndex = hostNamePiece.find("]");
+    if (addrEndIndex != string::npos) {
+      isIpv6 = true;
+      ++addrEndIndex;
+    } else {
+      size_t portStartIndex = hostNamePiece.find(":");
+      if (portStartIndex != string::npos) {
+        addrEndIndex = portStartIndex;
+      } else {
+        addrEndIndex = hostNamePiece.size();
+      }
+    }
+    hostName_.assign(hostNamePiece.data(), addrEndIndex);
+    if (isIpv6) {
+      if (hostName_.find("[") == string::npos) {
+        LOG(ERROR) << "Malformed ipv6 address " << hostName_;
+        hostName_ = "";
+        status = URI_PARSE_ERROR;
+      }
+      if (hostName_.find(":") == string::npos) {
+        LOG(ERROR) << "Malformed ipv6 address " << hostName_;
+        hostName_ = "";
+        status = URI_PARSE_ERROR;
+      }
+    } else {
+      if (hostName_.find(":") != string::npos) {
+        LOG(ERROR) << "ipv6 address found without enclosing []" << hostName_;
+        hostName_ = "";
+        status = URI_PARSE_ERROR;
+      }
+    }
+    if (addrEndIndex < hostNamePiece.size() - 1 &&
+        hostNamePiece[addrEndIndex] == ':') {
+      ++addrEndIndex;
+      port_.assign(hostNamePiece.data(), addrEndIndex,
+                   hostNamePiece.size() - addrEndIndex);
+    }
   }
   urlPiece.advance(paramsIndex + (paramsIndex < urlPiece.size()));
   while (!urlPiece.empty()) {
@@ -86,7 +137,22 @@ ErrorCode WdtUri::process(const string& url) {
 }
 
 string WdtUri::getHostName() const {
-  return hostName_;
+  string hostName = hostName_;
+  if (hostName.size() > 0 && hostName[0] == '[' &&
+      hostName[hostName.size() - 1] == ']') {
+    hostName = hostName.substr(1, hostName.size() - 2);
+  }
+  return hostName;
+}
+
+int32_t WdtUri::getPort() const {
+  int32_t port = -1;
+  try {
+    port = folly::to<int32_t>(port_);
+  } catch (std::exception& e) {
+    LOG(ERROR) << "Invalid port in the uri " << port_;
+  }
+  return port;
 }
 
 string WdtUri::getQueryParam(const string& key) const {
@@ -104,6 +170,7 @@ const unordered_map<string, string>& WdtUri::getQueryParams() const {
 
 void WdtUri::clear() {
   hostName_.clear();
+  port_.clear();
   queryParams_.clear();
 }
 
@@ -118,9 +185,14 @@ const string WdtTransferRequest::TRANSFER_ID_PARAM{"id"};
 const string WdtTransferRequest::PROTOCOL_VERSION_PARAM{"recpv"};
 const string WdtTransferRequest::DIRECTORY_PARAM{"dir"};
 const string WdtTransferRequest::PORTS_PARAM{"ports"};
+const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
+const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
 
-WdtTransferRequest::WdtTransferRequest(const vector<int32_t>& ports) {
+WdtTransferRequest::WdtTransferRequest(const vector<int32_t> &ports) {
   this->ports = ports;
+  // Sort the ports so that if they are a sequence then you
+  // can detect that
+  sort(this->ports.begin(), this->ports.end());
 }
 
 WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
@@ -164,6 +236,32 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
       }
     }
   } while (!portsList.empty());
+  if (!ports.empty()) {
+    return;
+  }
+  string startPortStr = wdtUri.getQueryParam(START_PORT_PARAM);
+  string numPortsStr = wdtUri.getQueryParam(NUM_PORTS_PARAM);
+  const auto& options = WdtOptions::get();
+  int32_t startPort = wdtUri.getPort();
+  if (startPort < 0) {
+    startPort = options.start_port;
+    if (!startPortStr.empty()) {
+      try {
+        startPort = folly::to<int32_t>(startPortStr);
+      } catch(std::exception& e) {
+        LOG(ERROR) << "Couldn't convert start port " << startPortStr;
+      }
+    } 
+  }
+  int numPorts = options.num_ports;
+  if (!numPortsStr.empty()) {
+      try {
+        numPorts = folly::to<int32_t>(numPortsStr);
+      } catch(std::exception& e) {
+        LOG(ERROR) << "Couldn't convert num ports " << numPortsStr;
+      }
+  }
+  ports = std::move(WdtBase::genPortsVector(startPort, numPorts));
 }
 
 string WdtTransferRequest::generateUrl(bool genFull) const {
@@ -176,11 +274,31 @@ string WdtTransferRequest::generateUrl(bool genFull) const {
   wdtUri.setQueryParam(TRANSFER_ID_PARAM, transferId);
   wdtUri.setQueryParam(PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
-  wdtUri.setQueryParam(PORTS_PARAM, getSerializedPortsList());
+  serializePorts(wdtUri);
   if (genFull) {
     wdtUri.setQueryParam(DIRECTORY_PARAM, directory);
   }
   return wdtUri.generateUrl();
+}
+
+void WdtTransferRequest::serializePorts(WdtUri& wdtUri) const {
+  if (ports.size() == 0) {
+    return;
+  }
+  int32_t startPort = ports[0];
+  bool hasHoles = false;
+  for (size_t i = 0; i < ports.size(); i++) {
+    if (ports[i] != startPort + i) {
+      hasHoles = true;
+      break;
+    }
+  }
+  if (hasHoles) {
+    wdtUri.setQueryParam(PORTS_PARAM, getSerializedPortsList());
+  } else {
+    wdtUri.setPort(startPort);
+    wdtUri.setQueryParam(NUM_PORTS_PARAM, folly::to<string>(ports.size()));
+  }
 }
 
 string WdtTransferRequest::getSerializedPortsList() const {
@@ -212,6 +330,15 @@ WdtBase::WdtBase() : abortCheckerCallback_(this) {
 
 WdtBase::~WdtBase() {
   abortChecker_ = nullptr;
+}
+
+std::vector<int32_t> WdtBase::genPortsVector(int32_t startPort,
+                                             int32_t numPorts) {
+  std::vector<int32_t> ports;
+  for (int32_t i = 0; i < numPorts; i++) {
+    ports.push_back(startPort + i);
+  }
+  return ports;
 }
 
 void WdtBase::abort(const ErrorCode abortCode) {

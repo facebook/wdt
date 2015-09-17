@@ -32,6 +32,7 @@ class SocketUtils {
   static bool getNameInfo(const struct sockaddr *sa, socklen_t salen,
                           std::string &host, std::string &port);
   static void setReadTimeout(int fd);
+
   static void setWriteTimeout(int fd);
   /// @see ioWithAbortCheck
   static int64_t readWithAbortCheck(int fd, char *buf, int64_t nbyte,
