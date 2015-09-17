@@ -371,7 +371,7 @@ void WdtResourceControllerTest::RequestSerializationTest() {
     ASSERT_TRUE(!transferRequest.hostName.empty());
   }
   {
-    string uri = "wdt://localhost?ports=1,2,3,10&dir=test&protocol=100&id=111";
+    string uri = "wdt://localhost?ports=1,2,3,10&dir=test&recpv=100&id=111";
     WdtTransferRequest transferRequest(uri);
     EXPECT_EQ(transferRequest.errorCode, OK);
     EXPECT_EQ(transferRequest.hostName, "localhost");
@@ -387,7 +387,7 @@ void WdtResourceControllerTest::RequestSerializationTest() {
   }
   {
     string uri =
-        "wdt://localhost?ports=123*,*,*,*&dir=test&protocol=100&id=111";
+        "wdt://localhost?ports=123*,*,*,*&dir=test&recpv=100&id=111";
     WdtTransferRequest transferRequest(uri);
     vector<int32_t> expectedPorts;
     EXPECT_EQ(transferRequest.ports, expectedPorts);
