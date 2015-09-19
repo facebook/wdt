@@ -37,8 +37,21 @@ struct SourceMetaData {
   FileAllocationStatus allocationStatus{NOT_EXISTS};
   /// if there is a size mismatch, this is the previous sequence id
   int64_t prevSeqId{0};
-  /// Read the file with these flags
-  int oFlags{0};
+  /// If true, files are read using O_DIRECT or F_NOCACHE
+  bool directReads{false};
+  /// File descriptor. If this is not -1, then wdt uses this to read
+  int fd{-1};
+  /// If true, fd was opened by wdt and must be closed after transfer finish
+  bool needToClose{false};
+
+  ~SourceMetaData() {
+    if (needToClose && fd >= 0) {
+      int ret = ::close(fd);
+      if (ret) {
+        PLOG(ERROR) << "Failed to close file " << relPath;
+      }
+    }
+  }
 };
 
 class ByteSource {

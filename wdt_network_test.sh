@@ -4,27 +4,7 @@
 # tee. source : http://petereisentraut.blogspot.com/2010/11/pipefail.html
 set -o pipefail
 
-restoreIptable() {
-  if [ -e "$DIR/ip6table" ]; then
-    # try to restore only if iptable was modified
-    sudo ip6tables-restore < $DIR/ip6table
-  fi
-}
-
-printServerLog() {
-  echo "Server log($DIR/server${TEST_COUNT}.log):"
-  cat $DIR/server${TEST_COUNT}.log
-}
-
-checkLastCmdStatus() {
-  LAST_STATUS=$?
-  if [ $LAST_STATUS -ne 0 ] ; then
-    restoreIptable
-    echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
-    printServerLog
-    exit $LAST_STATUS
-  fi
-}
+source `dirname "$0"`/common_functions.sh
 
 usage="
 The possible options to this script are
@@ -309,34 +289,6 @@ wait $pidofreceiver
 checkLastCmdStatus
 TEST_COUNT=$((TEST_COUNT + 1))
 
-STATUS=0
-
-(cd $DIR/src ; ( find . -type f -print0 | xargs -0 md5sum | sort ) > ../src.md5s )
-for ((i = 0; i < TEST_COUNT; i++))
-do
-  (cd $DIR/dst${i} ; ( find . -type f -print0 | xargs -0 md5sum | sort ) > \
-  ../dst${i}.md5s )
-  echo "Verifying correctness for test $((i + 1))"
-  echo "Should be no diff"
-  (cd $DIR; diff -u src.md5s dst${i}.md5s)
-  CUR_STATUS=$?
-  if [ $CUR_STATUS -ne 0 ]; then
-    cat $DIR/server${i}.log
-  fi
-  if [ $STATUS -eq 0 ] ; then
-    STATUS=$CUR_STATUS
-  fi
-  # treating PROTOCOL_ERROR as errors
-  cd $DIR; grep "PROTOCOL_ERROR" server${i}.log > /dev/null && STATUS=1
-  cd $DIR; grep "PROTOCOL_ERROR" client${i}.log > /dev/null && STATUS=1
-done
-
-if [ $STATUS -eq 0 ] ; then
-  echo "Good run, deleting logs in $DIR"
-  find $DIR -type d | xargs chmod 755 # cp -r makes lib/locale not writeable somehow
-  rm -rf $DIR
-else
-  echo "Bad run ($STATUS) - keeping full logs and partial transfer in $DIR"
-fi
+verifyTransferAndCleanup
 
 exit $STATUS

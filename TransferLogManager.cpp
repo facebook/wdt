@@ -749,6 +749,7 @@ bool TransferLogManager::parseVerifyAndFix(
     fileInfo.mergeChunks();
     parsedInfo.emplace_back(std::move(fileInfo));
   }
+  LOG(INFO) << "Transfer log parsing finished";
   return headerParsed;
 }
 }
