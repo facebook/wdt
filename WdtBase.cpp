@@ -114,7 +114,8 @@ WdtUri& WdtUri::operator=(const string& url) {
 }
 
 const string WdtTransferRequest::TRANSFER_ID_PARAM{"id"};
-const string WdtTransferRequest::PROTOCOL_VERSION_PARAM{"protocol"};
+/** RECeiver's Protocol Version */
+const string WdtTransferRequest::PROTOCOL_VERSION_PARAM{"recpv"};
 const string WdtTransferRequest::DIRECTORY_PARAM{"dir"};
 const string WdtTransferRequest::PORTS_PARAM{"ports"};
 
@@ -264,12 +265,14 @@ void WdtBase::setTransferId(const std::string& transferId) {
   LOG(INFO) << "Setting transfer id " << transferId_;
 }
 
-void WdtBase::setProtocolVersion(int64_t protocolVersion) {
-  WDT_CHECK(protocolVersion > 0) << "Protocol version can't be <= 0 "
-                                 << protocolVersion;
-  WDT_CHECK(Protocol::negotiateProtocol(protocolVersion) == protocolVersion)
-      << "Can not support wdt version " << protocolVersion;
-  protocolVersion_ = protocolVersion;
+void WdtBase::setProtocolVersion(int64_t protocol) {
+  WDT_CHECK(protocol > 0) << "Protocol version can't be <= 0 " << protocol;
+  int negotiatedPv = Protocol::negotiateProtocol(protocol);
+  if (negotiatedPv != protocol) {
+    LOG(WARNING) << "Negotiated protocol version " << protocol << " -> "
+                 << negotiatedPv;
+  }
+  protocolVersion_ = negotiatedPv;
   LOG(INFO) << "using wdt protocol version " << protocolVersion_;
 }
 
