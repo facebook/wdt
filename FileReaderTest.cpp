@@ -47,7 +47,7 @@ class RandomFile {
     metaData_->relPath = getShortName();
     metaData_->seqId = 0;
     metaData_->size = fileSize_;
-    metaData_->oFlags = O_RDONLY;
+    metaData_->directReads = true;
     return metaData_;
   }
   int64_t getSize() const {
@@ -79,6 +79,14 @@ bool canSupportODirect() {
   return false;
 }
 
+bool alignedBufferNeeded() {
+#ifdef O_DIRECT
+  return true;
+#else
+  return false;
+#endif
+}
+
 void testReadSize(int64_t fileSize, ByteSource& byteSource) {
   int64_t totalSizeRead = 0;
   while (true) {
@@ -88,33 +96,33 @@ void testReadSize(int64_t fileSize, ByteSource& byteSource) {
     if (size <= 0) {
       break;
     }
+    WDT_CHECK(data);
     totalSizeRead += size;
   }
   EXPECT_EQ(totalSizeRead, fileSize);
 }
 
-void testBufferSize(int64_t originalBufferSize, int oFlags,
+void testBufferSize(int64_t originalBufferSize, bool alignedBuffer,
                     ByteSource& byteSource) {
   auto newBufferSize = originalBufferSize;
   auto remainder = newBufferSize % kDiskBlockSize;
-  bool isOdirect = oFlags & O_DIRECT;
-  if (canSupportODirect() && isOdirect && remainder != 0) {
+  if (canSupportODirect() && alignedBuffer && remainder != 0) {
     newBufferSize += (kDiskBlockSize - remainder);
   }
-  if (canSupportODirect() && (oFlags & O_DIRECT)) {
+  if (canSupportODirect() && alignedBuffer) {
     EXPECT_EQ(byteSource.getBufferSize() % kDiskBlockSize, 0);
   }
   EXPECT_EQ(byteSource.getBufferSize(), newBufferSize);
 }
 
-void testFileRead(int64_t fileSize, int64_t bufferSize, int oflags) {
+void testFileRead(int64_t fileSize, int64_t bufferSize, bool directReads) {
   RandomFile file(fileSize);
   auto metaData = file.getMetaData();
-  metaData->oFlags = oflags;
+  metaData->directReads = directReads;
   FileByteSource byteSource(metaData, metaData->size, 0, bufferSize);
   ErrorCode code = byteSource.open();
   EXPECT_EQ(code, OK);
-  testBufferSize(bufferSize, oflags, byteSource);
+  testBufferSize(bufferSize, directReads && alignedBufferNeeded(), byteSource);
   testReadSize(file.getSize(), byteSource);
 }
 
@@ -125,7 +133,7 @@ TEST(FileByteSource, ODIRECT_NONMULTIPLE) {
   }
   int64_t fileSize = kDiskBlockSize * 100 + 10;
   int64_t bufferSize = 511;
-  std::thread t(&testFileRead, fileSize, bufferSize, O_RDONLY | O_DIRECT);
+  std::thread t(&testFileRead, fileSize, bufferSize, true);
   t.join();
 }
 
@@ -136,7 +144,7 @@ TEST(FileByteSource, SMALL_MULTIPLE_ODIRECT) {
   }
   int64_t fileSize = 512;
   int64_t bufferSize = 11;
-  std::thread t(&testFileRead, fileSize, bufferSize, O_RDONLY | O_DIRECT);
+  std::thread t(&testFileRead, fileSize, bufferSize, true);
   t.join();
 }
 
@@ -147,7 +155,7 @@ TEST(FileByteSource, SMALL_NONMULTIPLE_ODIRECT) {
   }
   int64_t fileSize = 1;
   int64_t bufferSize = 11;
-  std::thread t(&testFileRead, fileSize, bufferSize, O_RDONLY | O_DIRECT);
+  std::thread t(&testFileRead, fileSize, bufferSize, true);
   t.join();
 }
 
@@ -161,7 +169,7 @@ TEST(FileByteSource, FILEINFO_ODIRECT) {
   DirectorySourceQueue Q("/tmp", &queueAbortChecker);
   std::vector<FileInfo> files;
   FileInfo info(file.getShortName(), sizeToRead);
-  info.oFlags |= (O_DIRECT | O_RDWR);
+  info.directReads = true;
   files.push_back(info);
   Q.setFileInfo(files);
   Q.buildQueueSynchronously();
@@ -194,7 +202,7 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
   std::vector<FileInfo> files;
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);
-    info.oFlags |= O_DIRECT;
+    info.directReads = true;
     files.push_back(info);
   }
   Q.setFileInfo(files);
@@ -208,7 +216,9 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
         break;
       }
       EXPECT_EQ(byteSource->open(), OK);
-      testBufferSize(originalBufferSize, files[fileNumber].oFlags, *byteSource);
+      testBufferSize(originalBufferSize,
+                     files[fileNumber].directReads && alignedBufferNeeded(),
+                     *byteSource);
       testReadSize(sizeToRead, *byteSource);
       ++fileNumber;
     }
@@ -236,18 +246,18 @@ TEST(FileByteSource, MIXED_FILES) {
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);
     if (canSupportODirect() && fileNum % 2 != 0) {
-      info.oFlags |= O_DIRECT;
+      info.directReads = true;
     }
     fileNum++;
     filesInfo.push_back(info);
   }
   for (int i = 0; i < numFiles; i++) {
     auto metaData = randFiles[i].getMetaData();
-    metaData->oFlags = filesInfo[i].oFlags;
+    metaData->directReads = filesInfo[i].directReads;
     ByteSource* byteSource = new FileByteSource(metaData, filesInfo[i].fileSize,
                                                 0, originalBufferSize);
     EXPECT_EQ(byteSource->open(), OK);
-    if (!canSupportODirect() || i == 0) {
+    if (!alignedBufferNeeded() || i == 0) {
       // First file is regular
       EXPECT_EQ(byteSource->getBufferSize(), originalBufferSize);
     } else {
@@ -260,7 +270,7 @@ TEST(FileByteSource, MIXED_FILES) {
 TEST(FileByteSource, REGULAR_READ) {
   int64_t fileSize = kDiskBlockSize * 10 + 10;
   int64_t bufferSize = 11;
-  std::thread t(&testFileRead, fileSize, bufferSize, O_RDONLY);
+  std::thread t(&testFileRead, fileSize, bufferSize, false);
   t.join();
 }
 

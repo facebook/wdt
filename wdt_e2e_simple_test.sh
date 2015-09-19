@@ -7,18 +7,26 @@
 echo "Run from the cmake build dir (or ~/fbcode - or fbmake runtests)"
 
 BASEDIR=/tmp/wdtTest_$USER
+USE_ODIRECT=false
 usage="
 The possible options to this script are
 -d base directory to use (defaults to $BASEDIR)
+-o if the value is true, o_direct read is used
 "
 
 if [ "$1" == "-h" ]; then
   echo "$usage"
   exit 0
 fi
-while getopts ":d:h:" opt; do
+while getopts ":d:h:o:" opt; do
   case $opt in
     d) BASEDIR="$OPTARG"
+    ;;
+    o)
+    if [ "$OPTARG" == "true" ]; then
+      echo "Testing with o_direct reads"
+      USE_ODIRECT=true
+    fi
     ;;
     h) echo "$usage"
        exit
@@ -96,8 +104,8 @@ fi
 
 
 CMD="$WDTBIN -minloglevel=0 -directory $DIR/dst 2> $DIR/server.log | head -1 | \
-    xargs -I URL $WDTBIN -directory $DIR/src -connection_url URL 2>&1 | \
-    tee $DIR/client1.log"
+    xargs -I URL $WDTBIN -directory $DIR/src -connection_url URL \
+    -odirect_reads=$USE_ODIRECT 2>&1 | tee $DIR/client1.log"
 echo "First transfer: $CMD"
 eval $CMD
 STATUS=$?
@@ -106,7 +114,7 @@ STATUS=$?
 if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
   CMD="$WDTBIN -minloglevel=0 -directory $DIR/dst_symlinks 2>> $DIR/server.log |\
     head -1 | xargs -I URL $WDTBIN -follow_symlinks -directory $DIR/src \
-    -connection_url URL 2>&1 | tee $DIR/client2.log"
+    -connection_url URL -odirect_reads=$USE_ODIRECT 2>&1 | tee $DIR/client2.log"
   echo "Second transfer: $CMD"
   eval $CMD
   # TODO check for $? / crash... though diff will indirectly find that case

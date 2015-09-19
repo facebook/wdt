@@ -18,6 +18,22 @@ namespace facebook {
 namespace wdt {
 const int64_t kDiskBlockSize = 4 * 1024;
 
+/// File related code
+class FileUtil {
+ public:
+  /**
+   * Opens the file for reading.
+   *
+   * @param filename        name of the file
+   * @param isDirectReads   whether to open for direct reads
+   *
+   * @return    If successful, fd is returned, else -1 is returned
+   */
+  static int openForRead(const std::string &filename, bool isDirectReads);
+  // TODO: create a separate file for this class and move other file related
+  // code here
+};
+
 /**
  * ByteSource that reads data from a file. The buffer used is thread-local
  * for efficiency reasons so only one FileByteSource can be created/used
@@ -85,6 +101,12 @@ class FileByteSource : public ByteSource {
 
   /// close the source for reading
   virtual void close() override {
+    if (metadata_->fd >= 0) {
+      // if the fd is not opened by this source, no need to close it
+      VLOG(1) << "No need to close " << getIdentifier()
+              << ", this was not opened by FileByteSource";
+      return;
+    }
     if (fd_ >= 0) {
       START_PERF_TIMER
       ::close(fd_);
@@ -175,6 +197,9 @@ class FileByteSource : public ByteSource {
 
   /// buffer size
   int64_t bufferSize_;
+
+  /// Whether reads have to be done using aligned buffer and size
+  bool alignedReadNeeded_{false};
 
   /// transfer stats
   TransferStats transferStats_;

@@ -39,13 +39,19 @@ struct FileInfo {
   std::string fileName;
   /// Size of the file to be read, default is -1
   int64_t fileSize;
-  /**
-   * Flags to read the file with, wdt supports only
-   * O_RDONLY, and O_DIRECT no matter what flags are provided
-   */
-  int oFlags;
+  /// Whether read should be done using o_direct
+  bool directReads{false};
+  /// File descriptor. If this is not -1, then wdt uses this to read
+  int fd{-1};
   /// Constructor for file info with name and size
-  explicit FileInfo(const std::string &name, int64_t size = -1);
+  explicit FileInfo(const std::string &name, int64_t size = -1,
+                    bool directReads = WdtOptions::get().odirect_reads);
+  /**
+   * Constructor with name, size and fd
+   * If this constructor is used, then whether to do direct reads is decided
+   * by fd flags
+   */
+  FileInfo(const std::string &name, int64_t size, int fd);
   /// Verify that we can align for reading in O_DIRECT and
   /// the flags make sense
   void verifyAndFixFlags();

@@ -279,7 +279,6 @@ if (BUILD_TESTING)
     COMPILE_DEFINITIONS "STANDALONE_APP")
   target_link_libraries(option_type_test_short_flags wdt4tests_min)
 
-
   add_test(NAME WdtRandGenTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_rand_gen_test.sh")
 
@@ -294,5 +293,14 @@ if (BUILD_TESTING)
 
   add_test(NAME WdtPortBlockTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_port_block_test.py")
+
+  add_test(NAME WdtProtocolNegotiationTest COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_protocol_negotiation_test.py")
+
+  add_test(NAME WdtSimpleOdirectTest COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_simple_test.sh" -o true)
+
+  add_test(NAME WdtFileListTest COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_file_list_test.py")
 
 endif(BUILD_TESTING)

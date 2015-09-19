@@ -298,6 +298,11 @@ class WdtOptions {
   bool resume_using_dir_tree{false};
 
   /**
+   * If true, files are opened when they are discovered
+   */
+  bool open_files_during_discovery{false};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;

@@ -25,31 +25,32 @@ namespace wdt {
 
 using std::string;
 
-FileInfo::FileInfo(const string &name, int64_t size)
+FileInfo::FileInfo(const string &name, int64_t size, bool directReads)
     : fileName(name), fileSize(size) {
-  oFlags = O_RDONLY;
-  const auto &options = WdtOptions::get();
-  if (options.odirect_reads) {
-    oFlags |= O_DIRECT;
-  }
+  this->directReads = directReads;
+}
+
+FileInfo::FileInfo(const string &name, int64_t size, int fd)
+    : FileInfo(name, size) {
+  this->fd = fd;
 }
 
 void FileInfo::verifyAndFixFlags() {
-  if (oFlags & ~(O_DIRECT | O_RDONLY)) {
-    LOG(WARNING) << "Flags apart from O_RDONLY and O_DIRECT "
-                 << "provided, for " << fileName
-                 << ". Wdt will ignore the extra flags";
-    oFlags &= (O_RDONLY | O_DIRECT);
-  }
-#ifndef WDT_SUPPORTS_ODIRECT
-  bool hasOdirect = oFlags & O_DIRECT;
-  if (hasOdirect) {
-    LOG(WARNING) << "Can't read " << fileName << " in O_DIRECT"
-                 << ". Memalign not found, turning O_DIRECT flag"
-                 << " off for this file";
-    oFlags &= ~(O_DIRECT);
-  }
+  if (fd >= 0) {
+#ifdef O_DIRECT
+    int flags = fcntl(fd, F_GETFL, 0);
+    // directReads does not depend on the option in this case
+    directReads = (flags & O_DIRECT);
+// Do not have to worry about F_NOCACHE, since it has no alignment
+// requirement
 #endif
+  }
+  if (directReads) {
+#ifndef WDT_SUPPORTS_ODIRECT
+    LOG(WARNING) << "Wdt can't handle O_DIRECT in this system. " << fileName;
+    directReads = false;
+#endif
+  }
 }
 
 DirectorySourceQueue::DirectorySourceQueue(const string &rootDir,
@@ -472,8 +473,13 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   SourceMetaData *metadata = new SourceMetaData();
   metadata->fullPath = fullPath;
   metadata->relPath = relPath;
+  metadata->fd = fileInfo.fd;
+  metadata->directReads = fileInfo.directReads;
+  if (options_.open_files_during_discovery && metadata->fd < 0) {
+    metadata->fd = FileUtil::openForRead(fullPath, metadata->directReads);
+    metadata->needToClose = (metadata->fd >= 0);
+  }
   metadata->seqId = seqId;
-  metadata->oFlags = fileInfo.oFlags;
   metadata->size = fileSize;
   metadata->allocationStatus = allocationStatus;
   metadata->prevSeqId = prevSeqId;

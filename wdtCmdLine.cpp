@@ -17,6 +17,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
+#include <fstream>
 #include <signal.h>
 #include <thread>
 #ifndef ADDITIONAL_SENDER_SETUP
@@ -33,9 +34,9 @@ DEFINE_bool(run_as_daemon, false,
             "If true, run the receiver as never ending process");
 
 DEFINE_string(directory, ".", "Source/Destination directory");
-DEFINE_bool(files, false,
-            "If true, read a list of files and optional "
-            "filesizes from stdin relative to the directory and transfer then");
+DEFINE_string(manifest, "",
+              "If specified, then we will read a list of files and optional "
+              "sizes from this file, use - for stdin");
 DEFINE_string(
     destination, "",
     "empty is server (destination) mode, non empty is destination host");
@@ -46,7 +47,7 @@ DEFINE_string(transfer_id, "",
               "Transfer id. Receiver will generate one to be used (via URL) on"
               " the sender if not set explicitly");
 DEFINE_int32(
-    protocol_version, facebook::wdt::Protocol::protocol_version,
+    protocol_version, 0,
     "Protocol version to use, this is used to simulate protocol negotiation");
 
 DEFINE_string(connection_url, "",
@@ -80,10 +81,10 @@ std::condition_variable abortCondVar;
 
 void setUpAbort(WdtBase &senderOrReceiver) {
   int abortSeconds = FLAGS_abort_after_seconds;
-  LOG(INFO) << "Setting up abort " << abortSeconds << " seconds.";
   if (abortSeconds <= 0) {
     return;
   }
+  LOG(INFO) << "Setting up abort " << abortSeconds << " seconds.";
   static std::atomic<bool> abortTrigger{false};
   senderOrReceiver.setAbortChecker(
       std::make_shared<WdtAbortChecker>(abortTrigger));
@@ -105,6 +106,19 @@ void setUpAbort(WdtBase &senderOrReceiver) {
 void cancelAbort() {
   std::unique_lock<std::mutex> lk(abortMutex);
   abortCondVar.notify_one();
+}
+
+void readManifest(std::istream &fin, WdtTransferRequest &req) {
+  std::string line;
+  while (std::getline(fin, line)) {
+    std::vector<std::string> fields;
+    folly::split('\t', line, fields, true);
+    if (fields.empty() || fields.size() > 2) {
+      LOG(FATAL) << "Invalid input manifest: " << line;
+    }
+    int64_t filesize = fields.size() > 1 ? folly::to<int64_t>(fields[1]) : -1;
+    req.fileInfo.emplace_back(fields[0], filesize);
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -146,9 +160,18 @@ int main(int argc, char *argv[]) {
 
   // General case : Sender or Receiver
   const auto &options = WdtOptions::get();
-  WdtTransferRequest req(options.start_port, options.num_ports,
-                         FLAGS_directory);
-  req.transferId = FLAGS_transfer_id;
+  std::unique_ptr<WdtTransferRequest> reqPtr;
+  if (FLAGS_connection_url.empty()) {
+    reqPtr = folly::make_unique<WdtTransferRequest>(
+        options.start_port, options.num_ports, FLAGS_directory);
+    reqPtr->hostName = FLAGS_destination;
+    reqPtr->transferId = FLAGS_transfer_id;
+  } else {
+    LOG(INFO) << "Input url: " << FLAGS_connection_url;
+    reqPtr = folly::make_unique<WdtTransferRequest>(FLAGS_connection_url);
+    reqPtr->directory = FLAGS_directory;
+  }
+  WdtTransferRequest &req = *reqPtr;
   if (FLAGS_protocol_version > 0) {
     req.protocolVersion = FLAGS_protocol_version;
   }
@@ -183,29 +206,17 @@ int main(int argc, char *argv[]) {
     }
   } else {
     // Sender mode
-    std::vector<FileInfo> fileInfo;
-    if (FLAGS_files) {
+    if (!FLAGS_manifest.empty()) {
       // Each line should have the filename and optionally
       // the filesize separated by a single space
-      std::string line;
-      while (std::getline(std::cin, line)) {
-        std::vector<std::string> fields;
-        folly::split('\t', line, fields, true);
-        if (fields.empty() || fields.size() > 2) {
-          LOG(FATAL) << "Invalid input in stdin: " << line;
-        }
-        int64_t filesize =
-            fields.size() > 1 ? folly::to<int64_t>(fields[1]) : -1;
-        fileInfo.emplace_back(fields[0], filesize);
+      if (FLAGS_manifest == "-") {
+        readManifest(std::cin, req);
+      } else {
+        std::ifstream fin(FLAGS_manifest);
+        readManifest(fin, req);
+        fin.close();
       }
-      req.fileInfo = fileInfo;
-    }
-    req.hostName = FLAGS_destination;
-    if (!FLAGS_connection_url.empty()) {
-      LOG(INFO) << "Input url: " << FLAGS_connection_url;
-      // TODO: merge instead
-      req = WdtTransferRequest(FLAGS_connection_url);
-      req.directory = FLAGS_directory;  // re-set it for now
+      LOG(INFO) << "Using files lists, number of files " << req.fileInfo.size();
     }
     Sender sender(req);
     WdtTransferRequest processedRequest = sender.init();
