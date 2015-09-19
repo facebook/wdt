@@ -146,3 +146,5 @@ WDT_OPT(resume_using_dir_tree, bool,
         "If true, destination directory tree is trusted during resumption. So, "
         "only the remaining portion of the files are transferred. This is only "
         "supported if preallocation and block mode are disabled");
+WDT_OPT(open_files_during_discovery, bool,
+        "If true, files are opened when they are discovered");

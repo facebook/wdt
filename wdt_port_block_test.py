@@ -1,13 +1,8 @@
 #! /usr/bin/env python
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
 import os
 import re
 import subprocess
-from time import sleep
 from time import time
 from threading import Thread
 
@@ -38,10 +33,6 @@ def main():
     url_match = re.search('\?.*ports=([0-9]+).*', connection_url)
     rest_of_url = url_match.group(0)
     port_to_block = url_match.group(1)
-
-    # this sleep is needed to allow receiver to start listening. Otherwise,
-    # nc will not be able to connect and the port will not be blocked
-    sleep(0.5)
 
     # start a thread to wait for receiver finish
     thread = Thread(target=wait_for_receiver_finish,
