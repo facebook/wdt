@@ -52,6 +52,15 @@ int TransferLogManager::open() {
   return fd;
 }
 
+bool TransferLogManager::openLog(const std::string &curSenderIp) {
+  const auto &options = WdtOptions::get();
+  WDT_CHECK(options.enable_download_resumption);
+  if (options.resume_using_dir_tree) {
+    return verifySenderIpAndOpen(curSenderIp);
+  }
+  return openAndStartWriter(curSenderIp);
+}
+
 bool TransferLogManager::openAndStartWriter(const std::string &curSenderIp) {
   bool verifySuccessful = verifySenderIpAndOpen(curSenderIp);
   if (fd_ >= 0) {
@@ -124,36 +133,26 @@ void TransferLogManager::encodeLogHeader(char *dest, int64_t &off,
   off += (size + sizeof(int16_t));
 }
 
-void TransferLogManager::addLogHeader(int64_t config) {
+void TransferLogManager::writeLogHeader(int64_t config) {
   if (fd_ < 0) {
     return;
   }
-  loggingEnabled_ = true;
-  VLOG(1) << "Adding log header " << LOG_VERSION << " " << recoveryId_;
+  VLOG(1) << "Writing log header " << LOG_VERSION << " " << recoveryId_;
+  const auto &options = WdtOptions::get();
   char buf[kMaxEntryLength];
   int64_t size = 0;
   encodeLogHeader(buf, size, config);
-
+  if (options.resume_using_dir_tree) {
+    int64_t written = ::write(fd_, buf, size);
+    if (written != size) {
+      PLOG(ERROR) << "Disk write error while writing log header " << written
+                  << " " << size;
+    }
+    return;
+  }
+  loggingEnabled_ = true;
   std::lock_guard<std::mutex> lock(mutex_);
   entries_.emplace_back(buf, size);
-}
-
-bool TransferLogManager::writeLogHeader(int64_t config) {
-  if (fd_ < 0) {
-    return false;
-  }
-  VLOG(1) << "Writing log header " << LOG_VERSION << " " << recoveryId_;
-  char buf[kMaxEntryLength];
-  int64_t size = 0;
-  encodeLogHeader(buf, size, config);
-
-  int64_t written = ::write(fd_, buf, size);
-  if (written != size) {
-    PLOG(ERROR) << "Disk write error while writing log header " << written
-                << " " << size;
-    return false;
-  }
-  return true;
 }
 
 void TransferLogManager::addFileCreationEntry(const std::string &fileName,
@@ -229,6 +228,15 @@ void TransferLogManager::addInvalidationEntry(int64_t seqId) {
   encodeInvalidationEntry(buf, size, seqId);
   std::lock_guard<std::mutex> lock(mutex_);
   entries_.emplace_back(buf, size + sizeof(int16_t));
+}
+
+bool TransferLogManager::closeLog() {
+  const auto &options = WdtOptions::get();
+  WDT_CHECK(options.enable_download_resumption);
+  if (options.resume_using_dir_tree) {
+    return close();
+  }
+  return closeAndStopWriter();
 }
 
 bool TransferLogManager::close() {

@@ -20,12 +20,15 @@ usage="
 The possible options to this script are
 -s sender protocol version
 -r receiver protocol version
--c combination of options to run. Valid values are 1, 2 and 3.
+-p start port
+-c combination of options to run. Valid values are 1, 2, 3 and 4.
    1. pre-allocation and block-mode enabled, resumption done using transfer log
    2. pre-allocation disabled, block-mode enabled, resumption done using
       directory tree. This effectively disables resumption.
    3. pre-allocation and block-mode disabled, resumption done using directory
       tree
+   4. pre-allocation enabled and block-mode disabled, resumption done using
+      transfer log
 "
 
 #protocol versions, used to check version verification
@@ -37,15 +40,19 @@ DISABLE_PREALLOCATION=false
 BLOCK_SIZE_MBYTES=10
 RESUME_USING_DIR_TREE=false
 
+STARTING_PORT=25000
+
 if [ "$1" == "-h" ]; then
   echo "$usage"
   exit 0
 fi
-while getopts ":c:s:r:h:" opt; do
+while getopts ":c:s:p:r:h:" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
     r) RECEIVER_PROTOCOL_VERSION="$OPTARG"
+    ;;
+    p) STARTING_PORT="$OPTARG"
     ;;
     c)
       case $OPTARG in
@@ -64,7 +71,11 @@ using directory tree"
            DISABLE_PREALLOCATION=true
            RESUME_USING_DIR_TREE=true
         ;;
-        *) echo "Invalid combination, valid values are 1, 2 and 3"
+        4) echo "pre-allocation enabled, block-mode disabled, resumption done \
+using transfer log"
+        BLOCK_SIZE_MBYTES=0
+        ;;
+        *) echo "Invalid combination, valid values are 1, 2, 3 and 4"
            exit 1
         ;;
       esac
@@ -81,7 +92,6 @@ echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
 version $RECEIVER_PROTOCOL_VERSION"
 
 threads=4
-STARTING_PORT=22500
 ERROR_COUNT=10
 
 #sender and receiver id, used to check transfer-id verification
@@ -99,7 +109,7 @@ WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 WDTBIN_CLIENT="$WDTBIN -recovery_id=abcdef"
 WDTBIN_SERVER=$WDTBIN
 
-BASEDIR=/tmp/wdtTest_$USER
+BASEDIR=/dev/shm/wdtTest_$USER
 
 mkdir -p $BASEDIR
 DIR=`mktemp -d $BASEDIR/XXXXXX`
@@ -112,8 +122,6 @@ SRC_DIR=$DIR/src
 generateRandomFiles $SRC_DIR 16777216
 
 TEST_COUNT=0
-# Tests for which there is no need to verify source and destination md5s
-TESTS_SKIP_VERIFICATION=()
 
 echo "Testing that connection failure results in failed transfer"
 # first create a deep directory structure
@@ -132,7 +140,6 @@ cd $CURDIR
 _bin/wdt/wdt -directory $DIR/d -destination $HOSTNAME -max_retries 1 \
 -start_port $STARTING_PORT -num_ports $threads
 checkLastCmdStatusExpectingFailure
-TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Download resumption test(1)"
@@ -143,6 +150,7 @@ killCurrentTransfer
 rm -f $DIR/dst${TEST_COUNT}/file0
 startNewTransfer
 waitForTransferEnd
+verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Download resumption test(2)"
@@ -156,60 +164,36 @@ sleep 5
 killCurrentTransfer
 startNewTransfer
 waitForTransferEnd
+verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))
 
-echo "Download resumption with network error test(3)"
+echo "Download resumption with network error test"
 startNewTransfer
 sleep 10
 killCurrentTransfer
 startNewTransfer
-for ((i = 1; i <= ERROR_COUNT; i++))
-do
-  sleep 0.3 # sleep for 300ms
-  port=$((STARTING_PORT + RANDOM % threads))
-  echo "blocking $port"
-  sudo ip6tables-save > $DIR/ip6table
-  if [ $(($i % 2)) -eq 0 ]; then
-    sudo ip6tables -A INPUT -p tcp --sport $port -j DROP
-  else
-    sudo ip6tables -A INPUT -p tcp --dport $port -j DROP
-  fi
-  sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep more
-            # than that
-  echo "unblocking $port"
-  sudo ip6tables-restore < $DIR/ip6table
-done
+simulateNetworkGlitchesByDropping
 waitForTransferEnd
+verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))
 
-echo "Download resumption with network error test(4)"
+echo "Download resumption with network error and block size change test(1)"
 startNewTransfer
-for ((i = 1; i <= ERROR_COUNT; i++))
-do
-  sleep 0.3 # sleep for 300ms
-  port=$((STARTING_PORT + RANDOM % threads))
-  echo "blocking $port"
-  sudo ip6tables-save > $DIR/ip6table
-  if [ $(($i % 2)) -eq 0 ]; then
-    sudo ip6tables -A INPUT -p tcp --sport $port -j DROP
-  else
-    sudo ip6tables -A INPUT -p tcp --dport $port -j DROP
-  fi
-  sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep more
-            # than that
-  echo "unblocking $port"
-  sudo ip6tables-restore < $DIR/ip6table
-done
+simulateNetworkGlitchesByDropping
 killCurrentTransfer
 # change the block size for next transfer
 PRE_BLOCK_SIZE=$BLOCK_SIZE_MBYTES
-BLOCK_SIZE_MBYTES=8
+NEW_BLOCK_SIZE=8
+echo "Changing block size to $NEW_BLOCK_SIZE"
+BLOCK_SIZE_MBYTES=$NEW_BLOCK_SIZE
 startNewTransfer
 waitForTransferEnd
+verifyTransferAndCleanup
+echo "Resetting block size to $PRE_BLOCK_SIZE"
 BLOCK_SIZE_MBYTES=$PRE_BLOCK_SIZE
 TEST_COUNT=$((TEST_COUNT + 1))
 
-echo "Download resumption test for append-only file(5)"
+echo "Download resumption test for append-only file"
 # truncate file0
 cp $DIR/src/file0 $DIR/file0.bak
 truncate -s 10M $DIR/src/file0
@@ -223,6 +207,7 @@ sleep 5
 killCurrentTransfer
 startNewTransfer
 waitForTransferEnd
+verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))
 
 # abort set-up
@@ -254,7 +239,7 @@ if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   exit 1
 fi
 WDTBIN_CLIENT=$WDTBIN_CLIENT_OLD
-TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+removeDestination
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Abort timing test(2) - Receiver side abort"
@@ -262,8 +247,7 @@ WDTBIN_SERVER_OLD=$WDTBIN_SERVER
 WDTBIN_SERVER+=" -abort_check_interval_millis=$ABORT_CHECK_INTERVAL_MILLIS \
 -abort_after_seconds=$ABORT_AFTER_SECONDS"
 # Block a port to the beginning
-sudo ip6tables-save > $DIR/ip6table
-sudo ip6tables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
+blockDportByDropping "$STARTING_PORT"
 START_TIME_MILLIS=`date +%s%3N`
 startNewTransfer
 wait $pidofreceiver
@@ -272,7 +256,7 @@ wait $pidofsender
 DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
 echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
 ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
-sudo ip6tables-restore < $DIR/ip6table
+unblockDportByDropping "$STARTING_PORT"
 if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
@@ -280,7 +264,7 @@ if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   exit 1
 fi
 WDTBIN_SERVER=$WDTBIN_SERVER_OLD
-TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+removeDestination
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Transfer-id mismatch test"
@@ -289,7 +273,7 @@ SENDER_ID="abcdef"
 startNewTransfer
 waitForTransferEndExpectingFailure
 SENDER_ID=$SENDER_ID_OLD
-TESTS_SKIP_VERIFICATION+=($TEST_COUNT)
+removeDestination
 TEST_COUNT=$((TEST_COUNT + 1))
 
 # create another src directory full of files with the same name and size as the
@@ -306,8 +290,6 @@ do
 done
 cd -
 
-# list of tests for which we should compare destination with $DIR/src1
-USE_OTHER_SRC_DIR=()
 echo "Test hostname mismatch"
 # start first transfer
 # change src directory and make the transfer IPV4
@@ -326,9 +308,10 @@ SRC_DIR=$DIR/src1
 startNewTransfer
 waitForTransferEnd
 SRC_DIR=$DIR/src
-USE_OTHER_SRC_DIR+=($TEST_COUNT)
+verifyTransferAndCleanup true
 TEST_COUNT=$((TEST_COUNT + 1))
 
-verifyTransferAndCleanup
+echo "Good run, deleting logs in $DIR"
+rm -rf "$DIR"
 
-exit $STATUS
+exit 0
