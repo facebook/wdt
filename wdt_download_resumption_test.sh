@@ -44,7 +44,7 @@ STARTING_PORT=25000
 
 if [ "$1" == "-h" ]; then
   echo "$usage"
-  exit 0
+  wdtExit 0
 fi
 while getopts ":c:s:p:r:h:" opt; do
   case $opt in
@@ -76,12 +76,12 @@ using transfer log"
         BLOCK_SIZE_MBYTES=0
         ;;
         *) echo "Invalid combination, valid values are 1, 2, 3 and 4"
-           exit 1
+           wdtExit 1
         ;;
       esac
     ;;
     h) echo "$usage"
-       exit
+        wdtExit
     ;;
     \?) echo "Invalid option -$OPTARG" >&2
     ;;
@@ -236,7 +236,7 @@ if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
   printServerLog
-  exit 1
+  wdtExit 1
 fi
 WDTBIN_CLIENT=$WDTBIN_CLIENT_OLD
 removeDestination
@@ -256,12 +256,12 @@ wait $pidofsender
 DURATION=$((END_TIME_MILLIS - START_TIME_MILLIS))
 echo "Abort timing test, transfer duration ${DURATION} ms, expected duration \
 ${EXPECTED_TRANSFER_DURATION_MILLIS} ms."
-unblockDportByDropping "$STARTING_PORT"
+undoLastIpTableChange
 if (( $DURATION > $EXPECTED_TRANSFER_DURATION_MILLIS \
   || $DURATION < $ABORT_AFTER_MILLIS )); then
   echo "Abort timing test failed, exiting"
   printServerLog
-  exit 1
+  wdtExit 1
 fi
 WDTBIN_SERVER=$WDTBIN_SERVER_OLD
 removeDestination
@@ -314,4 +314,4 @@ TEST_COUNT=$((TEST_COUNT + 1))
 echo "Good run, deleting logs in $DIR"
 rm -rf "$DIR"
 
-exit 0
+wdtExit 0

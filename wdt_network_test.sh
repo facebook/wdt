@@ -6,6 +6,17 @@ set -o pipefail
 
 source `dirname "$0"`/common_functions.sh
 
+processTransferFinish() {
+  # first check sender status
+  checkLastCmdStatus
+  wait $pidofreceiver
+  # check receiver status
+  checkLastCmdStatus
+  verifyTransferAndCleanup
+  undoLastIpTableChange
+  TEST_COUNT=$((TEST_COUNT + 1))
+}
+
 usage="
 The possible options to this script are
 -s sender protocol version
@@ -21,7 +32,7 @@ STARTING_PORT=24000
 
 if [ "$1" == "-h" ]; then
   echo "$usage"
-  exit 0
+  wdtExit 0
 fi
 while getopts ":s:p:r:h:" opt; do
   case $opt in
@@ -32,7 +43,7 @@ while getopts ":s:p:r:h:" opt; do
     p) STARTING_PORT="$OPTARG"
     ;;
     h) echo "$usage"
-       exit
+       wdtExit
     ;;
     \?) echo "Invalid option -$OPTARG" >&2
     ;;
@@ -84,11 +95,7 @@ $WDTBIN_BASE -ipv6 -num_ports=$threads \
 -start_port=$((STARTING_PORT + 1)) \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Testing with different less number of threads in sender
@@ -100,11 +107,7 @@ $WDTBIN_BASE -ipv6 -num_ports=$((threads - 1)) \
 -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing with more number of threads in client"
@@ -115,11 +118,7 @@ $WDTBIN_BASE -ipv6 -num_ports=$((threads + 1)) \
 -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Blocking sender port before transfer by
@@ -130,12 +129,7 @@ $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
 $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log
-unblockSportByDropping "$STARTING_PORT"
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing with port blocked before transfer(2)"
@@ -145,12 +139,7 @@ $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
 $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log
-unblockDportByDropping "$STARTING_PORT"
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Blocking a port in the middle of the transfer
@@ -165,12 +154,7 @@ sleep 5
 echo "blocking $STARTING_PORT"
 blockSportByDropping "$STARTING_PORT"
 wait $pidofsender
-unblockSportByDropping "$STARTING_PORT"
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer(2)"
@@ -185,12 +169,7 @@ PORT_TO_BLOCK=$((STARTING_PORT + 1))
 echo "blocking $PORT_TO_BLOCK"
 blockDportByDropping "$PORT_TO_BLOCK"
 wait $pidofsender
-unblockDportByDropping "$PORT_TO_BLOCK"
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer and more \
@@ -206,12 +185,7 @@ PORT_TO_BLOCK=$((STARTING_PORT + 1))
 echo "blocking $PORT_TO_BLOCK"
 blockDportByDropping "$PORT_TO_BLOCK"
 wait $pidofsender
-unblockDportByDropping "$PORT_TO_BLOCK"
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer and less \
@@ -227,12 +201,7 @@ PORT_TO_BLOCK=$((STARTING_PORT + 1))
 echo "blocking $PORT_TO_BLOCK"
 blockDportByDropping "$PORT_TO_BLOCK"
 wait $pidofsender
-unblockDportByDropping "$PORT_TO_BLOCK"
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Simulating network glitches by rejecting packets
@@ -245,11 +214,7 @@ $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 simulateNetworkGlitchesByRejecting
 wait $pidofsender # wait for the sender to finish
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Simulating network glitches by dropping packets
@@ -262,13 +227,9 @@ $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 simulateNetworkGlitchesByDropping
 wait $pidofsender # wait for the sender to finish
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-verifyTransferAndCleanup
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 echo "Good run, deleting logs in $DIR"
 rm -rf "$DIR"
 
-exit 0
+wdtExit 0

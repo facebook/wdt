@@ -1,33 +1,56 @@
+IPTABLE_LOCK_FILE="/tmp/wdt.iptable.lock"
+
+acquireIptableLock() {
+  while true
+  do
+    lockfile -r 0 $IPTABLE_LOCK_FILE
+    STATUS=$?
+    if [ $STATUS -eq 0 ]; then
+      break
+    fi
+    echo "Failed to get iptable lock"
+  done
+}
+
+releaseIptableLock() {
+  rm -f $IPTABLE_LOCK_FILE
+}
+
 blockSportByDropping() {
+  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --sport "$1" -j DROP"
+  acquireIptableLock
   sudo ip6tables -A INPUT -p tcp --sport "$1" -j DROP
+  releaseIptableLock
 }
 
 blockDportByDropping() {
+  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --dport "$1" -j DROP"
+  acquireIptableLock
   sudo ip6tables -A INPUT -p tcp --dport "$1" -j DROP
+  releaseIptableLock
 }
 
 blockSportByRejecting() {
+  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --sport "$1" -j REJECT"
+  acquireIptableLock
   sudo ip6tables -A INPUT -p tcp --sport "$1" -j REJECT
+  releaseIptableLock
 }
 
 blockDportByRejecting() {
+  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --dport "$1" -j REJECT"
+  acquireIptableLock
   sudo ip6tables -A INPUT -p tcp --dport "$1" -j REJECT
+  releaseIptableLock
 }
 
-unblockSportByDropping() {
-  sudo ip6tables -D INPUT -p tcp --sport "$1" -j DROP
-}
-
-unblockDportByDropping() {
-  sudo ip6tables -D INPUT -p tcp --dport "$1" -j DROP
-}
-
-unblockSportByRejecting() {
-  sudo ip6tables -D INPUT -p tcp --sport "$1" -j REJECT 
-}
-
-unblockDportByRejecting() {
-  sudo ip6tables -D INPUT -p tcp --dport "$1" -j REJECT
+undoLastIpTableChange() {
+  if [ ! -z "$UNBLOCK_CMD" ]; then
+    acquireIptableLock
+    eval "$UNBLOCK_CMD"
+    releaseIptableLock
+    unset UNBLOCK_CMD
+  fi
 }
 
 simulateNetworkGlitchesByRejecting() {
@@ -41,13 +64,13 @@ simulateNetworkGlitchesByRejecting() {
       sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep
                 # more than that
       echo "unblocking $port"
-      unblockSportByRejecting $port
+      undoLastIpTableChange
     else
       blockDportByRejecting $port
       sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep
                 # more than that
       echo "unblocking $port"
-      unblockDportByRejecting $port
+      undoLastIpTableChange
     fi
   done
 }
@@ -63,13 +86,13 @@ simulateNetworkGlitchesByDropping() {
       sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep
                 # more than that
       echo "unblocking $port"
-      unblockSportByDropping $port
+      undoLastIpTableChange
     else
       blockDportByDropping $port
       sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep
                 # more than that
       echo "unblocking $port"
-      unblockDportByDropping $port
+      undoLastIpTableChange
     fi
   done
 }
@@ -79,12 +102,17 @@ printServerLog() {
   cat $DIR/server${TEST_COUNT}.log
 }
 
+wdtExit() {
+  undoLastIpTableChange
+  exit $1
+}
+
 checkLastCmdStatus() {
   LAST_STATUS=$?
   if [ $LAST_STATUS -ne 0 ] ; then
     echo "exiting abnormally with status $LAST_STATUS - aborting/failing test"
     printServerLog
-    exit $LAST_STATUS
+    wdtExit $LAST_STATUS
   fi
 }
 
@@ -93,7 +121,7 @@ checkLastCmdStatusExpectingFailure() {
   if [ $LAST_STATUS -eq 0 ] ; then
     echo "expecting wdt failure, but transfer was successful, failing test"
     printServerLog
-    exit 1
+    wdtExit 1
   fi
 }
 
@@ -127,12 +155,12 @@ generateRandomFiles() {
   if [ -z "$1" ]; then
     echo "generateRandomFile expects the directory to be passed as first \
       argument"
-    exit 1
+    wdtExit 1
   fi
   if [ -z "$2" ]; then
     echo "generateRandomFile expects base file size to be passed as second \
       argument"
-    exit 1
+    wdtExit 1
   fi
   mkdir -p $1
   cd $1
@@ -203,6 +231,13 @@ verifyTransferAndCleanup() {
     removeDestination
   else
     echo "Test $TEST_COUNT failed"
-    exit $STATUS
+    wdtExit $STATUS
   fi
 }
+
+signalHandler() {
+  echo "Caught signal, exiting..."
+  wdtExit 1
+}
+
+trap signalHandler SIGINT
