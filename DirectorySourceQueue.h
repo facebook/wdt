@@ -271,6 +271,9 @@ class DirectorySourceQueue : public SourceQueue {
    */
   void smartNotify(int32_t addedSource);
 
+  /// Removes all elements from the source queue
+  void clearSourceQueue();
+
   /// root directory to recurse on if fileInfo_ is empty
   std::string rootDir_;
 

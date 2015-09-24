@@ -29,38 +29,30 @@ namespace wdt {
 class TransferLogManager {
  public:
   /**
-   * Opens the log for writing and also starts a writer thread
-   *
-   * @param curSenderIp     current sender ip
-   *
-   * @return          If successful, true, else false
-   */
-  bool openAndStartWriter(const std::string &curSenderIp);
-
-  /**
-   * Verifies sender ip and opens the log for writing
+   * Verifies sender ip and opens the log for writing. In case of log based
+   * resumption, starts writer thread.
    *
    * @param curSenderIp     current sender ip
    *
    * @return         whether sender-ip matched log ip
    */
-  bool verifySenderIpAndOpen(const std::string &curSenderIp);
+  bool openLog(const std::string &curSenderIp);
 
   /**
-   * Adds a log header to the buffer
+   * In case of log based resumption, signals to the writer thread to finish.
+   * Waits for the writer thread to finish. Closes the transfer log.
+   *
+   * @return          If successful, true, else false
+   */
+  bool closeLog();
+
+  /**
+   * If resumption is based on directory tree, writes log header to the
+   * transfer log. Else, adds a file creation entry to the log buffer
    *
    * @param config    transfer config encoded as int
    */
-  void addLogHeader(int64_t config);
-
-  /**
-   * Writes log header to the transfer log
-   *
-   * @param config    transfer config encoded as int
-   *
-   * @return    whether the write was successful
-   */
-  bool writeLogHeader(int64_t config);
+  void writeLogHeader(int64_t config);
 
   /**
    * Adds a file creation entry to the log buffer
@@ -116,17 +108,6 @@ class TransferLogManager {
                      std::vector<FileChunksInfo> &fileChunksInfo);
 
   /**
-   * Signals to the writer thread to finish. Waits for the writer thread to
-   * finish. Closes the transfer log.
-   *
-   * @return          If successful, true, else false
-   */
-  bool closeAndStopWriter();
-
-  /// @return   whether the log was successfully closed or not
-  bool close();
-
-  /**
    * Unlinks wdt transfer log
    *
    * @return          If successful, true, else false
@@ -164,6 +145,35 @@ class TransferLogManager {
    * @return          If successful, true, else false
    */
   int open();
+
+  /**
+   * Opens the log for writing and also starts a writer thread
+   *
+   * @param curSenderIp     current sender ip
+   *
+   * @return          If successful, true, else false
+   */
+  bool openAndStartWriter(const std::string &curSenderIp);
+
+  /**
+   * Verifies sender ip and opens the log for writing
+   *
+   * @param curSenderIp     current sender ip
+   *
+   * @return         whether sender-ip matched log ip
+   */
+  bool verifySenderIpAndOpen(const std::string &curSenderIp);
+
+  /**
+   * Signals to the writer thread to finish. Waits for the writer thread to
+   * finish. Closes the transfer log.
+   *
+   * @return          If successful, true, else false
+   */
+  bool closeAndStopWriter();
+
+  /// @return   whether the log was successfully closed or not
+  bool close();
 
   /**
    * Truncates the log

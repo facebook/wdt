@@ -46,6 +46,9 @@ class WdtUri {
   /// Get the host name of the url
   std::string getHostName() const;
 
+  /// Get the port number
+  int32_t getPort() const;
+
   /// Get the query param by key
   std::string getQueryParam(const std::string& key) const;
 
@@ -54,6 +57,9 @@ class WdtUri {
 
   /// Sets hostname to generate a url
   void setHostName(const std::string& hostName);
+
+  /// Set the port for the uri
+  void setPort(int32_t port);
 
   /// Sets a query param in the query params map
   void setQueryParam(const std::string& key, const std::string& value);
@@ -86,8 +92,11 @@ class WdtUri {
   /// Prefix of the wdt url
   const std::string WDT_URL_PREFIX{"wdt://"};
 
-  /// Hostname where the receiver is running
+  /// Hostname/ip address in the uri
   std::string hostName_{""};
+
+  /// Port of the uri
+  int32_t port_{-1};
 
   /// Error code that reflects that status of parsing url
   ErrorCode errorCode_{OK};
@@ -138,6 +147,9 @@ struct WdtTransferRequest {
   /// Serialize this structure into a url string containing all fields
   std::string generateUrl(bool genFull = false) const;
 
+  /// Serialize the ports into uri
+  void serializePorts(WdtUri& wdtUri) const;
+
   /// Get stringified port list
   std::string getSerializedPortsList() const;
 
@@ -146,9 +158,12 @@ struct WdtTransferRequest {
 
   /// Names of the get parameters for different fields
   const static std::string TRANSFER_ID_PARAM;
-  const static std::string PROTOCOL_VERSION_PARAM;
+  /** Constant for for the protocol version get parameter in uri */
+  const static std::string RECEIVER_PROTOCOL_VERSION_PARAM;
   const static std::string DIRECTORY_PARAM;
   const static std::string PORTS_PARAM;
+  const static std::string START_PORT_PARAM;
+  const static std::string NUM_PORTS_PARAM;
 };
 
 /**
@@ -159,6 +174,10 @@ class WdtBase {
  public:
   /// Constructor
   WdtBase();
+
+  /// Get ports vector from startPort and numPorts
+  static std::vector<int32_t> genPortsVector(int32_t startPort,
+                                             int32_t numPorts);
 
   /**
    * Does the setup before start, returns the transfer request

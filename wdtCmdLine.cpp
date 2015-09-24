@@ -68,6 +68,9 @@ DEFINE_bool(print_options, false,
             "If true, wdt prints the option values and exits. Option values "
             "printed take into account option type and other command line "
             "flags specified.");
+DEFINE_bool(exit_on_bad_flags, true,
+            "If true, wdt exits on bad/unknown flag. Otherwise, an unknown "
+            "flags are ignored");
 
 using namespace facebook::wdt;
 template <typename T>
@@ -121,6 +124,12 @@ void readManifest(std::istream &fin, WdtTransferRequest &req) {
   }
 }
 
+namespace google {
+extern GFLAGS_DLL_DECL void (*gflags_exitfunc)(int);
+}
+
+bool badGflagFound = false;
+
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
@@ -134,8 +143,17 @@ int main(int argc, char *argv[]) {
   usage.append(google::ProgramInvocationShortName());
   usage.append(" -connection_url url_produced_by_receiver # for a sender");
   google::SetUsageMessage(usage);
+  google::gflags_exitfunc = [](int code) {
+    if (FLAGS_exit_on_bad_flags) {
+      exit(code);
+    }
+    badGflagFound = true;
+  };
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  if (badGflagFound) {
+    LOG(ERROR) << "Continuing despite bad flags";
+  }
   signal(SIGPIPE, SIG_IGN);
 
   FLAGS::initializeFromFlags();

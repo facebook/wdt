@@ -282,13 +282,15 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     // Make sure to join the progress thread.
     progressTrackerThread_.join();
   }
-  if (options.isLogBasedResumption()) {
-    transferLogManager_.closeAndStopWriter();
-  } else if (options.isDirectoryTreeBasedResumption()) {
-    transferLogManager_.close();
-  }
-
   std::unique_ptr<TransferReport> report = getTransferReport();
+
+  if (options.enable_download_resumption) {
+    transferLogManager_.closeLog();
+    if (report->getSummary().getCombinedErrorCode() == OK &&
+        !options.keep_transfer_log) {
+      transferLogManager_.unlink();
+    }
+  }
 
   if (progressReporter_ && totalSenderBytes_ >= 0) {
     report->setTotalFileSize(totalSenderBytes_);
@@ -313,7 +315,6 @@ std::unique_ptr<TransferReport> Receiver::finish() {
 }
 
 std::unique_ptr<TransferReport> Receiver::getTransferReport() {
-  const auto &options = WdtOptions::get();
   std::unique_ptr<TransferReport> report =
       folly::make_unique<TransferReport>(threadStats_);
   const TransferStats &summary = report->getSummary();
@@ -330,9 +331,6 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
     report->setErrorCode(ERROR);
   } else {
     report->setErrorCode(OK);
-    if (options.enable_download_resumption && !options.keep_transfer_log) {
-      transferLogManager_.unlink();
-    }
   }
   return report;
 }
@@ -562,14 +560,7 @@ void Receiver::startNewGlobalSession(ThreadData &data) {
   startTime_ = Clock::now();
 
   if (options.enable_download_resumption) {
-    bool verifySuccessful;
-    if (options.resume_using_dir_tree) {
-      verifySuccessful =
-          transferLogManager_.verifySenderIpAndOpen(socket.getPeerIp());
-    } else {
-      verifySuccessful =
-          transferLogManager_.openAndStartWriter(socket.getPeerIp());
-    }
+    bool verifySuccessful = transferLogManager_.openLog(socket.getPeerIp());
     if (!verifySuccessful) {
       fileChunksInfo_.clear();
     }
@@ -1274,10 +1265,8 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
         guard.dismiss();
         lock.lock();
         sendChunksStatus_ = SENT;
-        if (options.isDirectoryTreeBasedResumption()) {
+        if (options.enable_download_resumption) {
           transferLogManager_.writeLogHeader(getTransferConfig());
-        } else if (options.isLogBasedResumption()) {
-          transferLogManager_.addLogHeader(getTransferConfig());
         }
         conditionFileChunksSent_.notify_all();
         return READ_NEXT_CMD;
