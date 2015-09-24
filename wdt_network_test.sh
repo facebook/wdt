@@ -6,29 +6,44 @@ set -o pipefail
 
 source `dirname "$0"`/common_functions.sh
 
+processTransferFinish() {
+  # first check sender status
+  checkLastCmdStatus
+  wait $pidofreceiver
+  # check receiver status
+  checkLastCmdStatus
+  verifyTransferAndCleanup
+  undoLastIpTableChange
+  TEST_COUNT=$((TEST_COUNT + 1))
+}
+
 usage="
 The possible options to this script are
 -s sender protocol version
 -r receiver protocol version
+-p start port
 "
 
 #protocol versions, used to check version verification
 #version 0 represents default version
 SENDER_PROTOCOL_VERSION=0
 RECEIVER_PROTOCOL_VERSION=0
+STARTING_PORT=24000
 
 if [ "$1" == "-h" ]; then
   echo "$usage"
-  exit 0
+  wdtExit 0
 fi
-while getopts ":s:r:h:" opt; do
+while getopts ":s:p:r:h:" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
     r) RECEIVER_PROTOCOL_VERSION="$OPTARG"
     ;;
+    p) STARTING_PORT="$OPTARG"
+    ;;
     h) echo "$usage"
-       exit
+       wdtExit
     ;;
     \?) echo "Invalid option -$OPTARG" >&2
     ;;
@@ -39,9 +54,6 @@ echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
 version $RECEIVER_PROTOCOL_VERSION"
 
 threads=4
-# starting port is different from default because e2e test and this test will be
-# run in parallel during runtests.
-STARTING_PORT=22400
 ERROR_COUNT=25
 TEST_COUNT=0
 
@@ -83,10 +95,7 @@ $WDTBIN_BASE -ipv6 -num_ports=$threads \
 -start_port=$((STARTING_PORT + 1)) \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Testing with different less number of threads in sender
@@ -98,10 +107,7 @@ $WDTBIN_BASE -ipv6 -num_ports=$((threads - 1)) \
 -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing with more number of threads in client"
@@ -112,41 +118,28 @@ $WDTBIN_BASE -ipv6 -num_ports=$((threads + 1)) \
 -start_port=$STARTING_PORT \
 -destination $HOSTNAME -directory $DIR/src -full_reporting \
 |& tee -a $DIR/client${TEST_COUNT}.log
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Blocking sender port before transfer by
-sudo ip6tables-save > $DIR/ip6table
-sudo ip6tables -A INPUT -p tcp --sport $STARTING_PORT -j DROP
 echo "Testing with port blocked before transfer(1)"
+blockSportByDropping "$STARTING_PORT"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
 $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-sudo ip6tables-restore < $DIR/ip6table
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
-sudo ip6tables-save > $DIR/ip6table
-sudo ip6tables -A INPUT -p tcp --dport $STARTING_PORT -j DROP
 echo "Testing with port blocked before transfer(2)"
+blockDportByDropping "$STARTING_PORT"
 $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
 $DIR/server${TEST_COUNT}.log 2>&1 &
 pidofreceiver=$!
 $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-sudo ip6tables-restore < $DIR/ip6table
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Blocking a port in the middle of the transfer
@@ -158,15 +151,10 @@ $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 sleep 5
-sudo ip6tables-save > $DIR/ip6table
 echo "blocking $STARTING_PORT"
-sudo ip6tables -A INPUT -p tcp --sport $STARTING_PORT -j DROP
+blockSportByDropping "$STARTING_PORT"
 wait $pidofsender
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-sudo ip6tables-restore < $DIR/ip6table
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer(2)"
@@ -177,15 +165,11 @@ $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 sleep 5
-sudo ip6tables-save > $DIR/ip6table
-echo "blocking $STARTING_PORT"
-sudo ip6tables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
+PORT_TO_BLOCK=$((STARTING_PORT + 1))
+echo "blocking $PORT_TO_BLOCK"
+blockDportByDropping "$PORT_TO_BLOCK"
 wait $pidofsender
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-sudo ip6tables-restore < $DIR/ip6table
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer and more \
@@ -197,15 +181,11 @@ $WDTBIN_MORE_THREADS -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 sleep 5
-sudo ip6tables-save > $DIR/ip6table
-echo "blocking $STARTING_PORT"
-sudo ip6tables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
+PORT_TO_BLOCK=$((STARTING_PORT + 1))
+echo "blocking $PORT_TO_BLOCK"
+blockDportByDropping "$PORT_TO_BLOCK"
 wait $pidofsender
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-sudo ip6tables-restore < $DIR/ip6table
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer and less \
@@ -217,15 +197,11 @@ $WDTBIN_LESS_THREADS -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
 sleep 5
-sudo ip6tables-save > $DIR/ip6table
-echo "blocking $STARTING_PORT"
-sudo ip6tables -A INPUT -p tcp --dport $((STARTING_PORT + 1)) -j DROP
+PORT_TO_BLOCK=$((STARTING_PORT + 1))
+echo "blocking $PORT_TO_BLOCK"
+blockDportByDropping "$PORT_TO_BLOCK"
 wait $pidofsender
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-sudo ip6tables-restore < $DIR/ip6table
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Simulating network glitches by rejecting packets
@@ -236,27 +212,9 @@ pidofreceiver=$!
 $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
-for ((i = 1; i <= ERROR_COUNT; i++))
-do
-  sleep 0.3 # sleep for 300ms
-  port=$((STARTING_PORT + RANDOM % threads))
-  echo "blocking $port"
-  sudo ip6tables-save > $DIR/ip6table
-  if [ $(($i % 2)) -eq 0 ]; then
-    sudo ip6tables -A INPUT -p tcp --sport $port -j REJECT
-  else
-    sudo ip6tables -A INPUT -p tcp --dport $port -j REJECT
-  fi
-  sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep more
-            # than that
-  echo "unblocking $port"
-  sudo ip6tables-restore < $DIR/ip6table
-done
+simulateNetworkGlitchesByRejecting
 wait $pidofsender # wait for the sender to finish
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
 
 # Simulating network glitches by dropping packets
@@ -267,28 +225,11 @@ pidofreceiver=$!
 $WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
 $DIR/client${TEST_COUNT}.log &
 pidofsender=$!
-for ((i = 1; i <= ERROR_COUNT; i++))
-do
-  sleep 0.3 # sleep for 300ms
-  port=$((STARTING_PORT + RANDOM % threads))
-  echo "blocking $port"
-  sudo ip6tables-save > $DIR/ip6table
-  if [ $(($i % 2)) -eq 0 ]; then
-    sudo ip6tables -A INPUT -p tcp --sport $port -j DROP
-  else
-    sudo ip6tables -A INPUT -p tcp --dport $port -j DROP
-  fi
-  sleep 0.7 # sleep for 700ms, read/write timeout is 500ms, so must sleep more
-            # than that
-  echo "unblocking $port"
-  sudo ip6tables-restore < $DIR/ip6table
-done
+simulateNetworkGlitchesByDropping
 wait $pidofsender # wait for the sender to finish
-checkLastCmdStatus
-wait $pidofreceiver
-checkLastCmdStatus
-TEST_COUNT=$((TEST_COUNT + 1))
+processTransferFinish
 
-verifyTransferAndCleanup
+echo "Good run, deleting logs in $DIR"
+rm -rf "$DIR"
 
-exit $STATUS
+wdtExit 0

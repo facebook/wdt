@@ -128,6 +128,14 @@ bool DirectorySourceQueue::setRootDir(const string &newRootDir) {
   return true;
 }
 
+void DirectorySourceQueue::clearSourceQueue() {
+  // clear current content of the queue. For some reason, priority_queue does
+  // not have a clear method
+  while (!sourceQueue_.empty()) {
+    sourceQueue_.pop();
+  }
+}
+
 void DirectorySourceQueue::setPreviouslyReceivedChunks(
     std::vector<FileChunksInfo> &previouslyTransferredChunks) {
   std::unique_lock<std::mutex> lock(mutex_);
@@ -142,11 +150,7 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
     previouslyTransferredChunks_.insert(
         std::make_pair(chunkInfo.getFileName(), std::move(chunkInfo)));
   }
-  // clear current content of the queue. For some reason, priority_queue does
-  // not have a clear method
-  while (!sourceQueue_.empty()) {
-    sourceQueue_.pop();
-  }
+  clearSourceQueue();
   std::vector<SourceMetaData *> discoveredFileData = std::move(sharedFileData_);
   // recreate the queue
   for (const auto fileData : discoveredFileData) {
@@ -157,6 +161,9 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
 }
 
 DirectorySourceQueue::~DirectorySourceQueue() {
+  // need to remove all the sources because they access metadata at the
+  // destructor.
+  clearSourceQueue();
   for (SourceMetaData *fileData : sharedFileData_) {
     delete fileData;
   }

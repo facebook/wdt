@@ -59,6 +59,9 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
   if (fd < 0) {
     return -1;
   }
+  if (blockDetails->allocationStatus == EXISTS_CORRECT_SIZE) {
+    return fd;
+  }
   if (!setFileSize(fd, blockDetails->fileSize)) {
     close(fd);
     return -1;
@@ -75,8 +78,7 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
       transferLogManager_.addFileCreationEntry(
           blockDetails->fileName, blockDetails->seqId, blockDetails->fileSize);
     } else {
-      WDT_CHECK(blockDetails->allocationStatus == EXISTS_TOO_SMALL)
-          << blockDetails->allocationStatus;
+      WDT_CHECK_EQ(EXISTS_TOO_SMALL, blockDetails->allocationStatus);
       transferLogManager_.addFileResizeEntry(blockDetails->seqId,
                                              blockDetails->fileSize);
     }
