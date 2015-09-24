@@ -148,3 +148,5 @@ WDT_OPT(resume_using_dir_tree, bool,
         "supported if preallocation and block mode are disabled");
 WDT_OPT(open_files_during_discovery, bool,
         "If true, files are opened when they are discovered");
+WDT_OPT(url_backward_compatibility, bool,
+        "If true, we send url that works with older version(<19)");

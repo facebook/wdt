@@ -186,7 +186,12 @@ WdtUri& WdtUri::operator=(const string& url) {
   return *this;
 }
 
+// hard-coding
+const int WdtTransferRequest::LEGACY_PROTCOL_VERSION = 16;
+
 const string WdtTransferRequest::TRANSFER_ID_PARAM{"id"};
+// legacy protocol version
+const string WdtTransferRequest::LEGACY_PROTOCOL_VERSION_PARAM{"protocol"};
 /** RECeiver's Protocol Version */
 const string WdtTransferRequest::RECEIVER_PROTOCOL_VERSION_PARAM{"recpv"};
 const string WdtTransferRequest::DIRECTORY_PARAM{"dir"};
@@ -223,9 +228,9 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
     protocolVersion = folly::to<int64_t>(
         wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM));
   } catch (std::exception& e) {
-    LOG(ERROR) << "Error parsing protocol version "
-               << wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM);
-    errorCode = URI_PARSE_ERROR;
+    LOG(WARNING) << "Error parsing protocol version "
+                 << wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM) << " "
+                 << e.what();
   }
   string portsStr(wdtUri.getQueryParam(PORTS_PARAM));
   StringPiece portsList(portsStr);  // pointers into portsStr
@@ -281,6 +286,11 @@ string WdtTransferRequest::generateUrl(bool genFull) const {
   wdtUri.setQueryParam(TRANSFER_ID_PARAM, transferId);
   wdtUri.setQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
+  const auto &options = WdtOptions::get();
+  if (options.url_backward_compatibility) {
+    wdtUri.setQueryParam(LEGACY_PROTOCOL_VERSION_PARAM,
+                         folly::to<string>(LEGACY_PROTCOL_VERSION));
+  }
   serializePorts(wdtUri);
   if (genFull) {
     wdtUri.setQueryParam(DIRECTORY_PARAM, directory);
@@ -303,7 +313,8 @@ void WdtTransferRequest::serializePorts(WdtUri& wdtUri) const {
     }
     prevPort = ports[i];
   }
-  if (hasHoles) {
+  const auto &options = WdtOptions::get();
+  if (hasHoles || options.url_backward_compatibility) {
     wdtUri.setQueryParam(PORTS_PARAM, getSerializedPortsList());
   } else {
     wdtUri.setPort(ports[0]);
