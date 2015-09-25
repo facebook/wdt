@@ -69,7 +69,7 @@ ErrorCode WdtUri::process(const string& url) {
   urlPiece = StringPiece(url, WDT_URL_PREFIX.size());
   if (urlPiece.empty()) {
     LOG(ERROR) << "Empty host name " << url;
-    return URI_PARSE_ERROR;;
+    return URI_PARSE_ERROR;
   }
   ErrorCode status = OK;
   // Parse hot name
@@ -84,7 +84,7 @@ ErrorCode WdtUri::process(const string& url) {
     urlPiece.advance(hostNameEnd + 1);
   } else {
     size_t urlIndex = 0;
-    for (;urlIndex < urlPiece.size(); ++urlIndex) {
+    for (; urlIndex < urlPiece.size(); ++urlIndex) {
       if (urlPiece[urlIndex] == ':') {
         break;
       }
@@ -116,7 +116,7 @@ ErrorCode WdtUri::process(const string& url) {
       string portStr;
       portStr.assign(urlPiece.data(), 0, paramsIndex);
       port_ = folly::to<int32_t>(portStr);
-    } catch(std::exception& e) {
+    } catch (std::exception& e) {
       LOG(ERROR) << "Invalid port, can't be parsed " << url;
       status = URI_PARSE_ERROR;
     }
@@ -124,7 +124,7 @@ ErrorCode WdtUri::process(const string& url) {
   }
 
   if (urlPiece.empty()) {
-    return status;;
+    return status;
   }
 
   if (urlPiece[0] != '?') {
@@ -132,7 +132,7 @@ ErrorCode WdtUri::process(const string& url) {
     return URI_PARSE_ERROR;
   }
   urlPiece.advance(1);
-  //parse params
+  // parse params
   while (!urlPiece.empty()) {
     StringPiece keyValuePair = urlPiece.split_step('&');
     if (keyValuePair.empty()) {
@@ -431,12 +431,7 @@ void WdtBase::configureThrottler() {
   WDT_CHECK(!throttler_);
   VLOG(1) << "Configuring throttler options";
   const auto& options = WdtOptions::get();
-  double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
-  double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
-  double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
-  throttler_ = Throttler::makeThrottler(avgRateBytesPerSec, peakRateBytesPerSec,
-                                        bucketLimitBytes,
-                                        options.throttler_log_time_millis);
+  throttler_ = Throttler::makeThrottler(options);
   if (throttler_) {
     LOG(INFO) << "Enabling throttling " << *throttler_;
   } else {
