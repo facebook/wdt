@@ -37,6 +37,9 @@ class Throttler {
       double avgRateBytesPerSec, double peakRateBytesPerSec,
       double bucketLimitBytes, int64_t throttlerLogTimeMillis);
 
+  /// Utility method that makes throttler using the wdt options
+  static std::shared_ptr<Throttler> makeThrottler(const WdtOptions& options);
+
   /**
    * Sometimes the options passed to throttler might not make sense so this
    * method tries to auto configure them
@@ -108,6 +111,9 @@ class Throttler {
 
   /// Set the throttler logging time in millis
   void setThrottlerLogTimeMillis(int64_t throttlerLogTimeMillis);
+
+  /// Get the bytes processed till now
+  double getBytesProgress();
 
   friend std::ostream& operator<<(std::ostream& stream,
                                   const Throttler& throttler);

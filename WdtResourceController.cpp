@@ -30,7 +30,10 @@ void WdtControllerBase::updateMaxSendersLimit(int64_t maxNumSenders) {
 
 void WdtControllerBase::setThrottler(shared_ptr<Throttler> throttler) {
   throttler_ = throttler;
-  LOG(INFO) << "Set the throttler for " << controllerName_ << " " << *throttler;
+  if (throttler) {
+    LOG(INFO) << "Set the throttler for " << controllerName_ << " "
+              << *throttler;
+  }
 }
 
 shared_ptr<Throttler> WdtControllerBase::getThrottler() const {

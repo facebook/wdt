@@ -20,6 +20,15 @@ const double kPeakMultiplier = 1.2;
 const int kBucketMultiplier = 2;
 const double kTimeMultiplier = 0.25;
 
+std::shared_ptr<Throttler> Throttler::makeThrottler(const WdtOptions& options) {
+  double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
+  double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
+  double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
+  return Throttler::makeThrottler(avgRateBytesPerSec, peakRateBytesPerSec,
+                                  bucketLimitBytes,
+                                  options.throttler_log_time_millis);
+}
+
 std::shared_ptr<Throttler> Throttler::makeThrottler(
     double avgRateBytesPerSec, double peakRateBytesPerSec,
     double bucketLimitBytes, int64_t throttlerLogTimeMillis) {
@@ -224,6 +233,11 @@ void Throttler::deRegisterTransfer() {
   folly::SpinLockGuard lock(throttlerMutex_);
   WDT_CHECK(refCount_ > 0);
   refCount_--;
+}
+
+double Throttler::getBytesProgress() {
+  folly::SpinLockGuard lock(throttlerMutex_);
+  return bytesProgress_;
 }
 
 double Throttler::getAvgRateBytesPerSec() {

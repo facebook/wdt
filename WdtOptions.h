@@ -303,6 +303,11 @@ class WdtOptions {
   bool open_files_during_discovery{false};
 
   /**
+   * If true, we send url that works with older version(<19)
+   */
+  bool url_backward_compatibility{false};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;

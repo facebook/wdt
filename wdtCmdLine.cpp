@@ -187,6 +187,10 @@ int main(int argc, char *argv[]) {
   } else {
     LOG(INFO) << "Input url: " << FLAGS_connection_url;
     reqPtr = folly::make_unique<WdtTransferRequest>(FLAGS_connection_url);
+    if (reqPtr->errorCode != OK) {
+      LOG(ERROR) << "Invalid url " << errorCodeToStr(reqPtr->errorCode);
+      return ERROR;
+    }
     reqPtr->directory = FLAGS_directory;
   }
   WdtTransferRequest &req = *reqPtr;
