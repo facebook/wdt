@@ -274,7 +274,7 @@ Make sure to do the following, before "arc diff":
 
  fbconfig  --clang --with-project-version clang:dev -r  wdt
 
- fbmake runtests --extended-tests
+ fbmake runtests --run-disabled --extended-tests
  fbmake runtests_opt
  fbmake opt
 

@@ -24,21 +24,15 @@ ErrorCode FileWriter::open() {
   if (options.skip_writes) {
     return OK;
   }
-  if (blockDetails_->fileSize == blockDetails_->dataSize) {
-    // single block file
-    WDT_CHECK(blockDetails_->offset == 0);
-    fd_ = fileCreator_->openAndSetSize(blockDetails_);
-  } else {
-    // multi block file
-    fd_ = fileCreator_->openForBlocks(threadIndex_, blockDetails_);
-    if (fd_ >= 0 && blockDetails_->offset > 0) {
-      START_PERF_TIMER
-      if (lseek(fd_, blockDetails_->offset, SEEK_SET) < 0) {
-        PLOG(ERROR) << "Unable to seek " << blockDetails_->fileName;
-        close();
-      } else {
-        RECORD_PERF_RESULT(PerfStatReport::FILE_SEEK)
-      }
+  // TODO: consider a working optimization for small files
+  fd_ = fileCreator_->openForBlocks(threadIndex_, blockDetails_);
+  if (fd_ >= 0 && blockDetails_->offset > 0) {
+    START_PERF_TIMER
+    const int ret = lseek(fd_, blockDetails_->offset, SEEK_SET);
+    RECORD_PERF_RESULT(PerfStatReport::FILE_SEEK);
+    if (ret < 0) {
+      PLOG(ERROR) << "Unable to seek " << blockDetails_->fileName;
+      close();
     }
   }
   if (fd_ == -1) {

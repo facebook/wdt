@@ -58,7 +58,7 @@ ERROR_COUNT=25
 TEST_COUNT=0
 
 WDTBIN_BASE="_bin/wdt/wdt --transfer_id $$"
-WDTBIN_OPTS="-ipv6 -start_port=$STARTING_PORT \
+WDTBIN_OPTS="-enable_perf_stat_collection -ipv6 -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
 -progress_report_interval_millis=-1 -abort_check_interval_millis=100 \

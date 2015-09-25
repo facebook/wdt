@@ -301,6 +301,11 @@ class WdtOptions {
   bool url_backward_compatibility{false};
 
   /**
+   * If true, wdt can overwrite existing files
+   */
+  bool overwrite{false};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;

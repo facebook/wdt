@@ -58,17 +58,6 @@ class FileCreator {
   }
 
   /**
-   * Opens the file and sets its size. If the existing file size is greater than
-   * required size, the file is truncated using ftruncate. Space is
-   * allocated using posix_fallocate.
-   *
-   * @param blockDetails  block-details
-   *
-   * @return          file descriptor in case of success, -1 otherwise
-   */
-  int openAndSetSize(BlockDetails const *blockDetails);
-
-  /**
    * This is used to open the file in block mode. If the current thread is the
    * first one to try to open the file, then it allocates space using
    * openAndSetSize function. Other threads wait for the first thread to finish
@@ -95,17 +84,33 @@ class FileCreator {
 
  private:
   /**
+   * Opens the file and sets its size. If the existing file size is greater than
+   * required size, the file is truncated using ftruncate. Space is
+   * allocated using posix_fallocate.
+   *
+   * @param blockDetails  block-details
+   *
+   * @return          file descriptor in case of success, -1 otherwise
+   */
+  int openAndSetSize(BlockDetails const *blockDetails);
+
+  /**
    * Create a file and open for writing, recursively create subdirs.
    * Subdirs are only created once due to createdDirs_ cache, but
    * if an open fails where we assumed the directory already exists
    * based on cache, we try creating the dir and open again before
-   * failing.
+   * failing. Will not overwrite existing files unless overwrite option
+   * is set.
    *
    * @param relPath   path relative to root dir
    *
    * @return          file descriptor or -1 on error
    */
   int createFile(const std::string &relPath);
+  /**
+   * Open existing file
+   */
+  int openExistingFile(const std::string &relPath);
 
   /**
    * sets the size of the file. If the size is greater then the

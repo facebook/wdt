@@ -17,11 +17,14 @@ def start_receiver(receiver_cmd, root_dir, test_count):
                                         stdout=subprocess.PIPE,
                                         stderr=open(server_log, 'w'))
     connection_url = receiver_process.stdout.readline().strip()
+    if not connection_url:
+        print("ERR: Unable to get the connection url from receiver!")
     return (receiver_process, connection_url)
 
 def run_sender(sender_cmd, root_dir, test_count):
-    sender_cmd = sender_cmd + " 2>&1 | tee {0}/client{1}.log".format(
-            root_dir, test_count)
+    # TODO: fix this to not use tee, this is python...
+    sender_cmd = "sh -c \"set -o pipefail; " + sender_cmd \
+                + " 2>&1 | tee {0}/client{1}.log\"".format(root_dir, test_count)
     print("Sender: " + sender_cmd)
     return os.system(sender_cmd)
 
