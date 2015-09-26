@@ -286,7 +286,7 @@ string WdtTransferRequest::generateUrl(bool genFull) const {
   wdtUri.setQueryParam(TRANSFER_ID_PARAM, transferId);
   wdtUri.setQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
-  const auto &options = WdtOptions::get();
+  const auto& options = WdtOptions::get();
   if (options.url_backward_compatibility) {
     wdtUri.setQueryParam(LEGACY_PROTOCOL_VERSION_PARAM,
                          folly::to<string>(LEGACY_PROTCOL_VERSION));
@@ -313,7 +313,7 @@ void WdtTransferRequest::serializePorts(WdtUri& wdtUri) const {
     }
     prevPort = ports[i];
   }
-  const auto &options = WdtOptions::get();
+  const auto& options = WdtOptions::get();
   if (hasHoles || options.url_backward_compatibility) {
     wdtUri.setQueryParam(PORTS_PARAM, getSerializedPortsList());
   } else {

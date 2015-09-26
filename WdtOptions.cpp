@@ -11,9 +11,20 @@
 namespace facebook {
 namespace wdt {
 
-#define CHANGE_IF_NOT_SPECIFIED(option, specifiedOptions, value)  \
-  if (specifiedOptions.find(#option) == specifiedOptions.end()) { \
-    option = value;                                               \
+/**
+ * Macro to change the default of some flags based on some other flag
+ * Example of usage:
+ *  if (enable_download_resumption) {
+ *    CHANGE_IF_NOT_SPECIFIED(overwrite, userSpecifiedOptions, true,
+ *                            "(download resumption)")
+ *  }
+ */
+#define CHANGE_IF_NOT_SPECIFIED(option, specifiedOptions, value, msg)        \
+  if (specifiedOptions.find(#option) == specifiedOptions.end()) {            \
+    LOG(INFO) << "Setting " << #option << " to " << value << " " << msg;     \
+    option = value;                                                          \
+  } else {                                                                   \
+    LOG(INFO) << "Not overwriting user specified " << #option << " " << msg; \
   }
 
 const std::string WdtOptions::FLASH_OPTION_TYPE = "flash";
@@ -23,10 +34,13 @@ void WdtOptions::modifyOptions(
     const std::string& optionType,
     const std::set<std::string>& userSpecifiedOptions) {
   if (optionType == DISK_OPTION_TYPE) {
-    CHANGE_IF_NOT_SPECIFIED(num_ports, userSpecifiedOptions, 1)
-    CHANGE_IF_NOT_SPECIFIED(block_size_mbytes, userSpecifiedOptions, -1)
-    CHANGE_IF_NOT_SPECIFIED(disable_preallocation, userSpecifiedOptions, true)
-    CHANGE_IF_NOT_SPECIFIED(resume_using_dir_tree, userSpecifiedOptions, true)
+    std::string msg("(disk option type)");
+    CHANGE_IF_NOT_SPECIFIED(num_ports, userSpecifiedOptions, 1, msg)
+    CHANGE_IF_NOT_SPECIFIED(block_size_mbytes, userSpecifiedOptions, -1, msg)
+    CHANGE_IF_NOT_SPECIFIED(disable_preallocation, userSpecifiedOptions, true,
+                            msg)
+    CHANGE_IF_NOT_SPECIFIED(resume_using_dir_tree, userSpecifiedOptions, true,
+                            msg)
     return;
   }
   if (optionType != FLASH_OPTION_TYPE) {

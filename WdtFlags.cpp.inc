@@ -125,7 +125,7 @@ WDT_OPT(namespace_receiver_limit, int32,
         "A value of zero disables limits");
 
 #ifdef WDT_SUPPORTS_ODIRECT
-WDT_OPT(odirect_reads, bool, 
+WDT_OPT(odirect_reads, bool,
         "Wdt can read files in O_DIRECT mode, set this flag to true"
         " to make sender read all files in O_DIRECT");
 #else
@@ -150,3 +150,4 @@ WDT_OPT(open_files_during_discovery, bool,
         "If true, files are opened when they are discovered");
 WDT_OPT(url_backward_compatibility, bool,
         "If true, we send url that works with older version(<19)");
+WDT_OPT(overwrite, bool, "Allow the receiver to overwrite existing files");
