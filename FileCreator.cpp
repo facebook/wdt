@@ -55,7 +55,14 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
 
 int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
   const auto &options = WdtOptions::get();
-  int fd = createFile(blockDetails->fileName);
+  int fd;
+  const bool doCreate = blockDetails->allocationStatus == NOT_EXISTS;
+  const bool isTooLarge = (blockDetails->allocationStatus == EXISTS_TOO_LARGE);
+  if (doCreate) {
+    fd = createFile(blockDetails->fileName);
+  } else {
+    fd = openExistingFile(blockDetails->fileName);
+  }
   if (fd < 0) {
     return -1;
   }
@@ -67,14 +74,13 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
     return -1;
   }
   if (options.isLogBasedResumption()) {
-    if (blockDetails->allocationStatus == EXISTS_TOO_LARGE) {
+    if (isTooLarge) {
       LOG(WARNING) << "File size smaller in the sender side "
                    << blockDetails->fileName
                    << ", marking previous transferred chunks as invalid";
       transferLogManager_.addInvalidationEntry(blockDetails->prevSeqId);
     }
-    if (blockDetails->allocationStatus == EXISTS_TOO_LARGE ||
-        blockDetails->allocationStatus == NOT_EXISTS) {
+    if (isTooLarge || doCreate) {
       transferLogManager_.addFileCreationEntry(
           blockDetails->fileName, blockDetails->seqId, blockDetails->fileSize);
     } else {
@@ -147,10 +153,32 @@ int FileCreator::openForBlocks(int threadIndex,
       return -1;
     }
   }
-  return createFile(blockDetails->fileName);
+  return openExistingFile(blockDetails->fileName);
 }
 
 using std::string;
+
+int FileCreator::openExistingFile(const string &relPathStr) {
+  // This should have been validated earlier and errored out
+  // instead of crashing here
+  WDT_CHECK(!relPathStr.empty());
+  WDT_CHECK(relPathStr[0] != '/');
+  WDT_CHECK(relPathStr.back() != '/');
+
+  string path(rootDir_);
+  path.append(relPathStr);
+
+  int openFlags = O_WRONLY;
+  START_PERF_TIMER
+  int res = open(path.c_str(), openFlags, 0644);
+  RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
+  if (res < 0) {
+    PLOG(ERROR) << "failed opening file " << path;
+    return -1;
+  }
+  VLOG(1) << "successfully opened file " << path;
+  return res;
+}
 
 int FileCreator::createFile(const string &relPathStr) {
   CHECK(!relPathStr.empty());
@@ -167,19 +195,39 @@ int FileCreator::createFile(const string &relPathStr) {
   std::string dir;
   if (p) {
     dir.assign(relPathStr.data(), p);
-    if (!createDirRecursively(dir)) {
+    START_PERF_TIMER
+    const bool dirSuccess1 = createDirRecursively(dir);
+    RECORD_PERF_RESULT(PerfStatReport::DIRECTORY_CREATE)
+    if (!dirSuccess1) {
       // retry with force
       LOG(ERROR) << "failed to create dir " << dir << " recursively, "
                  << "trying to force directory creation";
-      if (!createDirRecursively(dir, true /* force */)) {
+      START_PERF_TIMER
+      const bool dirSuccess2 = createDirRecursively(dir, true /* force */);
+      RECORD_PERF_RESULT(PerfStatReport::DIRECTORY_CREATE)
+      if (!dirSuccess2) {
         LOG(ERROR) << "failed to create dir " << dir << " recursively";
         return -1;
       }
     }
   }
   int openFlags = O_CREAT | O_WRONLY;
+  auto &options = WdtOptions::get();
+  // When doing download resumption we sometime open files that do already
+  // exist and we need to overwrite them anyway (files which have been
+  // discarded from the log for some reason)
+  if (options.overwrite || options.enable_download_resumption) {
+    // Make sure file size resumption will not get messed up if we
+    // expect to create this file
+    openFlags |= O_TRUNC;
+  } else {
+    // Make sure open will fail if we don't allow overwriting and
+    // the file happens to already exist
+    openFlags |= O_EXCL;
+  }
   START_PERF_TIMER
   int res = open(path.c_str(), openFlags, 0644);
+  RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
   if (res < 0) {
     if (dir.empty()) {
       PLOG(ERROR) << "failed creating file " << path;
@@ -187,19 +235,22 @@ int FileCreator::createFile(const string &relPathStr) {
     }
     PLOG(ERROR) << "failed creating file " << path << ", trying to "
                 << "force directory creation";
-    if (!createDirRecursively(dir, true /* force */)) {
-      LOG(ERROR) << "failed to create dir " << dir << " recursively";
-      return -1;
+    {
+      START_PERF_TIMER
+      const bool dirSuccess = createDirRecursively(dir, true /* force */);
+      RECORD_PERF_RESULT(PerfStatReport::DIRECTORY_CREATE)
+      if (!dirSuccess) {
+        LOG(ERROR) << "failed to create dir " << dir << " recursively";
+        return -1;
+      }
     }
     START_PERF_TIMER
     res = open(path.c_str(), openFlags, 0644);
+    RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
     if (res < 0) {
       PLOG(ERROR) << "failed creating file " << path;
       return -1;
     }
-    RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
-  } else {
-    RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
   }
   VLOG(1) << "successfully created file " << path;
   return res;
@@ -210,7 +261,7 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
     return true;
   }
 
-  CHECK(dir.back() == '/');
+  WDT_CHECK(dir.back() == '/');
 
   int64_t lastIndex = dir.size() - 1;
   while (lastIndex > 0 && dir[lastIndex - 1] != '/') {

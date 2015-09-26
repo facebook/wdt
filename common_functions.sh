@@ -8,7 +8,7 @@ acquireIptableLock() {
     if [ $STATUS -eq 0 ]; then
       break
     fi
-    echo "Failed to get iptable lock"
+    echo "Failed to get iptable lock $IPTABLE_LOCK_FILE"
   done
 }
 
@@ -104,6 +104,9 @@ printServerLog() {
 
 wdtExit() {
   undoLastIpTableChange
+  if [ $1 -ne 0 ] ; then
+      echo "Failing test $0 : Test#${TEST_COUNT} - Logs in $DIR"
+  fi
   exit $1
 }
 
@@ -225,7 +228,7 @@ verifyTransferAndCleanup() {
   # treating PROTOCOL_ERROR as errors
   grep "PROTOCOL_ERROR" "$DIR/server${TEST_COUNT}.log" > /dev/null && STATUS=1
   grep "PROTOCOL_ERROR" "$DIR/client${TEST_COUNT}.log" > /dev/null && STATUS=1
-  
+
   if [ $STATUS -eq 0 ] ; then
     echo "Test $TEST_COUNT succeeded"
     removeDestination

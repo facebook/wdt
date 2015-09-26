@@ -476,6 +476,7 @@ class PerfStatReport {
     RECEIVER_WAIT_SLEEP,  // receiver sleep duration between sending wait cmd to
                           // sender. A high sum for this suggests threads
                           // were not properly load balanced
+    DIRECTORY_CREATE,
     END
   };
 

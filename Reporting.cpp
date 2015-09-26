@@ -246,9 +246,12 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
 folly::ThreadLocalPtr<PerfStatReport> perfStatReport;
 
 const std::string PerfStatReport::statTypeDescription_[] = {
-    "Socket Read", "Socket Write",    "File Open",          "File Close",
-    "File Read",   "File Write",      "Sync File Range",    "fsync",
-    "File Seek",   "Throttler Sleep", "Receiver Wait Sleep"};
+    "Socket Read",         "Socket Write",
+    "File Open",           "File Close",
+    "File Read",           "File Write",
+    "Sync File Range",     "fsync",
+    "File Seek",           "Throttler Sleep",
+    "Receiver Wait Sleep", "Directory creation"};
 
 PerfStatReport::PerfStatReport() {
   static_assert(
@@ -363,7 +366,7 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
         os << "p95 " << time << " ";
       }
       if (p99Count > runningCount && p99Count <= runningCount + count) {
-        os << "p99 " << time << "\n";
+        os << "p99 " << time;
       }
       runningCount += count;
 
@@ -373,7 +376,7 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
       }
       buckets[currentBucketIndex] += count;
     }
-
+    os << '\n';
     for (int i = 0; i < numBuckets; i++) {
       if (buckets[i] == 0) {
         continue;
