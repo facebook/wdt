@@ -167,13 +167,14 @@ int main(int argc, char *argv[]) {
   // Odd ball case of log parsing
   if (FLAGS_parse_transfer_log) {
     // Log parsing mode
+    WdtOptions::getMutable().enable_download_resumption = true;
     TransferLogManager transferLogManager;
     transferLogManager.setRootDir(FLAGS_directory);
-    if (!transferLogManager.parseAndPrint()) {
-      LOG(ERROR) << "Transfer log parsing failed";
-      return ERROR;
-    }
-    return OK;
+    transferLogManager.openLog();
+    bool success = transferLogManager.parseAndPrint();
+    LOG_IF(ERROR, success) << "Transfer log parsing failed";
+    transferLogManager.closeLog();
+    return success ? OK : ERROR;
   }
 
   // General case : Sender or Receiver
