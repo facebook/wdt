@@ -78,7 +78,7 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
       LOG(WARNING) << "File size smaller in the sender side "
                    << blockDetails->fileName
                    << ", marking previous transferred chunks as invalid";
-      transferLogManager_.addInvalidationEntry(blockDetails->prevSeqId);
+      transferLogManager_.addFileInvalidationEntry(blockDetails->prevSeqId);
     }
     if (isTooLarge || doCreate) {
       transferLogManager_.addFileCreationEntry(

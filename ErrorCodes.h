@@ -25,28 +25,31 @@ namespace wdt {
 #define WDT_CHECK_GE CHECK_GE
 #define WDT_CHECK_GT CHECK_GT
 // Note : All the new errors should be defined at the end
-#define ERRORS                                                            \
-  X(OK)                      /** No error  */                             \
-  X(ERROR)                   /** Generic error  */                        \
-  X(ABORT)                   /** Abort */                                 \
-  X(CONN_ERROR)              /** Connection Error */                      \
-  X(CONN_ERROR_RETRYABLE)    /** Retryable connection error  */           \
-  X(SOCKET_READ_ERROR)       /** Socket read error  */                    \
-  X(SOCKET_WRITE_ERROR)      /** Socket write error  */                   \
-  X(BYTE_SOURCE_READ_ERROR)  /** Byte source(file) read error  */         \
-  X(FILE_WRITE_ERROR)        /** file write error  */                     \
-  X(MEMORY_ALLOCATION_ERROR) /** Memory allocation failure  */            \
-  X(PROTOCOL_ERROR)          /** WDT protocol error  */                   \
-  X(VERSION_MISMATCH)        /** Sender and Receiver version mismatch */  \
-  X(ID_MISMATCH)             /** Sender and Receiver id mismatch*/        \
-  X(CHECKSUM_MISMATCH)       /** Checksums do not match */                \
-  X(RESOURCE_NOT_FOUND)      /** Not found in the resource controller */  \
-  X(ABORTED_BY_APPLICATION)  /** Transfer was aborted by application */   \
-  X(VERSION_INCOMPATIBLE)    /** Sender/receiver version incompatible */  \
-  X(NOT_FOUND)               /** Not found in the resource controller */  \
-  X(QUOTA_EXCEEDED)          /** Quota exceeded in resource controller */ \
-  X(FEWER_PORTS)             /** Couldn't listen on all the ports */      \
-  X(URI_PARSE_ERROR)         /** Wdt uri passed couldn't be parsed*/
+#define ERRORS                                                                \
+  X(OK)                      /** No error  */                                 \
+  X(ERROR)                   /** Generic error  */                            \
+  X(ABORT)                   /** Abort */                                     \
+  X(CONN_ERROR)              /** Connection Error */                          \
+  X(CONN_ERROR_RETRYABLE)    /** Retryable connection error  */               \
+  X(SOCKET_READ_ERROR)       /** Socket read error  */                        \
+  X(SOCKET_WRITE_ERROR)      /** Socket write error  */                       \
+  X(BYTE_SOURCE_READ_ERROR)  /** Byte source(file) read error  */             \
+  X(FILE_WRITE_ERROR)        /** file write error  */                         \
+  X(MEMORY_ALLOCATION_ERROR) /** Memory allocation failure  */                \
+  X(PROTOCOL_ERROR)          /** WDT protocol error  */                       \
+  X(VERSION_MISMATCH)        /** Sender and Receiver version mismatch */      \
+  X(ID_MISMATCH)             /** Sender and Receiver id mismatch*/            \
+  X(CHECKSUM_MISMATCH)       /** Checksums do not match */                    \
+  X(RESOURCE_NOT_FOUND)      /** Not found in the resource controller */      \
+  X(ABORTED_BY_APPLICATION)  /** Transfer was aborted by application */       \
+  X(VERSION_INCOMPATIBLE)    /** Sender/receiver version incompatible */      \
+  X(NOT_FOUND)               /** Not found in the resource controller */      \
+  X(QUOTA_EXCEEDED)          /** Quota exceeded in resource controller */     \
+  X(FEWER_PORTS)             /** Couldn't listen on all the ports */          \
+  X(URI_PARSE_ERROR)         /** Wdt uri passed couldn't be parsed */         \
+  X(INCONSISTENT_DIRECTORY)  /** Destination directory is not consistent with \
+                                transfer log */                               \
+  X(INVALID_LOG)             /** Transfer log invalid */
 
 enum ErrorCode {
 #define X(A) A,
