@@ -215,6 +215,9 @@ class Receiver : public WdtBase {
     /// the server socket
     bool curConnectionVerified_{false};
 
+    /// whether the transfer is in block mode or not
+    bool isBlockMode_{true};
+
     /// Constructor for thread data
     ThreadData(int threadIndex, ServerSocket &socket,
                TransferStats &threadStats, int protocolVersion,
@@ -483,6 +486,12 @@ class Receiver : public WdtBase {
 
   /// Increments failed thread count, does not wait for transfer to finish
   void incrFailedThreadCountAndCheckForSessionEnd(ThreadData &data);
+
+  /// adds log header and also a directory invalidation entry if needed
+  void addTransferLogHeader(bool isBlockMode, bool isSenderResuming);
+
+  /// fix and close transfer log
+  void fixAndCloseTransferLog(bool transferSuccess);
 
   /**
    * Get transfer report, meant to be called after threads have been finished

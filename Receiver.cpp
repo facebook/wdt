@@ -284,13 +284,8 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   }
   std::unique_ptr<TransferReport> report = getTransferReport();
 
-  if (options.enable_download_resumption) {
-    transferLogManager_.closeLog();
-    if (report->getSummary().getCombinedErrorCode() == OK &&
-        !options.keep_transfer_log) {
-      transferLogManager_.unlink();
-    }
-  }
+  bool transferSuccess = (report->getSummary().getCombinedErrorCode() == OK);
+  fixAndCloseTransferLog(transferSuccess);
 
   if (progressReporter_ && totalSenderBytes_ >= 0) {
     report->setTotalFileSize(totalSenderBytes_);
@@ -349,27 +344,6 @@ ErrorCode Receiver::transferAsync() {
   if (!progressReporter_ && progressReportIntervalMillis > 0) {
     // if progress reporter has not been set, use the default one
     progressReporter_ = folly::make_unique<ProgressReporter>();
-  }
-  if (options.enable_download_resumption) {
-    WDT_CHECK(!options.skip_writes)
-        << "Can not skip transfers with download resumption turned on";
-    if (options.resume_using_dir_tree) {
-      WDT_CHECK(!options.shouldPreallocateFiles())
-          << "Can not resume using directory tree if preallocation is enabled";
-    }
-    bool success = transferLogManager_.parseAndMatch(
-        recoveryId_, getTransferConfig(), fileChunksInfo_);
-    if (success && options.resume_using_dir_tree) {
-      if (!fileChunksInfo_.empty()) {
-        LOG(ERROR)
-            << "Should not have any block entry in the transfer log in "
-               "case of resumption using directory tree. Ignoring the log.";
-        transferLogManager_.renameBuggyLog();
-        fileChunksInfo_.clear();
-      } else {
-        traverseDestinationDir(fileChunksInfo_);
-      }
-    }
   }
   start();
   return OK;
@@ -473,6 +447,21 @@ void Receiver::start() {
   }
   fileCreator_.reset(new FileCreator(destDir_, threadServerSockets_.size(),
                                      transferLogManager_));
+  if (options.enable_download_resumption) {
+    WDT_CHECK(!options.skip_writes)
+        << "Can not skip transfers with download resumption turned on";
+    if (options.resume_using_dir_tree) {
+      WDT_CHECK(!options.shouldPreallocateFiles())
+          << "Can not resume using directory tree if preallocation is enabled";
+    }
+    transferLogManager_.openLog();
+    ErrorCode code = transferLogManager_.parseAndMatch(
+        recoveryId_, getTransferConfig(), fileChunksInfo_);
+    if (code == OK && options.resume_using_dir_tree) {
+      WDT_CHECK(fileChunksInfo_.empty());
+      traverseDestinationDir(fileChunksInfo_);
+    }
+  }
   perfReports_.resize(threadServerSockets_.size());
   const int64_t numSockets = threadServerSockets_.size();
   for (int64_t i = 0; i < numSockets; i++) {
@@ -560,7 +549,8 @@ void Receiver::startNewGlobalSession(ThreadData &data) {
   startTime_ = Clock::now();
 
   if (options.enable_download_resumption) {
-    bool verifySuccessful = transferLogManager_.openLog(socket.getPeerIp());
+    bool verifySuccessful =
+        transferLogManager_.verifySenderIp(socket.getPeerIp());
     if (!verifySuccessful) {
       fileChunksInfo_.clear();
     }
@@ -812,7 +802,6 @@ Receiver::ReceiverState Receiver::processExitCmd(ThreadData &data) {
 /***PROCESS_SETTINGS_CMD***/
 Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   VLOG(1) << data << " entered PROCESS_SETTINGS_CMD state ";
-  auto &options = WdtOptions::get();
   char *buf = data.getBuf();
   auto &off = data.off_;
   auto &oldOffset = data.oldOffset_;
@@ -823,6 +812,7 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   auto &enableChecksum = data.enableChecksum_;
   auto &threadProtocolVersion = data.threadProtocolVersion_;
   auto &curConnectionVerified = data.curConnectionVerified_;
+  auto &isBlockMode = data.isBlockMode_;
   Settings settings;
   int senderProtocolVersion;
 
@@ -872,15 +862,8 @@ Receiver::ReceiverState Receiver::processSettingsCmd(ThreadData &data) {
   senderReadTimeout = settings.readTimeoutMillis;
   senderWriteTimeout = settings.writeTimeoutMillis;
   enableChecksum = settings.enableChecksum;
+  isBlockMode = !settings.blockModeDisabled;
   curConnectionVerified = true;
-
-  if (options.isDirectoryTreeBasedResumption()) {
-    if (!settings.blockModeDisabled) {
-      LOG(ERROR)
-          << "Can not support block mode when resuming using directory tree";
-      transferLogManager_.unlink();
-    }
-  }
 
   if (settings.sendFileChunks) {
     // We only move to SEND_FILE_CHUNKS state, if download resumption is enabled
@@ -910,6 +893,19 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   auto &enableChecksum = data.enableChecksum_;
   auto &protocolVersion = data.threadProtocolVersion_;
   auto &curBlockWrittenBytes = data.curBlockWrittenBytes_;
+  auto &isBlockMode = data.isBlockMode_;
+
+  // following block needs to be executed for the first file cmd. There is no
+  // harm in executing it more than once. number of blocks equal to 0 is a good
+  // approximation for first file cmd. Did not want to introduce another boolean
+  if (options.enable_download_resumption && threadStats.getNumBlocks() == 0) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (sendChunksStatus_ != SENT) {
+      // sender is not in resumption mode
+      addTransferLogHeader(isBlockMode, /* sender not resuming */ false);
+      sendChunksStatus_ = SENT;
+    }
+  }
 
   curBlockWrittenBytes = 0;
   BlockDetails blockDetails;
@@ -1164,12 +1160,12 @@ Receiver::ReceiverState Receiver::processSizeCmd(ThreadData &data) {
 
 Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
   LOG(INFO) << data << " entered SEND_FILE_CHUNKS state ";
-  auto &options = WdtOptions::get();
   char *buf = data.getBuf();
   auto bufferSize = data.bufferSize_;
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
   auto &senderReadTimeout = data.senderReadTimeout_;
+  auto &isBlockMode = data.isBlockMode_;
   int64_t toWrite;
   int64_t written;
   std::unique_lock<std::mutex> lock(mutex_);
@@ -1265,13 +1261,64 @@ Receiver::ReceiverState Receiver::sendFileChunks(ThreadData &data) {
         guard.dismiss();
         lock.lock();
         sendChunksStatus_ = SENT;
-        if (options.enable_download_resumption) {
-          transferLogManager_.writeLogHeader(getTransferConfig());
-        }
+        addTransferLogHeader(isBlockMode, /* sender resuming */ true);
         conditionFileChunksSent_.notify_all();
         return READ_NEXT_CMD;
       }
     }
+  }
+}
+
+void Receiver::addTransferLogHeader(bool isBlockMode, bool isSenderResuming) {
+  const auto &options = WdtOptions::get();
+  if (!options.enable_download_resumption) {
+    return;
+  }
+  bool invalidationEntryNeeded = false;
+  if (!isSenderResuming) {
+    LOG(INFO) << "Sender is not in resumption mode. Invalidating directory.";
+    invalidationEntryNeeded = true;
+  } else if (options.resume_using_dir_tree && isBlockMode) {
+    LOG(INFO) << "Sender is running in block mode, but receiver is running in "
+                 "size based resumption mode. Invalidating directory.";
+    invalidationEntryNeeded = true;
+  }
+  if (invalidationEntryNeeded) {
+    transferLogManager_.invalidateDirectory();
+  }
+  bool isInconsistentDirectory =
+      (transferLogManager_.getResumptionStatus() == INCONSISTENT_DIRECTORY);
+  bool shouldWriteHeader =
+      (!options.resume_using_dir_tree || !isInconsistentDirectory);
+  if (shouldWriteHeader) {
+    transferLogManager_.writeLogHeader();
+  }
+}
+
+void Receiver::fixAndCloseTransferLog(bool transferSuccess) {
+  const auto &options = WdtOptions::get();
+  if (!options.enable_download_resumption) {
+    return;
+  }
+
+  bool isInconsistentDirectory =
+      (transferLogManager_.getResumptionStatus() == INCONSISTENT_DIRECTORY);
+  bool isInvalidLog =
+      (transferLogManager_.getResumptionStatus() == INVALID_LOG);
+  if (transferSuccess && isInconsistentDirectory) {
+    // write log header to validate directory in case of success
+    WDT_CHECK(options.resume_using_dir_tree);
+    transferLogManager_.writeLogHeader();
+  }
+  transferLogManager_.closeLog();
+  if (!transferSuccess) {
+    return;
+  }
+  if (isInvalidLog) {
+    transferLogManager_.renameBuggyLog();
+  }
+  if (!options.keep_transfer_log) {
+    transferLogManager_.unlink();
   }
 }
 

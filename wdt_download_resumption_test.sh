@@ -7,6 +7,7 @@ set -o pipefail
 startNewTransfer() {
   $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} -start_port=$STARTING_PORT \
   -transfer_id=$RECEIVER_ID -protocol_version=$RECEIVER_PROTOCOL_VERSION \
+  -recovery_id=$RECOVERY_ID -disable_preallocation=$DISABLE_PREALLOCATION \
   >> $DIR/server${TEST_COUNT}.log 2>&1 &
   pidofreceiver=$!
   $WDTBIN_CLIENT -directory $SRC_DIR -destination $HOSTNAME \
@@ -39,6 +40,8 @@ RECEIVER_PROTOCOL_VERSION=0
 DISABLE_PREALLOCATION=false
 BLOCK_SIZE_MBYTES=10
 RESUME_USING_DIR_TREE=false
+
+RECOVERY_ID="foo"
 
 STARTING_PORT=25000
 
@@ -92,17 +95,17 @@ echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
 version $RECEIVER_PROTOCOL_VERSION"
 
 threads=4
-ERROR_COUNT=10
+ERROR_COUNT=5
 
 #sender and receiver id, used to check transfer-id verification
 SENDER_ID="123456"
 RECEIVER_ID="123456"
 
 WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
--avg_mbytes_per_sec=40 -max_mbytes_per_sec=50 -run_as_daemon=false \
+-avg_mbytes_per_sec=80 -max_mbytes_per_sec=90 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -keep_transfer_log=false \
--treat_fewer_port_as_error -disable_preallocation=$DISABLE_PREALLOCATION \
+-treat_fewer_port_as_error \
 -resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection \
 -connect_timeout_millis 100"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
@@ -167,6 +170,70 @@ waitForTransferEnd
 verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))
 
+echo "Download resumption test with log truncation"
+startNewTransfer
+sleep 5
+killCurrentTransfer
+LOG_FILE=$DIR/dst${TEST_COUNT}/.wdt.log
+LOG_SIZE=`stat --printf="%s" $LOG_FILE`
+NEW_LOG_SIZE=$(( LOG_SIZE / 2 ))
+truncate -s $NEW_LOG_SIZE $LOG_FILE
+startNewTransfer
+waitForTransferEnd
+verifyTransferAndCleanup
+TEST_COUNT=$((TEST_COUNT + 1))
+
+echo "Download resumption test with log corruption"
+startNewTransfer
+sleep 5
+killCurrentTransfer
+LOG_FILE=$DIR/dst${TEST_COUNT}/.wdt.log
+# write some garbage at the end of the log
+echo "abc" >> $LOG_FILE
+startNewTransfer
+sleep 2
+killCurrentTransfer
+startNewTransfer
+waitForTransferEnd
+
+# check whether we have .wdt.log.bug present or not
+stat "${LOG_FILE}.bug"
+if [ $? -ne 0 ]; then
+  printServerLog
+  echo "Transfer log corrupted, but not detected by wdt, failing test"
+  wdtExit 1
+fi
+rm "${LOG_FILE}.bug"
+
+verifyTransferAndCleanup
+TEST_COUNT=$((TEST_COUNT + 1))
+
+changePreallocationSettings() {
+  if [ $DISABLE_PREALLOCATION == "false" ]; then
+    DISABLE_PREALLOCATION="true"
+  else
+    DISABLE_PREALLOCATION="false"
+  fi
+}
+
+if [ $RESUME_USING_DIR_TREE == "false" ]; then
+  echo "Download resumption with pre-allocation settings changed in the middle"
+  startNewTransfer
+  sleep 5
+  killCurrentTransfer
+  # change pre-allocation settings
+  changePreallocationSettings
+  startNewTransfer
+  sleep 5
+  killCurrentTransfer
+  # change it back
+  changePreallocationSettings
+  startNewTransfer
+  waitForTransferEnd
+  verifyTransferAndCleanup
+  TEST_COUNT=$((TEST_COUNT + 1))
+fi
+
 echo "Download resumption with network error test"
 startNewTransfer
 sleep 10
@@ -177,21 +244,49 @@ waitForTransferEnd
 verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))
 
-echo "Download resumption with network error and block size change test(1)"
-startNewTransfer
-simulateNetworkGlitchesByDropping
-killCurrentTransfer
-# change the block size for next transfer
-PRE_BLOCK_SIZE=$BLOCK_SIZE_MBYTES
-NEW_BLOCK_SIZE=8
-echo "Changing block size to $NEW_BLOCK_SIZE"
-BLOCK_SIZE_MBYTES=$NEW_BLOCK_SIZE
-startNewTransfer
-waitForTransferEnd
-verifyTransferAndCleanup
-echo "Resetting block size to $PRE_BLOCK_SIZE"
-BLOCK_SIZE_MBYTES=$PRE_BLOCK_SIZE
-TEST_COUNT=$((TEST_COUNT + 1))
+if [ $BLOCK_SIZE_MBYTES -gt 0 ]; then
+  # try to change the block size and also disable block mode
+  NEW_BLOCK_SIZES=(8 0)
+else
+  # try to enable block mode
+  NEW_BLOCK_SIZES=(8)
+fi
+
+for NEW_BLOCK_SIZE in ${NEW_BLOCK_SIZES[*]}
+do
+  echo "Download resumption with network error and block size change test(1)"
+  startNewTransfer
+  simulateNetworkGlitchesByDropping
+  killCurrentTransfer
+  # change the block size for next transfer
+  PRE_BLOCK_SIZE=$BLOCK_SIZE_MBYTES
+  echo "Changing block size to $NEW_BLOCK_SIZE"
+  BLOCK_SIZE_MBYTES=$NEW_BLOCK_SIZE
+  startNewTransfer
+  waitForTransferEnd
+  verifyTransferAndCleanup
+  echo "Resetting block size to $PRE_BLOCK_SIZE"
+  BLOCK_SIZE_MBYTES=$PRE_BLOCK_SIZE
+  TEST_COUNT=$((TEST_COUNT + 1))
+
+  echo "Download resumption with network error and block size change test(2)"
+  startNewTransfer
+  simulateNetworkGlitchesByDropping
+  killCurrentTransfer
+  # change the block size for next transfer
+  PRE_BLOCK_SIZE=$BLOCK_SIZE_MBYTES
+  echo "Changing block size to $NEW_BLOCK_SIZE"
+  BLOCK_SIZE_MBYTES=$NEW_BLOCK_SIZE
+  startNewTransfer
+  sleep 5
+  killCurrentTransfer
+  echo "Resetting block size to $PRE_BLOCK_SIZE"
+  BLOCK_SIZE_MBYTES=$PRE_BLOCK_SIZE
+  startNewTransfer
+  waitForTransferEnd
+  verifyTransferAndCleanup
+  TEST_COUNT=$((TEST_COUNT + 1))
+done
 
 echo "Download resumption test for append-only file"
 # truncate file0
@@ -209,6 +304,27 @@ startNewTransfer
 waitForTransferEnd
 verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))
+
+if [ $RESUME_USING_DIR_TREE == "true" ] && [ $BLOCK_SIZE_MBYTES -eq 0 ]; then
+  # combination 3
+  echo "Test with download resumption disabled and block mode enabled \
+for the sender in the middle"
+  startNewTransfer
+  sleep 2
+  killCurrentTransfer
+  PREV_WDT_CLIENT=$WDTBIN_CLIENT
+  BLOCK_SIZE_MBYTES=1
+  WDTBIN_CLIENT="$WDTBIN_CLIENT -enable_download_resumption=false"
+  startNewTransfer
+  simulateNetworkGlitchesByDropping
+  killCurrentTransfer
+  WDTBIN_CLIENT=$PREV_WDT_CLIENT
+  BLOCK_SIZE_MBYTES=0
+  startNewTransfer
+  waitForTransferEnd
+  verifyTransferAndCleanup
+  TEST_COUNT=$((TEST_COUNT + 1))
+fi
 
 # abort set-up
 ABORT_AFTER_SECONDS=5
@@ -290,21 +406,54 @@ do
 done
 cd -
 
-echo "Test hostname mismatch"
+startAndKillIpv4Transfer() {
+  PREV_WDT_CLIENT=$WDTBIN_CLIENT
+  PREV_WDT_SERVER=$WDTBIN_SERVER
+  WDTBIN_CLIENT+=" -ipv6=false -ipv4"
+  WDTBIN_SERVER+=" -ipv6=false -ipv4"
+  startNewTransfer
+  sleep 5
+  killCurrentTransfer
+  # change it back to IPV6
+  WDTBIN_CLIENT=$PREV_WDT_CLIENT
+  WDTBIN_SERVER=$PREV_WDT_SERVER
+}
+
+echo "Test hostname mismatch(1)"
 # start first transfer
-# change src directory and make the transfer IPV4
-PREV_WDT_CLIENT=$WDTBIN_CLIENT
-PREV_WDT_SERVER=$WDTBIN_SERVER
-WDTBIN_CLIENT+=" -ipv6=false -ipv4"
-WDTBIN_SERVER+=" -ipv6=false -ipv4"
+startAndKillIpv4Transfer
+# change src directory
+SRC_DIR=$DIR/src1
+startNewTransfer
+waitForTransferEnd
+SRC_DIR=$DIR/src
+verifyTransferAndCleanup true
+TEST_COUNT=$((TEST_COUNT + 1))
+
+echo "Test hostname mismatch(2)"
+# start first transfer
+startAndKillIpv4Transfer
+# change src directory
+SRC_DIR=$DIR/src1
+startNewTransfer
+sleep 2
+killCurrentTransfer
+startNewTransfer
+waitForTransferEnd
+SRC_DIR=$DIR/src
+verifyTransferAndCleanup true
+TEST_COUNT=$((TEST_COUNT + 1))
+
+echo "Test recovery-id mismatch"
 startNewTransfer
 sleep 5
 killCurrentTransfer
-# change it back to IPV6
-WDTBIN_CLIENT=$PREV_WDT_CLIENT
-WDTBIN_SERVER=$PREV_WDT_SERVER
-# change src directory and make the transfer IPV6
+# change recovery-id and src directory
+RECOVERY_ID="bar"
 SRC_DIR=$DIR/src1
+startNewTransfer
+sleep 2
+killCurrentTransfer
 startNewTransfer
 waitForTransferEnd
 SRC_DIR=$DIR/src
