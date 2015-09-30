@@ -610,9 +610,8 @@ Sender::SenderState Sender::sendSettings(ThreadData &data) {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     sendFileChunks =
-        downloadResumptionEnabled_ &&
-        protocolVersion_ >= Protocol::DOWNLOAD_RESUMPTION_VERSION &&
-        !fileChunksReceived_;
+        (downloadResumptionEnabled_ &&
+         protocolVersion_ >= Protocol::DOWNLOAD_RESUMPTION_VERSION);
   }
   Settings settings;
   settings.readTimeoutMillis = readTimeoutMillis;
