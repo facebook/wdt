@@ -25,14 +25,31 @@ struct Checkpoint {
   int32_t port{0};
   int64_t numBlocks{0};
   int64_t lastBlockReceivedBytes{0};
+  int64_t lastBlockSeqId{-1};
+  int64_t lastBlockOffset{0};
 
   Checkpoint() {
   }
 
-  Checkpoint(int32_t port, int64_t numBlocks, int64_t lastBlockReceivedBytes) {
+  explicit Checkpoint(int32_t port) {
     this->port = port;
-    this->numBlocks = numBlocks;
-    this->lastBlockReceivedBytes = lastBlockReceivedBytes;
+  }
+
+  void resetLastBlockDetails() {
+    lastBlockReceivedBytes = 0;
+    lastBlockSeqId = -1;
+    lastBlockOffset = 0;
+  }
+
+  void setLastBlockDetails(int64_t seqId, int64_t offset,
+                           int64_t receivedBytes) {
+    this->lastBlockSeqId = seqId;
+    this->lastBlockOffset = offset;
+    this->lastBlockReceivedBytes = receivedBytes;
+  }
+
+  void incrNumBlocks() {
+    numBlocks++;
   }
 };
 
@@ -212,6 +229,8 @@ class Protocol {
   static const int HEADER_FLAG_AND_PREV_SEQ_ID_VERSION;
   /// version from which checkpoint started including file offset
   static const int CHECKPOINT_OFFSET_VERSION;
+  /// version from which checkpoint started including seq-id
+  static const int CHECKPOINT_SEQ_ID_VERSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
@@ -223,7 +242,6 @@ class Protocol {
     ABORT_CMD = 0x41,     // A)bort
     CHUNKS_CMD = 0x43,    // C)hunk
     ACK_CMD = 0x61,       // a)ck
-    EXIT_CMD = 0x65,      // e)xit
     SIZE_CMD = 0x5A,      // Si(Z)e
     FOOTER_CMD = 0x46,    // F)ooter
     LOCAL_CHECKPOINT_CMD =
@@ -242,8 +260,6 @@ class Protocol {
   static const int64_t kMaxHeader = 1 + 2 + PATH_MAX + 4 * 10 + 1 + 10;
   /// min number of bytes that must be send to unblock receiver
   static const int64_t kMinBufLength = 256;
-  /// max size of local checkpoint encoding
-  static const int64_t kMaxLocalCheckpoint = 10 + 3 * 10;
   /// max size of done command encoding(1 byte for cmd, 1 for status, 10 for
   /// number of blocks, 10 for number of bytes sent)
   static const int64_t kMaxDone = 2 + 2 * 10;
@@ -261,6 +277,10 @@ class Protocol {
   static const int64_t kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
   /// max size of version encoding
   static const int64_t kMaxVersion = 10;
+
+  static_assert(kMinBufLength <= kMaxHeader && kMaxSettings <= kMaxHeader,
+                "Minimum buffer size is kMaxHeader. Header and Settings cmd "
+                "must fit within the buffer");
 
   /**
    * Return the library version, including protocol.
@@ -281,6 +301,9 @@ class Protocol {
    */
   static int negotiateProtocol(int requestedProtocolVersion,
                                int curProtocolVersion = protocol_version);
+
+  /// @return     max local checkpoint length for a specific version
+  static int getMaxLocalCheckpointLength(int protocolVersion);
 
   /// encodes blockDetails into dest+off
   /// moves the off into dest pointer, not going past max

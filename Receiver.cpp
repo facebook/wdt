@@ -43,8 +43,9 @@ int64_t readAtLeast(ServerSocket &s, char *buf, int64_t max, int64_t atLeast,
                     int64_t len) {
   VLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
           << atLeast << " from " << s.getFd();
-  CHECK(len >= 0) << "negative len " << len;
-  CHECK(atLeast >= 0) << "negative atLeast " << atLeast;
+  CHECK_GE(len, 0);
+  CHECK_GT(atLeast, 0);
+  CHECK_LE(atLeast, max);
   int count = 0;
   while (len < atLeast) {
     // because we want to process data as soon as it arrives, tryFull option for
@@ -96,7 +97,6 @@ const Receiver::StateFunction Receiver::stateMap_[] = {
     &Receiver::sendLocalCheckpoint,
     &Receiver::readNextCmd,
     &Receiver::processFileCmd,
-    &Receiver::processExitCmd,
     &Receiver::processSettingsCmd,
     &Receiver::processDoneCmd,
     &Receiver::processSizeCmd,
@@ -715,27 +715,34 @@ Receiver::ReceiverState Receiver::sendLocalCheckpoint(ThreadData &data) {
   auto &socket = data.socket_;
   auto &threadStats = data.threadStats_;
   auto &doneSendFailure = data.doneSendFailure_;
-  auto &curBlockWrittenBytes = data.curBlockWrittenBytes_;
+  auto &checkpoint = data.checkpoint_;
   int32_t protocolVersion = data.threadProtocolVersion_;
   char *buf = data.getBuf();
 
-  // in case SEND_DONE failed, a special checkpoint(-1) is sent to signal this
-  // condition
-  auto checkpoint = doneSendFailure ? -1 : threadStats.getNumBlocks();
   std::vector<Checkpoint> checkpoints;
-  checkpoints.emplace_back(threadServerSockets_[data.threadIndex_].getPort(),
-                           checkpoint, curBlockWrittenBytes);
+  if (doneSendFailure) {
+    // in case SEND_DONE failed, a special checkpoint(-1) is sent to signal this
+    // condition
+    Checkpoint localCheckpoint(socket.getPort());
+    localCheckpoint.numBlocks = -1;
+    checkpoints.emplace_back(localCheckpoint);
+  } else {
+    checkpoints.emplace_back(checkpoint);
+  }
+
   int64_t off = 0;
-  Protocol::encodeCheckpoints(protocolVersion, buf, off,
-                              Protocol::kMaxLocalCheckpoint, checkpoints);
-  auto written = socket.write(buf, Protocol::kMaxLocalCheckpoint);
-  if (written != Protocol::kMaxLocalCheckpoint) {
+  const int checkpointLen =
+      Protocol::getMaxLocalCheckpointLength(protocolVersion);
+  Protocol::encodeCheckpoints(protocolVersion, buf, off, checkpointLen,
+                              checkpoints);
+  int written = socket.write(buf, checkpointLen);
+  if (written != checkpointLen) {
     LOG(ERROR) << "unable to write local checkpoint. write mismatch "
-               << Protocol::kMaxLocalCheckpoint << " " << written;
+               << checkpointLen << " " << written;
     threadStats.setErrorCode(SOCKET_WRITE_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
-  threadStats.addHeaderBytes(Protocol::kMaxLocalCheckpoint);
+  threadStats.addHeaderBytes(checkpointLen);
   if (doneSendFailure) {
     return SEND_DONE_CMD;
   }
@@ -756,16 +763,13 @@ Receiver::ReceiverState Receiver::readNextCmd(ThreadData &data) {
   oldOffset = off;
   numRead = readAtLeast(socket, buf + off, bufferSize - off,
                         Protocol::kMinBufLength, numRead);
-  if (numRead <= 0) {
+  if (numRead < Protocol::kMinBufLength) {
     LOG(ERROR) << "socket read failure " << Protocol::kMinBufLength << " "
                << numRead;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
   Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf[off++];
-  if (cmd == Protocol::EXIT_CMD) {
-    return PROCESS_EXIT_CMD;
-  }
   if (cmd == Protocol::DONE_CMD) {
     return PROCESS_DONE_CMD;
   }
@@ -781,22 +785,6 @@ Receiver::ReceiverState Receiver::readNextCmd(ThreadData &data) {
   LOG(ERROR) << "received an unknown cmd";
   threadStats.setErrorCode(PROTOCOL_ERROR);
   return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
-}
-
-/***PROCESS_EXIT_CMD STATE***/
-Receiver::ReceiverState Receiver::processExitCmd(ThreadData &data) {
-  LOG(INFO) << data << " entered PROCESS_EXIT_CMD state ";
-  auto &socket = data.socket_;
-  auto &threadStats = data.threadStats_;
-
-  if (data.numRead_ != 1) {
-    LOG(ERROR) << "Unexpected state for exit command. probably junk "
-                  "content. ignoring...";
-    threadStats.setErrorCode(PROTOCOL_ERROR);
-    return WAIT_FOR_FINISH_WITH_THREAD_ERROR;
-  }
-  LOG(ERROR) << "Got exit command in port " << socket.getPort() << " - exiting";
-  exit(0);
 }
 
 /***PROCESS_SETTINGS_CMD***/
@@ -892,7 +880,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   auto &pendingCheckpointIndex = data.pendingCheckpointIndex_;
   auto &enableChecksum = data.enableChecksum_;
   auto &protocolVersion = data.threadProtocolVersion_;
-  auto &curBlockWrittenBytes = data.curBlockWrittenBytes_;
+  auto &checkpoint = data.checkpoint_;
   auto &isBlockMode = data.isBlockMode_;
 
   // following block needs to be executed for the first file cmd. There is no
@@ -907,7 +895,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
     }
   }
 
-  curBlockWrittenBytes = 0;
+  checkpoint.resetLastBlockDetails();
   BlockDetails blockDetails;
 
   auto guard = folly::makeGuard([&socket, &threadStats] {
@@ -941,7 +929,9 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
                                         numRead + oldOffset, blockDetails);
   int64_t headerBytes = off - oldOffset;
   // transferred header length must match decoded header length
-  WDT_CHECK(headerLen == headerBytes);
+  WDT_CHECK_EQ(headerLen, headerBytes) << " " << blockDetails.fileName << " "
+                                       << blockDetails.seqId << " "
+                                       << protocolVersion;
   threadStats.addHeaderBytes(headerBytes);
   if (!success) {
     LOG(ERROR) << "Error decoding at"
@@ -963,8 +953,9 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
       // considering partially written block contents as valid, this bypasses
       // checksum verification
       // TODO: Make sure checksum verification work with checkpoint offsets
-      curBlockWrittenBytes = writer.getTotalWritten();
-      threadStats.addEffectiveBytes(headerBytes, curBlockWrittenBytes);
+      checkpoint.setLastBlockDetails(blockDetails.seqId, blockDetails.offset,
+                                     writer.getTotalWritten());
+      threadStats.addEffectiveBytes(headerBytes, writer.getTotalWritten());
     }
   });
 
@@ -1096,6 +1087,7 @@ Receiver::ReceiverState Receiver::processFileCmd(ThreadData &data) {
   }
   threadStats.addEffectiveBytes(headerBytes, blockDetails.dataSize);
   threadStats.incrNumBlocks();
+  checkpoint.incrNumBlocks();
   return READ_NEXT_CMD;
 }
 
@@ -1420,7 +1412,7 @@ Receiver::ReceiverState Receiver::waitForFinishWithThreadError(
   LOG(INFO) << data << " entered WAIT_FOR_FINISH_WITH_THREAD_ERROR state ";
   auto &threadStats = data.threadStats_;
   auto &socket = data.socket_;
-  auto curBlockWrittenBytes = data.curBlockWrittenBytes_;
+  auto &checkpoint = data.checkpoint_;
   // should only be in this state if there is some error
   WDT_CHECK(threadStats.getErrorCode() != OK);
 
@@ -1428,10 +1420,7 @@ Receiver::ReceiverState Receiver::waitForFinishWithThreadError(
   socket.closeAll();
 
   std::unique_lock<std::mutex> lock(mutex_);
-  // post checkpoint in case of an error
-  Checkpoint localCheckpoint(threadServerSockets_[data.threadIndex_].getPort(),
-                             threadStats.getNumBlocks(), curBlockWrittenBytes);
-  addCheckpoint(localCheckpoint);
+  addCheckpoint(checkpoint);
   waitingWithErrorThreadCount_++;
 
   if (areAllThreadsFinished(true)) {
