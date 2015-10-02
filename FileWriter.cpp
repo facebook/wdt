@@ -28,7 +28,7 @@ ErrorCode FileWriter::open() {
   fd_ = fileCreator_->openForBlocks(threadIndex_, blockDetails_);
   if (fd_ >= 0 && blockDetails_->offset > 0) {
     START_PERF_TIMER
-    const int ret = lseek(fd_, blockDetails_->offset, SEEK_SET);
+    const int64_t ret = lseek(fd_, blockDetails_->offset, SEEK_SET);
     RECORD_PERF_RESULT(PerfStatReport::FILE_SEEK);
     if (ret < 0) {
       PLOG(ERROR) << "Unable to seek " << blockDetails_->fileName;

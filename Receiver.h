@@ -124,7 +124,6 @@ class Receiver : public WdtBase {
     SEND_LOCAL_CHECKPOINT,
     READ_NEXT_CMD,
     PROCESS_FILE_CMD,
-    PROCESS_EXIT_CMD,
     PROCESS_SETTINGS_CMD,
     PROCESS_DONE_CMD,
     PROCESS_SIZE_CMD,
@@ -171,9 +170,6 @@ class Receiver : public WdtBase {
     int64_t off_{0};
     int64_t oldOffset_{0};
 
-    /// Number of bytes written for the current block
-    int64_t curBlockWrittenBytes_{0};
-
     /// number of checkpoints already transferred
     int checkpointIndex_{0};
 
@@ -218,6 +214,8 @@ class Receiver : public WdtBase {
     /// whether the transfer is in block mode or not
     bool isBlockMode_{true};
 
+    Checkpoint checkpoint_;
+
     /// Constructor for thread data
     ThreadData(int threadIndex, ServerSocket &socket,
                TransferStats &threadStats, int protocolVersion,
@@ -226,7 +224,8 @@ class Receiver : public WdtBase {
           socket_(socket),
           threadStats_(threadStats),
           threadProtocolVersion_(protocolVersion),
-          bufferSize_(bufferSize) {
+          bufferSize_(bufferSize),
+          checkpoint_(socket.getPort()) {
       buf_.reset(new char[bufferSize_]);
     }
 
@@ -313,7 +312,6 @@ class Receiver : public WdtBase {
    *                   PROCESS_FILE_CMD,
    *                   SEND_GLOBAL_CHECKPOINTS,
    * Next states : PROCESS_FILE_CMD,
-   *               PROCESS_EXIT_CMD,
    *               PROCESS_DONE_CMD,
    *               PROCESS_SETTINGS_CMD,
    *               PROCESS_SIZE_CMD,
@@ -321,13 +319,6 @@ class Receiver : public WdtBase {
    *               WAIT_FOR_FINISH_WITH_THREAD_ERROR(in case of protocol errors)
    */
   ReceiverState readNextCmd(ThreadData &data);
-  /**
-   * Processes exit cmd. Wdt standalone or any application will exit after
-   * reaching this state
-   * Previous states : READ_NEXT_CMD
-   * Next states :
-   */
-  ReceiverState processExitCmd(ThreadData &data);
   /**
    * Processes file cmd. Logic of how we write the file to the destination
    * directory is defined here.

@@ -30,6 +30,7 @@ const int Protocol::DOWNLOAD_RESUMPTION_VERSION = 13;
 const int Protocol::SETTINGS_FLAG_VERSION = 12;
 const int Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION = 13;
 const int Protocol::CHECKPOINT_OFFSET_VERSION = 16;
+const int Protocol::CHECKPOINT_SEQ_ID_VERSION = 21;
 
 const std::string Protocol::getFullVersion() {
   std::string fullVersion(WDT_VERSION_STR);
@@ -98,6 +99,24 @@ std::ostream &operator<<(std::ostream &os,
   return os;
 }
 
+int Protocol::getMaxLocalCheckpointLength(int protocolVersion) {
+  // add 10 for the size of the vector(local checkpoint is a vector of
+  // checkpoints with size 1). Even though, it only takes 1 byte to encode this,
+  // previous version of code assumes this to be 10. So, keeping this as 10
+  int length = 10;
+  // port & number of blocks
+  length += 2 * 10;
+  if (protocolVersion >= CHECKPOINT_OFFSET_VERSION) {
+    // number of bytes in the last block
+    length += 10;
+  }
+  if (protocolVersion >= CHECKPOINT_SEQ_ID_VERSION) {
+    // seq-id and block offset
+    length += 2 * 10;
+  }
+  return length;
+}
+
 void Protocol::encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
                             int64_t max, const BlockDetails &blockDetails) {
   encodeString(dest, off, blockDetails.fileName);
@@ -161,6 +180,10 @@ void Protocol::encodeCheckpoints(int protocolVersion, char *dest, int64_t &off,
     if (protocolVersion >= CHECKPOINT_OFFSET_VERSION) {
       encodeInt(dest, off, checkpoint.lastBlockReceivedBytes);
     }
+    if (protocolVersion >= CHECKPOINT_SEQ_ID_VERSION) {
+      encodeInt(dest, off, checkpoint.lastBlockSeqId);
+      encodeInt(dest, off, checkpoint.lastBlockOffset);
+    }
   }
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
@@ -178,6 +201,10 @@ bool Protocol::decodeCheckpoints(int protocolVersion, char *src, int64_t &off,
       checkpoint.numBlocks = decodeInt(br);
       if (protocolVersion >= CHECKPOINT_OFFSET_VERSION) {
         checkpoint.lastBlockReceivedBytes = decodeInt(br);
+      }
+      if (protocolVersion >= CHECKPOINT_SEQ_ID_VERSION) {
+        checkpoint.lastBlockSeqId = decodeInt(br);
+        checkpoint.lastBlockOffset = decodeInt(br);
       }
       off = br.start() - (uint8_t *)src;
       if (checkForOverflow(off, max)) {

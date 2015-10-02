@@ -6,12 +6,18 @@ set -o pipefail
 
 source `dirname "$0"`/common_functions.sh
 
+startNewTransfer() {
+  $WDTBIN_SERVER $EXTRA_SERVER_ARGS -directory $DIR/dst${TEST_COUNT} > \
+  $DIR/server${TEST_COUNT}.log 2>&1 &
+  pidofreceiver=$!
+  $WDTBIN_CLIENT $EXTRA_CLIENT_ARGS |& tee -a $DIR/client${TEST_COUNT}.log &
+  pidofsender=$!
+  unset EXTRA_SERVER_ARGS
+  unset EXTRA_CLIENT_ARGS
+}
+
 processTransferFinish() {
-  # first check sender status
-  checkLastCmdStatus
-  wait $pidofreceiver
-  # check receiver status
-  checkLastCmdStatus
+  waitForTransferEnd
   verifyTransferAndCleanup
   undoLastIpTableChange
   TEST_COUNT=$((TEST_COUNT + 1))
@@ -50,6 +56,8 @@ while getopts ":s:p:r:h:" opt; do
   esac
 done
 
+setBinaries
+
 echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
 version $RECEIVER_PROTOCOL_VERSION"
 
@@ -57,23 +65,22 @@ threads=4
 ERROR_COUNT=25
 TEST_COUNT=0
 
-WDTBIN_BASE="_bin/wdt/wdt --transfer_id $$"
-WDTBIN_OPTS="-enable_perf_stat_collection -ipv6 -start_port=$STARTING_PORT \
--avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
--full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
--progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
--max_transfer_retries=5 -treat_fewer_port_as_error -connect_timeout_millis 100"
-WDTBIN="$WDTBIN_BASE -num_ports=$threads $WDTBIN_OPTS"
-WDTBIN_SERVER="$WDTBIN -protocol_version=$RECEIVER_PROTOCOL_VERSION"
-WDTBIN_CLIENT="$WDTBIN -protocol_version=$SENDER_PROTOCOL_VERSION"
-WDTBIN_MORE_THREADS="$WDTBIN_BASE -num_ports=$((threads + 1)) $WDTBIN_OPTS"
-WDTBIN_LESS_THREADS="$WDTBIN_BASE -num_ports=$((threads - 1)) $WDTBIN_OPTS"
 BASEDIR=/dev/shm/wdtTest_$USER
 
 mkdir -p $BASEDIR
 DIR=`mktemp -d --tmpdir=$BASEDIR`
 echo "Testing in $DIR"
 
+WDTBIN_OPTS="-enable_perf_stat_collection -ipv6 -start_port=$STARTING_PORT \
+-avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
+-full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
+-progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
+-max_transfer_retries=10 -treat_fewer_port_as_error \
+-connect_timeout_millis 100 -transfer_id $$ -num_ports=$threads"
+WDTBIN_SERVER="$WDT_RECEIVER $WDTBIN_OPTS \
+  -protocol_version=$RECEIVER_PROTOCOL_VERSION"
+WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS -destination $HOSTNAME \
+  -protocol_version=$SENDER_PROTOCOL_VERSION -directory $DIR/src"
 #pkill -x wdt
 
 mkdir -p $DIR/src/dir1
@@ -85,148 +92,90 @@ do
 done
 
 
-
 # Testing with different start ports
 echo "Testing with different start ports in sender and receiver"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_BASE -ipv6 -num_ports=$threads \
--start_port=$((STARTING_PORT + 1)) \
--destination $HOSTNAME -directory $DIR/src -full_reporting \
-|& tee -a $DIR/client${TEST_COUNT}.log
+EXTRA_CLIENT_ARGS="-start_port=$((STARTING_PORT + 1))"
+startNewTransfer
 processTransferFinish
 
 
 # Testing with different less number of threads in sender
 echo "Testing with less number of threads in client"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_BASE -ipv6 -num_ports=$((threads - 1)) \
--start_port=$STARTING_PORT \
--destination $HOSTNAME -directory $DIR/src -full_reporting \
-|& tee -a $DIR/client${TEST_COUNT}.log
+EXTRA_CLIENT_ARGS="-num_ports=$((threads - 1))"
+startNewTransfer
 processTransferFinish
 
 
 echo "Testing with more number of threads in client"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_BASE -ipv6 -num_ports=$((threads + 1)) \
--start_port=$STARTING_PORT \
--destination $HOSTNAME -directory $DIR/src -full_reporting \
-|& tee -a $DIR/client${TEST_COUNT}.log
+EXTRA_CLIENT_ARGS="-num_ports=$((threads + 1))"
+startNewTransfer
 processTransferFinish
 
 
 # Blocking sender port before transfer by
 echo "Testing with port blocked before transfer(1)"
 blockSportByDropping "$STARTING_PORT"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
-$DIR/client${TEST_COUNT}.log
+startNewTransfer
 processTransferFinish
 
 
 echo "Testing with port blocked before transfer(2)"
 blockDportByDropping "$STARTING_PORT"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
-$DIR/client${TEST_COUNT}.log
+startNewTransfer
 processTransferFinish
 
 
 # Blocking a port in the middle of the transfer
 echo "Testing by blocking a port in the middle of the transfer(1)"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
-$DIR/client${TEST_COUNT}.log &
-pidofsender=$!
+startNewTransfer
 sleep 5
 echo "blocking $STARTING_PORT"
 blockSportByDropping "$STARTING_PORT"
-wait $pidofsender
 processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer(2)"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
-$DIR/client${TEST_COUNT}.log &
-pidofsender=$!
+startNewTransfer
 sleep 5
 PORT_TO_BLOCK=$((STARTING_PORT + 1))
 echo "blocking $PORT_TO_BLOCK"
 blockDportByDropping "$PORT_TO_BLOCK"
-wait $pidofsender
 processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer and more \
 client threads"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_MORE_THREADS -directory $DIR/src -destination $HOSTNAME |& tee -a \
-$DIR/client${TEST_COUNT}.log &
-pidofsender=$!
+EXTRA_CLIENT_ARGS="-num_ports=$((threads + 1))"
+startNewTransfer
 sleep 5
 PORT_TO_BLOCK=$((STARTING_PORT + 1))
 echo "blocking $PORT_TO_BLOCK"
 blockDportByDropping "$PORT_TO_BLOCK"
-wait $pidofsender
 processTransferFinish
 
 
 echo "Testing by blocking a port in the middle of the transfer and less \
 client threads"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_LESS_THREADS -directory $DIR/src -destination $HOSTNAME |& tee -a \
-$DIR/client${TEST_COUNT}.log &
-pidofsender=$!
+EXTRA_CLIENT_ARGS="-num_ports=$((threads - 1))"
+startNewTransfer
 sleep 5
 PORT_TO_BLOCK=$((STARTING_PORT + 1))
 echo "blocking $PORT_TO_BLOCK"
 blockDportByDropping "$PORT_TO_BLOCK"
-wait $pidofsender
 processTransferFinish
 
 
 # Simulating network glitches by rejecting packets
 echo "Simulating network glitches by rejecting packets"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
-$DIR/client${TEST_COUNT}.log &
-pidofsender=$!
+startNewTransfer
 simulateNetworkGlitchesByRejecting
-wait $pidofsender # wait for the sender to finish
 processTransferFinish
 
 
 # Simulating network glitches by dropping packets
 echo "Simulating network glitches by dropping packets"
-$WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} > \
-$DIR/server${TEST_COUNT}.log 2>&1 &
-pidofreceiver=$!
-$WDTBIN_CLIENT -directory $DIR/src -destination $HOSTNAME |& tee -a \
-$DIR/client${TEST_COUNT}.log &
-pidofsender=$!
+startNewTransfer
 simulateNetworkGlitchesByDropping
-wait $pidofsender # wait for the sender to finish
 processTransferFinish
 
 echo "Good run, deleting logs in $DIR"

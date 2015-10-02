@@ -124,7 +124,7 @@ done
 
 #for size in 1k 64K 512K 1M 16M 256M 512M 1G
 #for size in 512K 1M 16M 256M 512M 1G
-for size in 1k 64K 512K 1M 16M 256M 512M
+for size in 1k 64K 512K 1M 16M 256M
 do
     base=inp$size
     echo dd if=/dev/... of=$DIR/src/$base.1 bs=$size count=1
@@ -135,6 +135,7 @@ do
         cp $DIR/src/$base.1 $DIR/src/$base.$i
     done
 done
+fallocate -l 3G $DIR/src/file_big
 echo "done with setup"
 
 # test symlink issues
