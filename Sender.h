@@ -46,23 +46,24 @@ class ThreadTransferHistory {
    * Adds the source to the history. If global checkpoint has already been
    * received, then the source is returned to the queue.
    *
+   * @param protocolVersion        current sender protocol version
    * @param source      source to be added to history
    * @return            true if added to history, false if not added due to a
    *                    global checkpoint
    */
-  bool addSource(std::unique_ptr<ByteSource> &source);
+  bool addSource(int protocolVersion, std::unique_ptr<ByteSource> &source);
 
   /**
    * Sets checkpoint. Also, returns unacked sources to queue
    *
-   * @param numReceivedSources     number of sources acked by the receiver
-   * @param lastBlockReceivedBytes number of bytes received for the last block
+   * @param protocolVersion        current sender protocol version
+   * @param checkpoint             checkpoint received
    * @param globalCheckpoint       global or local checkpoint
    * @return                       number of sources returned to queue, -1 in
    *                               case of error
    */
-  int64_t setCheckpointAndReturnToQueue(int64_t numReceivedSources,
-                                        int64_t lastBlockReceivedBytes,
+  int64_t setCheckpointAndReturnToQueue(int protocolVersion,
+                                        const Checkpoint &checkpoint,
                                         bool globalCheckpoint);
 
   /**
@@ -76,9 +77,12 @@ class ThreadTransferHistory {
 
   /**
    * returns all unacked sources to the queue
+   *
+   * @param protocolVersion        current sender protocol version
+   *
    * @return            number of sources returned to queue, -1 in case of error
    */
-  int64_t returnUnackedSourcesToQueue();
+  int64_t returnUnackedSourcesToQueue(int protocolVersion);
 
   /**
    * @return    number of sources acked by the receiver
@@ -88,8 +92,9 @@ class ThreadTransferHistory {
   }
 
  private:
-  void markSourceAsFailed(std::unique_ptr<ByteSource> &source,
-                          int64_t receivedBytes);
+  void markSourceAsFailed(int protocolVersion,
+                          std::unique_ptr<ByteSource> &source,
+                          const Checkpoint *checkpoint);
 
   /// reference to global queue
   DirectorySourceQueue &queue_;
@@ -101,8 +106,8 @@ class ThreadTransferHistory {
   bool globalCheckpoint_{false};
   /// number of sources acked by the receiver thread
   int64_t numAcknowledged_{0};
-  /// number of bytes received for the last block
-  int64_t lastBlockReceivedBytes_{0};
+  /// last received checkpoint
+  std::unique_ptr<Checkpoint> lastCheckpoint_{nullptr};
   folly::SpinLock lock_;
 };
 

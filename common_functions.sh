@@ -1,5 +1,13 @@
 IPTABLE_LOCK_FILE="/tmp/wdt.iptable.lock"
 
+setTcOptions() {
+  sudo tc qdisc add dev lo root netem delay 20ms 10ms duplicate 1% corrupt 0.1%
+}
+
+clearTcOptions() {
+  sudo tc qdisc del dev lo root
+}
+
 acquireIptableLock() {
   while true
   do
@@ -51,6 +59,16 @@ undoLastIpTableChange() {
     releaseIptableLock
     unset UNBLOCK_CMD
   fi
+}
+
+setBinaries() {
+  if [ -z "$WDT_SENDER" ]; then
+    WDT_SENDER="_bin/wdt/wdt"
+  fi
+  if [ -z "$WDT_RECEIVER" ]; then
+    WDT_RECEIVER="_bin/wdt/wdt"
+  fi
+  echo "Sender binary : $WDT_SENDER, Receiver binary : $WDT_RECEIVER"
 }
 
 simulateNetworkGlitchesByRejecting() {
