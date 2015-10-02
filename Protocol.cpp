@@ -205,6 +205,7 @@ bool Protocol::decodeCheckpoints(int protocolVersion, char *src, int64_t &off,
       if (protocolVersion >= CHECKPOINT_SEQ_ID_VERSION) {
         checkpoint.lastBlockSeqId = decodeInt(br);
         checkpoint.lastBlockOffset = decodeInt(br);
+        checkpoint.hasSeqId = true;
       }
       off = br.start() - (uint8_t *)src;
       if (checkForOverflow(off, max)) {

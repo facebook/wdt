@@ -43,14 +43,13 @@ std::string ThreadTransferHistory::getSourceId(int64_t index) {
   return sourceId;
 }
 
-bool ThreadTransferHistory::addSource(int protocolVersion,
-                                      std::unique_ptr<ByteSource> &source) {
+bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
   folly::SpinLockGuard guard(lock_);
   if (globalCheckpoint_) {
     // already received an error for this thread
     VLOG(1) << "adding source after global checkpoint is received. Returning "
                "the source to the queue";
-    markSourceAsFailed(protocolVersion, source, lastCheckpoint_.get());
+    markSourceAsFailed(source, lastCheckpoint_.get());
     lastCheckpoint_.reset();
     queue_.returnToQueue(source);
     return false;
@@ -60,7 +59,7 @@ bool ThreadTransferHistory::addSource(int protocolVersion,
 }
 
 int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
-    int protocolVersion, const Checkpoint &checkpoint, bool globalCheckpoint) {
+    const Checkpoint &checkpoint, bool globalCheckpoint) {
   folly::SpinLockGuard guard(lock_);
   const int64_t historySize = history_.size();
   int64_t numReceivedSources = checkpoint.numBlocks;
@@ -95,7 +94,7 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
     history_.pop_back();
     const Checkpoint *checkpointPtr =
         (i == numFailedSources - 1 ? &checkpoint : nullptr);
-    markSourceAsFailed(protocolVersion, source, checkpointPtr);
+    markSourceAsFailed(source, checkpointPtr);
     sourcesToReturn.emplace_back(std::move(source));
   }
   queue_.returnToQueue(sourcesToReturn);
@@ -119,20 +118,18 @@ void ThreadTransferHistory::markAllAcknowledged() {
   numAcknowledged_ = history_.size();
 }
 
-int64_t ThreadTransferHistory::returnUnackedSourcesToQueue(
-    int protocolVersion) {
+int64_t ThreadTransferHistory::returnUnackedSourcesToQueue() {
   Checkpoint checkpoint;
   checkpoint.numBlocks = numAcknowledged_;
-  return setCheckpointAndReturnToQueue(protocolVersion, checkpoint, false);
+  return setCheckpointAndReturnToQueue(checkpoint, false);
 }
 
 void ThreadTransferHistory::markSourceAsFailed(
-    int protocolVersion, std::unique_ptr<ByteSource> &source,
-    const Checkpoint *checkpoint) {
+    std::unique_ptr<ByteSource> &source, const Checkpoint *checkpoint) {
   auto metadata = source->getMetaData();
   bool validCheckpoint = false;
   if (checkpoint != nullptr) {
-    if (protocolVersion >= Protocol::CHECKPOINT_SEQ_ID_VERSION) {
+    if (checkpoint->hasSeqId) {
       if ((checkpoint->lastBlockSeqId == metadata.seqId) &&
           (checkpoint->lastBlockOffset == source->getOffset())) {
         validCheckpoint = true;
@@ -342,7 +339,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
     if (allSourcesAcked) {
       transferHistory.markAllAcknowledged();
     } else {
-      transferHistory.returnUnackedSourcesToQueue(protocolVersion_);
+      transferHistory.returnUnackedSourcesToQueue();
     }
     if (WdtOptions::get().full_reporting) {
       std::vector<TransferStats> stats = transferHistory.popAckedSourceStats();
@@ -617,8 +614,8 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
     return READ_RECEIVER_CMD;
   }
 
-  auto numReturned = transferHistory.setCheckpointAndReturnToQueue(
-      protocolVersion_, checkpoint, false);
+  auto numReturned =
+      transferHistory.setCheckpointAndReturnToQueue(checkpoint, false);
   if (numReturned == -1) {
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
@@ -687,7 +684,7 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
   threadStats += transferStats;
   source->addTransferStats(transferStats);
   source->close();
-  if (!transferHistory.addSource(protocolVersion_, source)) {
+  if (!transferHistory.addSource(source)) {
     // global checkpoint received for this thread. no point in
     // continuing
     LOG(ERROR) << "global checkpoint received, no point in continuing";
@@ -1028,8 +1025,8 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
             << ", " << checkpoint.lastBlockSeqId << ", "
             << checkpoint.lastBlockOffset << ", "
             << checkpoint.lastBlockReceivedBytes;
-    transferHistories[errThread].setCheckpointAndReturnToQueue(
-        protocolVersion_, checkpoint, true);
+    transferHistories[errThread].setCheckpointAndReturnToQueue(checkpoint,
+                                                               true);
   }
   return SEND_BLOCKS;
 }
@@ -1123,7 +1120,7 @@ Sender::SenderState Sender::processVersionMismatch(ThreadData &data) {
                  << ports_[i] << " numAcked " << history.getNumAcked();
       return END;
     }
-    history.returnUnackedSourcesToQueue(protocolVersion_);
+    history.returnUnackedSourcesToQueue();
   }
 
   int negotiatedProtocol = 0;

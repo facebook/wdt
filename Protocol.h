@@ -27,7 +27,7 @@ struct Checkpoint {
   int64_t lastBlockReceivedBytes{0};
   int64_t lastBlockSeqId{-1};
   int64_t lastBlockOffset{0};
-
+  bool hasSeqId{false};
   Checkpoint() {
   }
 
