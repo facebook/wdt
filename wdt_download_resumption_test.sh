@@ -109,7 +109,7 @@ WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
 -enable_download_resumption -keep_transfer_log=false \
 -treat_fewer_port_as_error \
 -resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection \
--connect_timeout_millis 100 -max_transfer_retries=5"
+-connect_timeout_millis 100 -max_transfer_retries=6"
 WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS"
 WDTBIN_SERVER="$WDT_RECEIVER $WDTBIN_OPTS"
 
