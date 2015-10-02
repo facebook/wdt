@@ -44,6 +44,8 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 #set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_FLAGS "-msse4.2")
+#set(CMAKE_CXX_FLAGS "-msse4.2 -Wextra -Wsign-compare -Wunused-variable")
+#set(CMAKE_CXX_FLAGS "-msse4.2 -Wextra -Wsign-compare -Wunused-variable -Wconversion -Wsign-conversion")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "_bin/wdt")
 
 # Check that we have the Folly source tree
