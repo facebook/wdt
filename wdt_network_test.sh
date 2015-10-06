@@ -75,7 +75,7 @@ WDTBIN_OPTS="-enable_perf_stat_collection -ipv6 -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
 -progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
--max_transfer_retries=26 -treat_fewer_port_as_error \
+-treat_fewer_port_as_error \
 -connect_timeout_millis 100 -transfer_id $$ -num_ports=$threads"
 WDTBIN_SERVER="$WDT_RECEIVER $WDTBIN_OPTS \
   -protocol_version=$RECEIVER_PROTOCOL_VERSION"

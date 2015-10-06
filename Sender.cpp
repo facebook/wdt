@@ -58,7 +58,7 @@ bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
   return true;
 }
 
-int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
+ErrorCode ThreadTransferHistory::setCheckpointAndReturnToQueue(
     const Checkpoint &checkpoint, bool globalCheckpoint) {
   folly::SpinLockGuard guard(lock_);
   const int64_t historySize = history_.size();
@@ -68,25 +68,23 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
     LOG(ERROR)
         << "checkpoint is greater than total number of sources transfered "
         << history_.size() << " " << numReceivedSources;
-    return -1;
+    return INVALID_CHECKPOINT;
   }
-  if (numReceivedSources < numAcknowledged_) {
-    LOG(ERROR) << "new checkpoint is less than older checkpoint "
-               << numAcknowledged_ << " " << numReceivedSources;
-    return -1;
+  ErrorCode errCode = validateCheckpoint(checkpoint, globalCheckpoint);
+  if (errCode == INVALID_CHECKPOINT) {
+    return INVALID_CHECKPOINT;
   }
+  globalCheckpoint_ |= globalCheckpoint;
+  lastCheckpoint_ = folly::make_unique<Checkpoint>(checkpoint);
   int64_t numFailedSources = historySize - numReceivedSources;
   if (numFailedSources == 0 && lastBlockReceivedBytes > 0) {
-    if (globalCheckpoint) {
-      lastCheckpoint_ = folly::make_unique<Checkpoint>(checkpoint);
-    } else {
+    if (!globalCheckpoint) {
       // no block to apply checkpoint offset. This can happen if we receive same
       // local checkpoint without adding anything to the history
       LOG(WARNING) << "Local checkpoint has received bytes for last block, but "
                       "there are no unacked blocks in the history. Ignoring.";
     }
   }
-  globalCheckpoint_ |= globalCheckpoint;
   numAcknowledged_ = numReceivedSources;
   std::vector<std::unique_ptr<ByteSource>> sourcesToReturn;
   for (int64_t i = 0; i < numFailedSources; i++) {
@@ -98,7 +96,10 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
     sourcesToReturn.emplace_back(std::move(source));
   }
   queue_.returnToQueue(sourcesToReturn);
-  return numFailedSources;
+  LOG(INFO) << numFailedSources
+            << " number of sources returned to queue, checkpoint: "
+            << checkpoint;
+  return errCode;
 }
 
 std::vector<TransferStats> ThreadTransferHistory::popAckedSourceStats() {
@@ -118,10 +119,54 @@ void ThreadTransferHistory::markAllAcknowledged() {
   numAcknowledged_ = history_.size();
 }
 
-int64_t ThreadTransferHistory::returnUnackedSourcesToQueue() {
+void ThreadTransferHistory::returnUnackedSourcesToQueue() {
   Checkpoint checkpoint;
   checkpoint.numBlocks = numAcknowledged_;
-  return setCheckpointAndReturnToQueue(checkpoint, false);
+  setCheckpointAndReturnToQueue(checkpoint, false);
+}
+
+ErrorCode ThreadTransferHistory::validateCheckpoint(
+    const Checkpoint &checkpoint, bool globalCheckpoint) {
+  if (lastCheckpoint_ == nullptr) {
+    return OK;
+  }
+  if (checkpoint.numBlocks < lastCheckpoint_->numBlocks) {
+    LOG(ERROR) << "Current checkpoint must be higher than previous checkpoint, "
+                  "Last checkpoint: "
+               << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+    return INVALID_CHECKPOINT;
+  }
+  if (checkpoint.numBlocks > lastCheckpoint_->numBlocks) {
+    return OK;
+  }
+  bool noProgress = false;
+  // numBlocks same
+  if (checkpoint.lastBlockSeqId == lastCheckpoint_->lastBlockSeqId &&
+      checkpoint.lastBlockOffset == lastCheckpoint_->lastBlockOffset) {
+    // same block
+    if (checkpoint.lastBlockReceivedBytes !=
+        lastCheckpoint_->lastBlockReceivedBytes) {
+      LOG(ERROR) << "Current checkpoint has different received bytes, but all "
+                    "other fields are same, Last checkpoint "
+                 << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+      return INVALID_CHECKPOINT;
+    }
+    noProgress = true;
+  } else {
+    // different block
+    WDT_CHECK(checkpoint.lastBlockReceivedBytes >= 0);
+    if (checkpoint.lastBlockReceivedBytes == 0) {
+      noProgress = true;
+    }
+  }
+  if (noProgress && !globalCheckpoint) {
+    // we can get same global checkpoint multiple times, so no need to check for
+    // progress
+    LOG(WARNING) << "No progress since last checkpoint, Last checkpoint: "
+                 << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+    return NO_PROGRESS;
+  }
+  return OK;
 }
 
 void ThreadTransferHistory::markSourceAsFailed(
@@ -544,9 +589,18 @@ Sender::SenderState Sender::connect(ThreadData &data) {
   int port = ports_[data.threadIndex_];
   TransferStats &threadStats = data.threadStats_;
   auto &socket = data.socket_;
+  auto &numReconnectWithoutProgress = data.numReconnectWithoutProgress_;
+  auto &options = WdtOptions::get();
 
   if (socket) {
     socket->close();
+  }
+  if (numReconnectWithoutProgress >= options.max_transfer_retries) {
+    LOG(ERROR) << "Sender thread reconnected " << numReconnectWithoutProgress
+               << " times without making any progress, giving up. port: "
+               << socket->getPort();
+    threadStats.setErrorCode(NO_PROGRESS);
+    return END;
   }
 
   ErrorCode code;
@@ -577,6 +631,7 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
   int port = ports_[data.threadIndex_];
   TransferStats &threadStats = data.threadStats_;
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
+  auto &numReconnectWithoutProgress = data.numReconnectWithoutProgress_;
 
   std::vector<Checkpoint> checkpoints;
   int64_t decodeOffset = 0;
@@ -584,9 +639,10 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
   int checkpointLen = Protocol::getMaxLocalCheckpointLength(protocolVersion_);
   int64_t numRead = data.socket_->read(buf, checkpointLen);
   if (numRead != checkpointLen) {
-    VLOG(1) << "read mismatch " << checkpointLen << " " << numRead << " port "
-            << port;
+    LOG(ERROR) << "read mismatch during reading local checkpoint "
+               << checkpointLen << " " << numRead << " port " << port;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
+    numReconnectWithoutProgress++;
     return CONNECT;
   }
   if (!Protocol::decodeCheckpoints(protocolVersion_, buf, decodeOffset,
@@ -614,13 +670,17 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
     return READ_RECEIVER_CMD;
   }
 
-  auto numReturned =
+  ErrorCode errCode =
       transferHistory.setCheckpointAndReturnToQueue(checkpoint, false);
-  if (numReturned == -1) {
+  if (errCode == INVALID_CHECKPOINT) {
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  VLOG(1) << numReturned << " number of source(s) returned to queue";
+  if (errCode == NO_PROGRESS) {
+    numReconnectWithoutProgress++;
+  } else {
+    numReconnectWithoutProgress = 0;
+  }
   return SEND_SETTINGS;
 }
 

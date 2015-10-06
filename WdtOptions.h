@@ -148,7 +148,8 @@ class WdtOptions {
   std::string prune_dir_regex{""};
 
   /**
-   * Maximum number of retries for transferring a file
+   * Maximum number of times sender thread reconnects without making any
+   * progress
    */
   int max_transfer_retries{3};
 

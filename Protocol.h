@@ -23,10 +23,15 @@ namespace wdt {
 /// blocks and number of bytes received for the last block
 struct Checkpoint {
   int32_t port{0};
+  /// number of complete blocks received
   int64_t numBlocks{0};
-  int64_t lastBlockReceivedBytes{0};
+  /// Next three fields are only set if a block is received partially
+  /// seq-id of the partially received block
   int64_t lastBlockSeqId{-1};
+  /// block offset of the partially received block
   int64_t lastBlockOffset{0};
+  /// number of bytes received for the partially received block
+  int64_t lastBlockReceivedBytes{0};
   bool hasSeqId{false};
   Checkpoint() {
   }
@@ -52,6 +57,8 @@ struct Checkpoint {
     numBlocks++;
   }
 };
+
+std::ostream &operator<<(std::ostream &os, const Checkpoint &checkpoint);
 
 /// structure representing a single chunk of a file
 struct Interval {
