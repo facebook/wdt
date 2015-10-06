@@ -31,7 +31,9 @@ WDT_OPT(skip_writes, bool, "Skip writes on the receiver side");
 WDT_OPT(backlog, int32, "Accept backlog");
 WDT_OPT(buffer_size, int32, "Buffer size (per thread/socket)");
 WDT_OPT(max_retries, int32, "how many attempts to connect/listen");
-WDT_OPT(max_transfer_retries, int32, "Max number of retries for a source");
+WDT_OPT(max_transfer_retries, int32,
+        "Maximum number of times sender thread reconnects without making any "
+        "progress");
 WDT_OPT(sleep_millis, int32, "how many ms to wait between attempts");
 WDT_OPT(block_size_mbytes, double,
         "Size of the blocks that files will be divided in, specify negative "

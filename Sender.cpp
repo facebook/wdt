@@ -43,14 +43,13 @@ std::string ThreadTransferHistory::getSourceId(int64_t index) {
   return sourceId;
 }
 
-bool ThreadTransferHistory::addSource(int protocolVersion,
-                                      std::unique_ptr<ByteSource> &source) {
+bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
   folly::SpinLockGuard guard(lock_);
   if (globalCheckpoint_) {
     // already received an error for this thread
     VLOG(1) << "adding source after global checkpoint is received. Returning "
                "the source to the queue";
-    markSourceAsFailed(protocolVersion, source, lastCheckpoint_.get());
+    markSourceAsFailed(source, lastCheckpoint_.get());
     lastCheckpoint_.reset();
     queue_.returnToQueue(source);
     return false;
@@ -59,8 +58,8 @@ bool ThreadTransferHistory::addSource(int protocolVersion,
   return true;
 }
 
-int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
-    int protocolVersion, const Checkpoint &checkpoint, bool globalCheckpoint) {
+ErrorCode ThreadTransferHistory::setCheckpointAndReturnToQueue(
+    const Checkpoint &checkpoint, bool globalCheckpoint) {
   folly::SpinLockGuard guard(lock_);
   const int64_t historySize = history_.size();
   int64_t numReceivedSources = checkpoint.numBlocks;
@@ -69,25 +68,23 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
     LOG(ERROR)
         << "checkpoint is greater than total number of sources transfered "
         << history_.size() << " " << numReceivedSources;
-    return -1;
+    return INVALID_CHECKPOINT;
   }
-  if (numReceivedSources < numAcknowledged_) {
-    LOG(ERROR) << "new checkpoint is less than older checkpoint "
-               << numAcknowledged_ << " " << numReceivedSources;
-    return -1;
+  ErrorCode errCode = validateCheckpoint(checkpoint, globalCheckpoint);
+  if (errCode == INVALID_CHECKPOINT) {
+    return INVALID_CHECKPOINT;
   }
+  globalCheckpoint_ |= globalCheckpoint;
+  lastCheckpoint_ = folly::make_unique<Checkpoint>(checkpoint);
   int64_t numFailedSources = historySize - numReceivedSources;
   if (numFailedSources == 0 && lastBlockReceivedBytes > 0) {
-    if (globalCheckpoint) {
-      lastCheckpoint_ = folly::make_unique<Checkpoint>(checkpoint);
-    } else {
+    if (!globalCheckpoint) {
       // no block to apply checkpoint offset. This can happen if we receive same
       // local checkpoint without adding anything to the history
       LOG(WARNING) << "Local checkpoint has received bytes for last block, but "
                       "there are no unacked blocks in the history. Ignoring.";
     }
   }
-  globalCheckpoint_ |= globalCheckpoint;
   numAcknowledged_ = numReceivedSources;
   std::vector<std::unique_ptr<ByteSource>> sourcesToReturn;
   for (int64_t i = 0; i < numFailedSources; i++) {
@@ -95,11 +92,14 @@ int64_t ThreadTransferHistory::setCheckpointAndReturnToQueue(
     history_.pop_back();
     const Checkpoint *checkpointPtr =
         (i == numFailedSources - 1 ? &checkpoint : nullptr);
-    markSourceAsFailed(protocolVersion, source, checkpointPtr);
+    markSourceAsFailed(source, checkpointPtr);
     sourcesToReturn.emplace_back(std::move(source));
   }
   queue_.returnToQueue(sourcesToReturn);
-  return numFailedSources;
+  LOG(INFO) << numFailedSources
+            << " number of sources returned to queue, checkpoint: "
+            << checkpoint;
+  return errCode;
 }
 
 std::vector<TransferStats> ThreadTransferHistory::popAckedSourceStats() {
@@ -119,20 +119,62 @@ void ThreadTransferHistory::markAllAcknowledged() {
   numAcknowledged_ = history_.size();
 }
 
-int64_t ThreadTransferHistory::returnUnackedSourcesToQueue(
-    int protocolVersion) {
+void ThreadTransferHistory::returnUnackedSourcesToQueue() {
   Checkpoint checkpoint;
   checkpoint.numBlocks = numAcknowledged_;
-  return setCheckpointAndReturnToQueue(protocolVersion, checkpoint, false);
+  setCheckpointAndReturnToQueue(checkpoint, false);
+}
+
+ErrorCode ThreadTransferHistory::validateCheckpoint(
+    const Checkpoint &checkpoint, bool globalCheckpoint) {
+  if (lastCheckpoint_ == nullptr) {
+    return OK;
+  }
+  if (checkpoint.numBlocks < lastCheckpoint_->numBlocks) {
+    LOG(ERROR) << "Current checkpoint must be higher than previous checkpoint, "
+                  "Last checkpoint: "
+               << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+    return INVALID_CHECKPOINT;
+  }
+  if (checkpoint.numBlocks > lastCheckpoint_->numBlocks) {
+    return OK;
+  }
+  bool noProgress = false;
+  // numBlocks same
+  if (checkpoint.lastBlockSeqId == lastCheckpoint_->lastBlockSeqId &&
+      checkpoint.lastBlockOffset == lastCheckpoint_->lastBlockOffset) {
+    // same block
+    if (checkpoint.lastBlockReceivedBytes !=
+        lastCheckpoint_->lastBlockReceivedBytes) {
+      LOG(ERROR) << "Current checkpoint has different received bytes, but all "
+                    "other fields are same, Last checkpoint "
+                 << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+      return INVALID_CHECKPOINT;
+    }
+    noProgress = true;
+  } else {
+    // different block
+    WDT_CHECK(checkpoint.lastBlockReceivedBytes >= 0);
+    if (checkpoint.lastBlockReceivedBytes == 0) {
+      noProgress = true;
+    }
+  }
+  if (noProgress && !globalCheckpoint) {
+    // we can get same global checkpoint multiple times, so no need to check for
+    // progress
+    LOG(WARNING) << "No progress since last checkpoint, Last checkpoint: "
+                 << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+    return NO_PROGRESS;
+  }
+  return OK;
 }
 
 void ThreadTransferHistory::markSourceAsFailed(
-    int protocolVersion, std::unique_ptr<ByteSource> &source,
-    const Checkpoint *checkpoint) {
+    std::unique_ptr<ByteSource> &source, const Checkpoint *checkpoint) {
   auto metadata = source->getMetaData();
   bool validCheckpoint = false;
   if (checkpoint != nullptr) {
-    if (protocolVersion >= Protocol::CHECKPOINT_SEQ_ID_VERSION) {
+    if (checkpoint->hasSeqId) {
       if ((checkpoint->lastBlockSeqId == metadata.seqId) &&
           (checkpoint->lastBlockOffset == source->getOffset())) {
         validCheckpoint = true;
@@ -342,7 +384,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
     if (allSourcesAcked) {
       transferHistory.markAllAcknowledged();
     } else {
-      transferHistory.returnUnackedSourcesToQueue(protocolVersion_);
+      transferHistory.returnUnackedSourcesToQueue();
     }
     if (WdtOptions::get().full_reporting) {
       std::vector<TransferStats> stats = transferHistory.popAckedSourceStats();
@@ -547,9 +589,18 @@ Sender::SenderState Sender::connect(ThreadData &data) {
   int port = ports_[data.threadIndex_];
   TransferStats &threadStats = data.threadStats_;
   auto &socket = data.socket_;
+  auto &numReconnectWithoutProgress = data.numReconnectWithoutProgress_;
+  auto &options = WdtOptions::get();
 
   if (socket) {
     socket->close();
+  }
+  if (numReconnectWithoutProgress >= options.max_transfer_retries) {
+    LOG(ERROR) << "Sender thread reconnected " << numReconnectWithoutProgress
+               << " times without making any progress, giving up. port: "
+               << socket->getPort();
+    threadStats.setErrorCode(NO_PROGRESS);
+    return END;
   }
 
   ErrorCode code;
@@ -580,6 +631,7 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
   int port = ports_[data.threadIndex_];
   TransferStats &threadStats = data.threadStats_;
   ThreadTransferHistory &transferHistory = data.getTransferHistory();
+  auto &numReconnectWithoutProgress = data.numReconnectWithoutProgress_;
 
   std::vector<Checkpoint> checkpoints;
   int64_t decodeOffset = 0;
@@ -587,9 +639,10 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
   int checkpointLen = Protocol::getMaxLocalCheckpointLength(protocolVersion_);
   int64_t numRead = data.socket_->read(buf, checkpointLen);
   if (numRead != checkpointLen) {
-    VLOG(1) << "read mismatch " << checkpointLen << " " << numRead << " port "
-            << port;
+    LOG(ERROR) << "read mismatch during reading local checkpoint "
+               << checkpointLen << " " << numRead << " port " << port;
     threadStats.setErrorCode(SOCKET_READ_ERROR);
+    numReconnectWithoutProgress++;
     return CONNECT;
   }
   if (!Protocol::decodeCheckpoints(protocolVersion_, buf, decodeOffset,
@@ -617,13 +670,17 @@ Sender::SenderState Sender::readLocalCheckPoint(ThreadData &data) {
     return READ_RECEIVER_CMD;
   }
 
-  auto numReturned = transferHistory.setCheckpointAndReturnToQueue(
-      protocolVersion_, checkpoint, false);
-  if (numReturned == -1) {
+  ErrorCode errCode =
+      transferHistory.setCheckpointAndReturnToQueue(checkpoint, false);
+  if (errCode == INVALID_CHECKPOINT) {
     threadStats.setErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  VLOG(1) << numReturned << " number of source(s) returned to queue";
+  if (errCode == NO_PROGRESS) {
+    numReconnectWithoutProgress++;
+  } else {
+    numReconnectWithoutProgress = 0;
+  }
   return SEND_SETTINGS;
 }
 
@@ -687,7 +744,7 @@ Sender::SenderState Sender::sendBlocks(ThreadData &data) {
   threadStats += transferStats;
   source->addTransferStats(transferStats);
   source->close();
-  if (!transferHistory.addSource(protocolVersion_, source)) {
+  if (!transferHistory.addSource(source)) {
     // global checkpoint received for this thread. no point in
     // continuing
     LOG(ERROR) << "global checkpoint received, no point in continuing";
@@ -1028,8 +1085,8 @@ Sender::SenderState Sender::processErrCmd(ThreadData &data) {
             << ", " << checkpoint.lastBlockSeqId << ", "
             << checkpoint.lastBlockOffset << ", "
             << checkpoint.lastBlockReceivedBytes;
-    transferHistories[errThread].setCheckpointAndReturnToQueue(
-        protocolVersion_, checkpoint, true);
+    transferHistories[errThread].setCheckpointAndReturnToQueue(checkpoint,
+                                                               true);
   }
   return SEND_BLOCKS;
 }
@@ -1123,7 +1180,7 @@ Sender::SenderState Sender::processVersionMismatch(ThreadData &data) {
                  << ports_[i] << " numAcked " << history.getNumAcked();
       return END;
     }
-    history.returnUnackedSourcesToQueue(protocolVersion_);
+    history.returnUnackedSourcesToQueue();
   }
 
   int negotiatedProtocol = 0;

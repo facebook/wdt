@@ -9,6 +9,7 @@ import subprocess
 from random import randint
 import shutil
 import tempfile
+import errno
 
 def start_receiver(receiver_cmd, root_dir, test_count):
     print("Receiver: " + receiver_cmd)
@@ -36,8 +37,13 @@ def check_transfer_status(status, root_dir, test_count):
         exit(status)
 
 def create_directory(root_dir):
-    if not os.path.exists(root_dir):
-        os.makedirs(root_dir)
+    # race condition during stress test can happen even if we check first
+    try:
+        os.mkdir(root_dir)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise e
+        pass
 
 def create_test_directory(prefix):
     user = os.environ['USER']

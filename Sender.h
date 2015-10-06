@@ -46,25 +46,21 @@ class ThreadTransferHistory {
    * Adds the source to the history. If global checkpoint has already been
    * received, then the source is returned to the queue.
    *
-   * @param protocolVersion        current sender protocol version
    * @param source      source to be added to history
    * @return            true if added to history, false if not added due to a
    *                    global checkpoint
    */
-  bool addSource(int protocolVersion, std::unique_ptr<ByteSource> &source);
+  bool addSource(std::unique_ptr<ByteSource> &source);
 
   /**
    * Sets checkpoint. Also, returns unacked sources to queue
    *
-   * @param protocolVersion        current sender protocol version
    * @param checkpoint             checkpoint received
    * @param globalCheckpoint       global or local checkpoint
-   * @return                       number of sources returned to queue, -1 in
-   *                               case of error
+   * @return                       number of sources returned to queue
    */
-  int64_t setCheckpointAndReturnToQueue(int protocolVersion,
-                                        const Checkpoint &checkpoint,
-                                        bool globalCheckpoint);
+  ErrorCode setCheckpointAndReturnToQueue(const Checkpoint &checkpoint,
+                                          bool globalCheckpoint);
 
   /**
    * @return            stats for acked sources, must be called after all the
@@ -75,14 +71,8 @@ class ThreadTransferHistory {
   /// marks all the sources as acked
   void markAllAcknowledged();
 
-  /**
-   * returns all unacked sources to the queue
-   *
-   * @param protocolVersion        current sender protocol version
-   *
-   * @return            number of sources returned to queue, -1 in case of error
-   */
-  int64_t returnUnackedSourcesToQueue(int protocolVersion);
+  /// returns all unacked sources to the queue
+  void returnUnackedSourcesToQueue();
 
   /**
    * @return    number of sources acked by the receiver
@@ -92,8 +82,10 @@ class ThreadTransferHistory {
   }
 
  private:
-  void markSourceAsFailed(int protocolVersion,
-                          std::unique_ptr<ByteSource> &source,
+  ErrorCode validateCheckpoint(const Checkpoint &checkpoint,
+                               bool globalCheckpoint);
+
+  void markSourceAsFailed(std::unique_ptr<ByteSource> &source,
                           const Checkpoint *checkpoint);
 
   /// reference to global queue
@@ -279,6 +271,8 @@ class Sender : public WdtBase {
     char buf_[Protocol::kMinBufLength];
     /// whether total file size has been sent to the receiver
     bool totalSizeSent_{false};
+    /// number of consecutive reconnects without any progress
+    int numReconnectWithoutProgress_{0};
     ThreadData(int threadIndex, TransferStats &threadStats,
                std::vector<ThreadTransferHistory> &transferHistories)
         : threadIndex_(threadIndex),
