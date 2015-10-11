@@ -15,7 +15,6 @@
 #include <fstream>
 #include <stdlib.h>
 #include <fcntl.h>
-DEFINE_int32(random_seed, folly::randomNumberSeed(), "random seed");
 
 namespace facebook {
 namespace wdt {

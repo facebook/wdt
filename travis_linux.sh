@@ -3,7 +3,7 @@
 set -x
 set -e
 
-date 
+date
 uname -a
 echo $HOSTNAME
 mkdir $HOME/bin || true
@@ -25,8 +25,8 @@ git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on .. && make -j 4 && make install)
 svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 ( cd glog && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
-git clone https://github.com/facebook/folly.git 
-pwd ; ls -l  
+git clone https://github.com/facebook/folly.git
+pwd ; ls -l
 cd wdt
 
 #set +e
