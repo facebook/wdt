@@ -97,8 +97,8 @@ void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   }
 }
 
-std::vector<SourceMetaData *>
-    &DirectorySourceQueue::getDiscoveredFilesMetaData() {
+std::vector<SourceMetaData *> &
+DirectorySourceQueue::getDiscoveredFilesMetaData() {
   return sharedFileData_;
 }
 

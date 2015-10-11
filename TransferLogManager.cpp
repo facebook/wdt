@@ -31,8 +31,7 @@ const int TransferLogManager::LOG_VERSION = 2;
 int64_t LogEncoderDecoder::timestampInMicroseconds() const {
   auto timestamp = Clock::now();
   return std::chrono::duration_cast<std::chrono::microseconds>(
-             timestamp.time_since_epoch())
-      .count();
+             timestamp.time_since_epoch()).count();
 }
 
 int64_t LogEncoderDecoder::encodeLogHeader(char *dest,
@@ -324,8 +323,7 @@ bool TransferLogManager::verifySenderIp(const std::string &curSenderIp) {
   if (!options.disable_sender_verification_during_resumption) {
     if (!senderIp_.empty() && senderIp_ != curSenderIp) {
       LOG(ERROR) << "Current sender ip does not match ip in the "
-                    "transfer log "
-                 << curSenderIp << " " << senderIp_
+                    "transfer log " << curSenderIp << " " << senderIp_
                  << ", ignoring transfer log";
       verifySuccessful = false;
       invalidateDirectory();
@@ -513,8 +511,7 @@ bool LogParser::writeFileInvalidationEntries(int fd,
     int written = ::write(fd, buf, toWrite);
     if (written != toWrite) {
       PLOG(ERROR) << "Disk write error while writing invalidation entry to "
-                     "transfer log "
-                  << written << " " << toWrite;
+                     "transfer log " << written << " " << toWrite;
       return false;
     }
   }
@@ -620,8 +617,8 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
   }
   if (options.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file creation entry in directory based "
-                  "resumption mode "
-               << fileName << " " << seqId << " " << fileSize;
+                  "resumption mode " << fileName << " " << seqId << " "
+               << fileSize;
     return INVALID_LOG;
   }
   if (fileInfoMap_.find(seqId) != fileInfoMap_.end() ||
@@ -672,8 +669,7 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
   }
   if (options.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file resize entry in directory based "
-                  "resumption mode "
-               << seqId << " " << fileSize;
+                  "resumption mode " << seqId << " " << fileSize;
     return INVALID_LOG;
   }
   auto it = fileInfoMap_.find(seqId);
@@ -717,8 +713,8 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
   }
   if (options.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a block write entry in directory based "
-                  "resumption mode "
-               << seqId << " " << offset << " " << blockSize;
+                  "resumption mode " << seqId << " " << offset << " "
+               << blockSize;
     return INVALID_LOG;
   }
   if (invalidSeqIds_.find(seqId) != invalidSeqIds_.end()) {
@@ -758,8 +754,7 @@ ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
   }
   if (options.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file invalidation entry in directory based "
-                  "resumption mode "
-               << seqId;
+                  "resumption mode " << seqId;
     return INVALID_LOG;
   }
   if (fileInfoMap_.find(seqId) == fileInfoMap_.end() &&
