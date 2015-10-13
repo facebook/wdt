@@ -214,6 +214,7 @@ void WdtResourceControllerTest::InvalidNamespaceTest() {
   int index = 0;
   string wdtNamespace = "test-namespace-1";
   string transferPrefix = "invalid-namespace";
+  requireRegistration(true);
   auto transferRequest =
       makeTransferRequest(getTransferId(transferPrefix, index));
   ReceiverPtr receiverPtr;

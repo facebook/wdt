@@ -19,8 +19,6 @@ namespace wdt {
 typedef std::shared_ptr<Receiver> ReceiverPtr;
 typedef std::shared_ptr<Sender> SenderPtr;
 
-const std::string kGlobalNamespace = "Global";
-
 /**
  * Base class for both wdt global and namespace controller
  */
@@ -165,7 +163,7 @@ class WdtResourceController : public WdtControllerBase {
   ErrorCode releaseReceiver(const std::string &wdtNamespace,
                             const std::string &identifier);
 
-  /// Register a wdt namespace
+  /// Register a wdt namespace (if strict mode)
   ErrorCode registerWdtNamespace(const std::string &wdtNamespace);
 
   /// De register a wdt namespace
@@ -212,6 +210,12 @@ class WdtResourceController : public WdtControllerBase {
   ErrorCode releaseStaleReceivers(const std::string &wdtNamespace,
                                   std::vector<std::string> &erasedIds);
 
+  /**
+   * Call with true to require registerWdtNameSpace() to be called
+   * before requesting sender/receiver for that namespace.
+   */
+  void requireRegistration(bool isStrict);
+
   /// Cleanly shuts down the controller
   void shutdown();
 
@@ -221,6 +225,9 @@ class WdtResourceController : public WdtControllerBase {
   /// Destructor for the global resource controller
   virtual ~WdtResourceController() override;
 
+  /// Default global namespace
+  static const std::string kGlobalNamespace;
+
  protected:
   typedef std::shared_ptr<WdtNamespaceController> NamespaceControllerPtr;
   /// Get the namespace controller
@@ -228,8 +235,11 @@ class WdtResourceController : public WdtControllerBase {
                                                 bool isLock = false) const;
 
  private:
+  NamespaceControllerPtr createNamespaceController(const std::string &name);
   /// Map containing the resource controller per namespace
   std::unordered_map<std::string, NamespaceControllerPtr> namespaceMap_;
+  /// Whether namespace need to be created explictly
+  bool strictRegistration_{false};
 };
 }
 }

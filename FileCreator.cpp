@@ -56,7 +56,7 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
 int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
   const auto &options = WdtOptions::get();
   int fd;
-  const bool doCreate = blockDetails->allocationStatus == NOT_EXISTS;
+  const bool doCreate = (blockDetails->allocationStatus == NOT_EXISTS);
   const bool isTooLarge = (blockDetails->allocationStatus == EXISTS_TOO_LARGE);
   if (doCreate) {
     fd = createFile(blockDetails->fileName);

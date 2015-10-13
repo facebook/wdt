@@ -118,6 +118,8 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
 
 Receiver::Receiver(const WdtTransferRequest &transferRequest) {
   LOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
+  // TODO: move to init and validate input transfer request (like empty dir)
+  // and ports and pv - issue#95
   transferId_ = transferRequest.transferId;
   if (transferId_.empty()) {
     transferId_ = WdtBase::generateTransferId();
@@ -174,6 +176,7 @@ WdtTransferRequest Receiver::init() {
     }
   }
   threadServerSockets_ = std::move(successfulSockets);
+  // TODO: mutate input request instead, post validation
   WdtTransferRequest transferRequest(getPorts());
   transferRequest.protocolVersion = protocolVersion_;
   transferRequest.transferId = transferId_;
