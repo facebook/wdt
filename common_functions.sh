@@ -240,17 +240,23 @@ verifyTransferAndCleanup() {
   fi
   (cd "$DIR"; diff -u "$SRC_MD5" "dst${TEST_COUNT}.md5s")
   STATUS=$?
-  if [ $STATUS -ne 0 ]; then
-    cat "$DIR/server${TEST_COUNT}.log"
-  fi
   # treating PROTOCOL_ERROR as errors
-  grep "PROTOCOL_ERROR" "$DIR/server${TEST_COUNT}.log" > /dev/null && STATUS=1
-  grep "PROTOCOL_ERROR" "$DIR/client${TEST_COUNT}.log" > /dev/null && STATUS=1
+  grep "PROTOCOL_ERROR" "$DIR/server${TEST_COUNT}.log" > /dev/null
+  if [ $? -eq 0 ]; then
+    echo "server has PROTOCOL ERROR"
+    STATUS=1
+  fi
+  grep "PROTOCOL_ERROR" "$DIR/client${TEST_COUNT}.log" > /dev/null
+  if [ $? -eq 0 ]; then
+    echo "client has PROTOCOL ERROR"
+    STATUS=1
+  fi
 
   if [ $STATUS -eq 0 ] ; then
     echo "Test $TEST_COUNT succeeded"
     removeDestination
   else
+    printServerLog
     echo "Test $TEST_COUNT failed"
     wdtExit $STATUS
   fi
