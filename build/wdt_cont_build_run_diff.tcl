@@ -124,8 +124,9 @@ while {1} {
     # cleanup previous builds failure - sudo not needed/asking for passwd on mac
     if {[catch {exec sh -c "set -o pipefail; set -x; date; uname -a;\
      $sudo rm -rf /tmp/wdtTest_$userdir /dev/shm/wdtTest_$userdir wdtTest &&\
-     cd $CDIR/fbsource/fbcode && time hg pull -u &&\
-     hg log -l 1 && hg log -v -l 1 folly && hg log -v -l 1 wdt &&\
+     cd $CDIR/fbsource/fbcode && time hg pull && time hg rebase -d master &&\
+     hg bookmark -v &&\
+     hg log -l 2 && hg log -v -l 1 folly && hg log -v -l 2 wdt &&\
      cd $CDIR/cmake_wdt_build && time make -j 4 && \
      CTEST_OUTPUT_ON_FAILURE=1 time make test &&\
      $extraCmds" >& $LOGF < /dev/null} results options]} {
@@ -134,7 +135,7 @@ while {1} {
         set msg "GOOD"
     }
     puts $msg
-    catch {exec hg log -l 1 -T "{rev}" wdt} hgout
+    catch {exec hg log -l 2 -T "{rev}\n" wdt | tail -1} hgout
     puts "wdt changeset now $hgout"
     if {[string length $last]==0} {
         sendEmail "contbuild restarted"
