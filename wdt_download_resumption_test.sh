@@ -106,8 +106,7 @@ RECEIVER_ID="123456"
 WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
 -avg_mbytes_per_sec=80 -max_mbytes_per_sec=90 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
--enable_download_resumption -keep_transfer_log=false \
--treat_fewer_port_as_error \
+-enable_download_resumption -treat_fewer_port_as_error \
 -resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection \
 -connect_timeout_millis 100"
 WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS"

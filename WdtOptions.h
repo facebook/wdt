@@ -22,8 +22,8 @@ namespace wdt {
 class WdtOptions {
  public:
   // WDT option types
-  static const char *FLASH_OPTION_TYPE;
-  static const char *DISK_OPTION_TYPE;
+  static const char* FLASH_OPTION_TYPE;
+  static const char* DISK_OPTION_TYPE;
 
   /**
    * A static method that can be called to create
