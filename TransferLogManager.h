@@ -333,6 +333,8 @@ class LogParser {
   std::string recoveryId_;
   int64_t config_;
   bool parseOnly_;
+  /// whether header is parsed or not
+  bool headerParsed_{false};
 
   /// seq-id to chunks map
   std::map<int64_t, FileChunksInfo> fileInfoMap_;

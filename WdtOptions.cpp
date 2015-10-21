@@ -27,8 +27,8 @@ namespace wdt {
     LOG(INFO) << "Not overwriting user specified " << #option << " " << msg; \
   }
 
-const std::string WdtOptions::FLASH_OPTION_TYPE = "flash";
-const std::string WdtOptions::DISK_OPTION_TYPE = "disk";
+const char* WdtOptions::FLASH_OPTION_TYPE = "flash";
+const char* WdtOptions::DISK_OPTION_TYPE = "disk";
 
 void WdtOptions::modifyOptions(
     const std::string& optionType,

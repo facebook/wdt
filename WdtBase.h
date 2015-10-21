@@ -15,7 +15,11 @@
 #include "Reporting.h"
 #include "Throttler.h"
 #include "Protocol.h"
+<<<<<<< HEAD
 #include "System.h"
+=======
+#include "WdtThread.h"
+>>>>>>> master
 #include <memory>
 #include <string>
 #include <vector>
@@ -228,6 +232,9 @@ class WdtBase {
   /// Sets the protocol version for the transfer
   void setProtocolVersion(int64_t protocolVersion);
 
+  ///  Get the protocol version of the transfer
+  int getProtocolVersion() const;
+
   /// Get the transfer id of the object
   std::string getTransferId();
 
@@ -244,19 +251,8 @@ class WdtBase {
   /// Utility to generate a random transfer id
   static std::string generateTransferId();
 
- protected:
-  /// Global throttler across all threads
-  std::shared_ptr<Throttler> throttler_;
-
-  /// Holds the instance of the progress reporter default or customized
-  std::unique_ptr<ProgressReporter> progressReporter_;
-
-  /// Unique id for the transfer
-  std::string transferId_;
-
-  /// protocol version to use, this is determined by negotiating protocol
-  /// version with the other side
-  int protocolVersion_{Protocol::protocol_version};
+  /// Get the throttler
+  std::shared_ptr<Throttler> getThrottler() const;
 
   /// abort checker class passed to socket functions
   class AbortChecker : public IAbortChecker {
@@ -272,11 +268,33 @@ class WdtBase {
     WdtBase* wdtBase_;
   };
 
+ protected:
+  /// Ports that the sender/receiver is running on
+  std::vector<int32_t> ports_;
+
+  /// Global throttler across all threads
+  std::shared_ptr<Throttler> throttler_;
+
+  /// Holds the instance of the progress reporter default or customized
+  std::unique_ptr<ProgressReporter> progressReporter_;
+
+  /// Unique id for the transfer
+  std::string transferId_;
+
+  /// protocol version to use, this is determined by negotiating protocol
+  /// version with the other side
+  int protocolVersion_{Protocol::protocol_version};
+
   /// abort checker passed to socket functions
   AbortChecker abortCheckerCallback_;
 
+<<<<<<< HEAD
   /// System to use
   System* sys_{nullptr};
+=======
+  /// Controller for wdt threads shared between base and threads
+  ThreadsController* threadsController_{nullptr};
+>>>>>>> master
 
  private:
   folly::RWSpinLock abortCodeLock_;

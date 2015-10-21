@@ -74,7 +74,7 @@ but we do plan on optimizing for disks as well in the future.
 
 ## Dependencies
 
-CMake for building WDT - See [BUILD.md](BUILD.md)
+CMake for building WDT - See [build/BUILD.md](build/BUILD.md)
 
 gflags (google flags library) but only for the command line,  the library
 doesn't depend on that
@@ -106,9 +106,9 @@ Benchmark generation tools
 
 ### Main files
 
-* CMakeLists.txt, BUILD.md, .travis.yml, travis_linux.sh, travis_osx.sh
+* CMakeLists.txt, .travis.yml, build/BUILD.md,travis_linux.sh,travis_osx.sh
 Build definition file - use CMake to generate a Makefile or a project file for
-your favorite IDE - details in [BUILD.md](BUILD.md)
+your favorite IDE - details in [build/BUILD.md](build/BUILD.md)
 
 * wdtCmdline.cpp
 
@@ -126,6 +126,10 @@ To specify the behavior of wdt. If wdt is used as a library, then the
 caller get the mutable object of options and set different options accordingly.
 When wdt is run in a standalone mode, behavior is changed through gflags in
 wdtCmdLine.cpp
+
+* WdtThread.{h|cpp}
+Common functionality and settings between SenderThread and ReceiverThread.
+Both of these kind of threads inherit from this base class.
 
 * WdtBase.{h|cpp}
 
@@ -158,11 +162,20 @@ directory, sorted by decreasing size (as they are discovered, you can start
 pulling from the queue even before all the files are found, it will return
 the current largest file)
 
+* ThreadTransferHistory.{h|cpp}
+
+Every thread maintains a transfer history so that when a connection breaks
+it can talk to the receiver to find out up to where in the history has been 
+sent. This class encapsulates all the logic for that bookkeeping
+
+* SenderThread.{h|cpp}
+
+Implements the functionality of one sender thread, which binds to a certain port
+and sends files over.
 
 * Sender.{h|cpp}
 
-Formerly wdtlib.cpp - main code sending files
-
+Spawns multiple SenderThread threads and sends the data across to receiver
 
 ### Consuming / Receiving
 
@@ -170,10 +183,15 @@ Formerly wdtlib.cpp - main code sending files
 
 Creates file and directories necessary for said file (mkdir -p like)
 
+* ReceiverThread.{h|cpp}
+
+Implements the funcionality of the receiver threads, responsible for listening on
+a port and receiving files over the network.
+
 * Receiver.{h|cpp}
 
-Formerly wdtlib.cpp - main code receiving files
-
+Parent receiver class that spawns multiple ReceiverThread threads and receives
+data from a remote host
 
 ### Low level building blocks
 

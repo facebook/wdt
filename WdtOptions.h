@@ -22,8 +22,8 @@ namespace wdt {
 class WdtOptions {
  public:
   // WDT option types
-  static const std::string FLASH_OPTION_TYPE;
-  static const std::string DISK_OPTION_TYPE;
+  static const char* FLASH_OPTION_TYPE;
+  static const char* DISK_OPTION_TYPE;
 
   /**
    * A static method that can be called to create
@@ -148,7 +148,8 @@ class WdtOptions {
   std::string prune_dir_regex{""};
 
   /**
-   * Maximum number of retries for transferring a file
+   * Maximum number of times sender thread reconnects without making any
+   * progress
    */
   int max_transfer_retries{3};
 

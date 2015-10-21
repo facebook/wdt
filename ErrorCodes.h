@@ -9,7 +9,7 @@
 #pragma once
 
 #include <wdt/WdtConfig.h>
-
+#include <glog/logging.h>
 #include <string>
 
 namespace facebook {
@@ -49,7 +49,9 @@ namespace wdt {
   X(URI_PARSE_ERROR)         /** Wdt uri passed couldn't be parsed */         \
   X(INCONSISTENT_DIRECTORY)  /** Destination directory is not consistent with \
                                 transfer log */                               \
-  X(INVALID_LOG)             /** Transfer log invalid */
+  X(INVALID_LOG)             /** Transfer log invalid */                      \
+  X(INVALID_CHECKPOINT)      /** Received checkpoint is invalid */            \
+  X(NO_PROGRESS)             /** Transfer has not progressed */
 
 enum ErrorCode {
 #define X(A) A,

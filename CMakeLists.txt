@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.21.1510011)
+project("WDT" LANGUAGES C CXX VERSION 1.22.1510210)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -44,6 +44,8 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 #set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_FLAGS "-msse4.2")
+#set(CMAKE_CXX_FLAGS "-msse4.2 -Wextra -Wsign-compare -Wunused-variable")
+#set(CMAKE_CXX_FLAGS "-msse4.2 -Wextra -Wsign-compare -Wunused-variable -Wconversion -Wsign-conversion")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "_bin/wdt")
 
 # Check that we have the Folly source tree
@@ -77,8 +79,13 @@ ErrorCodes.cpp
 FileByteSource.cpp
 FileCreator.cpp
 Protocol.cpp
+WdtThread.cpp
+ThreadsController.cpp
+ReceiverThread.cpp
 Receiver.cpp
 Reporting.cpp
+ThreadTransferHistory.cpp
+SenderThread.cpp
 Sender.cpp
 ServerSocket.cpp
 SocketUtils.cpp
@@ -305,5 +312,8 @@ if (BUILD_TESTING)
 
   add_test(NAME WdtOverwriteTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/wdt_overwrite_test.py")
+
+  add_test(NAME WdtBadServerTest COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_bad_server_test.py")
 
 endif(BUILD_TESTING)

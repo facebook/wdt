@@ -56,7 +56,7 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
 int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
   const auto &options = WdtOptions::get();
   int fd;
-  const bool doCreate = blockDetails->allocationStatus == NOT_EXISTS;
+  const bool doCreate = (blockDetails->allocationStatus == NOT_EXISTS);
   const bool isTooLarge = (blockDetails->allocationStatus == EXISTS_TOO_LARGE);
   if (doCreate) {
     fd = createFile(blockDetails->fileName);
@@ -132,8 +132,7 @@ int FileCreator::openForBlocks(int threadIndex,
   if (blockDetails->allocationStatus == EXISTS_CORRECT_SIZE &&
       it == fileStatusMap_.end()) {
     it = fileStatusMap_.insert(std::make_pair(blockDetails->seqId,
-                                              FileCreator::ALLOCATED))
-             .first;
+                                              FileCreator::ALLOCATED)).first;
   }
   if (it == fileStatusMap_.end()) {
     // allocation has not started for this file
@@ -165,8 +164,7 @@ int FileCreator::openExistingFile(const string &relPathStr) {
   WDT_CHECK(relPathStr[0] != '/');
   WDT_CHECK(relPathStr.back() != '/');
 
-  string path(rootDir_);
-  path.append(relPathStr);
+  const string path = rootDir_ + relPathStr;
 
   int openFlags = O_WRONLY;
   START_PERF_TIMER
@@ -185,8 +183,7 @@ int FileCreator::createFile(const string &relPathStr) {
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
 
-  std::string path(rootDir_);
-  path.append(relPathStr);
+  const string path = rootDir_ + relPathStr;
 
   int p = relPathStr.size();
   while (p && relPathStr[p - 1] != '/') {

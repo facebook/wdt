@@ -351,7 +351,11 @@ WdtBase::WdtBase() : abortCheckerCallback_(this), sys_(&System::getDefault()) {
 
 WdtBase::~WdtBase() {
   abortChecker_ = nullptr;
+<<<<<<< HEAD
   sys_ = nullptr;
+=======
+  delete threadsController_;
+>>>>>>> master
 }
 
 std::vector<int32_t> WdtBase::genPortsVector(int32_t startPort,
@@ -408,6 +412,10 @@ void WdtBase::setThrottler(std::shared_ptr<Throttler> throttler) {
   throttler_ = throttler;
 }
 
+std::shared_ptr<Throttler> WdtBase::getThrottler() const {
+  return throttler_;
+}
+
 void WdtBase::setTransferId(const std::string& transferId) {
   transferId_ = transferId;
   LOG(INFO) << "Setting transfer id " << transferId_;
@@ -422,6 +430,10 @@ void WdtBase::setProtocolVersion(int64_t protocol) {
   }
   protocolVersion_ = negotiatedPv;
   LOG(INFO) << "using wdt protocol version " << protocolVersion_;
+}
+
+int WdtBase::getProtocolVersion() const {
+  return protocolVersion_;
 }
 
 std::string WdtBase::getTransferId() {

@@ -11,6 +11,9 @@
 echo "Run this sender performance test from fbcode/ directory"
 echo "or give full path to wdt binary to use and staging directory"
 
+#set -x
+#set -o pipefail
+
 if [ -z "$1" ]; then
   WDTBIN="_bin/wdt/wdt"
 else
@@ -28,7 +31,7 @@ AWK=gawk
 # TEST_COUNT is an environment variable. It is set up by the python benchmarking
 # script.
 if [ -z $TEST_COUNT ]; then
-  TEST_COUNT=2
+  TEST_COUNT=16
 fi
 
 if [ -z "$HOSTNAME" ] ; then
@@ -45,8 +48,16 @@ SKIP_WRITES="true"
 
 # Without throttling:
 #WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_sockets 13"
+
+#CPU normalization
+NUM_CPU=`grep processor /proc/cpuinfo|wc -l`
+# leave one cpu alone for the rest (or typically 2 because of /2)
+NUM_THREADS=`echo \($NUM_CPU-1\)/2|bc`
+echo "Using $NUM_THREADS threads (on each sender, receiver) for $NUM_CPU CPUs"
+
 # With, still gets almost same max (21G) with throttling set high enough
-WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_ports 13 -transfer_id=$$
+WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_ports $NUM_THREADS
+-transfer_id=$$
 --avg_mbytes_per_sec=26000 --max_mbytes_per_sec=26001 --enable_checksum=false"
 CLIENT_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
 %Mmax)k\n%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps\nCLIENT_PROFILE %U \
@@ -66,6 +77,8 @@ if [ -z "$DIR" ]; then
   exit 1
 fi
 
+pkill -x wdt
+pkill -x wdt_fb
 pkill -x $WDTNAME
 
 mkdir $DIR/src
@@ -81,6 +94,8 @@ do
     done
 done
 echo "Done with staging src test files"
+
+#set -e
 
 /usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst -run_as_daemon=true -skip_writes=$SKIP_WRITES > \
 $DIR/server.log 2>&1 &
@@ -110,16 +125,36 @@ do
   echo "TRANSFER_TIME $TRANSFER_TIME"
 done
 
-echo -n e | nc $REMOTE 22356
+pkill -x $WDTNAME
+# echo -n e | nc $REMOTE 22356 # end command is gone
 
 echo "Server logs:"
 cat $DIR/server.log
 
-MAXRATE=`$AWK 'match($0, /.*Total sender throughput = ([0-9.]+)/, res) {rate=res[1]; if (rate>max) max=rate} END {print max}' $DIR/client?.log`
+# Todo : count how many runs are above X... and which
+
+MAXRATE=`$AWK 'BEGIN {max=0} match($0, /.*Total sender throughput = ([0-9.]+)/, res) {rate=res[1]; if (rate>max) max=rate} END {print int(max+.5)}' $DIR/client*.log`
+
+ALLSPEEDS=`$AWK 'match($0, /.*Total sender throughput = ([0-9.]+)/, res) {printf("%s ", res[1])}' $DIR/client*.log`
 
 echo "Deleting logs and staging in $DIR"
 rm -rf $DIR
 
-echo "Rate for $WDTBIN"
-echo $MAXRATE
+echo "Speed for all runs: $ALLSPEEDS"
+
+# Normalize by CPU / number of threads
+# (32 cores leaves 15 threads and can do ~20-21G, use 19 for margin of noise)
+EXPECTED_SPEED=`echo 19000*$NUM_THREADS/15|bc`
+
+echo "Best throughput for $WDTBIN"
+if [ "$MAXRATE" -lt "$EXPECTED_SPEED" ]; then
+    echo "Regression: $MAXRATE is too slow - before top"
+    atop -l 1 1 | head -40
+    echo "Regression: $MAXRATE is too slow for $NUM_CPU cpus ($EXPECTED_SPEED)"
+    exit 1
+else
+    echo "Good rate $MAXRATE for $NUM_CPU cpus (threshold $EXPECTED_SPEED)"
+    exit 0
+fi
+
 # all done

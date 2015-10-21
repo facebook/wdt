@@ -31,7 +31,8 @@ ErrorCode FileWriter::open() {
     const int64_t ret = lseek(fd_, blockDetails_->offset, SEEK_SET);
     RECORD_PERF_RESULT(PerfStatReport::FILE_SEEK);
     if (ret < 0) {
-      PLOG(ERROR) << "Unable to seek " << blockDetails_->fileName;
+      PLOG(ERROR) << "Unable to seek to " << blockDetails_->offset << " for "
+                  << blockDetails_->fileName;
       close();
     }
   }

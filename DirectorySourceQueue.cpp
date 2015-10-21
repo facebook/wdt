@@ -97,8 +97,8 @@ void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   }
 }
 
-std::vector<SourceMetaData *>
-    &DirectorySourceQueue::getDiscoveredFilesMetaData() {
+std::vector<SourceMetaData *> &
+DirectorySourceQueue::getDiscoveredFilesMetaData() {
   return sharedFileData_;
 }
 
@@ -396,15 +396,8 @@ void DirectorySourceQueue::returnToQueue(
   int returnedCount = 0;
   std::unique_lock<std::mutex> lock(mutex_);
   for (auto &source : sources) {
-    const int64_t retries = source->getTransferStats().getFailedAttempts();
-    if (retries >= options_.max_transfer_retries) {
-      LOG(ERROR) << source->getIdentifier() << " failed after " << retries
-                 << " number of tries.";
-      failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
-    } else {
-      sourceQueue_.push(std::move(source));
-      returnedCount++;
-    }
+    sourceQueue_.push(std::move(source));
+    returnedCount++;
     WDT_CHECK_GT(numBlocksDequeued_, 0);
     numBlocksDequeued_--;
   }

@@ -3,7 +3,7 @@ WDT opensource build uses CMake 3.2.x or later
 This should build in a variety of environments (if it doesn't please open
 an issue or even better, contribute a patch)
 
-See also [README.md](README.md#dependencies) Dependencies section
+See also [README.md](../README.md#dependencies) Dependencies section
 (Inside facebook see https://our.intern.facebook.com/intern/wiki/WDT/OpenSource)
 
 Checkout the .travis.yml and travis_linux.sh and travis_osx.sh
