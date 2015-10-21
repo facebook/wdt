@@ -304,6 +304,10 @@ void TransferLogManager::writeEntriesToDisk() {
     for (const auto &entry : entries) {
       buffer.append(entry);
     }
+    if (buffer.empty()) {
+      // do not write when there is nothing to write
+      continue;
+    }
     int toWrite = buffer.size();
     int written = ::write(fd_, buffer.c_str(), toWrite);
     if (written != toWrite) {
