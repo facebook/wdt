@@ -164,8 +164,7 @@ int FileCreator::openExistingFile(const string &relPathStr) {
   WDT_CHECK(relPathStr[0] != '/');
   WDT_CHECK(relPathStr.back() != '/');
 
-  string path(rootDir_);
-  path.append(relPathStr);
+  const string path = rootDir_ + relPathStr;
 
   int openFlags = O_WRONLY;
   START_PERF_TIMER
@@ -184,8 +183,7 @@ int FileCreator::createFile(const string &relPathStr) {
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
 
-  std::string path(rootDir_);
-  path.append(relPathStr);
+  const string path = rootDir_ + relPathStr;
 
   int p = relPathStr.size();
   while (p && relPathStr[p - 1] != '/') {

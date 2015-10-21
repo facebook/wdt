@@ -30,6 +30,24 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
   numFiles_ += stats.numFiles_;
   numBlocks_ += stats.numBlocks_;
   failedAttempts_ += stats.failedAttempts_;
+  if (numBlocksSend_ == -1) {
+    numBlocksSend_ = stats.numBlocksSend_;
+  } else if (stats.numBlocksSend_ != -1 &&
+             numBlocksSend_ != stats.numBlocksSend_) {
+    LOG_IF(ERROR, errCode_ == OK) << "Mismatch in the numBlocksSend "
+                                  << numBlocksSend_ << " "
+                                  << stats.numBlocksSend_;
+    errCode_ = ERROR;
+  }
+  if (totalSenderBytes_ == -1) {
+    totalSenderBytes_ = stats.totalSenderBytes_;
+  } else if (stats.totalSenderBytes_ != -1 &&
+             totalSenderBytes_ != stats.totalSenderBytes_) {
+    LOG_IF(ERROR, errCode_ == OK) << "Mismatch in the total sender bytes "
+                                  << totalSenderBytes_ << " "
+                                  << stats.totalSenderBytes_;
+    errCode_ = ERROR;
+  }
   if (stats.errCode_ != OK) {
     if (errCode_ == OK) {
       // First error. Setting this as the error code
@@ -121,6 +139,17 @@ TransferReport::TransferReport(
   }
   int64_t numTransferredFiles = numDiscoveredFiles - failedFilesSet.size();
   summary_.setNumFiles(numTransferredFiles);
+}
+
+TransferReport::TransferReport(TransferStats&& globalStats, double totalTime,
+                               int64_t totalFileSize)
+    : TransferReport(std::move(globalStats)) {
+  totalTime_ = totalTime;
+  totalFileSize_ = totalFileSize;
+}
+
+TransferReport::TransferReport(TransferStats&& globalStats) {
+  summary_ = std::move(globalStats);
 }
 
 TransferReport::TransferReport(const std::vector<TransferStats>& threadStats,

@@ -52,7 +52,7 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
   return os;
 }
-
+// TODO rename to ThreadResult
 /// class representing statistics related to file transfer
 class TransferStats {
  private:
@@ -74,6 +74,12 @@ class TransferStats {
 
   /// number of failed transfers
   int64_t failedAttempts_ = 0;
+
+  /// Total number of blocks sent by sender
+  int64_t numBlocksSend_{-1};
+
+  /// Total number of bytes sent by sender
+  int64_t totalSenderBytes_{-1};
 
   /// status of the transfer
   ErrorCode errCode_ = OK;
@@ -112,6 +118,36 @@ class TransferStats {
     numFiles_ = numBlocks_ = 0;
     failedAttempts_ = 0;
     errCode_ = remoteErrCode_ = OK;
+  }
+
+  /// Validates the global transfer stats. Only call this method
+  /// on the accumulated stats. Can only be called for receiver
+  void validate() {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    if (numBlocksSend_ == -1) {
+      LOG(ERROR) << "Negative number of blocks sent by the sender";
+      errCode_ = ERROR;
+    } else if (totalSenderBytes_ != -1 &&
+               totalSenderBytes_ != effectiveDataBytes_) {
+      // did not receive all the bytes
+      LOG(ERROR) << "Number of bytes sent and received do not match "
+                 << totalSenderBytes_ << " " << effectiveDataBytes_;
+      errCode_ = ERROR;
+    } else {
+      errCode_ = OK;
+    }
+  }
+
+  /// @return the number of blocks sent by sender
+  int64_t getNumBlocksSend() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return numBlocksSend_;
+  }
+
+  /// @return the total sender bytes
+  int64_t getTotalSenderBytes() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return totalSenderBytes_;
   }
 
   /// @return number of header bytes transferred
@@ -225,6 +261,18 @@ class TransferStats {
     headerBytes_ += count;
   }
 
+  /// @param set num blocks send
+  void setNumBlocksSend(int64_t numBlocksSend) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    numBlocksSend_ = numBlocksSend;
+  }
+
+  /// @param set total sender bytes
+  void setTotalSenderBytes(int64_t totalSenderBytes) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    totalSenderBytes_ = totalSenderBytes;
+  }
+
   /// one more file transfer failed
   void incrFailedAttempts() {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
@@ -311,6 +359,9 @@ class TransferReport {
   TransferReport(const std::vector<TransferStats> &threadStats,
                  double totalTime, int64_t totalFileSize);
 
+  TransferReport(TransferStats &&stats, double totalTime,
+                 int64_t totalFileSize);
+  explicit TransferReport(TransferStats &&stats);
   /// constructor used by receiver, does move the thread stats
   explicit TransferReport(std::vector<TransferStats> &threadStats);
   /// @return   summary of the report

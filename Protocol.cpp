@@ -49,7 +49,8 @@ int Protocol::negotiateProtocol(int requestedProtocolVersion,
 }
 
 std::ostream &operator<<(std::ostream &os, const Checkpoint &checkpoint) {
-  os << "num-blocks: " << checkpoint.numBlocks
+  os << "checkpoint-port: " << checkpoint.port
+     << "num-blocks: " << checkpoint.numBlocks
      << " seq-id: " << checkpoint.lastBlockSeqId
      << " block-offset: " << checkpoint.lastBlockOffset
      << " received-bytes: " << checkpoint.lastBlockReceivedBytes;

@@ -256,7 +256,6 @@ void TransferLogManager::openLog() {
         std::move(std::thread(&TransferLogManager::writeEntriesToDisk, this));
     LOG(INFO) << "Log writer thread started";
   }
-  return;
 }
 
 void TransferLogManager::closeLog() {
@@ -326,7 +325,8 @@ bool TransferLogManager::verifySenderIp(const std::string &curSenderIp) {
   bool verifySuccessful = true;
   if (!options.disable_sender_verification_during_resumption) {
     if (senderIp_.empty()) {
-      LOG(INFO) << "Sender-ip empty, not verifying sender-ip";
+      LOG(INFO) << "Sender-ip empty, not verifying sender-ip, new-ip: "
+                << curSenderIp;
     } else if (senderIp_ != curSenderIp) {
       LOG(ERROR) << "Current sender ip does not match ip in the "
                     "transfer log " << curSenderIp << " " << senderIp_
@@ -579,6 +579,7 @@ ErrorCode LogParser::processHeaderEntry(char *buf, int size,
   int64_t logConfig;
   if (!encoderDecoder_.decodeLogHeader(buf, size, timestamp, logVersion,
                                        logRecoveryId, senderIp, logConfig)) {
+    LOG(ERROR) << "Couldn't decode the log header";
     return INVALID_LOG;
   }
   if (logVersion != TransferLogManager::LOG_VERSION) {
@@ -894,6 +895,7 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
         return INVALID_LOG;
     }
     if (status == INVALID_LOG) {
+      LOG(ERROR) << "Invalid transfer log";
       return status;
     }
     if (status == INCONSISTENT_DIRECTORY) {

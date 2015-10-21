@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.21.1510120)
+project("WDT" LANGUAGES C CXX VERSION 1.22.1510210)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -79,8 +79,13 @@ ErrorCodes.cpp
 FileByteSource.cpp
 FileCreator.cpp
 Protocol.cpp
+WdtThread.cpp
+ThreadsController.cpp
+ReceiverThread.cpp
 Receiver.cpp
 Reporting.cpp
+ThreadTransferHistory.cpp
+SenderThread.cpp
 Sender.cpp
 ServerSocket.cpp
 SocketUtils.cpp

@@ -125,6 +125,10 @@ caller get the mutable object of options and set different options accordingly.
 When wdt is run in a standalone mode, behavior is changed through gflags in
 wdtCmdLine.cpp
 
+* WdtThread.{h|cpp}
+Common functionality and settings between SenderThread and ReceiverThread.
+Both of these kind of threads inherit from this base class.
+
 * WdtBase.{h|cpp}
 
 Common functionality and settings between Sender and Receiver
@@ -156,11 +160,20 @@ directory, sorted by decreasing size (as they are discovered, you can start
 pulling from the queue even before all the files are found, it will return
 the current largest file)
 
+* ThreadTransferHistory.{h|cpp}
+
+Every thread maintains a transfer history so that when a connection breaks
+it can talk to the receiver to find out up to where in the history has been 
+sent. This class encapsulates all the logic for that bookkeeping
+
+* SenderThread.{h|cpp}
+
+Implements the functionality of one sender thread, which binds to a certain port
+and sends files over.
 
 * Sender.{h|cpp}
 
-Formerly wdtlib.cpp - main code sending files
-
+Spawns multiple SenderThread threads and sends the data across to receiver
 
 ### Consuming / Receiving
 
@@ -168,10 +181,15 @@ Formerly wdtlib.cpp - main code sending files
 
 Creates file and directories necessary for said file (mkdir -p like)
 
+* ReceiverThread.{h|cpp}
+
+Implements the funcionality of the receiver threads, responsible for listening on
+a port and receiving files over the network.
+
 * Receiver.{h|cpp}
 
-Formerly wdtlib.cpp - main code receiving files
-
+Parent receiver class that spawns multiple ReceiverThread threads and receives
+data from a remote host
 
 ### Low level building blocks
 

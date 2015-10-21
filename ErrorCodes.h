@@ -9,7 +9,7 @@
 #pragma once
 
 #include <wdt/WdtConfig.h>
-
+#include <glog/logging.h>
 #include <string>
 
 namespace facebook {
