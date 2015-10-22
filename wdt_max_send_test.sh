@@ -52,7 +52,7 @@ SKIP_WRITES="true"
 #CPU normalization
 NUM_CPU=`grep processor /proc/cpuinfo|wc -l`
 # leave one cpu alone for the rest (or typically 2 because of /2)
-NUM_THREADS=`echo \($NUM_CPU-1\)/2|bc`
+NUM_THREADS=`echo $NUM_CPU/2|bc`
 echo "Using $NUM_THREADS threads (on each sender, receiver) for $NUM_CPU CPUs"
 
 # With, still gets almost same max (21G) with throttling set high enough
@@ -144,7 +144,7 @@ echo "Speed for all runs: $ALLSPEEDS"
 
 # Normalize by CPU / number of threads
 # (32 cores leaves 15 threads and can do ~20-21G, use 19 for margin of noise)
-EXPECTED_SPEED=`echo 19000*$NUM_THREADS/15|bc`
+EXPECTED_SPEED=`echo 16000*$NUM_THREADS/16|bc`
 
 echo "Best throughput for $WDTBIN"
 if [ "$MAXRATE" -lt "$EXPECTED_SPEED" ]; then
