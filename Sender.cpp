@@ -330,7 +330,7 @@ ErrorCode Sender::start() {
             << ports_ << "]";
   startTime_ = Clock::now();
   downloadResumptionEnabled_ = options.enable_download_resumption;
-  dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
+  dirThread_ = dirQueue_->buildQueueAsynchronously();
   if (twoPhases) {
     dirThread_.join();
   }

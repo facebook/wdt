@@ -252,8 +252,7 @@ void TransferLogManager::openLog() {
   }
   if (!options.resume_using_dir_tree) {
     // start writer thread
-    writerThread_ =
-        std::move(std::thread(&TransferLogManager::writeEntriesToDisk, this));
+    writerThread_ = std::thread(&TransferLogManager::writeEntriesToDisk, this);
     LOG(INFO) << "Log writer thread started";
   }
 }
