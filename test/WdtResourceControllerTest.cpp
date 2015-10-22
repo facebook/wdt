@@ -6,15 +6,18 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "WdtResourceController.h"
-#include "Protocol.h"
+#include <wdt/WdtResourceController.h>
+
 #include <folly/Random.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+
 using namespace std;
+
 namespace facebook {
 namespace wdt {
+
 class WdtResourceControllerTest : public WdtResourceController {
  public:
   const int protocolVersion = Protocol::protocol_version;
@@ -328,13 +331,13 @@ void WdtResourceControllerTest::RequestSerializationTest() {
       keys.push_back(to_string(folly::Random::rand32()));
       values.push_back(to_string(folly::Random::rand32()));
     }
-    for (int i = 0; i < keys.size(); i++) {
+    for (size_t i = 0; i < keys.size(); i++) {
       wdtUri.setQueryParam(keys[i], values[i]);
     }
     uri = wdtUri.generateUrl();
     EXPECT_NE(uri.getErrorCode(), OK);
     ASSERT_TRUE(uri.getHostName().empty());
-    for (int i = 0; i < keys.size(); i++) {
+    for (size_t i = 0; i < keys.size(); i++) {
       EXPECT_EQ(uri.getQueryParam(keys[i]), values[i]);
     }
   }

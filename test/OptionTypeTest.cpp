@@ -6,12 +6,12 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "WdtFlags.h"
-#include "WdtOptions.h"
+#include <wdt/WdtOptions.h>
+#include <wdt/util/WdtFlags.h>
+#include <wdt/util/WdtFlagsMacros.h>
+
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-
-#include "WdtFlagsMacros.h"
 
 /*
  * Tests in this file can not be run in the same process. That is because we

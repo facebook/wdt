@@ -6,9 +6,9 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "DirectorySourceQueue.h"
+#include <wdt/util/DirectorySourceQueue.h>
 
-#include "Protocol.h"
+#include <wdt/Protocol.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>

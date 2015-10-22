@@ -92,8 +92,18 @@ needed.
 
 ### Directories
 
-* deps/
-Dependencies (open source version)
+* top level
+Main WDT classes and Wdt command line source, CMakeLists.txt
+
+* util/
+Utilities used for implementing the main objects
+
+* test/
+Tests files and scripts
+
+* build/
+Build related scripts and files and utils
+
 
 * fbonly/
 Stuff specific to facebook/ (not in open source version)
@@ -163,7 +173,7 @@ the current largest file)
 * ThreadTransferHistory.{h|cpp}
 
 Every thread maintains a transfer history so that when a connection breaks
-it can talk to the receiver to find out up to where in the history has been 
+it can talk to the receiver to find out up to where in the history has been
 sent. This class encapsulates all the logic for that bookkeeping
 
 * SenderThread.{h|cpp}
@@ -288,7 +298,7 @@ wdt_max_send_test.sh
 (facebook only:)
 Make sure to do the following, before "arc diff":
 ```
- (cd wdt ; ./clangformat.sh ; ./version_update.tcl )
+ (cd wdt ; ./build/clangformat.sh ; ./build/version_update.tcl )
 
  fbconfig  --clang --with-project-version clang:dev -r  wdt
 
@@ -296,7 +306,7 @@ Make sure to do the following, before "arc diff":
  fbmake runtests_opt
  fbmake opt
 
- wdt/wdt_max_send_test.sh
+ wdt/test/wdt_max_send_test.sh
 ```
 
 and check the output of the last step to make sure one of the 3 runs is

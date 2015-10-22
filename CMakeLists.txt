@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.22.1510210)
+project("WDT" LANGUAGES C CXX VERSION 1.22.1510220)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -73,32 +73,32 @@ set (FOLLY_CPP_SRC
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
 add_library(wdtlib_min
-ClientSocket.cpp
-DirectorySourceQueue.cpp
+util/ClientSocket.cpp
+util/DirectorySourceQueue.cpp
 ErrorCodes.cpp
-FileByteSource.cpp
-FileCreator.cpp
+util/FileByteSource.cpp
+util/FileCreator.cpp
 Protocol.cpp
 WdtThread.cpp
-ThreadsController.cpp
+util/ThreadsController.cpp
 ReceiverThread.cpp
 Receiver.cpp
 Reporting.cpp
-ThreadTransferHistory.cpp
+util/ThreadTransferHistory.cpp
 SenderThread.cpp
 Sender.cpp
-ServerSocket.cpp
-SocketUtils.cpp
+util/ServerSocket.cpp
+util/SocketUtils.cpp
 Throttler.cpp
 WdtOptions.cpp
-FileWriter.cpp
-TransferLogManager.cpp
-SerializationUtil.cpp
+util/FileWriter.cpp
+util/TransferLogManager.cpp
+util/SerializationUtil.cpp
 WdtBase.cpp
 WdtResourceController.cpp
 )
 add_library(wdtlib
-WdtFlags.cpp
+util/WdtFlags.cpp
 )
 target_link_libraries(wdtlib wdtlib_min)
 
@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
 }" FOLLY_HAVE_WEAK_SYMBOLS)
 # Now record all this :
 # Folly's:
-configure_file(folly-config.h.in folly/folly-config.h)
+configure_file(build/folly-config.h.in folly/folly-config.h)
 # Wdt's config/version
 configure_file(WdtConfig.h.in wdt/WdtConfig.h)
 
@@ -189,8 +189,9 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${FOLLY_SOURCE_DIR})
 include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(wdt wdtCmdLine.cpp WdtFlags.cpp)
+add_executable(wdt wdtCmdLine.cpp util/WdtFlags.cpp)
 set_target_properties(wdt PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
 
 target_link_libraries(wdt wdtlib_min)
@@ -203,7 +204,7 @@ install(TARGETS wdt wdtlib wdtlib_min folly4wdt
   ARCHIVE DESTINATION lib
   )
 # wcp script
-install(PROGRAMS wcp.sh DESTINATION bin RENAME wcp)
+install(PROGRAMS test/wcp.sh DESTINATION bin RENAME wcp)
 
 
 ### Everything below is about testing (and not required to create wdt/wdtlib)
@@ -255,59 +256,60 @@ if (BUILD_TESTING)
   )
 
   add_library(wdt4tests
-    WdtFlags.cpp
+    util/WdtFlags.cpp
   )
   target_link_libraries(wdt4tests wdt4tests_min)
 
 
-  add_executable(protocol_test ProtocolTest.cpp)
+  add_executable(protocol_test test/ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
   add_test(NAME AllTestsInProtocolTest COMMAND protocol_test)
 
-  add_executable(resource_controller_test  WdtResourceControllerTest.cpp)
+  add_executable(resource_controller_test  test/WdtResourceControllerTest.cpp)
   target_link_libraries(resource_controller_test wdt4tests)
   add_test(NAME ResourceControllerTests COMMAND resource_controller_test)
 
-  add_executable(file_reader_test  FileReaderTest.cpp)
+  add_executable(file_reader_test  test/FileReaderTest.cpp)
   target_link_libraries(file_reader_test wdt4tests)
   add_test(NAME FileReaderTests COMMAND file_reader_test)
 
-  add_executable(option_type_test_long_flags OptionTypeTest.cpp)
+  add_executable(option_type_test_long_flags test/OptionTypeTest.cpp)
   target_link_libraries(option_type_test_long_flags wdt4tests)
 
-  add_executable(option_type_test_short_flags OptionTypeTest.cpp WdtFlags.cpp)
+  add_executable(option_type_test_short_flags test/OptionTypeTest.cpp
+                                              util/WdtFlags.cpp)
   set_target_properties(option_type_test_short_flags PROPERTIES
     COMPILE_DEFINITIONS "STANDALONE_APP")
   target_link_libraries(option_type_test_short_flags wdt4tests_min)
 
   add_test(NAME WdtRandGenTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_rand_gen_test.sh")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_rand_gen_test.sh")
 
   add_test(NAME WdtBasicE2E COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_simple_test.sh")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_e2e_simple_test.sh")
 
   add_test(NAME WdtBasicE2Exfs COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_xfs_test.sh")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_e2e_xfs_test.sh")
 
   add_test(NAME WdtOptionsTypeTests COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_option_type_test.sh")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_option_type_test.sh")
 
   add_test(NAME WdtPortBlockTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_port_block_test.py")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_port_block_test.py")
 
   add_test(NAME WdtProtocolNegotiationTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_protocol_negotiation_test.py")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_protocol_negotiation_test.py")
 
   add_test(NAME WdtSimpleOdirectTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_e2e_simple_test.sh" -o true)
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_e2e_simple_test.sh" -o true)
 
   add_test(NAME WdtFileListTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_file_list_test.py")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_file_list_test.py")
 
   add_test(NAME WdtOverwriteTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_overwrite_test.py")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_overwrite_test.py")
 
   add_test(NAME WdtBadServerTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/wdt_bad_server_test.py")
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_bad_server_test.py")
 
 endif(BUILD_TESTING)

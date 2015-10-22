@@ -8,18 +8,11 @@
  */
 #pragma once
 
-#include "WdtBase.h"
-#include "FileCreator.h"
-#include "ErrorCodes.h"
-#include "WdtOptions.h"
-#include "Reporting.h"
-#include "ServerSocket.h"
-#include "Protocol.h"
-#include "Writer.h"
-#include "Throttler.h"
-#include "ReceiverThread.h"
-#include "TransferLogManager.h"
-#include "ThreadsController.h"
+#include <wdt/WdtBase.h>
+#include <wdt/ReceiverThread.h>
+#include <wdt/util/FileCreator.h>
+#include <wdt/util/ServerSocket.h>
+#include <wdt/util/TransferLogManager.h>
 #include <memory>
 #include <string>
 #include <condition_variable>

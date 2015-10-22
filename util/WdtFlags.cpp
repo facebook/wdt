@@ -6,13 +6,12 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "WdtFlags.h"
-#include "WdtOptions.h"
+#include <wdt/util/WdtFlags.h>
+#include <wdt/Protocol.h>
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
-#include "Protocol.h"
 
 #include "WdtFlags.cpp.inc"
 

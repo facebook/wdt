@@ -8,8 +8,8 @@
  */
 #pragma once
 
-#include "ErrorCodes.h"
-#include "AbortChecker.h"
+#include <wdt/ErrorCodes.h>
+#include <wdt/AbortChecker.h>
 
 #include <string>
 #include <vector>

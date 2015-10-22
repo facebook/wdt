@@ -9,8 +9,8 @@
 #pragma once
 
 #include <wdt/WdtConfig.h>
-#include "Protocol.h"
-#include "TransferLogManager.h"
+#include <wdt/Protocol.h>
+#include <wdt/util/TransferLogManager.h>
 
 #include <glog/logging.h>
 #include <mutex>

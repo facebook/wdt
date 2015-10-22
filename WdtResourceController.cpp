@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "WdtResourceController.h"
+#include <wdt/WdtResourceController.h>
 
 using namespace std;
 const int64_t kDelTimeToSleepMillis = 100;

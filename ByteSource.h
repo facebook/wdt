@@ -8,8 +8,8 @@
  */
 #pragma once
 
-#include "Reporting.h"
-#include "Protocol.h"
+#include <wdt/Reporting.h>
+#include <wdt/Protocol.h>
 
 #include <string>
 
@@ -114,5 +114,6 @@ class ByteSource {
   /// @param stats    Stats to be added
   virtual void addTransferStats(const TransferStats &stats) = 0;
 };
-}
+
+}  // end namespaces
 }

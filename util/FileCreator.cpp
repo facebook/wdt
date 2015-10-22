@@ -6,9 +6,9 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "FileCreator.h"
-#include "ErrorCodes.h"
-#include "Reporting.h"
+#include <wdt/util/FileCreator.h>
+#include <wdt/ErrorCodes.h>
+#include <wdt/Reporting.h>
 
 #include <string.h>
 #include <sys/stat.h>

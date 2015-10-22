@@ -12,8 +12,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include "AbortChecker.h"
-#include "ErrorCodes.h"
+#include <wdt/AbortChecker.h>
+#include <wdt/ErrorCodes.h>
 
 namespace facebook {
 namespace wdt {

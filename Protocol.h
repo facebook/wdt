@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "ErrorCodes.h"
+#include <wdt/ErrorCodes.h>
 
 #include <folly/Range.h>
 #include <stddef.h>

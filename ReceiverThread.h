@@ -7,12 +7,14 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include "WdtBase.h"
-#include "WdtThread.h"
-#include "Receiver.h"
-#include "ServerSocket.h"
+#include <wdt/WdtBase.h>
+#include <wdt/WdtThread.h>
+#include <wdt/Receiver.h>
+#include <wdt/util/ServerSocket.h>
+
 namespace facebook {
 namespace wdt {
+
 class Receiver;
 /**
  * Wdt receiver has logic to maintain the consistency of the

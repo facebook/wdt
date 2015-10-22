@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "Protocol.h"
+#include <wdt/Protocol.h>
 
 #include <string>
 #include <set>

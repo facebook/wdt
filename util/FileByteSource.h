@@ -10,8 +10,8 @@
 
 #include <unistd.h>
 
-#include "ByteSource.h"
-#include "Reporting.h"
+#include <wdt/ByteSource.h>
+#include <wdt/Reporting.h>
 #include <folly/ThreadLocal.h>
 
 namespace facebook {

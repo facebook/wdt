@@ -9,9 +9,9 @@
 #pragma once
 
 #include <wdt/WdtConfig.h>
-#include "Writer.h"
-#include "FileCreator.h"
-#include "Protocol.h"
+#include <wdt/Writer.h>
+#include <wdt/Protocol.h>
+#include <wdt/util/FileCreator.h>
 
 namespace facebook {
 namespace wdt {

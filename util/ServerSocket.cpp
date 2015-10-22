@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "ServerSocket.h"
-#include "Reporting.h"
-#include "SocketUtils.h"
-#include "WdtOptions.h"
+#include <wdt/util/ServerSocket.h>
+#include <wdt/util/SocketUtils.h>
+#include <wdt/Reporting.h>
+#include <wdt/WdtOptions.h>
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <poll.h>

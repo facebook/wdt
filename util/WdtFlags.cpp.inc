@@ -18,7 +18,7 @@
  * the first time through WdtFlags.h and second time in the method
  * initializeFromFlags()
  */
-#include "WdtFlagsMacros.h"
+#include <wdt/util/WdtFlagsMacros.h>
 WDT_OPT(start_port, int32, "Starting port number for wdt");
 WDT_OPT(num_ports, int32, "Number of sockets");
 WDT_OPT(ipv6, bool, "prefers ipv6");

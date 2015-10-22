@@ -19,11 +19,12 @@
 #include <utility>
 #include <unordered_map>
 
-#include "SourceQueue.h"
-#include "WdtOptions.h"
-#include "FileByteSource.h"
-#include "Protocol.h"
-#include "AbortChecker.h"
+#include <wdt/AbortChecker.h>
+#include <wdt/WdtOptions.h>
+#include <wdt/Protocol.h>
+#include <wdt/SourceQueue.h>
+#include <wdt/util/FileByteSource.h>
+
 namespace facebook {
 namespace wdt {
 /**

@@ -9,6 +9,8 @@
 #pragma once
 #include <ostream>
 
+#include <wdt/WdtOptions.h>
+
 namespace facebook {
 namespace wdt {
 class WdtFlags {

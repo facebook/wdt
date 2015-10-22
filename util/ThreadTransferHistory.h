@@ -7,13 +7,15 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include "DirectorySourceQueue.h"
-#include "Reporting.h"
-#include "Protocol.h"
+#include <wdt/util/DirectorySourceQueue.h>
+#include <wdt/Reporting.h>
+#include <wdt/Protocol.h>
 #include <vector>
 #include <folly/SpinLock.h>
+
 namespace facebook {
 namespace wdt {
+
 /// Transfer history of a sender thread
 class ThreadTransferHistory {
  public:

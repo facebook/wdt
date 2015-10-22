@@ -12,8 +12,8 @@
 #include <vector>
 #include <unordered_map>
 #include <condition_variable>
-#include "WdtThread.h"
-#include "ErrorCodes.h"
+#include <wdt/WdtThread.h>
+#include <wdt/ErrorCodes.h>
 
 namespace facebook {
 namespace wdt {
