@@ -187,10 +187,11 @@ add_library(folly4wdt ${FOLLY_CPP_SRC})
 # Order is important - inside fb we want the above
 # folly-config.h to be picked up instead of the fbcode one
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${FOLLY_SOURCE_DIR})
 include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
+# Next line assumes the source dir is called wdt/ to match the
+# include <wdt/xxx.h>
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 add_executable(wdt wdtCmdLine.cpp util/WdtFlags.cpp)
