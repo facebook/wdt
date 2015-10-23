@@ -8,20 +8,6 @@
  */
 #pragma once
 
-<<<<<<< HEAD
-#include "ErrorCodes.h"
-#include "AbortChecker.h"
-#include "DirectorySourceQueue.h"
-#include "WdtOptions.h"
-#include "Reporting.h"
-#include "Throttler.h"
-#include "Protocol.h"
-<<<<<<< HEAD
-#include "System.h"
-=======
-#include "WdtThread.h"
->>>>>>> master
-=======
 #include <wdt/ErrorCodes.h>
 #include <wdt/AbortChecker.h>
 #include <wdt/WdtOptions.h>
@@ -31,7 +17,8 @@
 #include <wdt/WdtThread.h>
 #include <wdt/util/DirectorySourceQueue.h>
 #include <wdt/util/ThreadsController.h>
->>>>>>> master
+#include <wdt/util/System.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -301,13 +288,11 @@ class WdtBase {
   /// abort checker passed to socket functions
   AbortChecker abortCheckerCallback_;
 
-<<<<<<< HEAD
   /// System to use
   System* sys_{nullptr};
-=======
+
   /// Controller for wdt threads shared between base and threads
   ThreadsController* threadsController_{nullptr};
->>>>>>> master
 
  private:
   folly::RWSpinLock abortCodeLock_;

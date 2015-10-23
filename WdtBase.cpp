@@ -354,11 +354,8 @@ WdtBase::WdtBase() : abortCheckerCallback_(this), sys_(&System::getDefault()) {
 
 WdtBase::~WdtBase() {
   abortChecker_ = nullptr;
-<<<<<<< HEAD
   sys_ = nullptr;
-=======
   delete threadsController_;
->>>>>>> master
 }
 
 std::vector<int32_t> WdtBase::genPortsVector(int32_t startPort,

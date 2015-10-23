@@ -91,16 +91,10 @@ util/ServerSocket.cpp
 util/SocketUtils.cpp
 Throttler.cpp
 WdtOptions.cpp
-<<<<<<< HEAD
-FileWriter.cpp
-TransferLogManager.cpp
-SerializationUtil.cpp
-SystemPosix.cpp
-=======
 util/FileWriter.cpp
 util/TransferLogManager.cpp
 util/SerializationUtil.cpp
->>>>>>> master
+util/SystemPosix.cpp
 WdtBase.cpp
 WdtResourceController.cpp
 )
@@ -268,13 +262,9 @@ if (BUILD_TESTING)
   )
   target_link_libraries(wdt4tests wdt4tests_min)
 
-<<<<<<< HEAD
 # TODO macro/function so it doesn't take 3 lines to add 1 new test binary ?
-  add_executable(protocol_test ProtocolTest.cpp)
-=======
-
   add_executable(protocol_test test/ProtocolTest.cpp)
->>>>>>> master
+
   target_link_libraries(protocol_test wdt4tests)
   add_test(NAME AllTestsInProtocolTest COMMAND protocol_test)
 
@@ -286,15 +276,11 @@ if (BUILD_TESTING)
   target_link_libraries(file_reader_test wdt4tests)
   add_test(NAME FileReaderTests COMMAND file_reader_test)
 
-<<<<<<< HEAD
-  add_executable(system_test  tests/SystemTest.cpp)
+  add_executable(system_test  test/SystemTest.cpp)
   target_link_libraries(system_test wdt4tests)
   add_test(NAME SystemTests COMMAND system_test)
 
-  add_executable(option_type_test_long_flags OptionTypeTest.cpp)
-=======
   add_executable(option_type_test_long_flags test/OptionTypeTest.cpp)
->>>>>>> master
   target_link_libraries(option_type_test_long_flags wdt4tests)
 
   add_executable(option_type_test_short_flags test/OptionTypeTest.cpp

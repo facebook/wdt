@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "System.h"
-#include "WdtFlags.h"
+#include <wdt/util/System.h>
+#include <wdt/util/WdtFlags.h>
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>

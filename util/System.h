@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "ErrorCodes.h"
+#include <wdt/ErrorCodes.h>
 
 namespace facebook {
 namespace wdt {

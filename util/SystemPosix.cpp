@@ -6,19 +6,24 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#pragma once
+#include <wdt/util/SystemPosix.h>
 
-#include "System.h"
+#include <glog/logging.h>
 
 namespace facebook {
 namespace wdt {
 
-class PosixSystem : public System {
-public:
-  PosixSystem();
-  ~PosixSystem();
-
-};
-
+PosixSystem::PosixSystem() {
+  LOG(INFO) << "Created PosixSystem instance";
 }
-}  // namespace facebook::wdt
+
+PosixSystem::~PosixSystem() {
+  LOG(INFO) << "Deleting instance of PosixSystem";
+}
+
+System &System::getDefault() {
+  static PosixSystem sPosixSystem;
+  return sPosixSystem;
+}
+}
+}
