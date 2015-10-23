@@ -8,8 +8,8 @@
  */
 #pragma once
 
-#include "ErrorCodes.h"
-#include "WdtOptions.h"
+#include <wdt/ErrorCodes.h>
+#include <wdt/WdtOptions.h>
 
 #include <vector>
 #include <string>

@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "Sender.h"
-#include "Receiver.h"
-#include "Protocol.h"
-#include "WdtResourceController.h"
-#include "WdtFlags.h"
+#include <wdt/Sender.h>
+#include <wdt/Receiver.h>
+#include <wdt/Protocol.h>
+#include <wdt/WdtResourceController.h>
+#include <wdt/util/WdtFlags.h>
 #include <chrono>
 #include <future>
 #include <folly/String.h>
@@ -20,6 +20,8 @@
 #include <fstream>
 #include <signal.h>
 #include <thread>
+
+// Used in fbonly to add socket creator setup
 #ifndef ADDITIONAL_SENDER_SETUP
 #define ADDITIONAL_SENDER_SETUP
 #endif

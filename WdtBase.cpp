@@ -6,15 +6,18 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "WdtBase.h"
+#include <wdt/WdtBase.h>
 #include <folly/Conv.h>
 #include <folly/Range.h>
 #include <ctime>
 #include <random>
+
 using namespace std;
 using folly::StringPiece;
+
 namespace facebook {
 namespace wdt {
+
 WdtUri::WdtUri(const string& url) {
   errorCode_ = process(url);
 }

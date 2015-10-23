@@ -7,14 +7,18 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include "Reporting.h"
-#include "ErrorCodes.h"
-#include "ThreadsController.h"
+#include <wdt/Reporting.h>
+#include <wdt/ErrorCodes.h>
+#include <wdt/util/ThreadsController.h>
 #include <thread>
 #include <memory>
+
 namespace facebook {
 namespace wdt {
+
 class ThreadsController;
+
+/// Common functionality and settings between SenderThread and ReceiverThread
 class WdtThread {
  public:
   /// Constructor for wdt thread

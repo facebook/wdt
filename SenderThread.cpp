@@ -6,9 +6,9 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "SenderThread.h"
-#include "Sender.h"
-#include "ClientSocket.h"
+#include <wdt/SenderThread.h>
+#include <wdt/Sender.h>
+#include <wdt/util/ClientSocket.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/String.h>

@@ -2,6 +2,12 @@
 # run _setup once and then this will run a loop and email results
 # TODO: rewrite in python
 
+set diff [lindex $argv 0]
+puts "Working on diff $diff"
+if {[string length $diff]==0} {
+  puts stderr "Need DXXXXX argument"
+}
+
 # In order for /data/users/$USER to be different than default when creating
 # wdtTest for xfs test but exists and so those directory which we rm
 # don't conflict with the users' normal runs we hack the USER env var:
@@ -55,14 +61,14 @@ proc nextEmail {} {
 }
 
 proc sendEmail {reason} {
-    global type msg TO FROM LOGF EXTRA
+    global type msg TO FROM LOGF EXTRA diff
     puts "Sending email to $TO because: $reason"
     set emailFileName ${LOGF}.email
     # Email headers
     set f [open $emailFileName w]
     puts $f "From: $FROM"
     puts $f "To: $TO"
-    puts $f "Subject: WDT build: ${type}${EXTRA}: $msg ($reason)"
+    puts $f "Subject: WDT build: ${type}-${diff}${EXTRA}: $msg ($reason)"
     puts $f {Content-type: text/plain; charset="UTF-8"}
     puts $f ""; # seperate headers from body
     puts $f "filtered log, full log at https://fburl.com/wdt_${type}_builds"
@@ -93,15 +99,15 @@ if {$os == "Darwin"} {
      (sudo tc qdisc del dev lo root; sudo ip6tables --flush || true) &&\
      time fbconfig --clang -r wdt &&\
      time fbmake opt &&\
-     time wdt/wdt_max_send_test.sh |& tail -50 &&\
-     time wdt/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
+     time wdt/test/wdt_max_send_test.sh |& tail -50 &&\
+     time wdt/test/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
      time fbconfig --sanitize address -r wdt &&\
      time fbmake dbg &&\
-     time fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time fbmake runtests --run-disabled --return-nonzero-on-timeouts &&\
      sudo tc qdisc add dev lo root netem delay 20ms 10ms \
      duplicate 1% corrupt 0.1% &&\
      echo rerunning tests with tc delays &&\
-     time fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time fbmake runtests --run-disabled --return-nonzero-on-timeouts &&\
      sudo tc qdisc del dev lo root"
     set targetDir "~/public_html/wdt_builds/"
     set sudo "sudo"
@@ -124,7 +130,9 @@ while {1} {
     # cleanup previous builds failure - sudo not needed/asking for passwd on mac
     if {[catch {exec sh -c "set -o pipefail; set -x; date; uname -a;\
      $sudo rm -rf /tmp/wdtTest_$userdir /dev/shm/wdtTest_$userdir wdtTest &&\
-     cd $CDIR/fbsource/fbcode && time hg pull && time hg rebase -d master &&\
+     cd $CDIR/fbsource/fbcode && (hg book -d arcpatch-$diff || true) &&\
+     time hg pull && arc patch $diff &&\
+     ( time hg rebase -d master || true ) &&\
      hg bookmark -v &&\
      hg log -l 2 && hg log -v -l 1 folly && hg log -v -l 2 wdt &&\
      cd $CDIR/cmake_wdt_build && time make -j 4 && \

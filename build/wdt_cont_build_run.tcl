@@ -93,8 +93,8 @@ if {$os == "Darwin"} {
      (sudo tc qdisc del dev lo root; sudo ip6tables --flush || true) &&\
      time fbconfig --clang -r wdt &&\
      time fbmake opt &&\
-     time wdt/wdt_max_send_test.sh |& tail -50 &&\
-     time wdt/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
+     time wdt/test/wdt_max_send_test.sh |& tail -50 &&\
+     time wdt/test/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
      time fbconfig --sanitize address -r wdt &&\
      time fbmake dbg &&\
      time fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\

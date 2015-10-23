@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "ReceiverThread.h"
-#include "FileWriter.h"
+#include <wdt/ReceiverThread.h>
+#include <wdt/util/FileWriter.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/String.h>

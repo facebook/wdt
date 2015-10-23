@@ -6,12 +6,13 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "Sender.h"
+#include <wdt/Sender.h>
 
-#include "ClientSocket.h"
-#include "SenderThread.h"
-#include "Throttler.h"
-#include "SocketUtils.h"
+#include <wdt/SenderThread.h>
+#include <wdt/Throttler.h>
+
+#include <wdt/util/ClientSocket.h>
+#include <wdt/util/SocketUtils.h>
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
@@ -21,10 +22,9 @@
 #include <sys/stat.h>
 #include <folly/Checksum.h>
 
-#include <thread>
-
 namespace facebook {
 namespace wdt {
+
 void Sender::endCurTransfer() {
   endTime_ = Clock::now();
   LOG(INFO) << "Last thread finished " << durationSeconds(endTime_ - startTime_)
@@ -330,7 +330,7 @@ ErrorCode Sender::start() {
             << ports_ << "]";
   startTime_ = Clock::now();
   downloadResumptionEnabled_ = options.enable_download_resumption;
-  dirThread_ = std::move(dirQueue_->buildQueueAsynchronously());
+  dirThread_ = dirQueue_->buildQueueAsynchronously();
   if (twoPhases) {
     dirThread_.join();
   }

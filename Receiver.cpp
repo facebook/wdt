@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "Receiver.h"
-#include "ServerSocket.h"
-#include "FileWriter.h"
-#include "SocketUtils.h"
+#include <wdt/Receiver.h>
+#include <wdt/util/FileWriter.h>
+#include <wdt/util/ServerSocket.h>
+#include <wdt/util/SocketUtils.h>
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>

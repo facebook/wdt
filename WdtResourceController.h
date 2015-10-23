@@ -10,12 +10,13 @@
 #include <unordered_map>
 #include <vector>
 #include <folly/Memory.h>
-#include "ErrorCodes.h"
-#include "Receiver.h"
-#include "Sender.h"
-#include "DirectorySourceQueue.h"
+#include <wdt/ErrorCodes.h>
+#include <wdt/Receiver.h>
+#include <wdt/Sender.h>
+
 namespace facebook {
 namespace wdt {
+
 typedef std::shared_ptr<Receiver> ReceiverPtr;
 typedef std::shared_ptr<Sender> SenderPtr;
 

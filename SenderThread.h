@@ -8,13 +8,16 @@
  */
 #pragma once
 #include <thread>
-#include "WdtThread.h"
-#include "Sender.h"
-#include "ClientSocket.h"
-#include "ThreadTransferHistory.h"
+#include <wdt/WdtThread.h>
+#include <wdt/Sender.h>
+#include <wdt/util/ClientSocket.h>
+#include <wdt/util/ThreadTransferHistory.h>
+
 namespace facebook {
 namespace wdt {
+
 class DirectorySourceQueue;
+
 /// state machine states
 enum SenderState {
   CONNECT,

@@ -8,10 +8,8 @@
  */
 #pragma once
 
-#include "WdtBase.h"
-#include "ClientSocket.h"
-#include "WdtOptions.h"
-#include "ThreadsController.h"
+#include <wdt/WdtBase.h>
+#include <wdt/util/ClientSocket.h>
 #include <chrono>
 #include <memory>
 #include <condition_variable>
@@ -20,8 +18,10 @@
 
 namespace facebook {
 namespace wdt {
+
 class SenderThread;
 class TransferHistoryController;
+
 enum ProtoNegotiationStatus {
   V_MISMATCH_WAIT,      // waiting for version mismatch to be processed
   V_MISMATCH_RESOLVED,  // version mismatch processed and was successful
