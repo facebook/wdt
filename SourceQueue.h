@@ -10,7 +10,7 @@
 
 #include <memory>
 
-#include "ByteSource.h"
+#include <wdt/ByteSource.h>
 
 namespace facebook {
 namespace wdt {

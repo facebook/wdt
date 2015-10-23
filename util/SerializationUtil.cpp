@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "SerializationUtil.h"
+#include <wdt/util/SerializationUtil.h>
 #include <folly/Varint.h>
 
 namespace facebook {

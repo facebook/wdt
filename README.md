@@ -1,8 +1,10 @@
-![](wdt_logo.png)
+![](build/wdt_logo.png)
 `WDT` Warp speed Data Transfer
 ------------------------------
 
 [![Join the chat at https://gitter.im/facebook/wdt](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/facebook/wdt?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+[![Build Status](https://travis-ci.org/facebook/wdt.svg?branch=master)](https://travis-ci.org/facebook/wdt)
 
 ## Design philosophy/Overview
 

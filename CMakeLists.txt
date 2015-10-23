@@ -189,7 +189,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${FOLLY_SOURCE_DIR})
 include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 add_executable(wdt wdtCmdLine.cpp util/WdtFlags.cpp)
 set_target_properties(wdt PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")

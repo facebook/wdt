@@ -7,7 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include "Reporting.h"
+#include <wdt/Reporting.h>
 #include <folly/Synchronized.h>
 #include <thread>
 #include <glog/logging.h>
