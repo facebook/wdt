@@ -11,6 +11,7 @@
 #include <wdt/ErrorCodes.h>
 #include <wdt/WdtOptions.h>
 
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <chrono>
@@ -226,10 +227,9 @@ class TransferStats {
   /// @return error code based on combinator of local and remote error
   ErrorCode getCombinedErrorCode() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
-    if (errCode_ != OK || remoteErrCode_ != OK) {
-      return ERROR;
-    }
-    return OK;
+    // Return something else than ERROR (1) if we know more
+    // TODO: should be OO in ErrorCode "most interesting error"
+    return std::max(errCode_, remoteErrCode_);
   }
 
   /// @return status of the transfer

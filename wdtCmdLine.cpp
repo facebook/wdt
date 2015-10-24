@@ -109,8 +109,11 @@ void setUpAbort(WdtBase &senderOrReceiver) {
 }
 
 void cancelAbort() {
-  std::unique_lock<std::mutex> lk(abortMutex);
-  abortCondVar.notify_one();
+  {
+    std::unique_lock<std::mutex> lk(abortMutex);
+    abortCondVar.notify_one();
+  }
+  std::this_thread::yield();
 }
 
 void readManifest(std::istream &fin, WdtTransferRequest &req) {
@@ -253,5 +256,7 @@ int main(int argc, char *argv[]) {
     retCode = report->getSummary().getErrorCode();
   }
   cancelAbort();
+  LOG(INFO) << "Returning with code " << retCode << " "
+            << errorCodeToStr(retCode);
   return retCode;
 }

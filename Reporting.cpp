@@ -116,22 +116,45 @@ TransferReport::TransferReport(
   for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
-  summary_.setErrorCode(ERROR);
-  if (failedSourceStats_.empty() && failedDirectories_.empty()) {
-    // none of the files or directories failed
-    for (auto& stats : threadStats_) {
-      if (stats.getCombinedErrorCode() == OK) {
-        // one thread finished successfully
-        summary_.setErrorCode(OK);
-        break;
-      }
+  // Summarize reason for failure if any
+  ErrorCode code = OK;
+  bool atLeastOneOk = false;
+  for (auto& stats : threadStats_) {
+    ErrorCode sc = stats.getCombinedErrorCode();
+    if (sc == OK) {
+      atLeastOneOk = true;
+      continue;
+    }
+    if (sc > code) {
+      // assumes max is most interesting/specific code
+      // TODO: this should be OO inside ErrorCode class
+      code = sc;
     }
   }
+  LOG(INFO) << "Error code summary " << errorCodeToStr(code);
+  // none of the files or directories failed
+  bool possiblyOk = (failedSourceStats_.empty() && failedDirectories_.empty());
+  bool summaryOk = false;
+  if (possiblyOk && atLeastOneOk) {
+    if (code != OK) {
+      LOG(WARNING) << "WDT successfully recovered from error "
+                   << errorCodeToStr(code);
+    }
+    summary_.setErrorCode(OK);
+    summaryOk = true;
+  } else {
+    summary_.setErrorCode(code);
+  }
+
   if (summary_.getEffectiveDataBytes() != totalFileSize_) {
     // sender did not send all the bytes
     LOG(INFO) << "Could not send all the bytes " << totalFileSize_ << " "
               << summary_.getEffectiveDataBytes();
-    summary_.setErrorCode(ERROR);
+    if (summaryOk) {
+      LOG(ERROR) << "BUG: All threads OK yet sized based error detected";
+    }
+    // possibly recover a specific (or random) code:
+    summary_.setErrorCode((code == OK) ? ERROR : code);
   }
   std::set<std::string> failedFilesSet;
   for (auto& stats : failedSourceStats_) {
