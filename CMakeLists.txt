@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.22.1510220)
+project("WDT" LANGUAGES C CXX VERSION 1.22.1510250)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -311,5 +311,8 @@ if (BUILD_TESTING)
 
   add_test(NAME WdtBadServerTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_bad_server_test.py")
+
+  add_test(NAME ReceiverThrottlerRefCountTest COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/receiver_throttler_ref_count_test.sh")
 
 endif(BUILD_TESTING)

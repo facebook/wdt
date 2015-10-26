@@ -100,6 +100,10 @@ bool Receiver::hasNewTransferStarted() const {
 }
 
 void Receiver::endCurGlobalSession() {
+  if (!hasNewTransferStarted_) {
+    LOG(WARNING) << "WDT transfer did not start, no need to end session";
+    return;
+  }
   LOG(INFO) << "Ending the transfer " << transferId_;
   if (throttler_) {
     throttler_->deRegisterTransfer();
