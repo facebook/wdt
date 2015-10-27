@@ -223,6 +223,7 @@ ReceiverState ReceiverThread::sendLocalCheckpoint() {
     localCheckpoint.numBlocks = -1;
     checkpoints.emplace_back(localCheckpoint);
   } else {
+    VLOG(1) << *this << " sending local checkpoint " << checkpoint_;
     checkpoints.emplace_back(checkpoint_);
   }
 
@@ -289,7 +290,7 @@ ReceiverState ReceiverThread::processSettingsCmd() {
     return FINISH_WITH_ERROR;
   }
   if (senderProtocolVersion != threadProtocolVersion_) {
-    LOG(ERROR) << "Receiver and sender protocol version mismatch "
+    LOG(ERROR) << *this << " Receiver and sender protocol version mismatch "
                << senderProtocolVersion << " " << threadProtocolVersion_;
     int negotiatedProtocol = Protocol::negotiateProtocol(
         senderProtocolVersion, threadProtocolVersion_);
@@ -899,6 +900,9 @@ void ReceiverThread::reset() {
   senderReadTimeout_ = senderWriteTimeout_ = -1;
   curConnectionVerified_ = false;
   threadStats_.reset();
+  checkpoints_.clear();
+  newCheckpoints_.clear();
+  checkpoint_ = Checkpoint(socket_.getPort());
 }
 
 ReceiverThread::~ReceiverThread() {
