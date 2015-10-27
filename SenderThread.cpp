@@ -416,7 +416,6 @@ SenderState SenderThread::processDoneCmd() {
 
 SenderState SenderThread::processWaitCmd() {
   LOG(INFO) << *this << " entered PROCESS_WAIT_CMD state ";
-  ;
   ThreadTransferHistory &transferHistory = getTransferHistory();
   VLOG(1) << "received WAIT_CMD, port " << port_;
   transferHistory.markAllAcknowledged();
