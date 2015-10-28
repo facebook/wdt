@@ -11,6 +11,13 @@ import shutil
 import tempfile
 import errno
 
+def get_wdt_version():
+    dummy_cmd = "_bin/wdt/wdt --version"
+    dummy_process = subprocess.Popen(dummy_cmd.split(),
+                                     stdout=subprocess.PIPE)
+    protocol_string = dummy_process.stdout.readline().strip()
+    return protocol_string.split()[4]
+
 def start_receiver(receiver_cmd, root_dir, test_count):
     print("Receiver: " + receiver_cmd)
     server_log = "{0}/server{1}.log".format(root_dir, test_count)

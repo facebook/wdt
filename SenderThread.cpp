@@ -85,16 +85,23 @@ SenderState SenderThread::readLocalCheckPoint() {
     numReconnectWithoutProgress_++;
     return CONNECT;
   }
+  bool isValidCheckpoint = true;
   if (!Protocol::decodeCheckpoints(threadProtocolVersion_, buf_, decodeOffset,
                                    checkpointLen, checkpoints)) {
     LOG(ERROR) << "checkpoint decode failure "
-               << folly::humanify(std::string(buf_, checkpointLen));
-    threadStats_.setErrorCode(PROTOCOL_ERROR);
-    return END;
+               << folly::humanify(std::string(buf_, numRead));
+    isValidCheckpoint = false;
+  } else if (checkpoints.size() != 1) {
+    LOG(ERROR) << "Illegal local checkpoint, unexpected num checkpoints "
+               << checkpoints.size() << " "
+               << folly::humanify(std::string(buf_, numRead));
+    isValidCheckpoint = false;
+  } else if (checkpoints[0].port != port_) {
+    LOG(ERROR) << "illegal checkpoint, checkpoint " << checkpoints[0]
+               << " doesn't match the port " << port_;
+    isValidCheckpoint = false;
   }
-  if (checkpoints.size() != 1 || checkpoints[0].port != port_) {
-    LOG(ERROR) << "illegal local checkpoint "
-               << folly::humanify(std::string(buf_, checkpointLen));
+  if (!isValidCheckpoint) {
     threadStats_.setErrorCode(PROTOCOL_ERROR);
     return END;
   }
@@ -416,7 +423,6 @@ SenderState SenderThread::processDoneCmd() {
 
 SenderState SenderThread::processWaitCmd() {
   LOG(INFO) << *this << " entered PROCESS_WAIT_CMD state ";
-  ;
   ThreadTransferHistory &transferHistory = getTransferHistory();
   VLOG(1) << "received WAIT_CMD, port " << port_;
   transferHistory.markAllAcknowledged();

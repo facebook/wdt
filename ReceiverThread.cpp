@@ -223,6 +223,7 @@ ReceiverState ReceiverThread::sendLocalCheckpoint() {
     localCheckpoint.numBlocks = -1;
     checkpoints.emplace_back(localCheckpoint);
   } else {
+    VLOG(1) << *this << " sending local checkpoint " << checkpoint_;
     checkpoints.emplace_back(checkpoint_);
   }
 
@@ -289,7 +290,7 @@ ReceiverState ReceiverThread::processSettingsCmd() {
     return FINISH_WITH_ERROR;
   }
   if (senderProtocolVersion != threadProtocolVersion_) {
-    LOG(ERROR) << "Receiver and sender protocol version mismatch "
+    LOG(ERROR) << *this << " Receiver and sender protocol version mismatch "
                << senderProtocolVersion << " " << threadProtocolVersion_;
     int negotiatedProtocol = Protocol::negotiateProtocol(
         senderProtocolVersion, threadProtocolVersion_);
@@ -747,6 +748,7 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   if (socket_.write(buf_, 1) != 1) {
     PLOG(ERROR) << "unable to send DONE " << threadIndex_;
     doneSendFailure_ = true;
+    threadStats_.setErrorCode(SOCKET_WRITE_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
 
@@ -756,6 +758,7 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   if (read != 1 || buf_[0] != Protocol::DONE_CMD) {
     LOG(ERROR) << *this << " did not receive ack for DONE";
     doneSendFailure_ = true;
+    threadStats_.setErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
 
@@ -763,6 +766,7 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   if (read != 0) {
     LOG(ERROR) << *this << " EOF not found where expected";
     doneSendFailure_ = true;
+    threadStats_.setErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
   socket_.closeCurrentConnection();
@@ -781,7 +785,7 @@ ReceiverState ReceiverThread::finishWithError() {
   auto guard = cv->acquire();
   wdtParent_->addCheckpoint(checkpoint_);
   controller_->markState(threadIndex_, FINISHED);
-  // guard deletion notifies one thread
+  guard.notifyOne();
   return END;
 }
 
@@ -813,7 +817,7 @@ ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
       auto guard = cv->acquire();
       auto state = checkForFinishOrNewCheckpoints();
       if (state != WAIT_FOR_FINISH_OR_NEW_CHECKPOINT) {
-        // guard automatically notfies one
+        guard.notifyOne();
         return state;
       }
       START_PERF_TIMER
@@ -896,6 +900,9 @@ void ReceiverThread::reset() {
   senderReadTimeout_ = senderWriteTimeout_ = -1;
   curConnectionVerified_ = false;
   threadStats_.reset();
+  checkpoints_.clear();
+  newCheckpoints_.clear();
+  checkpoint_ = Checkpoint(socket_.getPort());
 }
 
 ReceiverThread::~ReceiverThread() {

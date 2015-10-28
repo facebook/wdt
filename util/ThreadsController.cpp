@@ -35,7 +35,6 @@ ConditionGuardImpl::~ConditionGuardImpl() {
   if (lock_ != nullptr) {
     delete lock_;
   }
-  cv_.notify_one();
 }
 
 ConditionGuardImpl::ConditionGuardImpl(mutex &guardMutex,
