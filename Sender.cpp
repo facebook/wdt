@@ -408,12 +408,11 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
   const auto &options = WdtOptions::get();
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket;
-  std::string portStr = folly::to<std::string>(port);
   if (!socketCreator_) {
     // socket creator not set, creating ClientSocket
-    socket = folly::make_unique<ClientSocket>(destHost_, portStr, abortChecker);
+    socket = folly::make_unique<ClientSocket>(destHost_, port, abortChecker);
   } else {
-    socket = socketCreator_(destHost_, portStr, abortChecker);
+    socket = socketCreator_(destHost_, port, abortChecker);
   }
   double retryInterval = options.sleep_millis;
   int maxRetries = options.max_retries;

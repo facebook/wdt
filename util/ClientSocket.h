@@ -19,7 +19,7 @@ namespace facebook {
 namespace wdt {
 class ClientSocket {
  public:
-  ClientSocket(const std::string &dest, const std::string &port,
+  ClientSocket(const std::string &dest, const int port,
                IAbortChecker const *abortChecker);
   virtual ErrorCode connect();
   /// tries to read nbyte data and periodically checks for abort
@@ -28,14 +28,17 @@ class ClientSocket {
   virtual int write(const char *buf, int nbyte, bool tryFull = true);
   virtual void close();
   int getFd() const;
-  std::string getPort() const;
+  int getPort() const;
+  /// @return   peer-ip of the connected socket
+  const std::string &getPeerIp() const;
   virtual void shutdown();
   virtual ~ClientSocket();
 
- private:
+ protected:
   const std::string dest_;
-  const std::string port_;
+  const int port_;
   int fd_;
+  std::string peerIp_;
   struct addrinfo sa_;
   IAbortChecker const *abortChecker_;
 };

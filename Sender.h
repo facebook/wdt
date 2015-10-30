@@ -139,7 +139,7 @@ class Sender : public WdtBase {
   std::unique_ptr<TransferReport> getTransferReport();
 
   typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
-      const std::string &dest, const std::string &port,
+      const std::string &dest, const int port,
       IAbortChecker const *abortChecker);
 
   /**

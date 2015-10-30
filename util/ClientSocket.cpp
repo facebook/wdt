@@ -21,7 +21,7 @@ namespace wdt {
 
 using std::string;
 
-ClientSocket::ClientSocket(const string &dest, const string &port,
+ClientSocket::ClientSocket(const string &dest, const int port,
                            IAbortChecker const *abortChecker)
     : dest_(dest), port_(port), fd_(-1), abortChecker_(abortChecker) {
   memset(&sa_, 0, sizeof(sa_));
@@ -45,7 +45,8 @@ ErrorCode ClientSocket::connect() {
       freeaddrinfo(infoList);
     }
   });
-  int res = getaddrinfo(dest_.c_str(), port_.c_str(), &sa_, &infoList);
+  string portStr = folly::to<string>(port_);
+  int res = getaddrinfo(dest_.c_str(), portStr.c_str(), &sa_, &infoList);
   if (res) {
     // not errno, can't use PLOG (perror)
     LOG(ERROR) << "Failed getaddrinfo " << dest_ << " , " << port_ << " : "
@@ -152,6 +153,7 @@ ErrorCode ClientSocket::connect() {
       continue;
     }
     VLOG(1) << "Successful connect on " << fd_;
+    peerIp_ = host;
     sa_ = *info;
     break;
   }
@@ -172,8 +174,12 @@ int ClientSocket::getFd() const {
   return fd_;
 }
 
-std::string ClientSocket::getPort() const {
+int ClientSocket::getPort() const {
   return port_;
+}
+
+const std::string &ClientSocket::getPeerIp() const {
+  return peerIp_;
 }
 
 int ClientSocket::read(char *buf, int nbyte, bool tryFull) {
@@ -206,4 +212,4 @@ ClientSocket::~ClientSocket() {
   this->close();
 }
 }
-}  // end namespace facebook::wtd
+}  // end namespace facebook::wdt
