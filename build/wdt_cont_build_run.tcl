@@ -138,7 +138,7 @@ while {1} {
     puts $msg
     set autoBump 1
     set firstLine "err"
-    if {[catch {exec hg log -1 1 -T "{desc}" wdt} prevDesc]} {
+    if {[catch {exec hg log -l 1 -T "{desc}" wdt} prevDesc]} {
         puts "Error getting desc: $prevDesc"
         set autoBump 0
     } else {
