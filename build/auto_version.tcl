@@ -38,7 +38,8 @@ proc auto_land {} {
 
 proc check_clean {} {
     catch {exec hg status -m -a -r -d} status
-    if {[string length status]} {
+    set status [string trim $status]
+    if {[string length $status]} {
         puts "Error, aborting: not clean repo state: $status"
         exit 1
     }
