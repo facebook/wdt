@@ -28,26 +28,35 @@ Reviewers: ldemailly
 Reviewed by: ldemailly
 }
     puts [exec hg commit -m $commit_msg]
-    puts "committed"
+    puts "*** Committed"
 }
 
 proc auto_land {} {
     puts [exec echo y | arc land --ninja]
-    puts "landed"
+    puts "*** Landed, going back to master:"
+    puts [exec hg update master]
 }
 
 proc check_clean {} {
     catch {exec hg status -m -a -r -d} status
     set status [string trim $status]
     if {[string length $status]} {
-        puts "Error, aborting: not clean repo state: $status"
+        puts "*** Error, aborting: not clean repo state: $status"
         exit 1
     }
 }
 
+proc switch_to_and_update_master {} {
+    puts "*** Switching to and updating master:"
+    puts [exec hg pull]
+    puts [exec hg update master]
+}
+
+# Put it all together:
+switch_to_and_update_master
 check_clean
 version_update
-puts "WARNING - this will auto land:"
+puts "*** WARNING - this will auto land:"
 puts [exec hg status]
 puts "Interrupt now if that's not what you want..."
 after 2000
