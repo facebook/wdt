@@ -385,14 +385,15 @@ class TransferReport {
   void setCurrentThroughput(double currentThroughput) {
     currentThroughput_ = currentThroughput;
   }
-  void setLocalErrorCode(ErrorCode errCode) {
-    summary_.setLocalErrorCode(errCode);
-  }
   void setTotalTime(double totalTime) {
     totalTime_ = totalTime;
   }
   void setTotalFileSize(int64_t totalFileSize) {
     totalFileSize_ = totalFileSize;
+  }
+  void setErrorCode(const ErrorCode errCode) {
+    summary_.setLocalErrorCode(errCode);
+    summary_.setRemoteErrorCode(errCode);
   }
   friend std::ostream &operator<<(std::ostream &os,
                                   const TransferReport &report);

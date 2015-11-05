@@ -189,7 +189,7 @@ std::unique_ptr<TransferReport> Sender::getTransferReport() {
   ErrorCode errCode = transferReport->getSummary().getErrorCode();
   if (status == NOT_STARTED && errCode == OK) {
     LOG(INFO) << "Transfer not started, setting the error code to ERROR";
-    transferReport->setLocalErrorCode(ERROR);
+    transferReport->setErrorCode(ERROR);
   }
   return transferReport;
 }

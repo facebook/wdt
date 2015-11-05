@@ -67,6 +67,8 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
 
   if (stats.localErrCode_ == OK && stats.remoteErrCode_ == OK) {
     os << "Transfer status = OK.";
+  } else if (stats.localErrCode_ == stats.remoteErrCode_) {
+    os << "Transfer status = " << errorCodeToStr(stats.localErrCode_) << ".";
   } else {
     os << "Transfer status (local) = " << errorCodeToStr(stats.localErrCode_)
        << ", (remote) = " << errorCodeToStr(stats.remoteErrCode_) << ".";
@@ -112,31 +114,31 @@ TransferReport::TransferReport(
   }
   LOG(INFO) << "Error code summary " << errorCodeToStr(summaryErrorCode);
   // none of the files or directories failed
-  bool possiblyOk = (failedSourceStats_.empty() && failedDirectories_.empty());
-  bool summaryOk = false;
-  if (!possiblyOk) {
-    LOG(WARNING) << "Unable to send all files/directories";
-    if (summaryErrorCode == OK) {
-      // only happens when wdt can not read a file/directory
-      summary_.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
-    }
-  } else if (atLeastOneOk) {
+  bool possiblyOk = true;
+  if (!failedDirectories_.empty()) {
+    possiblyOk = false;
+    summaryErrorCode =
+        getMoreInterestingError(summaryErrorCode, BYTE_SOURCE_READ_ERROR);
+  }
+  for (const auto& sourceStat : failedSourceStats_) {
+    possiblyOk = false;
+    summaryErrorCode =
+        getMoreInterestingError(summaryErrorCode, sourceStat.getErrorCode());
+  }
+  if (possiblyOk && atLeastOneOk) {
     if (summaryErrorCode != OK) {
       LOG(WARNING) << "WDT successfully recovered from error "
                    << errorCodeToStr(summaryErrorCode);
     }
-    // Since getErrorCode checks both local and remote error code, we have to
-    // reset both error codes.
-    summary_.setLocalErrorCode(OK);
-    summary_.setRemoteErrorCode(OK);
-    summaryOk = true;
+    summaryErrorCode = OK;
   }
+  setErrorCode(summaryErrorCode);
 
   if (summary_.getEffectiveDataBytes() != totalFileSize_) {
     // sender did not send all the bytes
     LOG(INFO) << "Could not send all the bytes " << totalFileSize_ << " "
               << summary_.getEffectiveDataBytes();
-    WDT_CHECK(!summaryOk)
+    WDT_CHECK(summaryErrorCode != OK)
         << "BUG: All threads OK yet sized based error detected";
   }
   std::set<std::string> failedFilesSet;
