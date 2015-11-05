@@ -29,7 +29,7 @@ void Sender::endCurTransfer() {
   endTime_ = Clock::now();
   LOG(INFO) << "Last thread finished " << durationSeconds(endTime_ - startTime_)
             << " for transfer id " << transferId_;
-  transferFinished_ = true;
+  setTransferStatus(FINISHED);
   if (throttler_) {
     throttler_->deRegisterTransfer();
   }
@@ -46,7 +46,6 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
     : queueAbortChecker_(this), destHost_(destHost) {
   LOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   srcDir_ = srcDir;
-  transferFinished_ = true;
   const auto &options = WdtOptions::get();
   int port = options.start_port;
   int numSockets = options.num_ports;
@@ -97,7 +96,8 @@ WdtTransferRequest Sender::init() {
 }
 
 Sender::~Sender() {
-  if (!isTransferFinished()) {
+  TransferStatus status = getTransferStatus();
+  if (status == ONGOING) {
     LOG(WARNING) << "Sender being deleted. Forcefully aborting the transfer";
     abort(ABORTED_BY_APPLICATION);
   }
@@ -158,7 +158,7 @@ bool Sender::isSendFileChunks() const {
           protocolVersion_ >= Protocol::DOWNLOAD_RESUMPTION_VERSION);
 }
 
-bool Sender::isFileChunksReceived() const {
+bool Sender::isFileChunksReceived() {
   std::lock_guard<std::mutex> lock(mutex_);
   return fileChunksReceived_;
 }
@@ -185,12 +185,13 @@ std::unique_ptr<TransferReport> Sender::getTransferReport() {
   std::unique_ptr<TransferReport> transferReport =
       folly::make_unique<TransferReport>(std::move(globalStats), totalTime,
                                          totalFileSize);
+  TransferStatus status = getTransferStatus();
+  ErrorCode errCode = transferReport->getSummary().getErrorCode();
+  if (status == NOT_STARTED && errCode == OK) {
+    LOG(INFO) << "Transfer not started, setting the error code to ERROR";
+    transferReport->setErrorCode(ERROR);
+  }
   return transferReport;
-}
-
-bool Sender::isTransferFinished() {
-  std::unique_lock<std::mutex> lock(mutex_);
-  return transferFinished_;
 }
 
 Clock::time_point Sender::getEndTime() {
@@ -205,22 +206,16 @@ TransferStats Sender::getGlobalTransferStats() const {
   return globalStats;
 }
 
-ErrorCode Sender::verifyVersionMismatchStats() const {
-  for (const auto &senderThread : senderThreads_) {
-    const auto &threadStats = senderThread->getTransferStats();
-    if (threadStats.getErrorCode() == OK) {
-      LOG(ERROR) << "Found a thread that completed transfer successfully "
-                 << "despite version mismatch. " << senderThread->getPort();
-      return ERROR;
-    }
-  }
-  return OK;
-}
-
 std::unique_ptr<TransferReport> Sender::finish() {
   std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
   VLOG(1) << "Sender::finish()";
-  if (areThreadsJoined_) {
+  TransferStatus status = getTransferStatus();
+  if (status == NOT_STARTED) {
+    LOG(WARNING) << "Even though transfer has not started, finish is called";
+    // getTransferReport will set the error code to ERROR
+    return getTransferReport();
+  }
+  if (status == THREADS_JOINED) {
     VLOG(1) << "Threads have already been joined. Returning the"
             << " existing transfer report";
     return getTransferReport();
@@ -236,17 +231,15 @@ std::unique_ptr<TransferReport> Sender::finish() {
     dirThread_.join();
   }
   WDT_CHECK(numActiveThreads_ == 0);
+  setTransferStatus(THREADS_JOINED);
   if (progressReportEnabled) {
-    {
-      std::unique_lock<std::mutex> lock(mutex_);
-      conditionFinished_.notify_all();
-    }
     progressReporterThread_.join();
   }
   std::vector<TransferStats> threadStats;
   for (auto &senderThread : senderThreads_) {
     threadStats.push_back(std::move(senderThread->moveStats()));
   }
+
   bool allSourcesAcked = false;
   for (auto &senderThread : senderThreads_) {
     auto &stats = senderThread->getTransferStats();
@@ -306,7 +299,6 @@ std::unique_ptr<TransferReport> Sender::finish() {
             << transferReport->getSummary().getEffectiveTotalBytes() /
                    (totalTime - directoryTime) / kMbToB
             << " Mbytes/sec pure transfer rate)";
-  areThreadsJoined_ = true;
   return transferReport;
 }
 
@@ -320,8 +312,7 @@ std::unique_ptr<TransferReport> Sender::transfer() {
 }
 
 ErrorCode Sender::start() {
-  areThreadsJoined_ = false;
-  transferFinished_ = false;
+  setTransferStatus(ONGOING);
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
   WDT_CHECK(!(twoPhases && options.enable_download_resumption))
@@ -330,10 +321,6 @@ ErrorCode Sender::start() {
             << ports_ << "]";
   startTime_ = Clock::now();
   downloadResumptionEnabled_ = options.enable_download_resumption;
-  dirThread_ = dirQueue_->buildQueueAsynchronously();
-  if (twoPhases) {
-    dirThread_.join();
-  }
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
   if (throttler_) {
@@ -348,6 +335,10 @@ ErrorCode Sender::start() {
   threadsController_->setNumConditions(SenderThread::NUM_CONDITIONS);
   senderThreads_ = threadsController_->makeThreads<Sender, SenderThread>(
       this, ports_.size(), ports_);
+  dirThread_ = dirQueue_->buildQueueAsynchronously();
+  if (twoPhases) {
+    dirThread_.join();
+  }
   for (auto &senderThread : senderThreads_) {
     senderThread->startThread();
   }
@@ -408,12 +399,11 @@ std::unique_ptr<ClientSocket> Sender::connectToReceiver(
   const auto &options = WdtOptions::get();
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket;
-  std::string portStr = folly::to<std::string>(port);
   if (!socketCreator_) {
     // socket creator not set, creating ClientSocket
-    socket = folly::make_unique<ClientSocket>(destHost_, portStr, abortChecker);
+    socket = folly::make_unique<ClientSocket>(destHost_, port, abortChecker);
   } else {
-    socket = socketCreator_(destHost_, portStr, abortChecker);
+    socket = socketCreator_(destHost_, port, abortChecker);
   }
   double retryInterval = options.sleep_millis;
   int maxRetries = options.max_retries;
@@ -485,7 +475,7 @@ TransferStats Sender::sendOneByteSource(
                 << ". fd = " << socket->getFd()
                 << ". file = " << metadata.relPath
                 << ". port = " << socket->getPort();
-    stats.setErrorCode(SOCKET_WRITE_ERROR);
+    stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
     stats.incrFailedAttempts();
     return stats;
   }
@@ -533,7 +523,7 @@ TransferStats Sender::sendOneByteSource(
                     << ". fd = " << socket->getFd()
                     << ". file = " << metadata.relPath
                     << ". port = " << socket->getPort();
-        stats.setErrorCode(SOCKET_WRITE_ERROR);
+        stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
         stats.incrFailedAttempts();
         return stats;
       }
@@ -548,14 +538,14 @@ TransferStats Sender::sendOneByteSource(
       if (getCurAbortCode() != OK) {
         LOG(ERROR) << "Transfer aborted during block transfer "
                    << socket->getPort() << " " << source->getIdentifier();
-        stats.setErrorCode(ABORT);
+        stats.setLocalErrorCode(ABORT);
         stats.incrFailedAttempts();
         return stats;
       }
     } while (written < size);
     if (written > size) {
       LOG(ERROR) << "Write error " << written << " > " << size;
-      stats.setErrorCode(SOCKET_WRITE_ERROR);
+      stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
       stats.incrFailedAttempts();
       return stats;
     }
@@ -573,7 +563,7 @@ TransferStats Sender::sendOneByteSource(
       LOG(WARNING) << "file " << source->getIdentifier() << " previous size "
                    << metadata.size << " current size " << fileStat.st_size;
     }
-    stats.setErrorCode(BYTE_SOURCE_READ_ERROR);
+    stats.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
     stats.incrFailedAttempts();
     return stats;
   }
@@ -590,13 +580,13 @@ TransferStats Sender::sendOneByteSource(
     written = socket->write(headerBuf, toWrite);
     if (written != toWrite) {
       LOG(ERROR) << "Write mismatch " << written << " " << toWrite;
-      stats.setErrorCode(SOCKET_WRITE_ERROR);
+      stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
       stats.incrFailedAttempts();
       return stats;
     }
     stats.addHeaderBytes(toWrite);
   }
-  stats.setErrorCode(OK);
+  stats.setLocalErrorCode(OK);
   stats.incrNumBlocks();
   stats.addEffectiveBytes(stats.getHeaderBytes(), stats.getDataBytes());
   return stats;
@@ -622,7 +612,7 @@ void Sender::reportProgress() {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       conditionFinished_.wait_for(lock, waitingTime);
-      if (transferFinished_) {
+      if (transferStatus_ == THREADS_JOINED) {
         break;
       }
     }

@@ -440,6 +440,24 @@ std::string WdtBase::getTransferId() {
   return transferId_;
 }
 
+WdtBase::TransferStatus WdtBase::getTransferStatus() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return transferStatus_;
+}
+
+void WdtBase::setTransferStatus(TransferStatus transferStatus) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  transferStatus_ = transferStatus;
+  if (transferStatus_ == THREADS_JOINED) {
+    conditionFinished_.notify_one();
+  }
+}
+
+bool WdtBase::isStale() {
+  TransferStatus status = getTransferStatus();
+  return (status == FINISHED || status == THREADS_JOINED);
+}
+
 void WdtBase::configureThrottler() {
   WDT_CHECK(!throttler_);
   VLOG(1) << "Configuring throttler options";

@@ -130,16 +130,39 @@ while {1} {
      CTEST_OUTPUT_ON_FAILURE=1 time make test &&\
      $extraCmds" >& $LOGF < /dev/null} results options]} {
         set msg "BAD"
+        set good 0
     } else {
         set msg "GOOD"
+        set good 1
     }
     puts $msg
+    set autoBump 1
+    set firstLine "err"
+    if {[catch {exec hg log -l 1 -T "{desc}" wdt} prevDesc]} {
+        puts "Error getting desc: $prevDesc"
+        set autoBump 0
+    } else {
+        set firstLine [lindex [split $prevDesc \n] 0];
+        if {![string compare $firstLine "wdt version bump"]} {
+            puts "Previous commit is auto commit, will not auto commit!"
+            set autoBump 0
+        }
+    }
     catch {exec hg log -l 1 -T "{rev}" wdt} hgout
-    puts "wdt changeset now $hgout"
+    puts "wdt changeset now $hgout (autoBump $autoBump, good $good) $firstLine"
     if {[string length $last]==0} {
         sendEmail "contbuild restarted"
     } elseif {[string compare $hgout $hgprev]} {
-        sendEmail "hg log wdt change"
+        sendEmail "hg log wdt change $firstLine"
+        if {$autoBump && $good} {
+            puts "Auto updating version after good build for $firstLine:"
+            set LOGF "$LOGF.auto_bump"
+            if {[catch {exec wdt/build/auto_version.tcl >& $LOGF}]} {
+                puts "Unable to bump - see $LOGF"
+                set msg "auto version update failure"
+                sendEmail "exec error"
+            }
+        }
     } elseif {[string compare $last $msg]} {
         # Build changed from $last to $msg
         sendEmail "was $last"

@@ -90,7 +90,7 @@ ErrorCode FileByteSource::open() {
     }
   }
 
-  transferStats_.setErrorCode(errCode);
+  transferStats_.setLocalErrorCode(errCode);
   return errCode;
 }
 
@@ -120,7 +120,7 @@ char *FileByteSource::read(int64_t &size) {
   if (numRead < 0) {
     PLOG(ERROR) << "failure while reading file " << metadata_->fullPath;
     this->close();
-    transferStats_.setErrorCode(BYTE_SOURCE_READ_ERROR);
+    transferStats_.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
     return nullptr;
   }
   if (numRead == 0) {

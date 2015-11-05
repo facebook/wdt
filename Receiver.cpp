@@ -100,6 +100,7 @@ bool Receiver::hasNewTransferStarted() const {
 }
 
 void Receiver::endCurGlobalSession() {
+  setTransferStatus(FINISHED);
   if (!hasNewTransferStarted_) {
     LOG(WARNING) << "WDT transfer did not start, no need to end session";
     return;
@@ -192,7 +193,8 @@ void Receiver::setRecoveryId(const std::string &recoveryId) {
 }
 
 Receiver::~Receiver() {
-  if (hasPendingTransfer()) {
+  TransferStatus status = getTransferStatus();
+  if (status == ONGOING) {
     LOG(WARNING) << "There is an ongoing transfer and the destructor"
                  << " is being called. Trying to finish the transfer";
     abort(ABORTED_BY_APPLICATION);
@@ -224,24 +226,17 @@ int64_t Receiver::getTransferConfig() const {
   return config;
 }
 
-bool Receiver::hasPendingTransfer() {
-  std::unique_lock<std::mutex> lock(mutex_);
-  return !transferFinished_;
-}
-
-void Receiver::markTransferFinished(bool isFinished) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  transferFinished_ = isFinished;
-  if (isFinished) {
-    conditionRecvFinished_.notify_one();
-  }
-}
-
 std::unique_ptr<TransferReport> Receiver::finish() {
   std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
-  if (areThreadsJoined_) {
-    VLOG(1) << "Threads have already been joined. Returning the "
-            << "transfer report";
+  TransferStatus status = getTransferStatus();
+  if (status == NOT_STARTED) {
+    LOG(WARNING) << "Even though transfer has not started, finish is called";
+    // getTransferReport will set the error code to ERROR
+    return getTransferReport();
+  }
+  if (status == THREADS_JOINED) {
+    LOG(WARNING) << "Threads have already been joined. Returning the "
+                 << "transfer report";
     return getTransferReport();
   }
   const auto &options = WdtOptions::get();
@@ -253,10 +248,8 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   for (auto &receiverThread : receiverThreads_) {
     receiverThread->finish();
   }
-  // A very important step to mark the transfer finished
-  // No other transferAsync, or runForever can be called on this
-  // instance unless the current transfer has finished
-  markTransferFinished(true);
+
+  setTransferStatus(THREADS_JOINED);
 
   if (isJoinable_) {
     // Make sure to join the progress thread.
@@ -264,7 +257,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   }
   std::unique_ptr<TransferReport> report = getTransferReport();
   auto &summary = report->getSummary();
-  bool transferSuccess = (report->getSummary().getCombinedErrorCode() == OK);
+  bool transferSuccess = (report->getSummary().getErrorCode() == OK);
   fixAndCloseTransferLog(transferSuccess);
   auto totalSenderBytes = summary.getTotalSenderBytes();
   if (progressReporter_ && totalSenderBytes >= 0) {
@@ -282,7 +275,6 @@ std::unique_ptr<TransferReport> Receiver::finish() {
 
   LOG(WARNING) << "WDT receiver's transfer has been finished";
   LOG(INFO) << *report;
-  areThreadsJoined_ = true;
   return report;
 }
 
@@ -291,40 +283,29 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
   for (const auto &receiverThread : receiverThreads_) {
     globalStats += receiverThread->getTransferStats();
   }
-  globalStats.validate();
-  std::unique_ptr<TransferReport> report =
+  std::unique_ptr<TransferReport> transferReport =
       folly::make_unique<TransferReport>(std::move(globalStats));
-  return report;
+  TransferStatus status = getTransferStatus();
+  ErrorCode errCode = transferReport->getSummary().getErrorCode();
+  if (status == NOT_STARTED && errCode == OK) {
+    LOG(INFO) << "Transfer not started, setting the error code to ERROR";
+    transferReport->setErrorCode(ERROR);
+  }
+  return transferReport;
 }
 
 ErrorCode Receiver::transferAsync() {
   const auto &options = WdtOptions::get();
-  if (hasPendingTransfer()) {
-    // finish is the only method that should be able to
-    // change the value of transferFinished_
-    LOG(ERROR) << "There is already a transfer running on this "
-               << "instance of receiver";
-    return ERROR;
-  }
   isJoinable_ = true;
   int progressReportIntervalMillis = options.progress_report_interval_millis;
   if (!progressReporter_ && progressReportIntervalMillis > 0) {
     // if progress reporter has not been set, use the default one
     progressReporter_ = folly::make_unique<ProgressReporter>();
   }
-  start();
-  return OK;
+  return start();
 }
 
 ErrorCode Receiver::runForever() {
-  if (hasPendingTransfer()) {
-    // finish is the only method that should be able to
-    // change the value of transferFinished_
-    LOG(ERROR) << "There is already a transfer running on this "
-               << "instance of receiver";
-    return ERROR;
-  }
-
   const auto &options = WdtOptions::get();
   WDT_CHECK(!options.enable_download_resumption)
       << "Transfer resumption not supported in long running mode";
@@ -332,7 +313,10 @@ ErrorCode Receiver::runForever() {
   // Enforce the full reporting to be false in the daemon mode.
   // These statistics are expensive, and useless as they will never
   // be received/reviewed in a forever running process.
-  start();
+  ErrorCode errCode = start();
+  if (errCode != OK) {
+    return errCode;
+  }
   finish();
   // This method should never finish
   return ERROR;
@@ -363,8 +347,8 @@ void Receiver::progressTracker() {
   while (true) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
-      conditionRecvFinished_.wait_for(lock, waitingTime);
-      if (transferFinished_ || getCurAbortCode() != OK) {
+      conditionFinished_.wait_for(lock, waitingTime);
+      if (transferStatus_ == THREADS_JOINED) {
         break;
       }
     }
@@ -395,15 +379,12 @@ void Receiver::progressTracker() {
   }
 }
 
-void Receiver::start() {
+ErrorCode Receiver::start() {
+  WDT_CHECK_EQ(getTransferStatus(), NOT_STARTED)
+      << "There is already a transfer running on this instance of receiver";
   startTime_ = Clock::now();
-  if (hasPendingTransfer()) {
-    LOG(WARNING) << "There is an existing transfer in progress on this object";
-  }
-  areThreadsJoined_ = false;
   LOG(INFO) << "Starting (receiving) server on ports [ " << getPorts()
             << "] Target dir : " << destDir_;
-  markTransferFinished(false);
   const auto &options = WdtOptions::get();
   // TODO do the init stuff here
   if (options.enable_download_resumption) {
@@ -413,7 +394,11 @@ void Receiver::start() {
       WDT_CHECK(!options.shouldPreallocateFiles())
           << "Can not resume using directory tree if preallocation is enabled";
     }
-    transferLogManager_.openLog();
+    ErrorCode errCode = transferLogManager_.openLog();
+    if (errCode != OK) {
+      LOG(ERROR) << "Failed to open transfer log " << errorCodeToStr(errCode);
+      return errCode;
+    }
     ErrorCode code = transferLogManager_.parseAndMatch(
         recoveryId_, getTransferConfig(), fileChunksInfo_);
     if (code == OK && options.resume_using_dir_tree) {
@@ -426,22 +411,25 @@ void Receiver::start() {
   } else {
     LOG(INFO) << "Throttler set externally. Throttler : " << *throttler_;
   }
+  setTransferStatus(ONGOING);
   while (true) {
     for (auto &receiverThread : receiverThreads_) {
       receiverThread->startThread();
     }
-    if (!isJoinable_) {
-      // If it is long running mode, finish the threads
-      // processing the current transfer and re spawn them again
-      // with the same sockets
-      for (auto &receiverThread : receiverThreads_) {
-        receiverThread->finish();
-        receiverThread->reset();
-      }
-      threadsController_->reset();
-      continue;
+    if (isJoinable_) {
+      break;
     }
-    break;
+    // If it is long running mode, finish the threads
+    // processing the current transfer and re spawn them again
+    // with the same sockets
+    for (auto &receiverThread : receiverThreads_) {
+      receiverThread->finish();
+      receiverThread->reset();
+    }
+    threadsController_->reset();
+    // reset transfer status
+    setTransferStatus(NOT_STARTED);
+    continue;
   }
   if (isJoinable_) {
     if (progressReporter_) {
@@ -450,6 +438,7 @@ void Receiver::start() {
     std::thread trackerThread(&Receiver::progressTracker, this);
     progressTrackerThread_ = std::move(trackerThread);
   }
+  return OK;
 }
 
 void Receiver::addTransferLogHeader(bool isBlockMode, bool isSenderResuming) {

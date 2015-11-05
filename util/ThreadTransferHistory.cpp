@@ -204,7 +204,7 @@ void ThreadTransferHistory::markSourceAsFailed(
   int64_t receivedBytes =
       (validCheckpoint ? checkpoint->lastBlockReceivedBytes : 0);
   TransferStats &sourceStats = source->getTransferStats();
-  if (sourceStats.getErrorCode() != OK) {
+  if (sourceStats.getLocalErrorCode() != OK) {
     // already marked as failed
     sourceStats.addEffectiveBytes(0, receivedBytes);
     threadStats_.addEffectiveBytes(0, receivedBytes);
@@ -214,7 +214,7 @@ void ThreadTransferHistory::markSourceAsFailed(
     int64_t wastedBytes = dataBytes - receivedBytes;
     sourceStats.subtractEffectiveBytes(headerBytes, wastedBytes);
     sourceStats.decrNumBlocks();
-    sourceStats.setErrorCode(SOCKET_WRITE_ERROR);
+    sourceStats.setLocalErrorCode(SOCKET_WRITE_ERROR);
     sourceStats.incrFailedAttempts();
 
     threadStats_.subtractEffectiveBytes(headerBytes, wastedBytes);

@@ -15,8 +15,6 @@
 #include <wdt/util/TransferLogManager.h>
 #include <memory>
 #include <string>
-#include <condition_variable>
-#include <mutex>
 #include <thread>
 #include <chrono>
 
@@ -83,23 +81,12 @@ class Receiver : public WdtBase {
   virtual ~Receiver();
 
   /**
-   * Take a lock on the instance mutex and return the value of
-   * whether the existing transfer has been finished
-   */
-  bool hasPendingTransfer();
-
-  /**
    * Use the method to get the list of ports receiver is listening on
    */
   std::vector<int32_t> getPorts() const;
 
  protected:
   friend class ReceiverThread;
-
-  /**
-   * @param isFinished         Mark transfer active/inactive
-   */
-  void markTransferFinished(bool isFinished);
 
   /**
    * Traverses root directory and returns discovered file information
@@ -118,7 +105,7 @@ class Receiver : public WdtBase {
   TransferLogManager &getTransferLogManager();
 
   /// Responsible for basic setup and starting threads
-  void start();
+  ErrorCode start();
 
   /**
    * Periodically calculates current transfer report and send it to progress
@@ -165,13 +152,6 @@ class Receiver : public WdtBase {
   /// The thread that is responsible for calling running the progress tracker
   std::thread progressTrackerThread_;
 
-  /**
-   * Flags that represents if a transfer has finished. Threads on completion
-   * set this flag. This is always accurate even if you don't call finish()
-   * No transfer can be started as long as this flag is false.
-   */
-  bool transferFinished_{true};
-
   /// Flag based on which threads finish processing on receiving a done
   bool isJoinable_{false};
 
@@ -186,14 +166,6 @@ class Receiver : public WdtBase {
    * transfers across resumption
    */
   std::string recoveryId_;
-
-  /**
-   * Progress tracker thread is a thread which has to be joined when the
-   * transfer is finished. The root thread in finish() and the progress
-   * tracker coordinate with each other through the boolean and this
-   * condition variable.
-   */
-  std::condition_variable conditionRecvFinished_;
 
   /**
    * The instance of the receiver threads are stored in this vector.
@@ -215,23 +187,8 @@ class Receiver : public WdtBase {
   /// already transferred file chunks
   std::vector<FileChunksInfo> fileChunksInfo_;
 
-  /// Mutex to guard all the shared variables
-  mutable std::mutex mutex_;
-
   /// Marks when a new transfer has started
   std::atomic<bool> hasNewTransferStarted_{false};
-
-  /**
-   * Returns true if threads have been joined (done in finish())
-   * This is how destructor determines whether it should join threads
-   */
-  bool areThreadsJoined_{false};
-
-  /**
-   * Mutex for the management of this instance, specifically to keep the
-   * instance sane for multi threaded public API calls
-   */
-  std::mutex instanceManagementMutex_;
 
   /// Buffer size used by this receiver
   int64_t bufferSize_;

@@ -174,7 +174,7 @@ vector<string> WdtNamespaceController::releaseStaleSenders() {
     for (auto it = sendersMap_.begin(); it != sendersMap_.end();) {
       auto sender = it->second;
       string identifier = it->first;
-      if (sender->isTransferFinished()) {
+      if (sender->isStale()) {
         it = sendersMap_.erase(it);
         erasedIds.push_back(identifier);
         senders.push_back(std::move(sender));
@@ -211,7 +211,7 @@ vector<string> WdtNamespaceController::releaseStaleReceivers() {
     for (auto it = receiversMap_.begin(); it != receiversMap_.end();) {
       auto receiver = it->second;
       string identifier = it->first;
-      if (!receiver->hasPendingTransfer()) {
+      if (receiver->isStale()) {
         it = receiversMap_.erase(it);
         erasedIds.push_back(identifier);
         receivers.push_back(std::move(receiver));
@@ -221,7 +221,7 @@ vector<string> WdtNamespaceController::releaseStaleReceivers() {
       it++;
     }
   }
-  LOG(INFO) << "Cleared " << receivers.size() << "stale senders";
+  LOG(INFO) << "Cleared " << receivers.size() << "stale receivers";
   return erasedIds;
 }
 

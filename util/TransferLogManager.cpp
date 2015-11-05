@@ -17,6 +17,7 @@
 #include <folly/String.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <ctime>
 #include <iomanip>
 
@@ -233,7 +234,7 @@ std::string TransferLogManager::getFullPath(const std::string &relPath) {
   return fullPath;
 }
 
-void TransferLogManager::openLog() {
+ErrorCode TransferLogManager::openLog() {
   WDT_CHECK(fd_ < 0);
   WDT_CHECK(!rootDir_.empty()) << "Root directory not set";
   const auto &options = WdtOptions::get();
@@ -243,15 +244,34 @@ void TransferLogManager::openLog() {
   fd_ = ::open(getFullPath(LOG_NAME).c_str(), openFlags, 0644);
   if (fd_ < 0) {
     PLOG(ERROR) << "Could not open wdt log";
-    return;
-  } else {
-    LOG(INFO) << "Transfer log opened";
+    return BYTE_SOURCE_READ_ERROR;
   }
+  // try to acquire file lock
+  if (::flock(fd_, LOCK_EX | LOCK_NB) != 0) {
+    PLOG(ERROR) << "Failed to acquire transfer log lock " << rootDir_ << " "
+                << fd_;
+    close();
+    return TRANSFER_LOG_ACQUIRE_ERROR;
+  }
+  LOG(INFO) << "Transfer log opened";
   if (!options.resume_using_dir_tree) {
     // start writer thread
     writerThread_ = std::thread(&TransferLogManager::writeEntriesToDisk, this);
     LOG(INFO) << "Log writer thread started";
   }
+  return OK;
+}
+
+void TransferLogManager::close() {
+  if (fd_ < 0) {
+    return;
+  }
+  if (::close(fd_) != 0) {
+    PLOG(ERROR) << "Failed to close wdt log " << fd_;
+  } else {
+    LOG(INFO) << "Transfer log closed";
+  }
+  fd_ = -1;
 }
 
 void TransferLogManager::closeLog() {
@@ -268,12 +288,11 @@ void TransferLogManager::closeLog() {
     conditionFinished_.notify_one();
     writerThread_.join();
   }
-  if (::close(fd_) != 0) {
-    PLOG(ERROR) << "Failed to close wdt log " << fd_;
-  } else {
-    LOG(INFO) << "Transfer log closed";
-  }
-  fd_ = -1;
+  close();
+}
+
+TransferLogManager::~TransferLogManager() {
+  WDT_CHECK_LT(fd_, 0) << "Destructor called, but transfer log not called";
 }
 
 void TransferLogManager::writeEntriesToDisk() {

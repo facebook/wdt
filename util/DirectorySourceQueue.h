@@ -40,10 +40,11 @@ struct FileInfo {
   std::string fileName;
   /// Size of the file to be read, default is -1
   int64_t fileSize;
-  /// Whether read should be done using o_direct
-  bool directReads{false};
   /// File descriptor. If this is not -1, then wdt uses this to read
   int fd{-1};
+  /// Whether read should be done using o_direct. If fd is set, this flag will
+  /// be set automatically to match the fd open mode
+  bool directReads{false};
   /// Constructor for file info with name and size
   explicit FileInfo(const std::string &name, int64_t size = -1,
                     bool directReads = WdtOptions::get().odirect_reads);

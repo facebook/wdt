@@ -12,8 +12,6 @@
 #include <wdt/util/ClientSocket.h>
 #include <chrono>
 #include <memory>
-#include <condition_variable>
-#include <mutex>
 #include <iostream>
 
 namespace facebook {
@@ -88,10 +86,6 @@ class Sender : public WdtBase {
    */
   std::unique_ptr<TransferReport> transfer();
 
-  /// TODO: move to base
-  /// @return    whether transfer is finished
-  bool isTransferFinished();
-
   /// End time of the transfer
   Clock::time_point getEndTime();
 
@@ -139,7 +133,7 @@ class Sender : public WdtBase {
   std::unique_ptr<TransferReport> getTransferReport();
 
   typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
-      const std::string &dest, const std::string &port,
+      const std::string &dest, const int port,
       IAbortChecker const *abortChecker);
 
   /**
@@ -151,13 +145,10 @@ class Sender : public WdtBase {
 
  private:
   friend class SenderThread;
+  friend class QueueAbortChecker;
 
   /// Get the sum of all the thread transfer stats
   TransferStats getGlobalTransferStats() const;
-
-  /// Verifies that if there is version mismatch then no thread stats
-  /// should be OK
-  ErrorCode verifyVersionMismatchStats() const;
 
   /// General utility used by sender threads to connect to receiver
   std::unique_ptr<ClientSocket> connectToReceiver(
@@ -172,7 +163,7 @@ class Sender : public WdtBase {
   bool isSendFileChunks() const;
 
   /// Retruns true if file chunks been received by a thread
-  bool isFileChunksReceived() const;
+  bool isFileChunksReceived();
 
   /// Sender thread calls this method to set the file chunks info received
   /// from the receiver
@@ -186,7 +177,7 @@ class Sender : public WdtBase {
     }
 
     bool shouldAbort() const {
-      return sender_->isTransferFinished();
+      return (sender_->getTransferStatus() == FINISHED);
     }
 
    private:
@@ -264,22 +255,10 @@ class Sender : public WdtBase {
   /// version mismatch and changes this status variable. Other threads check
   /// this variable to decide when to proceed.
   ProtoNegotiationStatus protoNegotiationStatus_{V_MISMATCH_WAIT};
-  /// This condition is notified when the transfer is finished
-  std::condition_variable conditionFinished_;
-  /// Mutex which is shared between the parent thread, sender thread and
-  /// progress reporter thread
-  mutable std::mutex mutex_;
-  /// Set to false when the transfer begins and then turned on when it ends
-  bool transferFinished_;
   /// Time at which the transfer was started
   std::chrono::time_point<Clock> startTime_;
   /// Time at which the transfer finished
   std::chrono::time_point<Clock> endTime_;
-  /// Has finished been called and threads joined
-  bool areThreadsJoined_{true};
-  /// Mutex for the management of this instance, specifically to keep the
-  /// instance sane for multi threaded public API calls
-  std::mutex instanceManagementMutex_;
 
   /// Transfer history controller for the sender threads
   std::unique_ptr<TransferHistoryController> transferHistoryController_;
