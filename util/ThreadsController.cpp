@@ -170,6 +170,11 @@ int ThreadsController::getTotalThreads() {
   return totalThreads_;
 }
 
+bool ThreadsController::hasThreads(ThreadStatus threadState) {
+  // thread indices are all positive
+  return hasThreads(-1, threadState);
+}
+
 bool ThreadsController::hasThreads(int threadIndex, ThreadStatus threadState) {
   GuardLock lock(controllerMutex_);
   for (auto &threadPair : threadStateMap_) {

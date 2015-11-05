@@ -114,7 +114,7 @@ ReceiverState ReceiverThread::listen() {
     if (code == OK) {
       break;
     } else if (code == CONN_ERROR) {
-      threadStats_.setErrorCode(code);
+      threadStats_.setLocalErrorCode(code);
       return FAILED;
     }
     LOG(INFO) << "Sleeping after failed attempt " << retry;
@@ -124,7 +124,7 @@ ReceiverState ReceiverThread::listen() {
   // one more/last try (stays true if it worked above)
   if (socket_.listen() != OK) {
     LOG(ERROR) << "Unable to listen/bind despite retries";
-    threadStats_.setErrorCode(CONN_ERROR);
+    threadStats_.setLocalErrorCode(CONN_ERROR);
     return FAILED;
   }
   return ACCEPT_FIRST_CONNECTION;
@@ -146,7 +146,7 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
     }
     if (acceptAttempts == options.max_accept_retries) {
       LOG(ERROR) << "unable to accept after " << acceptAttempts << " attempts";
-      threadStats_.setErrorCode(CONN_ERROR);
+      threadStats_.setLocalErrorCode(CONN_ERROR);
       return FAILED;
     }
     if (wdtParent_->getCurAbortCode() != OK) {
@@ -187,7 +187,7 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
   curConnectionVerified_ = false;
   if (code != OK) {
     LOG(ERROR) << "accept() failed with timeout " << timeout;
-    threadStats_.setErrorCode(code);
+    threadStats_.setLocalErrorCode(code);
     if (doneSendFailure_) {
       // if SEND_DONE_CMD state had already been reached, we do not need to
       // wait for other threads to end
@@ -204,11 +204,11 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
   numRead_ = off_ = 0;
   pendingCheckpointIndex_ = checkpointIndex_;
   ReceiverState nextState = READ_NEXT_CMD;
-  if (threadStats_.getErrorCode() != OK) {
+  if (threadStats_.getLocalErrorCode() != OK) {
     nextState = SEND_LOCAL_CHECKPOINT;
   }
   // reset thread status
-  threadStats_.setErrorCode(OK);
+  threadStats_.setLocalErrorCode(OK);
   return nextState;
 }
 
@@ -236,7 +236,7 @@ ReceiverState ReceiverThread::sendLocalCheckpoint() {
   if (written != checkpointLen) {
     LOG(ERROR) << "unable to write local checkpoint. write mismatch "
                << checkpointLen << " " << written;
-    threadStats_.setErrorCode(SOCKET_WRITE_ERROR);
+    threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
   threadStats_.addHeaderBytes(checkpointLen);
@@ -255,7 +255,7 @@ ReceiverState ReceiverThread::readNextCmd() {
   if (numRead_ < Protocol::kMinBufLength) {
     LOG(ERROR) << "socket read failure " << Protocol::kMinBufLength << " "
                << numRead_;
-    threadStats_.setErrorCode(SOCKET_READ_ERROR);
+    threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
   Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf_[off_++];
@@ -272,7 +272,7 @@ ReceiverState ReceiverThread::readNextCmd() {
     return PROCESS_SIZE_CMD;
   }
   LOG(ERROR) << "received an unknown cmd";
-  threadStats_.setErrorCode(PROTOCOL_ERROR);
+  threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
   return FINISH_WITH_ERROR;
 }
 
@@ -286,7 +286,7 @@ ReceiverState ReceiverThread::processSettingsCmd() {
       buf_, off_, oldOffset_ + Protocol::kMaxVersion, senderProtocolVersion);
   if (!success) {
     LOG(ERROR) << "Unable to decode version " << threadIndex_;
-    threadStats_.setErrorCode(PROTOCOL_ERROR);
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }
   if (senderProtocolVersion != threadProtocolVersion_) {
@@ -297,14 +297,14 @@ ReceiverState ReceiverThread::processSettingsCmd() {
     if (negotiatedProtocol == 0) {
       LOG(WARNING) << "Can not support sender with version "
                    << senderProtocolVersion << ", aborting!";
-      threadStats_.setErrorCode(VERSION_INCOMPATIBLE);
+      threadStats_.setLocalErrorCode(VERSION_INCOMPATIBLE);
       return SEND_ABORT_CMD;
     } else {
       LOG_IF(INFO, threadProtocolVersion_ != negotiatedProtocol)
           << "Changing receiver protocol version to " << negotiatedProtocol;
       threadProtocolVersion_ = negotiatedProtocol;
       if (negotiatedProtocol != senderProtocolVersion) {
-        threadStats_.setErrorCode(VERSION_MISMATCH);
+        threadStats_.setLocalErrorCode(VERSION_MISMATCH);
         return SEND_ABORT_CMD;
       }
     }
@@ -315,7 +315,7 @@ ReceiverState ReceiverThread::processSettingsCmd() {
       oldOffset_ + Protocol::kMaxVersion + Protocol::kMaxSettings, settings);
   if (!success) {
     LOG(ERROR) << *this << "Unable to decode settings cmd ";
-    threadStats_.setErrorCode(PROTOCOL_ERROR);
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }
   auto senderId = settings.transferId;
@@ -323,7 +323,7 @@ ReceiverState ReceiverThread::processSettingsCmd() {
   if (transferId != senderId) {
     LOG(ERROR) << "Receiver and sender id mismatch " << senderId << " "
                << transferId;
-    threadStats_.setErrorCode(ID_MISMATCH);
+    threadStats_.setLocalErrorCode(ID_MISMATCH);
     return SEND_ABORT_CMD;
   }
   senderReadTimeout_ = settings.readTimeoutMillis;
@@ -362,7 +362,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   checkpoint_.resetLastBlockDetails();
   BlockDetails blockDetails;
   auto guard = folly::makeGuard([&] {
-    if (threadStats_.getErrorCode() != OK) {
+    if (threadStats_.getLocalErrorCode() != OK) {
       threadStats_.incrFailedAttempts();
     }
   });
@@ -384,7 +384,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   }
   if (numRead_ < headerLen) {
     LOG(ERROR) << "Unable to read full header " << headerLen << " " << numRead_;
-    threadStats_.setErrorCode(SOCKET_READ_ERROR);
+    threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
   off_ += sizeof(int16_t);
@@ -400,7 +400,7 @@ ReceiverState ReceiverThread::processFileCmd() {
     LOG(ERROR) << "Error decoding at"
                << " ooff:" << oldOffset_ << " off_: " << off_
                << " numRead_: " << numRead_;
-    threadStats_.setErrorCode(PROTOCOL_ERROR);
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }
 
@@ -422,7 +422,7 @@ ReceiverState ReceiverThread::processFileCmd() {
     }
   });
   if (writer.open() != OK) {
-    threadStats_.setErrorCode(FILE_WRITE_ERROR);
+    threadStats_.setLocalErrorCode(FILE_WRITE_ERROR);
     return SEND_ABORT_CMD;
   }
   int32_t checksum = 0;
@@ -445,7 +445,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   }
   ErrorCode code = writer.write(buf_ + off_, toWrite);
   if (code != OK) {
-    threadStats_.setErrorCode(code);
+    threadStats_.setLocalErrorCode(code);
     return SEND_ABORT_CMD;
   }
   off_ += toWrite;
@@ -473,7 +473,7 @@ ReceiverState ReceiverThread::processFileCmd() {
     }
     code = writer.write(buf_, nres);
     if (code != OK) {
-      threadStats_.setErrorCode(code);
+      threadStats_.setLocalErrorCode(code);
       return SEND_ABORT_CMD;
     }
   }
@@ -482,7 +482,7 @@ ReceiverState ReceiverThread::processFileCmd() {
     // Write errors to disk are already taken care of above
     LOG(ERROR) << "could not read entire content for " << blockDetails.fileName
                << " port " << socket_.getPort();
-    threadStats_.setErrorCode(SOCKET_READ_ERROR);
+    threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
   writtenGuard.dismiss();
@@ -517,13 +517,13 @@ ReceiverState ReceiverThread::processFileCmd() {
     if (numRead_ < Protocol::kMinBufLength) {
       LOG(ERROR) << "socket read failure " << Protocol::kMinBufLength << " "
                  << numRead_;
-      threadStats_.setErrorCode(SOCKET_READ_ERROR);
+      threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
       return ACCEPT_WITH_TIMEOUT;
     }
     Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf_[off_++];
     if (cmd != Protocol::FOOTER_CMD) {
       LOG(ERROR) << "Expecting footer cmd, but received " << cmd;
-      threadStats_.setErrorCode(PROTOCOL_ERROR);
+      threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return FINISH_WITH_ERROR;
     }
     int32_t receivedChecksum;
@@ -531,14 +531,14 @@ ReceiverState ReceiverThread::processFileCmd() {
         buf_, off_, oldOffset_ + Protocol::kMaxFooter, receivedChecksum);
     if (!success) {
       LOG(ERROR) << "Unable to decode footer cmd";
-      threadStats_.setErrorCode(PROTOCOL_ERROR);
+      threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return FINISH_WITH_ERROR;
     }
     if (checksum != receivedChecksum) {
       LOG(ERROR) << "Checksum mismatch " << checksum << " " << receivedChecksum
                  << " port " << socket_.getPort() << " file "
                  << blockDetails.fileName;
-      threadStats_.setErrorCode(CHECKSUM_MISMATCH);
+      threadStats_.setLocalErrorCode(CHECKSUM_MISMATCH);
       return ACCEPT_WITH_TIMEOUT;
     }
     int64_t msgLen = off_ - oldOffset_;
@@ -560,7 +560,7 @@ ReceiverState ReceiverThread::processDoneCmd() {
   if (numRead_ != Protocol::kMinBufLength) {
     LOG(ERROR) << "Unexpected state for done command"
                << " off_: " << off_ << " numRead_: " << numRead_;
-    threadStats_.setErrorCode(PROTOCOL_ERROR);
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }
 
@@ -572,7 +572,7 @@ ReceiverState ReceiverThread::processDoneCmd() {
                                       numBlocksSend, totalSenderBytes);
   if (!success) {
     LOG(ERROR) << "Unable to decode done cmd";
-    threadStats_.setErrorCode(PROTOCOL_ERROR);
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }
   threadStats_.setNumBlocksSend(numBlocksSend);
@@ -591,7 +591,7 @@ ReceiverState ReceiverThread::processSizeCmd() {
       buf_, off_, oldOffset_ + Protocol::kMaxSize, totalSenderBytes);
   if (!success) {
     LOG(ERROR) << "Unable to decode size cmd";
-    threadStats_.setErrorCode(PROTOCOL_ERROR);
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }
   VLOG(1) << "Number of bytes to receive " << totalSenderBytes;
@@ -616,7 +616,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
         if (written != toWrite) {
           LOG(ERROR) << *this << " socket write error " << toWrite << " "
                      << written;
-          threadStats_.setErrorCode(SOCKET_WRITE_ERROR);
+          threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
           return ACCEPT_WITH_TIMEOUT;
         }
         threadStats_.addHeaderBytes(toWrite);
@@ -629,7 +629,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
         if (written != toWrite) {
           LOG(ERROR) << *this << " socket write error " << toWrite << " "
                      << written;
-          threadStats_.setErrorCode(SOCKET_WRITE_ERROR);
+          threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
           return ACCEPT_WITH_TIMEOUT;
         }
         threadStats_.addHeaderBytes(toWrite);
@@ -648,7 +648,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
         }
         if (written != off) {
           LOG(ERROR) << "Socket write error " << off << " " << written;
-          threadStats_.setErrorCode(SOCKET_READ_ERROR);
+          threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
           execFunnel->notifyFail();
           return ACCEPT_WITH_TIMEOUT;
         }
@@ -675,7 +675,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
         if (numEntriesWritten != numParsedChunksInfo) {
           LOG(ERROR) << "Could not write all the file chunks "
                      << numParsedChunksInfo << " " << numEntriesWritten;
-          threadStats_.setErrorCode(SOCKET_WRITE_ERROR);
+          threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
           execFunnel->notifyFail();
           return ACCEPT_WITH_TIMEOUT;
         }
@@ -684,7 +684,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
         int64_t numRead = socket_.read(buf_, toRead);
         if (numRead != toRead) {
           LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
-          threadStats_.setErrorCode(SOCKET_READ_ERROR);
+          threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
           execFunnel->notifyFail();
           return ACCEPT_WITH_TIMEOUT;
         }
@@ -712,7 +712,7 @@ ReceiverState ReceiverThread::sendGlobalCheckpoint() {
   auto written = socket_.write(buf_, off_);
   if (written != off_) {
     LOG(ERROR) << "unable to write error checkpoints";
-    threadStats_.setErrorCode(SOCKET_WRITE_ERROR);
+    threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   } else {
     threadStats_.addHeaderBytes(off_);
@@ -727,7 +727,7 @@ ReceiverState ReceiverThread::sendAbortCmd() {
   int64_t offset = 0;
   buf_[offset++] = Protocol::ABORT_CMD;
   Protocol::encodeAbort(buf_, offset, threadProtocolVersion_,
-                        threadStats_.getErrorCode(),
+                        threadStats_.getLocalErrorCode(),
                         threadStats_.getNumFiles());
   socket_.write(buf_, offset);
   // No need to check if we were successful in sending ABORT
@@ -735,7 +735,7 @@ ReceiverState ReceiverThread::sendAbortCmd() {
   // other side will timeout
   socket_.closeCurrentConnection();
   threadStats_.addHeaderBytes(offset);
-  if (threadStats_.getErrorCode() == VERSION_MISMATCH) {
+  if (threadStats_.getLocalErrorCode() == VERSION_MISMATCH) {
     // Receiver should try again expecting sender to have changed its version
     return ACCEPT_WITH_TIMEOUT;
   }
@@ -748,7 +748,7 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   if (socket_.write(buf_, 1) != 1) {
     PLOG(ERROR) << "unable to send DONE " << threadIndex_;
     doneSendFailure_ = true;
-    threadStats_.setErrorCode(SOCKET_WRITE_ERROR);
+    threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
 
@@ -758,7 +758,7 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   if (read != 1 || buf_[0] != Protocol::DONE_CMD) {
     LOG(ERROR) << *this << " did not receive ack for DONE";
     doneSendFailure_ = true;
-    threadStats_.setErrorCode(SOCKET_READ_ERROR);
+    threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
 
@@ -766,7 +766,7 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   if (read != 0) {
     LOG(ERROR) << *this << " EOF not found where expected";
     doneSendFailure_ = true;
-    threadStats_.setErrorCode(SOCKET_READ_ERROR);
+    threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
   socket_.closeCurrentConnection();
@@ -777,7 +777,7 @@ ReceiverState ReceiverThread::sendDoneCmd() {
 ReceiverState ReceiverThread::finishWithError() {
   LOG(INFO) << *this << " entered FINISH_WITH_ERROR state ";
   // should only be in this state if there is some error
-  WDT_CHECK(threadStats_.getErrorCode() != OK);
+  WDT_CHECK(threadStats_.getLocalErrorCode() != OK);
 
   // close the socket, so that sender receives an error during connect
   socket_.closeAll();
@@ -807,7 +807,7 @@ ReceiverState ReceiverThread::checkForFinishOrNewCheckpoints() {
 ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
   LOG(INFO) << *this << " entered WAIT_FOR_FINISH_OR_NEW_CHECKPOINT state ";
   // should only be called if the are no errors
-  WDT_CHECK(threadStats_.getErrorCode() == OK);
+  WDT_CHECK(threadStats_.getLocalErrorCode() == OK);
   auto cv = controller_->getCondition(WAIT_FOR_FINISH_OR_CHECKPOINT_CV);
   int timeoutMillis = senderReadTimeout_ / kWaitTimeoutFactor;
   controller_->markState(threadIndex_, WAITING);
@@ -833,7 +833,7 @@ ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
     buf_[0] = Protocol::WAIT_CMD;
     if (socket_.write(buf_, 1) != 1) {
       PLOG(ERROR) << *this << " unable to write WAIT ";
-      threadStats_.setErrorCode(SOCKET_WRITE_ERROR);
+      threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
       controller_->markState(threadIndex_, RUNNING);
       return ACCEPT_WITH_TIMEOUT;
     }
@@ -851,7 +851,7 @@ void ReceiverThread::start() {
   });
   if (!buf_) {
     LOG(ERROR) << "error allocating " << bufferSize_;
-    threadStats_.setErrorCode(MEMORY_ALLOCATION_ERROR);
+    threadStats_.setLocalErrorCode(MEMORY_ALLOCATION_ERROR);
     return;
   }
   ReceiverState state = LISTEN;
@@ -860,7 +860,7 @@ void ReceiverThread::start() {
     if (abortCode != OK) {
       LOG(ERROR) << "Transfer aborted " << socket_.getPort() << " "
                  << errorCodeToStr(abortCode);
-      threadStats_.setErrorCode(ABORT);
+      threadStats_.setLocalErrorCode(ABORT);
       break;
     }
     if (state == FAILED) {

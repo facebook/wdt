@@ -127,7 +127,7 @@ class TransferLogManager {
    * resumption, starts writer thread. If the log is not present, a new one is
    * created
    */
-  void openLog();
+  ErrorCode openLog();
 
   /**
    * In case of log based resumption, signals to the writer thread to finish.
@@ -222,6 +222,9 @@ class TransferLogManager {
   /// @param rootDir        root directory of the receiver
   void setRootDir(const std::string &rootDir);
 
+  /// destructor
+  ~TransferLogManager();
+
  private:
   const std::string LOG_NAME = ".wdt.log";
   const std::string BUGGY_LOG_NAME = ".wdt.log.bug";
@@ -236,6 +239,9 @@ class TransferLogManager {
 
   /// fsync transfer log
   void fsync();
+
+  /// closes transfer log
+  void close();
 
   /**
    * Parses the transfer log. Verifies if all the file exists or not(This is

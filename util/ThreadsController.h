@@ -321,6 +321,9 @@ class ThreadsController {
   /// Returns true if any thread apart from the calling is in the state
   bool hasThreads(int threadIndex, ThreadStatus threadState);
 
+  /// @return     true if any registered thread is in the state
+  bool hasThreads(ThreadStatus threadState);
+
   /// Get the nunber of registered threads
   int getTotalThreads();
 

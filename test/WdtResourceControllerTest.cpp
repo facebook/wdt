@@ -84,21 +84,6 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
 
   ASSERT_TRUE(numSenders_ == numSenders - 1);
   ASSERT_TRUE(numReceivers_ == numReceivers - 1);
-  vector<string> erasedIds;
-  code = releaseStaleSenders(wdtNamespace, erasedIds);
-  EXPECT_EQ(code, OK);
-  vector<string> expectedErasedIds;
-  for (int i = 1; i <= 2; i++) {
-    expectedErasedIds.push_back(getTransferId(transferPrefix, i));
-  }
-  sort(erasedIds.begin(), erasedIds.end());
-  sort(expectedErasedIds.begin(), expectedErasedIds.end());
-  EXPECT_EQ(erasedIds, expectedErasedIds);
-
-  erasedIds.clear();
-  code = releaseStaleReceivers(wdtNamespace, erasedIds);
-  sort(erasedIds.begin(), erasedIds.end());
-  EXPECT_EQ(erasedIds, expectedErasedIds);
 }
 
 void WdtResourceControllerTest::MultipleNamespacesTest() {

@@ -20,6 +20,10 @@ std::string errorCodeToStr(ErrorCode code) {
   return folly::to<std::string>(code);
 }
 
+ErrorCode getMoreInterestingError(ErrorCode err1, ErrorCode err2) {
+  return std::max(err1, err2);
+}
+
 std::string strerrorStr(int errnum) {
   std::string result;
   char buf[1024], *res = buf;

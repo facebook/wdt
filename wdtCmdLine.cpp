@@ -225,9 +225,11 @@ int main(int argc, char *argv[]) {
       receiver.setRecoveryId(FLAGS_recovery_id);
     }
     if (!FLAGS_run_as_daemon) {
-      receiver.transferAsync();
-      std::unique_ptr<TransferReport> report = receiver.finish();
-      retCode = report->getSummary().getErrorCode();
+      retCode = receiver.transferAsync();
+      if (retCode == OK) {
+        std::unique_ptr<TransferReport> report = receiver.finish();
+        retCode = report->getSummary().getErrorCode();
+      }
     } else {
       retCode = receiver.runForever();
       // not reached

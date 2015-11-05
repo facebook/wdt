@@ -252,6 +252,10 @@ class WdtBase {
   /// Get the throttler
   std::shared_ptr<Throttler> getThrottler() const;
 
+  /// @param      whether the object is stale. If all the transferring threads
+  ///             have finished, the object will marked as stale
+  bool isStale();
+
   /// abort checker class passed to socket functions
   class AbortChecker : public IAbortChecker {
    public:
@@ -267,6 +271,19 @@ class WdtBase {
   };
 
  protected:
+  enum TransferStatus {
+    NOT_STARTED,     // threads not started
+    ONGOING,         // transfer is ongoing
+    FINISHED,        // last running thread finished
+    THREADS_JOINED,  // threads joined
+  };
+
+  /// @return current transfer status
+  TransferStatus getTransferStatus();
+
+  /// @param transferStatus   current transfer status
+  void setTransferStatus(TransferStatus transferStatus);
+
   /// Ports that the sender/receiver is running on
   std::vector<int32_t> ports_;
 
@@ -285,6 +302,20 @@ class WdtBase {
 
   /// abort checker passed to socket functions
   AbortChecker abortCheckerCallback_;
+
+  /// current transfer status
+  TransferStatus transferStatus_{NOT_STARTED};
+
+  /// Mutex which is shared between the parent thread, transferring threads and
+  /// progress reporter thread
+  std::mutex mutex_;
+
+  /// Mutex for the management of this instance, specifically to keep the
+  /// instance sane for multi threaded public API calls
+  std::mutex instanceManagementMutex_;
+
+  /// This condition is notified when the transfer is finished
+  std::condition_variable conditionFinished_;
 
   /// Controller for wdt threads shared between base and threads
   ThreadsController* threadsController_{nullptr};

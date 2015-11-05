@@ -34,37 +34,23 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
     numBlocksSend_ = stats.numBlocksSend_;
   } else if (stats.numBlocksSend_ != -1 &&
              numBlocksSend_ != stats.numBlocksSend_) {
-    LOG_IF(ERROR, errCode_ == OK) << "Mismatch in the numBlocksSend "
-                                  << numBlocksSend_ << " "
-                                  << stats.numBlocksSend_;
-    errCode_ = ERROR;
+    LOG_IF(ERROR, localErrCode_ == OK) << "Mismatch in the numBlocksSend "
+                                       << numBlocksSend_ << " "
+                                       << stats.numBlocksSend_;
+    localErrCode_ = ERROR;
   }
   if (totalSenderBytes_ == -1) {
     totalSenderBytes_ = stats.totalSenderBytes_;
   } else if (stats.totalSenderBytes_ != -1 &&
              totalSenderBytes_ != stats.totalSenderBytes_) {
-    LOG_IF(ERROR, errCode_ == OK) << "Mismatch in the total sender bytes "
-                                  << totalSenderBytes_ << " "
-                                  << stats.totalSenderBytes_;
-    errCode_ = ERROR;
+    LOG_IF(ERROR, localErrCode_ == OK) << "Mismatch in the total sender bytes "
+                                       << totalSenderBytes_ << " "
+                                       << stats.totalSenderBytes_;
+    localErrCode_ = ERROR;
   }
-  if (stats.errCode_ != OK) {
-    if (errCode_ == OK) {
-      // First error. Setting this as the error code
-      errCode_ = stats.errCode_;
-    } else if (stats.errCode_ != errCode_) {
-      // Different error than the previous one. Setting error code as generic
-      // ERROR
-      errCode_ = ERROR;
-    }
-  }
-  if (stats.remoteErrCode_ != OK) {
-    if (remoteErrCode_ == OK) {
-      remoteErrCode_ = stats.remoteErrCode_;
-    } else if (stats.remoteErrCode_ != remoteErrCode_) {
-      remoteErrCode_ = ERROR;
-    }
-  }
+  localErrCode_ = getMoreInterestingError(localErrCode_, stats.localErrCode_);
+  remoteErrCode_ =
+      getMoreInterestingError(remoteErrCode_, stats.remoteErrCode_);
   return *this;
 }
 
@@ -79,10 +65,10 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
                       stats.effectiveDataBytes_;
   }
 
-  if (stats.errCode_ == OK && stats.remoteErrCode_ == OK) {
+  if (stats.localErrCode_ == OK && stats.remoteErrCode_ == OK) {
     os << "Transfer status = OK.";
   } else {
-    os << "Transfer status (local) = " << errorCodeToStr(stats.errCode_)
+    os << "Transfer status (local) = " << errorCodeToStr(stats.localErrCode_)
        << ", (remote) = " << errorCodeToStr(stats.remoteErrCode_) << ".";
   }
 
@@ -116,45 +102,42 @@ TransferReport::TransferReport(
   for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
-  // Summarize reason for failure if any
-  ErrorCode code = OK;
+  ErrorCode summaryErrorCode = summary_.getErrorCode();
   bool atLeastOneOk = false;
   for (auto& stats : threadStats_) {
-    ErrorCode sc = stats.getCombinedErrorCode();
-    if (sc == OK) {
+    if (stats.getErrorCode() == OK) {
       atLeastOneOk = true;
-      continue;
-    }
-    if (sc > code) {
-      // assumes max is most interesting/specific code
-      // TODO: this should be OO inside ErrorCode class
-      code = sc;
+      break;
     }
   }
-  LOG(INFO) << "Error code summary " << errorCodeToStr(code);
+  LOG(INFO) << "Error code summary " << errorCodeToStr(summaryErrorCode);
   // none of the files or directories failed
   bool possiblyOk = (failedSourceStats_.empty() && failedDirectories_.empty());
   bool summaryOk = false;
-  if (possiblyOk && atLeastOneOk) {
-    if (code != OK) {
-      LOG(WARNING) << "WDT successfully recovered from error "
-                   << errorCodeToStr(code);
+  if (!possiblyOk) {
+    LOG(WARNING) << "Unable to send all files/directories";
+    if (summaryErrorCode == OK) {
+      // only happens when wdt can not read a file/directory
+      summary_.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
     }
-    summary_.setErrorCode(OK);
+  } else if (atLeastOneOk) {
+    if (summaryErrorCode != OK) {
+      LOG(WARNING) << "WDT successfully recovered from error "
+                   << errorCodeToStr(summaryErrorCode);
+    }
+    // Since getErrorCode checks both local and remote error code, we have to
+    // reset both error codes.
+    summary_.setLocalErrorCode(OK);
+    summary_.setRemoteErrorCode(OK);
     summaryOk = true;
-  } else {
-    summary_.setErrorCode(code);
   }
 
   if (summary_.getEffectiveDataBytes() != totalFileSize_) {
     // sender did not send all the bytes
     LOG(INFO) << "Could not send all the bytes " << totalFileSize_ << " "
               << summary_.getEffectiveDataBytes();
-    if (summaryOk) {
-      LOG(ERROR) << "BUG: All threads OK yet sized based error detected";
-    }
-    // possibly recover a specific (or random) code:
-    summary_.setErrorCode((code == OK) ? ERROR : code);
+    WDT_CHECK(!summaryOk)
+        << "BUG: All threads OK yet sized based error detected";
   }
   std::set<std::string> failedFilesSet;
   for (auto& stats : failedSourceStats_) {
@@ -166,13 +149,9 @@ TransferReport::TransferReport(
 
 TransferReport::TransferReport(TransferStats&& globalStats, double totalTime,
                                int64_t totalFileSize)
-    : TransferReport(std::move(globalStats)) {
+    : summary_(std::move(globalStats)) {
   totalTime_ = totalTime;
   totalFileSize_ = totalFileSize;
-}
-
-TransferReport::TransferReport(TransferStats&& globalStats) {
-  summary_ = std::move(globalStats);
 }
 
 TransferReport::TransferReport(const std::vector<TransferStats>& threadStats,
@@ -183,11 +162,29 @@ TransferReport::TransferReport(const std::vector<TransferStats>& threadStats,
   }
 }
 
-TransferReport::TransferReport(std::vector<TransferStats>& threadStats)
-    : threadStats_(std::move(threadStats)) {
-  for (const auto& stats : threadStats_) {
-    summary_ += stats;
+TransferReport::TransferReport(TransferStats&& globalStats)
+    : summary_(std::move(globalStats)) {
+  const int64_t numBlocksSend = summary_.getNumBlocksSend();
+  const int64_t numBlocksReceived = summary_.getNumBlocks();
+  const int64_t numBytesSend = summary_.getTotalSenderBytes();
+  const int64_t numBytesReceived = summary_.getEffectiveDataBytes();
+  ErrorCode summaryErrorCode = summary_.getLocalErrorCode();
+  if (numBlocksSend == -1 || numBlocksSend != numBlocksReceived) {
+    LOG(ERROR) << "Did not receive all the blocks sent by the sender "
+               << numBlocksSend << " " << numBlocksReceived;
+    summaryErrorCode = getMoreInterestingError(summaryErrorCode, ERROR);
+  } else if (numBytesSend != -1 && numBytesSend != numBytesReceived) {
+    // did not receive all the bytes
+    LOG(ERROR) << "Number of bytes sent and received do not match "
+               << numBytesSend << " " << numBytesReceived;
+    summaryErrorCode = getMoreInterestingError(summaryErrorCode, ERROR);
+  } else {
+    summaryErrorCode = OK;
   }
+  // only the local error code is set here. Any remote error means transfer
+  // failure. Since, getErrorCode checks both local and remote codes, it will
+  // return the correct one
+  summary_.setLocalErrorCode(summaryErrorCode);
 }
 
 std::ostream& operator<<(std::ostream& os, const TransferReport& report) {

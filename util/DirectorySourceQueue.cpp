@@ -554,7 +554,9 @@ std::pair<int64_t, ErrorCode> DirectorySourceQueue::getNumBlocksAndStatus()
   std::lock_guard<std::mutex> lock(mutex_);
   ErrorCode status = OK;
   if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
-    status = ERROR;
+    // this function is called by active sender threads. The only way files or
+    // directories can fail when sender threads are active is due to read errors
+    status = BYTE_SOURCE_READ_ERROR;
   }
   return std::make_pair(numBlocks_, status);
 }
