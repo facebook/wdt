@@ -36,7 +36,7 @@ void WdtOptions::modifyOptions(
     const std::set<std::string>& userSpecifiedOptions) {
   if (optionType == DISK_OPTION_TYPE) {
     std::string msg("(disk option type)");
-    CHANGE_IF_NOT_SPECIFIED(num_ports, userSpecifiedOptions, 1, msg)
+    CHANGE_IF_NOT_SPECIFIED(num_ports, userSpecifiedOptions, 3, msg)
     CHANGE_IF_NOT_SPECIFIED(block_size_mbytes, userSpecifiedOptions, -1, msg)
     CHANGE_IF_NOT_SPECIFIED(disable_preallocation, userSpecifiedOptions, true,
                             msg)
