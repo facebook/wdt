@@ -152,6 +152,9 @@ killCurrentTransfer
 # rm a file to create an invalid log entry
 rm -f $DIR/dst${TEST_COUNT}/file0
 startNewTransfer
+sleep 5
+killCurrentTransfer
+startNewTransfer
 waitForTransferEnd
 verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))

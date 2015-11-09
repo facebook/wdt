@@ -237,7 +237,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
   }
   std::vector<TransferStats> threadStats;
   for (auto &senderThread : senderThreads_) {
-    threadStats.push_back(std::move(senderThread->moveStats()));
+    threadStats.push_back(senderThread->moveStats());
   }
 
   bool allSourcesAcked = false;

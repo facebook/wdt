@@ -297,6 +297,7 @@ TransferLogManager::~TransferLogManager() {
 
 void TransferLogManager::writeEntriesToDisk() {
   WDT_CHECK(fd_ >= 0) << "Writer thread started before the log is opened";
+  LOG(INFO) << "Transfer log writer thread started";
   auto &options = WdtOptions::get();
   WDT_CHECK(options.transfer_log_write_interval_ms >= 0);
   auto waitingTime =
@@ -330,6 +331,7 @@ void TransferLogManager::writeEntriesToDisk() {
       return;
     }
   }
+  LOG(INFO) << "Transfer log writer thread finished";
 }
 
 bool TransferLogManager::verifySenderIp(const std::string &curSenderIp) {
@@ -512,7 +514,8 @@ ErrorCode TransferLogManager::parseVerifyAndFix(
       invalidateDirectory();
     }
   }
-  LOG(INFO) << "Transfer log parsing finished";
+  LOG(INFO) << "Transfer log parsing finished "
+            << errorCodeToStr(resumptionStatus_);
   return resumptionStatus_;
 }
 
@@ -531,11 +534,10 @@ bool LogParser::writeFileInvalidationEntries(int fd,
   char buf[TransferLogManager::kMaxEntryLength];
   for (auto seqId : seqIds) {
     int64_t size = encoderDecoder_.encodeFileInvalidationEntry(buf, seqId);
-    int toWrite = size + sizeof(int16_t);
-    int written = ::write(fd, buf, toWrite);
-    if (written != toWrite) {
+    int written = ::write(fd, buf, size);
+    if (written != size) {
       PLOG(ERROR) << "Disk write error while writing invalidation entry to "
-                     "transfer log " << written << " " << toWrite;
+                     "transfer log " << written << " " << size;
       return false;
     }
   }
@@ -799,6 +801,7 @@ ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
   if (parseOnly_) {
     std::cout << getFormattedTimestamp(timestamp)
               << " Invalidation entry for seq-id " << seqId << std::endl;
+    return OK;
   }
   if (options.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file invalidation entry in directory based "
@@ -844,6 +847,7 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
       return INVALID_LOG;
     }
     if (numRead == 0) {
+      VLOG(1) << "got EOF, toRead " << toRead;
       break;
     }
     if (numRead != toRead) {
@@ -856,7 +860,7 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
       }
       break;
     }
-    if (entrySize < 0 || entrySize > TransferLogManager::kMaxEntryLength) {
+    if (entrySize <= 0 || entrySize > TransferLogManager::kMaxEntryLength) {
       LOG(ERROR) << "Transfer log parse error, invalid entry length "
                  << entrySize;
       return INVALID_LOG;
@@ -868,6 +872,7 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
       return INVALID_LOG;
     }
     if (numRead == 0) {
+      VLOG(1) << "got EOF, entrySize " << entrySize;
       break;
     }
     if (numRead != entrySize) {

@@ -70,7 +70,7 @@ TEST(OptionType, DiskOptionTypeTest1) {
   const auto &options = WdtOptions::get();
   google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
   WdtFlags::initializeFromFlags();
-  EXPECT_EQ(1, options.num_ports);
+  EXPECT_EQ(3, options.num_ports);
   EXPECT_EQ(-1, options.block_size_mbytes);
 }
 
