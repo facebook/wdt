@@ -10,6 +10,15 @@ append ::env(USER) "_wdt_contbuild"
 set userdir $::env(USER)
 puts "Will run script with USER env = $userdir"
 
+set maxTestDuration "15m"
+set totalMaxDuration "35m"
+
+puts "Max test duration: $maxTestDuration - Max total $totalMaxDuration"
+
+# Set throughput - lower for now / there is some issue with kernel or env
+# (or our code?)
+set ::env(WDT_THROUGHPUT) 13000
+
 set CDIR "/data/users/$userdir"
 
 # path and ld library path
@@ -43,6 +52,8 @@ proc sleep {time} {
 
 # we will email for the first change
 set last {}
+# uncomment to force initial version update after restart
+# set last "force"
 # previous hg log for wdt (will cause email first too)
 set hgprev {none}
 # also email every x :
@@ -80,6 +91,7 @@ nextEmail
 
 cd $CDIR/fbsource/fbcode
 
+
 # only 2 types for now - either 'open source' on the mac or full otherwise
 set os [exec uname]
 if {$os == "Darwin"} {
@@ -87,8 +99,10 @@ if {$os == "Darwin"} {
     set extraCmds "echo done"
     set targetDir "/usr/local/var/www/wdt_builds/"
     set sudo ""
+    set timeoutCmd "gtimeout"
 } else {
     set type "unix"
+    set timeoutCmd "timeout"
     set extraCmds "cd $CDIR/fbsource/fbcode &&\
      (sudo tc qdisc del dev lo root; sudo ip6tables --flush || true) &&\
      time fbconfig --clang -r wdt &&\
@@ -97,11 +111,11 @@ if {$os == "Darwin"} {
      time wdt/test/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
      time fbconfig --sanitize address -r wdt &&\
      time fbmake dbg &&\
-     time fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time $timeoutCmd $maxTestDuration fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\
      sudo tc qdisc add dev lo root netem delay 20ms 10ms \
      duplicate 1% corrupt 0.1% &&\
      echo rerunning tests with tc delays &&\
-     time fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time $timeoutCmd $maxTestDuration fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\
      sudo tc qdisc del dev lo root"
     set targetDir "~/public_html/wdt_builds/"
     set sudo "sudo"
@@ -122,12 +136,13 @@ while {1} {
     set LOGF "$CDIR/$LOGTS.log"
     puts "Logging to $LOGF"
     # cleanup previous builds failure - sudo not needed/asking for passwd on mac
-    if {[catch {exec sh -c "set -o pipefail; set -x; date; uname -a;\
+    if {[catch {exec $timeoutCmd $totalMaxDuration sh -c "set -o pipefail;\
+     set -x; date; uname -a;\
      $sudo rm -rf /tmp/wdtTest_$userdir /dev/shm/wdtTest_$userdir wdtTest &&\
      cd $CDIR/fbsource/fbcode && time hg pull -u &&\
      hg log -l 1 && hg log -v -l 1 folly && hg log -v -l 1 wdt &&\
      cd $CDIR/cmake_wdt_build && time make -j 4 && \
-     CTEST_OUTPUT_ON_FAILURE=1 time make test &&\
+     CTEST_OUTPUT_ON_FAILURE=1 time $timeoutCmd $maxTestDuration make test &&\
      $extraCmds" >& $LOGF < /dev/null} results options]} {
         set msg "BAD"
         set good 0

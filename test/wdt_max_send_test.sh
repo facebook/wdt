@@ -34,6 +34,12 @@ if [ -z $TEST_COUNT ]; then
   TEST_COUNT=16
 fi
 
+# WDT_THROUGHPUT is an env var. Set it to overwrite the expected 16Gbyte/sec
+if [ -z $WDT_THROUGHPUT ]; then
+  WDT_THROUGHPUT=16000
+fi
+
+
 if [ -z "$HOSTNAME" ] ; then
     echo "HOSTNAME not set, will try with 'localhost'"
     HOSTNAME=localhost
@@ -143,8 +149,8 @@ rm -rf $DIR
 echo "Speed for all runs: $ALLSPEEDS"
 
 # Normalize by CPU / number of threads
-# (32 cores leaves 15 threads and can do ~20-21G, use 19 for margin of noise)
-EXPECTED_SPEED=`echo 16000*$NUM_THREADS/16|bc`
+# (32 cores leaves 15 threads and can do ~20-22G, use 16 for margin of noise)
+EXPECTED_SPEED=`echo $WDT_THROUGHPUT*$NUM_THREADS/16|bc`
 
 echo "Best throughput for $WDTBIN"
 if [ "$MAXRATE" -lt "$EXPECTED_SPEED" ]; then
