@@ -67,7 +67,6 @@ endif()
 set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
-"${FOLLY_SOURCE_DIR}/folly/Malloc.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Checksum.cpp"
 )
 
