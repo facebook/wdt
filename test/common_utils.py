@@ -61,10 +61,11 @@ def create_test_directory(prefix):
     print("Testing in {0}".format(root_dir))
     return root_dir
 
-def generate_random_files(root_dir, seed_size):
+def generate_random_files(root_dir, total_size):
     create_directory(root_dir)
     cur_dir = os.getcwd()
     os.chdir(root_dir)
+    seed_size = int(total_size / 70)
     for i in range(0, 4):
         file_name = "sample{0}".format(i)
         with open(file_name, 'wb') as fout:

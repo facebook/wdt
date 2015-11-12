@@ -18,7 +18,7 @@ def main():
     print("wdt protocol version " + wdt_version)
     root_dir = create_test_directory("/tmp")
     src_dir = root_dir + "/src"
-    generate_random_files(src_dir, 4096)
+    generate_random_files(src_dir, 256 * 1024)
 
     wdtbin_opts = "-full_reporting -num_ports 4"
     wdtbin = "_bin/wdt/wdt " + wdtbin_opts

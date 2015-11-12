@@ -40,7 +40,7 @@ def main():
     root_dir = create_test_directory("/tmp")
     src_dir = root_dir + "/src"
     # create 5mb random files
-    generate_random_files(src_dir, 64 * 1024)
+    generate_random_files(src_dir, 5 * 1024 * 1024)
 
     start_server()
     port = bad_socket.getsockname()[1]

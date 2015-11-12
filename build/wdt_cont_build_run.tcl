@@ -111,7 +111,7 @@ if {$os == "Darwin"} {
      time wdt/test/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
      time fbconfig --sanitize address -r wdt &&\
      time fbmake dbg &&\
-     time $timeoutCmd $maxTestDuration fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time $timeoutCmd $maxTestDuration fbmake runtests --extended-tests --run-disabled --record-results --return-nonzero-on-timeouts &&\
      sudo tc qdisc add dev lo root netem delay 20ms 10ms \
      duplicate 1% corrupt 0.1% &&\
      echo rerunning tests with tc delays &&\
