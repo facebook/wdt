@@ -34,7 +34,8 @@ def run_sender(sender_cmd, root_dir, test_count):
     sender_cmd = "bash -c \"set -o pipefail; " + sender_cmd \
                 + " 2>&1 | tee {0}/client{1}.log\"".format(root_dir, test_count)
     print("Sender: " + sender_cmd)
-    return os.system(sender_cmd)
+    # return code of system is shifted by 8 bytes
+    return os.system(sender_cmd) >> 8
 
 def check_transfer_status(status, root_dir, test_count):
     if status:

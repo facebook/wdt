@@ -508,6 +508,7 @@ class PerfStatReport {
                           // sender. A high sum for this suggests threads
                           // were not properly load balanced
     DIRECTORY_CREATE,
+    IOCTL,
     END
   };
 

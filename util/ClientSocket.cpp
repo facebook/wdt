@@ -169,6 +169,10 @@ ErrorCode ClientSocket::connect() {
   return OK;
 }
 
+int ClientSocket::getUnackedBytes() const {
+  return SocketUtils::getUnackedBytes(fd_);
+}
+
 int ClientSocket::getFd() const {
   VLOG(1) << "fd is " << fd_;
   return fd_;
@@ -185,6 +189,12 @@ const std::string &ClientSocket::getPeerIp() const {
 int ClientSocket::read(char *buf, int nbyte, bool tryFull) {
   return SocketUtils::readWithAbortCheck(fd_, buf, nbyte, abortChecker_,
                                          tryFull);
+}
+
+int ClientSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
+                                  bool tryFull) {
+  return SocketUtils::readWithAbortCheckAndTimeout(
+      fd_, buf, nbyte, abortChecker_, timeoutMs, tryFull);
 }
 
 int ClientSocket::write(const char *buf, int nbyte, bool tryFull) {

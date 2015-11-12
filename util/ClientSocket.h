@@ -22,8 +22,14 @@ class ClientSocket {
   ClientSocket(const std::string &dest, const int port,
                IAbortChecker const *abortChecker);
   virtual ErrorCode connect();
+  /// @return   number of unacked bytes in send buffer, returns -1 in case it
+  ///           fails to get unacked bytes for this socket
+  int getUnackedBytes() const;
   /// tries to read nbyte data and periodically checks for abort
   virtual int read(char *buf, int nbyte, bool tryFull = true);
+  /// tries to read nbyte data with a specificand periodically checks for abort
+  virtual int readWithTimeout(char *buf, int nbyte, int timeoutMs,
+                              bool tryFull = true);
   /// tries to write nbyte data and periodically checks for abort
   virtual int write(const char *buf, int nbyte, bool tryFull = true);
   virtual void close();

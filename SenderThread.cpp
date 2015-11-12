@@ -206,6 +206,7 @@ SenderState SenderThread::sendSizeCmd() {
 
 SenderState SenderThread::sendDoneCmd() {
   VLOG(1) << *this << " entered SEND_DONE_CMD state";
+
   int64_t off = 0;
   buf_[off++] = Protocol::DONE_CMD;
   auto pair = dirQueue_->getNumBlocksAndStatus();
@@ -345,12 +346,71 @@ SenderState SenderThread::readFileChunks() {
   return SEND_BLOCKS;
 }
 
+ErrorCode SenderThread::readNextReceiverCmd() {
+  const auto &options = WdtOptions::get();
+  int numUnackedBytes = socket_->getUnackedBytes();
+  int timeToClearSendBuffer = 0;
+  Clock::time_point startTime = Clock::now();
+  while (true) {
+    int numRead = socket_->read(buf_, 1);
+    if (numRead == 1) {
+      return OK;
+    }
+    if (wdtParent_->getCurAbortCode() != OK) {
+      return ABORT;
+    }
+    if (numRead == 0) {
+      PLOG(ERROR) << "Got unexpected EOF, reconnecting";
+      return SOCKET_READ_ERROR;
+    }
+    WDT_CHECK_LT(numRead, 0);
+    PLOG(ERROR) << "Failed to read receiver cmd " << numRead;
+    if (errno != EAGAIN) {
+      // not timed out
+      return SOCKET_READ_ERROR;
+    }
+    int curUnackedBytes = socket_->getUnackedBytes();
+    if (numUnackedBytes < 0 || curUnackedBytes < 0) {
+      LOG(ERROR) << "Failed to read number of unacked bytes, reconnecting";
+      return SOCKET_READ_ERROR;
+    }
+    WDT_CHECK_GE(numUnackedBytes, curUnackedBytes);
+    if (curUnackedBytes == 0) {
+      timeToClearSendBuffer = durationMillis(Clock::now() - startTime);
+      break;
+    }
+    if (curUnackedBytes == numUnackedBytes) {
+      LOG(ERROR) << "Number of unacked bytes did not change, reconnecting "
+                 << curUnackedBytes;
+      return SOCKET_READ_ERROR;
+    }
+    LOG(INFO) << "Read receiver command failed, but number of unacked "
+                 "bytes decreased, retrying socket read " << numUnackedBytes
+              << " " << curUnackedBytes;
+    numUnackedBytes = curUnackedBytes;
+  }
+  // we are assuming that sender and receiver tcp buffer sizes are same. So, we
+  // expect another timeToClearSendBuffer milliseconds for receiver to clear its
+  // buffer
+  int readTimeout = timeToClearSendBuffer + options.drain_extra_ms;
+  LOG(INFO) << "Send buffer cleared in " << timeToClearSendBuffer
+            << "ms, waiting for " << readTimeout
+            << "ms for receiver buffer to clear";
+  // readWithTimeout internally checks for abort periodically
+  int numRead = socket_->readWithTimeout(buf_, 1, readTimeout);
+  if (numRead != 1) {
+    PLOG(ERROR) << "Failed to read receiver cmd " << numRead;
+    return SOCKET_READ_ERROR;
+  }
+  return OK;
+}
+
 SenderState SenderThread::readReceiverCmd() {
   VLOG(1) << *this << " entered READ_RECEIVER_CMD state";
-  int64_t numRead = socket_->read(buf_, 1);
-  if (numRead != 1) {
-    LOG(ERROR) << "READ unexpected " << numRead;
-    threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
+
+  ErrorCode errCode = readNextReceiverCmd();
+  if (errCode != OK) {
+    threadStats_.setLocalErrorCode(errCode);
     return CONNECT;
   }
   Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf_[0];
@@ -370,7 +430,7 @@ SenderState SenderThread::readReceiverCmd() {
     int checkpointLen =
         Protocol::getMaxLocalCheckpointLength(threadProtocolVersion_);
     int64_t toRead = checkpointLen - 1;
-    numRead = socket_->read(buf_ + 1, toRead);
+    int numRead = socket_->read(buf_ + 1, toRead);
     if (numRead != toRead) {
       LOG(ERROR) << "Could not read possible local checkpoint " << toRead << " "
                  << numRead << " " << port_;

@@ -33,6 +33,11 @@ class SocketUtils {
                           std::string &host, std::string &port);
   static void setReadTimeout(int fd);
   static void setWriteTimeout(int fd);
+  static int getUnackedBytes(int fd);
+  /// @see ioWithAbortCheck
+  static int64_t readWithAbortCheckAndTimeout(int fd, char *buf, int64_t nbyte,
+                                              IAbortChecker const *abortChecker,
+                                              int timeoutMs, bool tryFull);
   /// @see ioWithAbortCheck
   static int64_t readWithAbortCheck(int fd, char *buf, int64_t nbyte,
                                     IAbortChecker const *abortChecker,
