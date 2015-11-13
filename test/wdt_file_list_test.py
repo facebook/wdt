@@ -24,7 +24,7 @@ def main():
     root_dir = create_test_directory("/tmp")
     src_dir = root_dir + "/src"
     # create random files
-    generate_random_files(src_dir, 4096)
+    generate_random_files(src_dir, 256 * 1024)
 
     # generate file list
     file_list_in = open(os.path.join(root_dir, "file_list"), 'wb')

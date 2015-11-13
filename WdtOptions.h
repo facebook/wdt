@@ -314,6 +314,12 @@ class WdtOptions {
   bool overwrite{false};
 
   /**
+   * Extra time buffer to account for network when sender waits for receiver to
+   * finish processing buffered data
+   */
+  int drain_extra_ms{500};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;

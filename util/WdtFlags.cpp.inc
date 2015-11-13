@@ -153,3 +153,6 @@ WDT_OPT(open_files_during_discovery, bool,
 WDT_OPT(url_backward_compatibility, bool,
         "If true, we send url that works with older version(<19)");
 WDT_OPT(overwrite, bool, "Allow the receiver to overwrite existing files");
+WDT_OPT(drain_extra_ms, int32,
+        "Extra time buffer to account for network when sender waits for "
+        "receiver to finish processing buffered data");

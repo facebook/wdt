@@ -8,9 +8,9 @@
 
 #define WDT_VERSION_MAJOR 1
 #define WDT_VERSION_MINOR 22
-#define WDT_VERSION_BUILD 1511080
+#define WDT_VERSION_BUILD 1511120
 // Add -fbcode to version str
-#define WDT_VERSION_STR "1.22.1511080-fbcode"
+#define WDT_VERSION_STR "1.22.1511120-fbcode"
 // Tie minor and proto version
 #define WDT_PROTOCOL_VERSION WDT_VERSION_MINOR
 
@@ -18,3 +18,4 @@
 #define HAS_SYNC_FILE_RANGE 1
 #define HAS_POSIX_MEMALIGN 1
 #define WDT_SUPPORTS_ODIRECT 1
+#define WDT_HAS_SOCKIOS_H 1

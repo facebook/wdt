@@ -14,9 +14,13 @@
 #include <glog/logging.h>
 #include <folly/Conv.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <algorithm>
+#ifdef WDT_HAS_SOCKIOS_H
+#include <linux/sockios.h>
+#endif
 
 namespace facebook {
 namespace wdt {
@@ -83,17 +87,44 @@ int SocketUtils::getTimeout(int networkTimeout) {
   return std::min(networkTimeout, abortInterval);
 }
 
+/* static */
+int SocketUtils::getUnackedBytes(int fd) {
+#ifdef WDT_HAS_SOCKIOS_H
+  int numUnackedBytes;
+  START_PERF_TIMER
+  if (::ioctl(fd, SIOCOUTQ, &numUnackedBytes) != 0) {
+    PLOG(ERROR) << "Failed to get unacked bytes for socket " << fd;
+    numUnackedBytes = -1;
+  }
+  RECORD_PERF_RESULT(PerfStatReport::IOCTL)
+  return numUnackedBytes;
+#else
+  LOG(WARNING) << "Wdt has no way to determine unacked bytes for socket";
+  return -1;
+#endif
+}
+
+/* static */
 int64_t SocketUtils::readWithAbortCheck(int fd, char *buf, int64_t nbyte,
                                         IAbortChecker const *abortChecker,
                                         bool tryFull) {
   const auto &options = WdtOptions::get();
+  return readWithAbortCheckAndTimeout(fd, buf, nbyte, abortChecker,
+                                      options.read_timeout_millis, tryFull);
+}
+
+/* static */
+int64_t SocketUtils::readWithAbortCheckAndTimeout(
+    int fd, char *buf, int64_t nbyte, IAbortChecker const *abortChecker,
+    int timeoutMs, bool tryFull) {
   START_PERF_TIMER
-  int64_t numRead = ioWithAbortCheck(read, fd, buf, nbyte, abortChecker,
-                                     options.read_timeout_millis, tryFull);
+  int64_t numRead =
+      ioWithAbortCheck(read, fd, buf, nbyte, abortChecker, timeoutMs, tryFull);
   RECORD_PERF_RESULT(PerfStatReport::SOCKET_READ);
   return numRead;
 }
 
+/* static */
 int64_t SocketUtils::writeWithAbortCheck(int fd, const char *buf, int64_t nbyte,
                                          IAbortChecker const *abortChecker,
                                          bool tryFull) {

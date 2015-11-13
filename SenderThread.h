@@ -250,6 +250,14 @@ class SenderThread : public WdtThread {
    */
   SenderState processVersionMismatch();
 
+  /**
+   * Reads next receiver cmd. If the read times out, checks to see if the tcp
+   * unacked bytes have decreased or not
+   *
+   * @return      status of the read
+   */
+  ErrorCode readNextReceiverCmd();
+
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];
 

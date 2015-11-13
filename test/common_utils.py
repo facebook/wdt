@@ -34,7 +34,8 @@ def run_sender(sender_cmd, root_dir, test_count):
     sender_cmd = "bash -c \"set -o pipefail; " + sender_cmd \
                 + " 2>&1 | tee {0}/client{1}.log\"".format(root_dir, test_count)
     print("Sender: " + sender_cmd)
-    return os.system(sender_cmd)
+    # return code of system is shifted by 8 bytes
+    return os.system(sender_cmd) >> 8
 
 def check_transfer_status(status, root_dir, test_count):
     if status:
@@ -60,10 +61,11 @@ def create_test_directory(prefix):
     print("Testing in {0}".format(root_dir))
     return root_dir
 
-def generate_random_files(root_dir, seed_size):
+def generate_random_files(root_dir, total_size):
     create_directory(root_dir)
     cur_dir = os.getcwd()
     os.chdir(root_dir)
+    seed_size = int(total_size / 70)
     for i in range(0, 4):
         file_name = "sample{0}".format(i)
         with open(file_name, 'wb') as fout:
