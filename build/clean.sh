@@ -1,2 +1,3 @@
 #!/bin/sh
-find . \( -name "*~" -o -name "*.orig" \) -print0 | xargs -0 rm -v
+find . \( -name "*~" -o -name "*.orig" -o -name "*.rej" \) -print0 | \
+    xargs -0 rm -v
