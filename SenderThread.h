@@ -258,6 +258,14 @@ class SenderThread : public WdtThread {
    */
   ErrorCode readNextReceiverCmd();
 
+  /**
+   * Reads and verifies spurious extra checkpoint. Receiver can insert extra
+   * checkpoint in case some bad client connected to it.
+   *
+   * @return      status of read/verification
+   */
+  ErrorCode readAndVerifySpuriousCheckpoint();
+
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];
 
