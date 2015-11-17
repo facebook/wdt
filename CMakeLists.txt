@@ -269,6 +269,10 @@ if (BUILD_TESTING)
   target_link_libraries(resource_controller_test wdt4tests)
   add_test(NAME ResourceControllerTests COMMAND resource_controller_test)
 
+  add_executable(wdt_url_test  test/WdtUrlTest.cpp)
+  target_link_libraries(wdt_url_test wdt4tests)
+  add_test(NAME WdtUrlTests COMMAND wdt_url_test)
+
   add_executable(file_reader_test  test/FileReaderTest.cpp)
   target_link_libraries(file_reader_test wdt4tests)
   add_test(NAME FileReaderTests COMMAND file_reader_test)

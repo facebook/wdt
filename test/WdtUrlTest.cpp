@@ -159,8 +159,8 @@ TEST(RequestSerializationTest, UrlTests) {
     EXPECT_EQ(deser.transferId, "tid1");
     EXPECT_EQ(deser.protocolVersion, 753);
     EXPECT_EQ(deser.ports.size(), 5);
-    for (int i=0; i<5; ++i) {
-      EXPECT_EQ(deser.ports[i], 123+i);
+    for (int i = 0; i < 5; ++i) {
+      EXPECT_EQ(deser.ports[i], 123 + i);
     }
     EXPECT_EQ(deser.errorCode, OK);
     EXPECT_EQ(deser.generateUrl(true), serialized);
@@ -238,7 +238,6 @@ TEST(RequestSerializationTest, TransferIdGenerationTest) {
   string transferId2 = WdtBase::generateTransferId();
   EXPECT_NE(transferId1, transferId2);
 }
-
 }
 }
 

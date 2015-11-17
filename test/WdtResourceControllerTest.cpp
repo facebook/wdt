@@ -306,7 +306,6 @@ TEST(WdtResourceControllerTest, ReleaseStaleTest) {
   WdtResourceControllerTest t;
   t.ReleaseStaleTest();
 }
-
 }
 }
 
