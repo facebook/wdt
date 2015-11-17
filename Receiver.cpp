@@ -47,13 +47,13 @@ Receiver::Receiver(const WdtTransferRequest &transferRequest) {
   LOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
   // TODO: move to init and validate input transfer request (like empty dir)
   // and ports and pv - issue#95
-  transferId_ = transferRequest.transferId;
-  if (transferId_.empty()) {
-    transferId_ = WdtBase::generateTransferId();
+  transferRequest_ = transferRequest;
+  if (getTransferId().empty()) {
+    setTransferId(WdtBase::generateTransferId());
   }
+  // TODO clean that up too - take from transferId_
   setProtocolVersion(transferRequest.protocolVersion);
   setDir(transferRequest.directory);
-  ports_ = transferRequest.ports;
 }
 
 Receiver::Receiver(int port, int numSockets, const std::string &destDir)
@@ -92,7 +92,7 @@ void Receiver::startNewGlobalSession(const std::string &peerIp) {
   }
   hasNewTransferStarted_.store(true);
   LOG(INFO) << "Starting new transfer,  peerIp " << peerIp << " , transfer id "
-            << transferId_;
+            << getTransferId();
 }
 
 bool Receiver::hasNewTransferStarted() const {
@@ -105,7 +105,7 @@ void Receiver::endCurGlobalSession() {
     LOG(WARNING) << "WDT transfer did not start, no need to end session";
     return;
   }
-  LOG(INFO) << "Ending the transfer " << transferId_;
+  LOG(INFO) << "Ending the transfer " << getTransferId();
   if (throttler_) {
     throttler_->deRegisterTransfer();
   }
@@ -126,15 +126,16 @@ WdtTransferRequest Receiver::init() {
               << " smaller than " << Protocol::kMaxHeader << " using "
               << bufferSize_ << " instead";
   }
-  auto numThreads = ports_.size();
+  auto numThreads = transferRequest_.ports.size();
   fileCreator_.reset(
       new FileCreator(destDir_, numThreads, transferLogManager_));
   threadsController_ = new ThreadsController(numThreads);
   threadsController_->setNumFunnels(ReceiverThread::NUM_FUNNELS);
   threadsController_->setNumBarriers(ReceiverThread::NUM_BARRIERS);
   threadsController_->setNumConditions(ReceiverThread::NUM_CONDITIONS);
+  // TODO: take transferRequest directly !
   receiverThreads_ = threadsController_->makeThreads<Receiver, ReceiverThread>(
-      this, ports_.size(), ports_);
+      this, transferRequest_.ports.size(), transferRequest_.ports);
   size_t numSuccessfulInitThreads = 0;
   for (auto &receiverThread : receiverThreads_) {
     ErrorCode code = receiverThread->init();
@@ -145,29 +146,34 @@ WdtTransferRequest Receiver::init() {
   LOG(INFO) << "Registered " << numSuccessfulInitThreads
             << " successful sockets";
   ErrorCode code = OK;
-  if (numSuccessfulInitThreads != ports_.size()) {
+  const size_t targetSize = transferRequest_.ports.size();
+  // TODO: replace with getNumPorts/thread
+  if (numSuccessfulInitThreads != targetSize) {
     code = FEWER_PORTS;
     if (numSuccessfulInitThreads == 0) {
       code = ERROR;
     }
   }
-  WdtTransferRequest transferRequest(getPorts());
-  transferRequest.protocolVersion = protocolVersion_;
-  transferRequest.transferId = transferId_;
-  LOG(INFO) << "Transfer id " << transferRequest.transferId;
-  if (transferRequest.hostName.empty()) {
+  transferRequest_.protocolVersion = protocolVersion_;
+
+  transferRequest_.ports.clear();
+  for (const auto &receiverThread : receiverThreads_) {
+    transferRequest_.ports.push_back(receiverThread->getPort());
+  }
+
+  if (transferRequest_.hostName.empty()) {
     char hostName[1024];
     int ret = gethostname(hostName, sizeof(hostName));
     if (ret == 0) {
-      transferRequest.hostName.assign(hostName);
+      transferRequest_.hostName.assign(hostName);
     } else {
       PLOG(ERROR) << "Couldn't find the host name";
       code = ERROR;
     }
   }
-  transferRequest.directory = getDir();
-  transferRequest.errorCode = code;
-  return transferRequest;
+  transferRequest_.directory = getDir();
+  transferRequest_.errorCode = code;
+  return transferRequest_;
 }
 
 void Receiver::setDir(const std::string &destDir) {
@@ -200,14 +206,6 @@ Receiver::~Receiver() {
     abort(ABORTED_BY_APPLICATION);
   }
   finish();
-}
-
-vector<int32_t> Receiver::getPorts() const {
-  vector<int32_t> ports;
-  for (const auto &receiverThread : receiverThreads_) {
-    ports.push_back(receiverThread->getPort());
-  }
-  return ports;
 }
 
 const std::vector<FileChunksInfo> &Receiver::getFileChunksInfo() const {
@@ -383,8 +381,8 @@ ErrorCode Receiver::start() {
   WDT_CHECK_EQ(getTransferStatus(), NOT_STARTED)
       << "There is already a transfer running on this instance of receiver";
   startTime_ = Clock::now();
-  LOG(INFO) << "Starting (receiving) server on ports [ " << getPorts()
-            << "] Target dir : " << destDir_;
+  LOG(INFO) << "Starting (receiving) server on ports [ "
+            << transferRequest_.ports << "] Target dir : " << destDir_;
   const auto &options = WdtOptions::get();
   // TODO do the init stuff here
   if (options.enable_download_resumption) {

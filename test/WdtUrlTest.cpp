@@ -238,8 +238,52 @@ TEST(RequestSerializationTest, TransferIdGenerationTest) {
   string transferId2 = WdtBase::generateTransferId();
   EXPECT_NE(transferId1, transferId2);
 }
+
+TEST(TransferRequestTest, Encryption1) {
+  {
+    WdtTransferRequest req("");
+    EXPECT_FALSE(req.encryptionData.isSet());
+  }
+  {
+    WdtTransferRequest req(123, 3, "/foo/bar");
+    string ser = req.generateUrl(true);
+    LOG(INFO) << "Url without e= " << ser;
+    WdtTransferRequest req2(123, 3, "/foo/ba2");
+    EXPECT_FALSE(req2 == req);
+    req2.directory = "/foo/bar";
+    EXPECT_EQ(req, req2);
+    req.encryptionData = EncryptionParams(ENC_AES128_CTR, "data1");
+    EXPECT_FALSE(req == req2);
+  }
+  {
+    // TODO: hostname is mandatory in url yet not in constructor,
+    // while directory isn't and yet is
+    WdtTransferRequest req(123, 3, "/data/dir1");
+    req.hostName = "host1";
+    EXPECT_EQ(req.errorCode, OK);
+    req.encryptionData = EncryptionParams(ENC_AES128_CTR, "barFOO");
+    EXPECT_EQ(req.encryptionData.getType(), ENC_AES128_CTR);
+    string binary("FOObar56");
+    binary.push_back(0);
+    binary.push_back(1);
+    binary.push_back(0xff);
+    binary.push_back(0xfe);
+    const string secret(binary);
+    req.encryptionData = EncryptionParams(ENC_AES128_CTR, secret);
+    string ser = req.generateUrl(/* with dir */ true, /* with secret */ false);
+    LOG(INFO) << "Url with e= " << ser;
+    EXPECT_EQ(ser,
+              "wdt://host1:123?e=1:464f4f62617235360001fffe&num_ports=3&"
+              "dir=/data/dir1&recpv=22&id=");
+    WdtTransferRequest unser(ser);
+    EXPECT_EQ(unser.errorCode, OK);
+    EXPECT_EQ(unser.encryptionData.getType(), ENC_AES128_CTR);
+    EXPECT_EQ(unser.encryptionData.getSecret(), secret);
+    EXPECT_EQ(req, unser);
+  }
 }
 }
+}  // namespace end
 
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;

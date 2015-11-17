@@ -80,11 +80,6 @@ class Receiver : public WdtBase {
    */
   virtual ~Receiver();
 
-  /**
-   * Use the method to get the list of ports receiver is listening on
-   */
-  std::vector<int32_t> getPorts() const;
-
  protected:
   friend class ReceiverThread;
 

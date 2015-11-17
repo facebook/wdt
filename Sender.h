@@ -109,10 +109,6 @@ class Sender : public WdtBase {
   /// @param followSymlinks   whether to follow symlinks or not
   void setFollowSymlinks(const bool followSymlinks);
 
-  /// Get the ports sender is operating on
-  /// @return     list of destination ports
-  const std::vector<int32_t> &getPorts() const;
-
   /// Get the destination sender is sending to
   /// @return     destination host-name
   const std::string &getDestination() const;

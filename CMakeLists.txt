@@ -73,6 +73,7 @@ set (FOLLY_CPP_SRC
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
 add_library(wdtlib_min
 util/ClientSocket.cpp
+util/EncryptionUtils.cpp
 util/DirectorySourceQueue.cpp
 ErrorCodes.cpp
 util/FileByteSource.cpp

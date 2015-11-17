@@ -201,13 +201,7 @@ const string WdtTransferRequest::DIRECTORY_PARAM{"dir"};
 const string WdtTransferRequest::PORTS_PARAM{"ports"};
 const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
 const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
-
-WdtTransferRequest::WdtTransferRequest(const vector<int32_t>& ports) {
-  this->ports = ports;
-  // Sort the ports so that if they are a sequence then you
-  // can detect that
-  sort(this->ports.begin(), this->ports.end());
-}
+const string WdtTransferRequest::ENCRYPTION_PARAM{"e"};
 
 WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
                                        const string& directory) {
@@ -227,6 +221,15 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   hostName = wdtUri.getHostName();
   transferId = wdtUri.getQueryParam(TRANSFER_ID_PARAM);
   directory = wdtUri.getQueryParam(DIRECTORY_PARAM);
+  string encStr = wdtUri.getQueryParam(ENCRYPTION_PARAM);
+  if (!encStr.empty()) {
+    ErrorCode code = EncryptionParams::unserialize(encStr, encryptionData);
+    if (code != OK) {
+      LOG(ERROR) << "Unable to parse encryption data from \"" << encStr << "\" "
+                 << errorCodeToStr(code);
+      errorCode = getMoreInterestingError(code, errorCode);
+    }
+  }
   try {
     protocolVersion = folly::to<int64_t>(
         wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM));
@@ -251,6 +254,7 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
     }
   } while (!portsList.empty());
   if (!ports.empty()) {
+    // Done with ports - rest of the function is alternative way to set ports
     return;
   }
   // Figure out ports using other params only if there was no port list
@@ -277,9 +281,10 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
     }
   }
   ports = WdtBase::genPortsVector(startPort, numPorts);
+  // beware of the return above, add future params processing above the return
 }
 
-string WdtTransferRequest::generateUrl(bool genFull) const {
+string WdtTransferRequest::generateUrl(bool genFull, bool forLogging) const {
   if (errorCode == ERROR || errorCode == URI_PARSE_ERROR) {
     LOG(ERROR) << "Transfer request has errors present ";
     return errorCodeToStr(errorCode);
@@ -297,6 +302,12 @@ string WdtTransferRequest::generateUrl(bool genFull) const {
   serializePorts(wdtUri);
   if (genFull) {
     wdtUri.setQueryParam(DIRECTORY_PARAM, directory);
+  }
+  if (encryptionData.isSet()) {
+    VLOG(1) << "Encryption data is set " << encryptionData.getLogSafeString();
+    wdtUri.setQueryParam(ENCRYPTION_PARAM,
+                         forLogging ? encryptionData.getLogSafeString()
+                                    : encryptionData.getUrlSafeString());
   }
   return wdtUri.generateUrl();
 }
@@ -338,12 +349,14 @@ string WdtTransferRequest::getSerializedPortsList() const {
 }
 
 bool WdtTransferRequest::operator==(const WdtTransferRequest& that) const {
+  // TODO: fix this to use normal short-cutting
   bool result = true;
   result &= (transferId == that.transferId);
   result &= (protocolVersion == that.protocolVersion);
   result &= (directory == that.directory);
   result &= (hostName == that.hostName);
   result &= (ports == that.ports);
+  result &= (encryptionData == that.encryptionData);
   // No need to check the file info, simply checking whether two objects
   // are same with respect to the wdt settings
   return result;
@@ -416,8 +429,8 @@ std::shared_ptr<Throttler> WdtBase::getThrottler() const {
 }
 
 void WdtBase::setTransferId(const std::string& transferId) {
-  transferId_ = transferId;
-  LOG(INFO) << "Setting transfer id " << transferId_;
+  transferRequest_.transferId = transferId;
+  LOG(INFO) << "Setting transfer id " << transferId;
 }
 
 void WdtBase::setProtocolVersion(int64_t protocol) {
@@ -436,7 +449,7 @@ int WdtBase::getProtocolVersion() const {
 }
 
 std::string WdtBase::getTransferId() {
-  return transferId_;
+  return transferRequest_.transferId;
 }
 
 WdtBase::TransferStatus WdtBase::getTransferStatus() {
