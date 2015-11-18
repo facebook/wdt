@@ -173,7 +173,7 @@ string WdtUri::getQueryParam(const string& key) const {
   return it->second;
 }
 
-const unordered_map<string, string>& WdtUri::getQueryParams() const {
+const map<string, string>& WdtUri::getQueryParams() const {
   return queryParams_;
 }
 

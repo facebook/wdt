@@ -56,7 +56,7 @@ class WdtUri {
   std::string getQueryParam(const std::string& key) const;
 
   /// Get all the query params
-  const std::unordered_map<std::string, std::string>& getQueryParams() const;
+  const std::map<std::string, std::string>& getQueryParams() const;
 
   /// Sets hostname to generate a url
   void setHostName(const std::string& hostName);
@@ -86,11 +86,12 @@ class WdtUri {
    */
   ErrorCode process(const std::string& url);
 
+  // TODO: use a vector instead, we don't really need to search...
   /**
    * Map of get parameters of the url. Key and value
    * of the map are the name and value of get parameter respectively
    */
-  std::unordered_map<std::string, std::string> queryParams_;
+  std::map<std::string, std::string> queryParams_;
 
   /// Prefix of the wdt url
   const std::string WDT_URL_PREFIX{"wdt://"};

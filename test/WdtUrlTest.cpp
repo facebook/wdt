@@ -273,8 +273,8 @@ TEST(TransferRequestTest, Encryption1) {
     string ser = req.generateUrl(/* with dir */ true, /* with secret */ false);
     LOG(INFO) << "Url with e= " << ser;
     EXPECT_EQ(ser,
-              "wdt://host1:123?e=1:464f4f62617235360001fffe&num_ports=3&"
-              "dir=/data/dir1&recpv=22&id=");
+              "wdt://host1:123?dir=/data/dir1&e=1:464f4f62617235360001fffe"
+              "&id=&num_ports=3&recpv=22");
     WdtTransferRequest unser(ser);
     EXPECT_EQ(unser.errorCode, OK);
     EXPECT_EQ(unser.encryptionData.getType(), ENC_AES128_CTR);
