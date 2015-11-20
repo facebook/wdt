@@ -26,26 +26,26 @@ script:
   # Debug
   - date ; uname -a ; pwd ; ls -l ..; echo $HOSTNAME
   - ifconfig -a 
-  - nc -v ::1 8118
-  - sudo ifconfig lo add ::1/128
-  - nc -v ::1 8118
+  - nc -v ::1 8118 || true
+  - sudo ifconfig lo add ::1/128 || true
+  - nc -v ::1 8118 || true
   - ifconfig -a
   # Build
   - mkdir ../build && cd ../build
   - echo $PATH; echo $LD_LIBRARY_PATH
   - which $CXX
-  #- cmake ../wdt -DBUILD_TESTING=1
+  - cmake ../wdt -DBUILD_TESTING=1
   #- make -j 4 VERBOSE=1
-  #- make -j 4
+  - make -j 4
   #- WDT_TEST_SYMLINKS=0 CTEST_OUTPUT_ON_FAILURE=1 make test
-  #- CTEST_OUTPUT_ON_FAILURE=1 make test
+  - CTEST_OUTPUT_ON_FAILURE=1 make test
   # to see the full output/debug:
   #- ../wdt_e2e_simple_test.sh
 
 before_install:
   - echo "Travis os name $TRAVIS_OS_NAME"
   # will change PATH so we find cmake,...
-  - source ./build/travis_${TRAVIS_OS_NAME}.sh
+  #- source ./build/travis_${TRAVIS_OS_NAME}.sh
 
 notifications:
   webhooks:
