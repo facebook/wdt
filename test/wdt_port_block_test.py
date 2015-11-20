@@ -15,7 +15,7 @@ def wait_for_receiver_finish(receiver_process):
     receiver_status = receiver_process.wait()
     receiver_end_time = time()
 
-def main():
+def test(resumption):
     global receiver_end_time
     global receiver_status
     environment_variable_name = 'WDT_TEST_IPV6_CLIENT'
@@ -24,7 +24,7 @@ def main():
         print("Test with ipv6 client is disabled in this system")
         return
 
-    receiver_cmd = "_bin/wdt/wdt -start_port 0 -skip_writes -v 1"
+    receiver_cmd = "_bin/wdt/wdt -start_port 0 -skip_writes -num_ports=1 -v 1"
     print(receiver_cmd)
     receiver_process = subprocess.Popen(receiver_cmd.split(),
                                         stdout=subprocess.PIPE)
@@ -57,10 +57,14 @@ def main():
     sender_cmd = ("(sleep 20 | nc -4 localhost {0}) &> /dev/null & "
                   "(sleep 20 | nc -4 localhost {0}) &> /dev/null & "
                   "sleep 1; _bin/wdt/wdt -directory wdt/ -ipv6 "
+                  "-num_ports=1 "
                   "-connection_url \"wdt://[::1]{1}{2}\"").format(
                           port_to_block, start_port, rest_of_url)
+    if resumption:
+        sender_cmd = sender_cmd + " -enable_download_resumption"
     print(sender_cmd)
     status = os.system(sender_cmd)
+    status >>= 8
     sender_end_time = time()
 
     # wait for receiver finish
@@ -68,6 +72,7 @@ def main():
     status |= receiver_status
 
     if status != 0:
+        print("Test failed, exiting with {0}".format(status))
         exit(status)
 
     diff = abs(sender_end_time - receiver_end_time) * 1000
@@ -78,6 +83,12 @@ def main():
         exit(1)
     print(("Test passed - Sender and Receiver"
            " end time diff {0} ms").format(diff))
+
+def main():
+    print("Testing without download resumption")
+    test(False)
+    print("Testing with download resumption")
+    test(True)
 
 if __name__ == "__main__":
     main()
