@@ -9,7 +9,7 @@
 #pragma once
 
 #include <wdt/WdtConfig.h>
-
+#include <glog/logging.h>
 #include <string>
 
 namespace facebook {
@@ -51,7 +51,8 @@ namespace wdt {
                                 transfer log */                               \
   X(INVALID_LOG)             /** Transfer log invalid */                      \
   X(INVALID_CHECKPOINT)      /** Received checkpoint is invalid */            \
-  X(NO_PROGRESS)             /** Transfer has not progressed */
+  X(NO_PROGRESS)             /** Transfer has not progressed */               \
+  X(TRANSFER_LOG_ACQUIRE_ERROR) /** Failed to acquire lock for transfer log */
 
 enum ErrorCode {
 #define X(A) A,
@@ -72,6 +73,11 @@ std::string const kErrorToStr[] = {
  * @return      string representation
  */
 std::string errorCodeToStr(ErrorCode code);
+
+/**
+ * returns more interesting of two errors
+ */
+ErrorCode getMoreInterestingError(ErrorCode err1, ErrorCode err2);
 
 /**
  * Thread safe version of strerror(), easier than strerror_r

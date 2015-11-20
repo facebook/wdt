@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "Sender.h"
-#include "Receiver.h"
-#include "Protocol.h"
-#include "WdtResourceController.h"
-#include "WdtFlags.h"
+#include <wdt/Sender.h>
+#include <wdt/Receiver.h>
+#include <wdt/Protocol.h>
+#include <wdt/WdtResourceController.h>
+#include <wdt/util/WdtFlags.h>
 #include <chrono>
 #include <future>
 #include <folly/String.h>
@@ -20,6 +20,8 @@
 #include <fstream>
 #include <signal.h>
 #include <thread>
+
+// Used in fbonly to add socket creator setup
 #ifndef ADDITIONAL_SENDER_SETUP
 #define ADDITIONAL_SENDER_SETUP
 #endif
@@ -107,8 +109,11 @@ void setUpAbort(WdtBase &senderOrReceiver) {
 }
 
 void cancelAbort() {
-  std::unique_lock<std::mutex> lk(abortMutex);
-  abortCondVar.notify_one();
+  {
+    std::unique_lock<std::mutex> lk(abortMutex);
+    abortCondVar.notify_one();
+  }
+  std::this_thread::yield();
 }
 
 void readManifest(std::istream &fin, WdtTransferRequest &req) {
@@ -220,9 +225,11 @@ int main(int argc, char *argv[]) {
       receiver.setRecoveryId(FLAGS_recovery_id);
     }
     if (!FLAGS_run_as_daemon) {
-      receiver.transferAsync();
-      std::unique_ptr<TransferReport> report = receiver.finish();
-      retCode = report->getSummary().getErrorCode();
+      retCode = receiver.transferAsync();
+      if (retCode == OK) {
+        std::unique_ptr<TransferReport> report = receiver.finish();
+        retCode = report->getSummary().getErrorCode();
+      }
     } else {
       retCode = receiver.runForever();
       // not reached
@@ -251,5 +258,7 @@ int main(int argc, char *argv[]) {
     retCode = report->getSummary().getErrorCode();
   }
   cancelAbort();
+  LOG(INFO) << "Returning with code " << retCode << " "
+            << errorCodeToStr(retCode);
   return retCode;
 }

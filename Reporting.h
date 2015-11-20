@@ -8,9 +8,10 @@
  */
 #pragma once
 
-#include "ErrorCodes.h"
-#include "WdtOptions.h"
+#include <wdt/ErrorCodes.h>
+#include <wdt/WdtOptions.h>
 
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <chrono>
@@ -52,7 +53,7 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
   return os;
 }
-
+// TODO rename to ThreadResult
 /// class representing statistics related to file transfer
 class TransferStats {
  private:
@@ -75,8 +76,14 @@ class TransferStats {
   /// number of failed transfers
   int64_t failedAttempts_ = 0;
 
+  /// Total number of blocks sent by sender
+  int64_t numBlocksSend_{-1};
+
+  /// Total number of bytes sent by sender
+  int64_t totalSenderBytes_{-1};
+
   /// status of the transfer
-  ErrorCode errCode_ = OK;
+  ErrorCode localErrCode_ = OK;
 
   /// status of the remote
   ErrorCode remoteErrCode_ = OK;
@@ -111,7 +118,19 @@ class TransferStats {
     effectiveHeaderBytes_ = effectiveDataBytes_ = 0;
     numFiles_ = numBlocks_ = 0;
     failedAttempts_ = 0;
-    errCode_ = remoteErrCode_ = OK;
+    localErrCode_ = remoteErrCode_ = OK;
+  }
+
+  /// @return the number of blocks sent by sender
+  int64_t getNumBlocksSend() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return numBlocksSend_;
+  }
+
+  /// @return the total sender bytes
+  int64_t getTotalSenderBytes() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return totalSenderBytes_;
   }
 
   /// @return number of header bytes transferred
@@ -188,18 +207,15 @@ class TransferStats {
   }
 
   /// @return error code based on combinator of local and remote error
-  ErrorCode getCombinedErrorCode() const {
-    folly::RWSpinLock::ReadHolder lock(mutex_.get());
-    if (errCode_ != OK || remoteErrCode_ != OK) {
-      return ERROR;
-    }
-    return OK;
-  }
-
-  /// @return status of the transfer
   ErrorCode getErrorCode() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
-    return errCode_;
+    return getMoreInterestingError(localErrCode_, remoteErrCode_);
+  }
+
+  /// @return status of the transfer on this side
+  ErrorCode getLocalErrorCode() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return localErrCode_;
   }
 
   /// @return status of the transfer on the remote end
@@ -225,6 +241,18 @@ class TransferStats {
     headerBytes_ += count;
   }
 
+  /// @param set num blocks send
+  void setNumBlocksSend(int64_t numBlocksSend) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    numBlocksSend_ = numBlocksSend;
+  }
+
+  /// @param set total sender bytes
+  void setTotalSenderBytes(int64_t totalSenderBytes) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    totalSenderBytes_ = totalSenderBytes;
+  }
+
   /// one more file transfer failed
   void incrFailedAttempts() {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
@@ -232,9 +260,9 @@ class TransferStats {
   }
 
   /// @param status of the transfer
-  void setErrorCode(ErrorCode errCode) {
+  void setLocalErrorCode(ErrorCode errCode) {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
-    errCode_ = errCode;
+    localErrCode_ = errCode;
   }
 
   /// @param status of the transfer on the remote end
@@ -296,7 +324,7 @@ class TransferReport {
  public:
   /**
    * This constructor moves all the stat objects to member variables. This is
-   * only called at the end of transfer.
+   * only called at the end of transfer by the sender
    */
   TransferReport(std::vector<TransferStats> &transferredSourceStats,
                  std::vector<TransferStats> &failedSourceStats,
@@ -311,8 +339,10 @@ class TransferReport {
   TransferReport(const std::vector<TransferStats> &threadStats,
                  double totalTime, int64_t totalFileSize);
 
-  /// constructor used by receiver, does move the thread stats
-  explicit TransferReport(std::vector<TransferStats> &threadStats);
+  TransferReport(TransferStats &&stats, double totalTime,
+                 int64_t totalFileSize);
+  /// constructor used by receiver, does move the stats
+  explicit TransferReport(TransferStats &&globalStats);
   /// @return   summary of the report
   const TransferStats &getSummary() const {
     return summary_;
@@ -355,14 +385,15 @@ class TransferReport {
   void setCurrentThroughput(double currentThroughput) {
     currentThroughput_ = currentThroughput;
   }
-  void setErrorCode(ErrorCode errCode) {
-    summary_.setErrorCode(errCode);
-  }
   void setTotalTime(double totalTime) {
     totalTime_ = totalTime;
   }
   void setTotalFileSize(int64_t totalFileSize) {
     totalFileSize_ = totalFileSize;
+  }
+  void setErrorCode(const ErrorCode errCode) {
+    summary_.setLocalErrorCode(errCode);
+    summary_.setRemoteErrorCode(errCode);
   }
   friend std::ostream &operator<<(std::ostream &os,
                                   const TransferReport &report);
@@ -477,6 +508,7 @@ class PerfStatReport {
                           // sender. A high sum for this suggests threads
                           // were not properly load balanced
     DIRECTORY_CREATE,
+    IOCTL,
     END
   };
 

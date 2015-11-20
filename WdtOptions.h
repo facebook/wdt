@@ -22,8 +22,8 @@ namespace wdt {
 class WdtOptions {
  public:
   // WDT option types
-  static const std::string FLASH_OPTION_TYPE;
-  static const std::string DISK_OPTION_TYPE;
+  static const char* FLASH_OPTION_TYPE;
+  static const char* DISK_OPTION_TYPE;
 
   /**
    * A static method that can be called to create
@@ -305,6 +305,12 @@ class WdtOptions {
    * If true, wdt can overwrite existing files
    */
   bool overwrite{false};
+
+  /**
+   * Extra time buffer to account for network when sender waits for receiver to
+   * finish processing buffered data
+   */
+  int drain_extra_ms{500};
 
   /**
    * @return    whether files should be pre-allocated or not

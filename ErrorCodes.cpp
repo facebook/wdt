@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "ErrorCodes.h"
+#include <wdt/ErrorCodes.h>
 #include <folly/Conv.h>
 #include <string.h>
 
@@ -18,6 +18,10 @@ std::string errorCodeToStr(ErrorCode code) {
     return kErrorToStr[code];
   }
   return folly::to<std::string>(code);
+}
+
+ErrorCode getMoreInterestingError(ErrorCode err1, ErrorCode err2) {
+  return std::max(err1, err2);
 }
 
 std::string strerrorStr(int errnum) {

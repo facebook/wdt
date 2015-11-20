@@ -6,13 +6,15 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "WdtResourceController.h"
+#include <wdt/WdtResourceController.h>
 
 using namespace std;
 const int64_t kDelTimeToSleepMillis = 100;
 
 namespace facebook {
 namespace wdt {
+
+const std::string WdtResourceController::kGlobalNamespace("Global");
 
 void WdtControllerBase::updateMaxReceiversLimit(int64_t maxNumReceivers) {
   GuardLock lock(controllerMutex_);
@@ -172,7 +174,7 @@ vector<string> WdtNamespaceController::releaseStaleSenders() {
     for (auto it = sendersMap_.begin(); it != sendersMap_.end();) {
       auto sender = it->second;
       string identifier = it->first;
-      if (sender->isTransferFinished()) {
+      if (sender->isStale()) {
         it = sendersMap_.erase(it);
         erasedIds.push_back(identifier);
         senders.push_back(std::move(sender));
@@ -209,7 +211,7 @@ vector<string> WdtNamespaceController::releaseStaleReceivers() {
     for (auto it = receiversMap_.begin(); it != receiversMap_.end();) {
       auto receiver = it->second;
       string identifier = it->first;
-      if (!receiver->hasPendingTransfer()) {
+      if (receiver->isStale()) {
         it = receiversMap_.erase(it);
         erasedIds.push_back(identifier);
         receivers.push_back(std::move(receiver));
@@ -219,7 +221,7 @@ vector<string> WdtNamespaceController::releaseStaleReceivers() {
       it++;
     }
   }
-  LOG(INFO) << "Cleared " << receivers.size() << "stale senders";
+  LOG(INFO) << "Cleared " << receivers.size() << "stale receivers";
   return erasedIds;
 }
 
@@ -308,8 +310,13 @@ ErrorCode WdtResourceController::createSender(
     GuardLock lock(controllerMutex_);
     controller = getNamespaceController(wdtNamespace);
     if (!controller) {
-      LOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
-      return NOT_FOUND;
+      if (strictRegistration_) {
+        LOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
+        return NOT_FOUND;
+      } else {
+        LOG(INFO) << "First time " << wdtNamespace << " is seen, creating.";
+        controller = createNamespaceController(wdtNamespace);
+      }
     }
     if (numSenders_ >= maxNumSenders_ && maxNumSenders_ > 0) {
       LOG(ERROR) << "Exceeded quota on max senders. "
@@ -339,8 +346,13 @@ ErrorCode WdtResourceController::createReceiver(
     GuardLock lock(controllerMutex_);
     controller = getNamespaceController(wdtNamespace);
     if (!controller) {
-      LOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
-      return NOT_FOUND;
+      if (strictRegistration_) {
+        LOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
+        return NOT_FOUND;
+      } else {
+        LOG(INFO) << "First time " << wdtNamespace << " is seen, creating.";
+        controller = createNamespaceController(wdtNamespace);
+      }
     }
     if (numReceivers_ >= maxNumReceivers_ && maxNumReceivers_ > 0) {
       LOG(ERROR) << "Exceeded quota on max receivers. "
@@ -514,6 +526,14 @@ ErrorCode WdtResourceController::releaseStaleReceivers(
   return OK;
 }
 
+WdtResourceController::NamespaceControllerPtr
+WdtResourceController::createNamespaceController(
+    const std::string &wdtNamespace) {
+  auto namespaceController = make_shared<WdtNamespaceController>(wdtNamespace);
+  namespaceMap_[wdtNamespace] = namespaceController;
+  return namespaceController;
+}
+
 ErrorCode WdtResourceController::registerWdtNamespace(
     const std::string &wdtNamespace) {
   GuardLock lock(controllerMutex_);
@@ -521,8 +541,7 @@ ErrorCode WdtResourceController::registerWdtNamespace(
     LOG(INFO) << "Found existing controller for " << wdtNamespace;
     return OK;
   }
-  auto namespaceController = make_shared<WdtNamespaceController>(wdtNamespace);
-  namespaceMap_[wdtNamespace] = namespaceController;
+  createNamespaceController(wdtNamespace);
   return OK;
 }
 
@@ -574,6 +593,7 @@ void WdtResourceController::updateMaxSendersLimit(
   }
 }
 
+// TODO: consider putting strict/not strict handling logic here...
 shared_ptr<WdtNamespaceController>
 WdtResourceController::getNamespaceController(const string &wdtNamespace,
                                               bool isLock) const {
@@ -587,5 +607,10 @@ WdtResourceController::getNamespaceController(const string &wdtNamespace,
   }
   return nullptr;
 }
+
+void WdtResourceController::requireRegistration(bool strict) {
+  strictRegistration_ = strict;
 }
+
+}  // end namespace
 }

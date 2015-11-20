@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "Protocol.h"
+#include <wdt/Protocol.h>
 
-#include "ErrorCodes.h"
-#include "WdtOptions.h"
-#include "SerializationUtil.h"
+#include <wdt/ErrorCodes.h>
+#include <wdt/WdtOptions.h>
+#include <wdt/util/SerializationUtil.h>
 
 #include <folly/String.h>  // exceptionStr
 #include <algorithm>
@@ -49,7 +49,8 @@ int Protocol::negotiateProtocol(int requestedProtocolVersion,
 }
 
 std::ostream &operator<<(std::ostream &os, const Checkpoint &checkpoint) {
-  os << "num-blocks: " << checkpoint.numBlocks
+  os << "checkpoint-port: " << checkpoint.port
+     << "num-blocks: " << checkpoint.numBlocks
      << " seq-id: " << checkpoint.lastBlockSeqId
      << " block-offset: " << checkpoint.lastBlockOffset
      << " received-bytes: " << checkpoint.lastBlockReceivedBytes;

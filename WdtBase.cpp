@@ -6,15 +6,18 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "WdtBase.h"
+#include <wdt/WdtBase.h>
 #include <folly/Conv.h>
 #include <folly/Range.h>
 #include <ctime>
 #include <random>
+
 using namespace std;
 using folly::StringPiece;
+
 namespace facebook {
 namespace wdt {
+
 WdtUri::WdtUri(const string& url) {
   errorCode_ = process(url);
 }
@@ -351,6 +354,7 @@ WdtBase::WdtBase() : abortCheckerCallback_(this) {
 
 WdtBase::~WdtBase() {
   abortChecker_ = nullptr;
+  delete threadsController_;
 }
 
 std::vector<int32_t> WdtBase::genPortsVector(int32_t startPort,
@@ -407,6 +411,10 @@ void WdtBase::setThrottler(std::shared_ptr<Throttler> throttler) {
   throttler_ = throttler;
 }
 
+std::shared_ptr<Throttler> WdtBase::getThrottler() const {
+  return throttler_;
+}
+
 void WdtBase::setTransferId(const std::string& transferId) {
   transferId_ = transferId;
   LOG(INFO) << "Setting transfer id " << transferId_;
@@ -423,8 +431,30 @@ void WdtBase::setProtocolVersion(int64_t protocol) {
   LOG(INFO) << "using wdt protocol version " << protocolVersion_;
 }
 
+int WdtBase::getProtocolVersion() const {
+  return protocolVersion_;
+}
+
 std::string WdtBase::getTransferId() {
   return transferId_;
+}
+
+WdtBase::TransferStatus WdtBase::getTransferStatus() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return transferStatus_;
+}
+
+void WdtBase::setTransferStatus(TransferStatus transferStatus) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  transferStatus_ = transferStatus;
+  if (transferStatus_ == THREADS_JOINED) {
+    conditionFinished_.notify_one();
+  }
+}
+
+bool WdtBase::isStale() {
+  TransferStatus status = getTransferStatus();
+  return (status == FINISHED || status == THREADS_JOINED);
 }
 
 void WdtBase::configureThrottler() {

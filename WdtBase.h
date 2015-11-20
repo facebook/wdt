@@ -8,18 +8,21 @@
  */
 #pragma once
 
-#include "ErrorCodes.h"
-#include "AbortChecker.h"
-#include "DirectorySourceQueue.h"
-#include "WdtOptions.h"
-#include "Reporting.h"
-#include "Throttler.h"
-#include "Protocol.h"
+#include <wdt/ErrorCodes.h>
+#include <wdt/AbortChecker.h>
+#include <wdt/WdtOptions.h>
+#include <wdt/Reporting.h>
+#include <wdt/Throttler.h>
+#include <wdt/Protocol.h>
+#include <wdt/WdtThread.h>
+#include <wdt/util/DirectorySourceQueue.h>
+#include <wdt/util/ThreadsController.h>
 #include <memory>
 #include <string>
 #include <vector>
 #include <folly/RWSpinLock.h>
 #include <unordered_map>
+
 namespace facebook {
 namespace wdt {
 
@@ -227,6 +230,9 @@ class WdtBase {
   /// Sets the protocol version for the transfer
   void setProtocolVersion(int64_t protocolVersion);
 
+  ///  Get the protocol version of the transfer
+  int getProtocolVersion() const;
+
   /// Get the transfer id of the object
   std::string getTransferId();
 
@@ -243,19 +249,12 @@ class WdtBase {
   /// Utility to generate a random transfer id
   static std::string generateTransferId();
 
- protected:
-  /// Global throttler across all threads
-  std::shared_ptr<Throttler> throttler_;
+  /// Get the throttler
+  std::shared_ptr<Throttler> getThrottler() const;
 
-  /// Holds the instance of the progress reporter default or customized
-  std::unique_ptr<ProgressReporter> progressReporter_;
-
-  /// Unique id for the transfer
-  std::string transferId_;
-
-  /// protocol version to use, this is determined by negotiating protocol
-  /// version with the other side
-  int protocolVersion_{Protocol::protocol_version};
+  /// @param      whether the object is stale. If all the transferring threads
+  ///             have finished, the object will marked as stale
+  bool isStale();
 
   /// abort checker class passed to socket functions
   class AbortChecker : public IAbortChecker {
@@ -271,8 +270,55 @@ class WdtBase {
     WdtBase* wdtBase_;
   };
 
+ protected:
+  enum TransferStatus {
+    NOT_STARTED,     // threads not started
+    ONGOING,         // transfer is ongoing
+    FINISHED,        // last running thread finished
+    THREADS_JOINED,  // threads joined
+  };
+
+  /// @return current transfer status
+  TransferStatus getTransferStatus();
+
+  /// @param transferStatus   current transfer status
+  void setTransferStatus(TransferStatus transferStatus);
+
+  /// Ports that the sender/receiver is running on
+  std::vector<int32_t> ports_;
+
+  /// Global throttler across all threads
+  std::shared_ptr<Throttler> throttler_;
+
+  /// Holds the instance of the progress reporter default or customized
+  std::unique_ptr<ProgressReporter> progressReporter_;
+
+  /// Unique id for the transfer
+  std::string transferId_;
+
+  /// protocol version to use, this is determined by negotiating protocol
+  /// version with the other side
+  int protocolVersion_{Protocol::protocol_version};
+
   /// abort checker passed to socket functions
   AbortChecker abortCheckerCallback_;
+
+  /// current transfer status
+  TransferStatus transferStatus_{NOT_STARTED};
+
+  /// Mutex which is shared between the parent thread, transferring threads and
+  /// progress reporter thread
+  std::mutex mutex_;
+
+  /// Mutex for the management of this instance, specifically to keep the
+  /// instance sane for multi threaded public API calls
+  std::mutex instanceManagementMutex_;
+
+  /// This condition is notified when the transfer is finished
+  std::condition_variable conditionFinished_;
+
+  /// Controller for wdt threads shared between base and threads
+  ThreadsController* threadsController_{nullptr};
 
  private:
   folly::RWSpinLock abortCodeLock_;
