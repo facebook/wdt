@@ -7,12 +7,12 @@ date
 uname -a
 echo $HOSTNAME
 mkdir $HOME/bin || true
-CMAKE_BASE=cmake-3.3.0-Darwin-x86_64
+CMAKE_BASE=cmake-3.3.2-Darwin-x86_64
 cd ..
 CMAKE_BIN_DIR=`pwd`/$CMAKE_BASE/CMake.app/Contents/bin
 export PATH=$CMAKE_BIN_DIR:$HOME/bin:$PATH
 export LD_LIBRARY_PATH=$HOME/lib:$LD_LIBRARY_PATH
-wget http://www.cmake.org/files/v3.3/$CMAKE_BASE.tar.gz
+wget https://www.cmake.org/files/v3.3/$CMAKE_BASE.tar.gz
 tar xfz $CMAKE_BASE.tar.gz
 which cmake
 cmake --version
@@ -25,6 +25,7 @@ svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 git clone https://github.com/facebook/folly.git 
 pwd ; ls -l  
 cd wdt
-
+# to avoid svn clone errors of gmock later:
+( echo p | svn list https://googlemock.googlecode.com ) || true
 #set +e
 set +x
