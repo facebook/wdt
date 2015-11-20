@@ -74,6 +74,11 @@ DEFINE_bool(exit_on_bad_flags, true,
             "If true, wdt exits on bad/unknown flag. Otherwise, an unknown "
             "flags are ignored");
 
+DEFINE_int32(test_only_encryption_type, 0,
+             "Test only encryption type, to test url encoding/decoding");
+DEFINE_string(test_only_encryption_secret, "",
+              "Test only encryption secret, to test url encoding/decoding");
+
 using namespace facebook::wdt;
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
@@ -190,14 +195,18 @@ int main(int argc, char *argv[]) {
         options.start_port, options.num_ports, FLAGS_directory);
     reqPtr->hostName = FLAGS_destination;
     reqPtr->transferId = FLAGS_transfer_id;
+    reqPtr->encryptionData = EncryptionParams(
+        static_cast<EncryptionType>(FLAGS_test_only_encryption_type),
+        FLAGS_test_only_encryption_secret);
   } else {
-    LOG(INFO) << "Input url: " << FLAGS_connection_url;
     reqPtr = folly::make_unique<WdtTransferRequest>(FLAGS_connection_url);
     if (reqPtr->errorCode != OK) {
-      LOG(ERROR) << "Invalid url " << errorCodeToStr(reqPtr->errorCode);
+      LOG(ERROR) << "Invalid url \"" << FLAGS_connection_url
+                 << "\" : " << errorCodeToStr(reqPtr->errorCode);
       return ERROR;
     }
     reqPtr->directory = FLAGS_directory;
+    LOG(INFO) << "Parsed url as " << reqPtr->generateUrl(true);
   }
   WdtTransferRequest &req = *reqPtr;
   if (FLAGS_protocol_version > 0) {
@@ -216,8 +225,13 @@ int main(int argc, char *argv[]) {
       LOG(ERROR) << "Error setting up receiver";
       return ERROR;
     }
-    LOG(INFO) << "Starting receiver with connection url ";
-    std::cout << augmentedReq.generateUrl() << std::endl;
+    // In the log:
+    LOG(INFO) << "Starting receiver with connection url "
+              << augmentedReq.generateUrl();  // The url without secret
+    // on stdout: the one with secret:
+    std::cout << augmentedReq.generateUrl(/* no directory in url */ false,
+                                          /* do produce the real secret*/ false)
+              << std::endl;
     std::cout.flush();
     setUpAbort(receiver);
     if (!FLAGS_recovery_id.empty()) {
@@ -248,6 +262,9 @@ int main(int argc, char *argv[]) {
       }
       LOG(INFO) << "Using files lists, number of files " << req.fileInfo.size();
     }
+    LOG(INFO) << "Making Sender with encryption set = "
+              << req.encryptionData.isSet();
+
     Sender sender(req);
     WdtTransferRequest processedRequest = sender.init();
     LOG(INFO) << "Starting sender with details "

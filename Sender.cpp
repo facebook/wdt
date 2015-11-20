@@ -28,7 +28,7 @@ namespace wdt {
 void Sender::endCurTransfer() {
   endTime_ = Clock::now();
   LOG(INFO) << "Last thread finished " << durationSeconds(endTime_ - startTime_)
-            << " for transfer id " << transferId_;
+            << " for transfer id " << getTransferId();
   setTransferStatus(FINISHED);
   if (throttler_) {
     throttler_->deRegisterTransfer();
@@ -39,7 +39,8 @@ void Sender::startNewTransfer() {
   if (throttler_) {
     throttler_->registerTransfer();
   }
-  LOG(INFO) << "Starting a new transfer " << transferId_ << " to " << destHost_;
+  LOG(INFO) << "Starting a new transfer " << getTransferId() << " to "
+            << destHost_;
 }
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir)
@@ -50,7 +51,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
   int port = options.start_port;
   int numSockets = options.num_ports;
   for (int i = 0; i < numSockets; i++) {
-    ports_.push_back(port + i);
+    transferRequest_.ports.push_back(port + i);
   }
   dirQueue_.reset(new DirectorySourceQueue(srcDir_, &queueAbortChecker_));
   VLOG(3) << "Configuring the  directory queue";
@@ -63,36 +64,42 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
   progressReporter_ = folly::make_unique<ProgressReporter>();
 }
 
+// TODO: argghhhh
 Sender::Sender(const WdtTransferRequest &transferRequest)
     : Sender(transferRequest.hostName, transferRequest.directory,
              transferRequest.ports, transferRequest.fileInfo) {
-  transferId_ = transferRequest.transferId;
-  if (transferId_.empty()) {
-    transferId_ = WdtBase::generateTransferId();
+  transferRequest_ = transferRequest;
+  if (getTransferId().empty()) {
+    LOG(WARNING) << "Sender without transferId... will likely fail to connect";
   }
+  // TODO: use transferRequest_
   setProtocolVersion(transferRequest.protocolVersion);
 }
+
+// TODO: cleanup constructors - stick to transferRequest_
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir,
                const std::vector<int32_t> &ports,
                const std::vector<FileInfo> &srcFileInfo)
     : Sender(destHost, srcDir) {
-  ports_ = ports;
+  // TODO let's not copy vectors around to ourselves
+  transferRequest_.ports = ports;
   dirQueue_->setFileInfo(srcFileInfo);
   transferHistoryController_ =
       folly::make_unique<TransferHistoryController>(*dirQueue_);
 }
 
 WdtTransferRequest Sender::init() {
-  WdtTransferRequest transferRequest(getPorts());
-  transferRequest.transferId = transferId_;
-  transferRequest.protocolVersion = protocolVersion_;
-  transferRequest.directory = srcDir_;
-  transferRequest.hostName = destHost_;
+  VLOG(1) << "Sender Init() with encryption set = "
+          << transferRequest_.encryptionData.isSet();
+  // TODO cleanup / most not necessary / duplicate state
+  transferRequest_.protocolVersion = protocolVersion_;
+  transferRequest_.directory = srcDir_;
+  transferRequest_.hostName = destHost_;
   // TODO Figure out what to do with file info
   // transferRequest.fileInfo = dirQueue_->getFileInfo();
-  transferRequest.errorCode = OK;
-  return transferRequest;
+  transferRequest_.errorCode = OK;
+  return transferRequest_;
 }
 
 Sender::~Sender() {
@@ -127,10 +134,6 @@ void Sender::setFollowSymlinks(const bool followSymlinks) {
 void Sender::setProgressReportIntervalMillis(
     const int progressReportIntervalMillis) {
   progressReportIntervalMillis_ = progressReportIntervalMillis;
-}
-
-const std::vector<int32_t> &Sender::getPorts() const {
-  return ports_;
 }
 
 const std::string &Sender::getSrcDir() const {
@@ -252,7 +255,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
   }
 
   std::vector<TransferStats> transferredSourceStats;
-  for (auto port : ports_) {
+  for (auto port : transferRequest_.ports) {
     auto &transferHistory =
         transferHistoryController_->getTransferHistory(port);
     if (allSourcesAcked) {
@@ -318,7 +321,7 @@ ErrorCode Sender::start() {
   WDT_CHECK(!(twoPhases && options.enable_download_resumption))
       << "Two phase is not supported with download resumption";
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
-            << ports_ << "]";
+            << transferRequest_.ports << "]";
   startTime_ = Clock::now();
   downloadResumptionEnabled_ = options.enable_download_resumption;
   bool progressReportEnabled =
@@ -329,12 +332,13 @@ ErrorCode Sender::start() {
   } else {
     configureThrottler();
   }
-  threadsController_ = new ThreadsController(ports_.size());
+  threadsController_ = new ThreadsController(transferRequest_.ports.size());
   threadsController_->setNumBarriers(SenderThread::NUM_BARRIERS);
   threadsController_->setNumFunnels(SenderThread::NUM_FUNNELS);
   threadsController_->setNumConditions(SenderThread::NUM_CONDITIONS);
+  // TODO: fix this ! use transferRequest! (and dup from Receiver)
   senderThreads_ = threadsController_->makeThreads<Sender, SenderThread>(
-      this, ports_.size(), ports_);
+      this, transferRequest_.ports.size(), transferRequest_.ports);
   dirThread_ = dirQueue_->buildQueueAsynchronously();
   if (twoPhases) {
     dirThread_.join();

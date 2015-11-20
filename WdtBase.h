@@ -16,6 +16,7 @@
 #include <wdt/Protocol.h>
 #include <wdt/WdtThread.h>
 #include <wdt/util/DirectorySourceQueue.h>
+#include <wdt/util/EncryptionUtils.h>
 #include <wdt/util/ThreadsController.h>
 #include <wdt/util/System.h>
 
@@ -57,7 +58,7 @@ class WdtUri {
   std::string getQueryParam(const std::string& key) const;
 
   /// Get all the query params
-  const std::unordered_map<std::string, std::string>& getQueryParams() const;
+  const std::map<std::string, std::string>& getQueryParams() const;
 
   /// Sets hostname to generate a url
   void setHostName(const std::string& hostName);
@@ -87,11 +88,12 @@ class WdtUri {
    */
   ErrorCode process(const std::string& url);
 
+  // TODO: use a vector instead, we don't really need to search...
   /**
    * Map of get parameters of the url. Key and value
    * of the map are the name and value of get parameter respectively
    */
-  std::unordered_map<std::string, std::string> queryParams_;
+  std::map<std::string, std::string> queryParams_;
 
   /// Prefix of the wdt url
   const std::string WDT_URL_PREFIX{"wdt://"};
@@ -118,6 +120,9 @@ struct WdtTransferRequest {
    */
   std::string transferId;
 
+  /// Encryption protocol:sessionKey / secret (not printed), empty = clear text
+  EncryptionParams encryptionData;
+
   /// Protocol version on sender and receiver
   int64_t protocolVersion{Protocol::protocol_version};
 
@@ -130,14 +135,15 @@ struct WdtTransferRequest {
   /// Directory to write the data to / read the data from
   std::string directory;
 
-  /// Only required for the sender
+  /// Only used for the sender and when not using directory discovery
   std::vector<FileInfo> fileInfo;
 
   /// Any error associated with this transfer request upon processing
   ErrorCode errorCode{OK};
 
-  /// Constructor with list of ports
-  explicit WdtTransferRequest(const std::vector<int32_t>& ports);
+  /// Empty constructor
+  WdtTransferRequest() {
+  }
 
   /**
    * Constructor with start port and num ports. Fills the vector with
@@ -148,8 +154,12 @@ struct WdtTransferRequest {
   /// Constructor to construct the request object from a url string
   explicit WdtTransferRequest(const std::string& uriString);
 
-  /// Serialize this structure into a url string containing all fields
-  std::string generateUrl(bool genFull = false) const;
+  // TODO: split into generateUrlWithSecret()...
+  /**
+   * Serialize this structure into a url string containing all fields
+   * Will only put the real encoded secret if forLogging is set to false
+   */
+  std::string generateUrl(bool genFull = false, bool forLogging = true) const;
 
   /// Serialize the ports into uri
   void serializePorts(WdtUri& wdtUri) const;
@@ -173,6 +183,8 @@ struct WdtTransferRequest {
   const static std::string PORTS_PARAM;
   const static std::string START_PORT_PARAM;
   const static std::string NUM_PORTS_PARAM;
+  /// Encryption parameters (proto:key for now, certificate,... potentially)
+  const static std::string ENCRYPTION_PARAM;
 };
 
 /**
@@ -286,17 +298,14 @@ class WdtBase {
   /// @param transferStatus   current transfer status
   void setTransferStatus(TransferStatus transferStatus);
 
-  /// Ports that the sender/receiver is running on
-  std::vector<int32_t> ports_;
+  /// Input/output transfer request
+  WdtTransferRequest transferRequest_;
 
   /// Global throttler across all threads
   std::shared_ptr<Throttler> throttler_;
 
   /// Holds the instance of the progress reporter default or customized
   std::unique_ptr<ProgressReporter> progressReporter_;
-
-  /// Unique id for the transfer
-  std::string transferId_;
 
   /// protocol version to use, this is determined by negotiating protocol
   /// version with the other side

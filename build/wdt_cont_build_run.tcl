@@ -100,6 +100,7 @@ if {$os == "Darwin"} {
     set targetDir "/usr/local/var/www/wdt_builds/"
     set sudo ""
     set timeoutCmd "gtimeout"
+    set autoVersion 0
 } else {
     set type "unix"
     set timeoutCmd "timeout"
@@ -119,6 +120,7 @@ if {$os == "Darwin"} {
      sudo tc qdisc del dev lo root"
     set targetDir "~/public_html/wdt_builds/"
     set sudo "sudo"
+    set autoVersion 1
 }
 
 while {1} {
@@ -139,7 +141,7 @@ while {1} {
     if {[catch {exec $timeoutCmd $totalMaxDuration sh -c "set -o pipefail;\
      set -x; date; uname -a;\
      $sudo rm -rf /tmp/wdtTest_$userdir /dev/shm/wdtTest_$userdir wdtTest &&\
-     cd $CDIR/fbsource/fbcode && time hg pull -u &&\
+     cd $CDIR/fbsource/fbcode && time hg pull -r master -u &&\
      hg log -l 1 && hg log -v -l 1 folly && hg log -v -l 1 wdt &&\
      cd $CDIR/cmake_wdt_build && time make -j 4 && \
      CTEST_OUTPUT_ON_FAILURE=1 time $timeoutCmd $maxTestDuration make test &&\
@@ -151,7 +153,7 @@ while {1} {
         set good 1
     }
     puts $msg
-    set autoBump 1
+    set autoBump $autoVersion; # only on unix build will it possibly trigger
     set firstLine "err"
     if {[catch {exec hg log -l 1 -T "{desc}" wdt} prevDesc]} {
         puts "Error getting desc: $prevDesc"

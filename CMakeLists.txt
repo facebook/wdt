@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.22.1511120)
+project("WDT" LANGUAGES C CXX VERSION 1.22.1511190)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -73,6 +73,7 @@ set (FOLLY_CPP_SRC
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
 add_library(wdtlib_min
 util/ClientSocket.cpp
+util/EncryptionUtils.cpp
 util/DirectorySourceQueue.cpp
 ErrorCodes.cpp
 util/FileByteSource.cpp
@@ -272,6 +273,10 @@ if (BUILD_TESTING)
   add_executable(resource_controller_test  test/WdtResourceControllerTest.cpp)
   target_link_libraries(resource_controller_test wdt4tests)
   add_test(NAME ResourceControllerTests COMMAND resource_controller_test)
+
+  add_executable(wdt_url_test  test/WdtUrlTest.cpp)
+  target_link_libraries(wdt_url_test wdt4tests)
+  add_test(NAME WdtUrlTests COMMAND wdt_url_test)
 
   add_executable(file_reader_test  test/FileReaderTest.cpp)
   target_link_libraries(file_reader_test wdt4tests)
