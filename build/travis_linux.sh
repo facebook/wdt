@@ -17,7 +17,7 @@ else
   ln -s /usr/bin/gcc-4.9 $HOME/bin/gcc
 fi
 cd ..
-wget http://www.cmake.org/files/v3.3/cmake-3.3.0-Linux-x86_64.sh
+wget --no-check-certificate http://www.cmake.org/files/v3.3/cmake-3.3.0-Linux-x86_64.sh
 sh cmake-3.3.0-Linux-x86_64.sh --prefix=$HOME --skip-license
 git clone https://github.com/floitsch/double-conversion.git
 (cd double-conversion; cmake -DCMAKE_INSTALL_PREFIX=$HOME .; make -j 4 && make install)
