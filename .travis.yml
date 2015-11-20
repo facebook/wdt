@@ -1,4 +1,5 @@
-sudo: false
+sudo: true
+dist: trusty
 
 language: cpp
 
@@ -24,15 +25,16 @@ addons:
 script:
   # Debug
   - date ; uname -a ; pwd ; ls -l ..; echo $HOSTNAME
+  - ifconfig -a 
   # Build
   - mkdir ../build && cd ../build
   - echo $PATH; echo $LD_LIBRARY_PATH
   - which $CXX
-  - cmake ../wdt -DBUILD_TESTING=1
+  #- cmake ../wdt -DBUILD_TESTING=1
   #- make -j 4 VERBOSE=1
-  - make -j 4
+  #- make -j 4
   #- WDT_TEST_SYMLINKS=0 CTEST_OUTPUT_ON_FAILURE=1 make test
-  - CTEST_OUTPUT_ON_FAILURE=1 make test
+  #- CTEST_OUTPUT_ON_FAILURE=1 make test
   # to see the full output/debug:
   #- ../wdt_e2e_simple_test.sh
 
