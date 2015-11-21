@@ -261,6 +261,7 @@ if (BUILD_TESTING)
   )
   target_link_libraries(wdt4tests wdt4tests_min)
 
+  # TODO: make a macro/function to add tests in 1 line instead of 3
 
   add_executable(protocol_test test/ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
@@ -273,6 +274,10 @@ if (BUILD_TESTING)
   add_executable(wdt_url_test  test/WdtUrlTest.cpp)
   target_link_libraries(wdt_url_test wdt4tests)
   add_test(NAME WdtUrlTests COMMAND wdt_url_test)
+
+  add_executable(wdt_fd_test  test/FdTest.cpp)
+  target_link_libraries(wdt_fd_test wdt4tests)
+  add_test(NAME WdtFdTests COMMAND wdt_fd_test)
 
   add_executable(file_reader_test  test/FileReaderTest.cpp)
   target_link_libraries(file_reader_test wdt4tests)
