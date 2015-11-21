@@ -151,12 +151,9 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
         std::make_pair(chunkInfo.getFileName(), std::move(chunkInfo)));
   }
   clearSourceQueue();
-  std::vector<SourceMetaData *> discoveredFileData = std::move(sharedFileData_);
   // recreate the queue
-  for (const auto fileData : discoveredFileData) {
-    FileInfo fileInfo(fileData->relPath, fileData->size);
-    createIntoQueue(fileData->fullPath, fileInfo, true);
-    delete fileData;
+  for (const auto metadata : sharedFileData_) {
+    createIntoQueueInternal(metadata, true);
   }
 }
 
@@ -352,7 +349,7 @@ bool DirectorySourceQueue::explore() {
             continue;
           }
           FileInfo fileInfo(newRelativePath, fileStat.st_size);
-          createIntoQueue(newFullPath, fileInfo, false);
+          createIntoQueue(newFullPath, fileInfo);
           continue;
         }
       }
@@ -412,8 +409,7 @@ void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
 }
 
 void DirectorySourceQueue::createIntoQueue(const string &fullPath,
-                                           FileInfo &fileInfo,
-                                           bool alreadyLocked) {
+                                           FileInfo &fileInfo) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
   // large file. This can be optimized as follows -
@@ -424,8 +420,33 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   // block and use a shorter header for subsequent blocks. Also, we can remove
   // block size once negotiated, since blocksize is sort of fixed.
   fileInfo.verifyAndFixFlags();
-  auto &fileSize = fileInfo.fileSize;
-  auto &relPath = fileInfo.fileName;
+  SourceMetaData *metadata = new SourceMetaData();
+  metadata->fullPath = fullPath;
+  metadata->relPath = fileInfo.fileName;
+  metadata->fd = fileInfo.fd;
+  metadata->directReads = fileInfo.directReads;
+  metadata->size = fileInfo.fileSize;
+  if (options_.open_files_during_discovery && metadata->fd < 0) {
+    metadata->fd = FileUtil::openForRead(fullPath, metadata->directReads);
+    metadata->needToClose = (metadata->fd >= 0);
+  }
+  sharedFileData_.emplace_back(metadata);
+  createIntoQueueInternal(metadata, false);
+}
+
+void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata,
+                                                   bool alreadyLocked) {
+  // TODO: currently we are treating small files(size less than blocksize) as
+  // blocks. Also, we transfer file name in the header for all the blocks for a
+  // large file. This can be optimized as follows -
+  // a) if filesize < blocksize, we do not send blocksize and offset in the
+  // header. This should be useful for tiny files(0-few hundred bytes). We will
+  // have to use separate header format and commands for files and blocks.
+  // b) if filesize > blocksize, we can use send filename only in the first
+  // block and use a shorter header for subsequent blocks. Also, we can remove
+  // block size once negotiated, since blocksize is sort of fixed.
+  auto &fileSize = metadata->size;
+  auto &relPath = metadata->relPath;
   int64_t blockSizeBytes = blockSizeMbytes_ * 1024 * 1024;
   bool enableBlockTransfer = blockSizeBytes > 0;
   if (!enableBlockTransfer) {
@@ -469,21 +490,10 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
                            ? EXISTS_TOO_SMALL
                            : EXISTS_CORRECT_SIZE;
   }
-
-  SourceMetaData *metadata = new SourceMetaData();
-  metadata->fullPath = fullPath;
-  metadata->relPath = relPath;
-  metadata->fd = fileInfo.fd;
-  metadata->directReads = fileInfo.directReads;
-  if (options_.open_files_during_discovery && metadata->fd < 0) {
-    metadata->fd = FileUtil::openForRead(fullPath, metadata->directReads);
-    metadata->needToClose = (metadata->fd >= 0);
-  }
   metadata->seqId = seqId;
-  metadata->size = fileSize;
-  metadata->allocationStatus = allocationStatus;
   metadata->prevSeqId = prevSeqId;
-  sharedFileData_.emplace_back(metadata);
+  metadata->allocationStatus = allocationStatus;
+
   for (const auto &chunk : remainingChunks) {
     int64_t offset = chunk.start_;
     int64_t remainingBytes = chunk.size();
@@ -534,7 +544,7 @@ bool DirectorySourceQueue::enqueueFiles() {
       }
       info.fileSize = fileStat.st_size;
     }
-    createIntoQueue(fullPath, info, false);
+    createIntoQueue(fullPath, info);
   }
   return true;
 }

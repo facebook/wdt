@@ -35,7 +35,7 @@ namespace wdt {
  */
 struct FileInfo {
   /**
-   * Name of the file to be read, generally as relative oath
+   * Name of the file to be read, generally as relative path
    */
   std::string fileName;
   /// Size of the file to be read, default is -1
@@ -253,16 +253,23 @@ class DirectorySourceQueue : public SourceQueue {
   bool enqueueFiles();
 
   /**
-   * initial creation from either explore or enqueue files - always increment
-   * numentries inside the lock, doesn't check for fail retries
+   * initial creation from either explore or enqueue files, uses
+   * createIntoQueueInternal to create blocks
    *
    * @param fullPath             full path of the file to be added
    * @param fileInfo             Information about file
+   */
+  void createIntoQueue(const std::string &fullPath, FileInfo &fileInfo);
+
+  /**
+   * initial creation from either explore or enqueue files - always increment
+   * numentries inside the lock, doesn't check for fail retries
+   *
+   * @param metadata             file meta-data
    * @param alreadyLocked        whether lock has already been acquired by the
    *                             calling method
    */
-  void createIntoQueue(const std::string &fullPath, FileInfo &fileInfo,
-                       bool alreadyLocked);
+  void createIntoQueueInternal(SourceMetaData *metadata, bool alreadyLocked);
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple
