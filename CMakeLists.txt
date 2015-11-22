@@ -68,6 +68,7 @@ set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Checksum.cpp"
+"${FOLLY_SOURCE_DIR}/folly/detail/ThreadLocalDetail.cpp"
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
