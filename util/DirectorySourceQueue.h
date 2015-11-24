@@ -263,13 +263,11 @@ class DirectorySourceQueue : public SourceQueue {
 
   /**
    * initial creation from either explore or enqueue files - always increment
-   * numentries inside the lock, doesn't check for fail retries
+   * numentries. Lock must be held before calling this.
    *
    * @param metadata             file meta-data
-   * @param alreadyLocked        whether lock has already been acquired by the
-   *                             calling method
    */
-  void createIntoQueueInternal(SourceMetaData *metadata, bool alreadyLocked);
+  void createIntoQueueInternal(SourceMetaData *metadata);
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple

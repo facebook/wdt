@@ -153,7 +153,7 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
   clearSourceQueue();
   // recreate the queue
   for (const auto metadata : sharedFileData_) {
-    createIntoQueueInternal(metadata, true);
+    createIntoQueueInternal(metadata);
   }
 }
 
@@ -430,12 +430,12 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
     metadata->fd = FileUtil::openForRead(fullPath, metadata->directReads);
     metadata->needToClose = (metadata->fd >= 0);
   }
+  std::unique_lock<std::mutex> lock(mutex_);
   sharedFileData_.emplace_back(metadata);
-  createIntoQueueInternal(metadata, false);
+  createIntoQueueInternal(metadata);
 }
 
-void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata,
-                                                   bool alreadyLocked) {
+void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
   // large file. This can be optimized as follows -
@@ -456,10 +456,6 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata,
   // ensures that we create a single block
   auto blockSize = enableBlockTransfer ? blockSizeBytes : fileSize;
   int blockCount = 0;
-  std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
-  if (!alreadyLocked) {
-    lock.lock();
-  }
   std::vector<Interval> remainingChunks;
   int64_t seqId;
   FileAllocationStatus allocationStatus;
@@ -510,9 +506,6 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata,
   }
   numEntries_++;
   numBlocks_ += blockCount;
-  if (!alreadyLocked) {
-    lock.unlock();
-  }
   smartNotify(blockCount);
 }
 
