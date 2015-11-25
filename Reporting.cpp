@@ -51,6 +51,11 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
   localErrCode_ = getMoreInterestingError(localErrCode_, stats.localErrCode_);
   remoteErrCode_ =
       getMoreInterestingError(remoteErrCode_, stats.remoteErrCode_);
+  if (stats.localErrCode_ == OK && stats.remoteErrCode_ == OK) {
+    // encryption type valid only if error code is OK
+    // TODO: verify whether all successful threads have same encryption types
+    encryptionType_ = stats.encryptionType_;
+  }
   return *this;
 }
 
@@ -85,7 +90,9 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
      << ". Total bytes = " << (stats.dataBytes_ + stats.headerBytes_)
      << ". Wasted bytes due to failure = "
      << (stats.dataBytes_ - stats.effectiveDataBytes_) << " ("
-     << failureOverhead << "% overhead).";
+     << failureOverhead << "% overhead)"
+     << ". Encryption type = " << encryptionTypeToStr(stats.encryptionType_)
+     << ".";
   return os;
 }
 

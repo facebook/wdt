@@ -17,11 +17,11 @@ TransferStats WdtThread::moveStats() {
   return std::move(threadStats_);
 }
 
-const PerfStatReport& WdtThread::getPerfReport() const {
+const PerfStatReport &WdtThread::getPerfReport() const {
   return perfReport_;
 }
 
-const TransferStats& WdtThread::getTransferStats() const {
+const TransferStats &WdtThread::getTransferStats() const {
   return threadStats_;
 }
 

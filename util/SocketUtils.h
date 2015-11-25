@@ -35,17 +35,13 @@ class SocketUtils {
   static void setWriteTimeout(int fd);
   static int getUnackedBytes(int fd);
   /// @see ioWithAbortCheck
-  static int64_t readWithAbortCheckAndTimeout(int fd, char *buf, int64_t nbyte,
-                                              IAbortChecker const *abortChecker,
-                                              int timeoutMs, bool tryFull);
-  /// @see ioWithAbortCheck
   static int64_t readWithAbortCheck(int fd, char *buf, int64_t nbyte,
                                     IAbortChecker const *abortChecker,
-                                    bool tryFull);
+                                    int timeoutMs, bool tryFull);
   /// @see ioWithAbortCheck
   static int64_t writeWithAbortCheck(int fd, const char *buf, int64_t nbyte,
                                      IAbortChecker const *abortChecker,
-                                     bool tryFull);
+                                     int timeoutMs, bool tryFull);
 
  private:
   /**

@@ -280,7 +280,7 @@ class ReceiverThread : public WdtThread {
    * Server socket object that provides functionality such as listen()
    * accept, read, write on the socket
    */
-  ServerSocket socket_;
+  std::unique_ptr<ServerSocket> socket_{nullptr};
 
   /// Buffer that receives reads data into from the network
   char *buf_{nullptr};

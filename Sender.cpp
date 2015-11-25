@@ -99,6 +99,9 @@ WdtTransferRequest Sender::init() {
   // TODO Figure out what to do with file info
   // transferRequest.fileInfo = dirQueue_->getFileInfo();
   transferRequest_.errorCode = OK;
+
+  bool encrypt = transferRequest_.encryptionData.isSet();
+  LOG_IF(INFO, encrypt) << "Encryption is enabled for this transfer";
   return transferRequest_;
 }
 
@@ -397,56 +400,6 @@ void Sender::setSocketCreator(const SocketCreator socketCreator) {
   socketCreator_ = socketCreator;
 }
 
-std::unique_ptr<ClientSocket> Sender::connectToReceiver(
-    const int port, IAbortChecker const *abortChecker, ErrorCode &errCode) {
-  auto startTime = Clock::now();
-  const auto &options = WdtOptions::get();
-  int connectAttempts = 0;
-  std::unique_ptr<ClientSocket> socket;
-  if (!socketCreator_) {
-    // socket creator not set, creating ClientSocket
-    socket = folly::make_unique<ClientSocket>(destHost_, port, abortChecker);
-  } else {
-    socket = socketCreator_(destHost_, port, abortChecker);
-  }
-  double retryInterval = options.sleep_millis;
-  int maxRetries = options.max_retries;
-  if (maxRetries < 1) {
-    LOG(ERROR) << "Invalid max_retries " << maxRetries << " using 1 instead";
-    maxRetries = 1;
-  }
-  for (int i = 1; i <= maxRetries; ++i) {
-    ++connectAttempts;
-    errCode = socket->connect();
-    if (errCode == OK) {
-      break;
-    } else if (errCode == CONN_ERROR) {
-      return nullptr;
-    }
-    if (getCurAbortCode() != OK) {
-      errCode = ABORT;
-      return nullptr;
-    }
-    if (i != maxRetries) {
-      // sleep between attempts but not after the last
-      VLOG(1) << "Sleeping after failed attempt " << i;
-      usleep(retryInterval * 1000);
-    }
-  }
-  double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
-  if (errCode != OK) {
-    LOG(ERROR) << "Unable to connect to " << destHost_ << " " << port
-               << " despite " << connectAttempts << " retries in "
-               << elapsedSecsConn << " seconds.";
-    errCode = CONN_ERROR;
-    return nullptr;
-  }
-  ((connectAttempts > 1) ? LOG(WARNING) : LOG(INFO))
-      << "Connection took " << connectAttempts << " attempt(s) and "
-      << elapsedSecsConn << " seconds. port " << port;
-  return socket;
-}
-
 TransferStats Sender::sendOneByteSource(
     const std::unique_ptr<ClientSocket> &socket,
     const std::unique_ptr<ByteSource> &source, ErrorCode transferStatus) {
@@ -503,7 +456,6 @@ TransferStats Sender::sendOneByteSource(
         options.enable_checksum) {
       checksum = folly::crc32c((const uint8_t *)buffer, size, checksum);
     }
-    written = 0;
     if (throttler_) {
       /**
        * If throttling is enabled we call limit(deltaBytes) which
@@ -519,40 +471,24 @@ TransferStats Sender::sendOneByteSource(
       totalThrottlerBytes += throttlerInstanceBytes;
       throttlerInstanceBytes = 0;
     }
-    do {
-      int64_t w = socket->write(buffer + written, size - written);
-      if (w < 0) {
-        // TODO: retries, close connection etc...
-        PLOG(ERROR) << "Write error " << written << " (" << size << ")"
-                    << ". fd = " << socket->getFd()
-                    << ". file = " << metadata.relPath
-                    << ". port = " << socket->getPort();
-        stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
-        stats.incrFailedAttempts();
-        return stats;
-      }
-      stats.addDataBytes(w);
-      written += w;
-      if (w != size) {
-        VLOG(1) << "Short write " << w << " sub total now " << written << " on "
-                << socket->getFd() << " out of " << size;
-      } else {
-        VLOG(3) << "Wrote all of " << size << " on " << socket->getFd();
-      }
-      if (getCurAbortCode() != OK) {
-        LOG(ERROR) << "Transfer aborted during block transfer "
-                   << socket->getPort() << " " << source->getIdentifier();
-        stats.setLocalErrorCode(ABORT);
-        stats.incrFailedAttempts();
-        return stats;
-      }
-    } while (written < size);
-    if (written > size) {
-      LOG(ERROR) << "Write error " << written << " > " << size;
+    written = socket->write(buffer, size, /* retry writes */ true);
+    if (getCurAbortCode() != OK) {
+      LOG(ERROR) << "Transfer aborted during block transfer "
+                 << socket->getPort() << " " << source->getIdentifier();
+      stats.setLocalErrorCode(ABORT);
+      stats.incrFailedAttempts();
+      return stats;
+    }
+    if (written != size) {
+      LOG(ERROR) << "Write error " << written << " (" << size << ")"
+                 << ". fd = " << socket->getFd()
+                 << ". file = " << metadata.relPath
+                 << ". port = " << socket->getPort();
       stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
       stats.incrFailedAttempts();
       return stats;
     }
+    stats.addDataBytes(written);
     actualSize += written;
   }
   if (actualSize != expectedSize) {

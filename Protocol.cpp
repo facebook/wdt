@@ -31,6 +31,7 @@ const int Protocol::SETTINGS_FLAG_VERSION = 12;
 const int Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION = 13;
 const int Protocol::CHECKPOINT_OFFSET_VERSION = 16;
 const int Protocol::CHECKPOINT_SEQ_ID_VERSION = 21;
+const int Protocol::ENCRYPTION_V1_VERSION = 23;
 
 const std::string Protocol::getFullVersion() {
   std::string fullVersion(WDT_VERSION_STR);
@@ -471,6 +472,33 @@ bool Protocol::decodeSettings(int protocolVersion, char *src, int64_t &off,
       settings.sendFileChunks = flags & (1 << 1);
       settings.blockModeDisabled = flags & (1 << 2);
       br.pop_front();
+    }
+  } catch (const std::exception &ex) {
+    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    return false;
+  }
+  off = br.start() - (uint8_t *)src;
+  return !checkForOverflow(off, max);
+}
+
+/* static */
+void Protocol::encodeEncryptionSettings(char *dest, int64_t &off, int64_t max,
+                                        const EncryptionType encryptionType,
+                                        const std::string &iv) {
+  encodeInt(dest, off, encryptionType);
+  encodeString(dest, off, iv);
+  WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
+}
+
+/* static */
+bool Protocol::decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
+                                        EncryptionType &encryptionType,
+                                        std::string &iv) {
+  folly::ByteRange br((uint8_t *)(src + off), max);
+  try {
+    encryptionType = (EncryptionType)(decodeInt(br));
+    if (!decodeString(br, src, max, iv)) {
+      return false;
     }
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);

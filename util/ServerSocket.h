@@ -8,13 +8,11 @@
  */
 #pragma once
 
+#include <wdt/util/WdtSocket.h>
 #include <wdt/ErrorCodes.h>
-#include <wdt/AbortChecker.h>
 
 #include <string>
 #include <vector>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netdb.h>
 
 namespace facebook {
@@ -22,13 +20,10 @@ namespace wdt {
 
 typedef struct addrinfo *addrInfoList;
 
-class ServerSocket {
+class ServerSocket : public WdtSocket {
  public:
-  ServerSocket(ServerSocket &&that) noexcept;
-  ServerSocket(const ServerSocket &that) = delete;
-  ServerSocket(int32_t port, int backlog, IAbortChecker const *abortChecker);
-  ServerSocket &operator=(const ServerSocket &that) = delete;
-  ServerSocket &operator=(ServerSocket &&that);
+  ServerSocket(int port, int backlog, IAbortChecker const *abortChecker,
+               const EncryptionParams &encryptionParams);
   virtual ~ServerSocket();
   /// Sets up listening socket (first wildcard type (ipv4 or ipv6 depending
   /// on flag)).
@@ -38,33 +33,23 @@ class ServerSocket {
   /// @param tryCurAddressFirst   if this is true, current address is tried
   ///                             first during poll round-robin
   ErrorCode acceptNextConnection(int timeoutMillis, bool tryCurAddressFirst);
-  /// tries to read nbyte data and periodically checks for abort
-  int read(char *buf, int nbyte, bool tryFull = true);
-  /// tries to write nbyte data and periodically checks for abort
-  int write(const char *buf, int nbyte, bool tryFull = true);
   /// @return       peer ip
   std::string getPeerIp() const;
   /// @return       peer port
   std::string getPeerPort() const;
-  int getFd() const;
-  int closeCurrentConnection();
-  int32_t getPort() const;
   int getBackLog() const;
   /// Destroy the active connection and the listening fd
   /// if done by the same thread who owned the socket
   void closeAll();
 
  private:
-  int32_t port_;
   const int backlog_;
   std::vector<int> listeningFds_;
-  int fd_;
   /// index of the poll-fd last checked. This is used to not try the same fd
   /// every-time. We use round-robin policy to avoid accepting from a single fd
   int lastCheckedPollIndex_{0};
   std::string peerIp_;
   std::string peerPort_;
-  IAbortChecker const *abortChecker_;
 
   /**
    * Tries to listen to addr provided

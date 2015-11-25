@@ -17,7 +17,7 @@ def main():
                     "-avg_mbytes_per_sec=10").format(
                             root_dir, test_count)
     (receiver_process, url) = start_receiver(receiver_cmd, root_dir, test_count)
-    sender_cmd = ("_bin/wdt/wdt -directory {0}/src{1} -read_timeout_millis=300 "
+    sender_cmd = ("_bin/wdt/wdt -directory {0}/src{1} -read_timeout_millis=500 "
                   "-num_ports=1 -enable_perf_stat_collection "
                   "-connection_url=\'{2}\'").format(root_dir, test_count, url)
     status = run_sender(sender_cmd, root_dir, test_count)

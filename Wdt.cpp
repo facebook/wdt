@@ -89,8 +89,7 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
 }
 
 ErrorCode Wdt::wdtSetAbortSocketCreatorAndReporter(
-    const std::string &, Sender *sender,
-    const WdtTransferRequest &,
+    const std::string &, Sender *sender, const WdtTransferRequest &,
     std::shared_ptr<IAbortChecker> abortChecker) {
   if (abortChecker.get() != nullptr) {
     sender->setAbortChecker(abortChecker);

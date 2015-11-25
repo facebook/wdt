@@ -72,9 +72,6 @@ DEFINE_bool(print_options, false,
 DEFINE_bool(exit_on_bad_flags, true,
             "If true, wdt exits on bad/unknown flag. Otherwise, an unknown "
             "flags are ignored");
-
-DEFINE_int32(test_only_encryption_type, 0,
-             "Test only encryption type, to test url encoding/decoding");
 DEFINE_string(test_only_encryption_secret, "",
               "Test only encryption secret, to test url encoding/decoding");
 
@@ -203,9 +200,11 @@ int main(int argc, char *argv[]) {
         options.start_port, options.num_ports, FLAGS_directory);
     reqPtr->hostName = FLAGS_destination;
     reqPtr->transferId = FLAGS_transfer_id;
-    reqPtr->encryptionData = EncryptionParams(
-        static_cast<EncryptionType>(FLAGS_test_only_encryption_type),
-        FLAGS_test_only_encryption_secret);
+    if (!FLAGS_test_only_encryption_secret.empty()) {
+      reqPtr->encryptionData =
+          EncryptionParams(parseEncryptionType(options.encryption_type),
+                           FLAGS_test_only_encryption_secret);
+    }
   } else {
     reqPtr = folly::make_unique<WdtTransferRequest>(FLAGS_connection_url);
     if (reqPtr->errorCode != OK) {
@@ -214,7 +213,7 @@ int main(int argc, char *argv[]) {
       return ERROR;
     }
     reqPtr->directory = FLAGS_directory;
-    LOG(INFO) << "Parsed url as " << reqPtr->generateUrl(true);
+    LOG(INFO) << "Parsed url as " << reqPtr->getLogSafeString();
   }
   WdtTransferRequest &req = *reqPtr;
   if (FLAGS_protocol_version > 0) {
@@ -224,22 +223,20 @@ int main(int argc, char *argv[]) {
   if (FLAGS_destination.empty() && FLAGS_connection_url.empty()) {
     Receiver receiver(req);
     WdtTransferRequest augmentedReq = receiver.init();
-    if (FLAGS_treat_fewer_port_as_error &&
-        augmentedReq.errorCode == FEWER_PORTS) {
-      LOG(ERROR) << "Receiver could not bind to all the ports";
-      return FEWER_PORTS;
-    }
-    if (augmentedReq.errorCode == ERROR) {
+    if (augmentedReq.errorCode == FEWER_PORTS) {
+      if (FLAGS_treat_fewer_port_as_error) {
+        LOG(ERROR) << "Receiver could not bind to all the ports";
+        return FEWER_PORTS;
+      }
+    } else if (augmentedReq.errorCode != OK) {
       LOG(ERROR) << "Error setting up receiver";
-      return ERROR;
+      return augmentedReq.errorCode;
     }
     // In the log:
     LOG(INFO) << "Starting receiver with connection url "
-              << augmentedReq.generateUrl();  // The url without secret
+              << augmentedReq.getLogSafeString();  // The url without secret
     // on stdout: the one with secret:
-    std::cout << augmentedReq.generateUrl(/* no directory in url */ false,
-                                          /* do produce the real secret*/ false)
-              << std::endl;
+    std::cout << augmentedReq.genWdtUrlWithSecret() << std::endl;
     std::cout.flush();
     setAbortChecker(receiver);
     if (!FLAGS_recovery_id.empty()) {

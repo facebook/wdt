@@ -8,6 +8,7 @@
  */
 #pragma once
 #include <wdt/WdtConfig.h>
+#include <wdt/util/EncryptionUtils.h>
 #include <cstdint>
 #include <string>
 #include <unistd.h>
@@ -311,6 +312,11 @@ class WdtOptions {
    * finish processing buffered data
    */
   int drain_extra_ms{500};
+
+  /**
+   * Encryption type to use
+   */
+  std::string encryption_type{encryptionTypeToStr(ENC_AES128_CTR)};
 
   /**
    * @return    whether files should be pre-allocated or not

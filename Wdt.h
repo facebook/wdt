@@ -15,6 +15,7 @@
 #include <wdt/ErrorCodes.h>
 // For IAbortChecker and WdtTransferRequest - TODO: split out ?
 #include <wdt/WdtBase.h>
+#include <wdt/util/EncryptionUtils.h>
 #include <ostream>
 
 namespace facebook {
@@ -78,6 +79,8 @@ class Wdt {
   bool settingsApplied_{false};
   std::string appName_;
   WdtOptions &options_;
+  /// responsible for initializing openssl
+  WdtCryptoIntializer cryptoInitializer_;
   // Internal initialization so sub classes can share the code
   virtual ErrorCode initializeWdtInternal(const std::string &appName);
   // Optionally set socket creator and progress reporter (used for fb)

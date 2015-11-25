@@ -22,8 +22,9 @@ namespace wdt {
 using std::string;
 
 ClientSocket::ClientSocket(const string &dest, const int port,
-                           IAbortChecker const *abortChecker)
-    : dest_(dest), port_(port), fd_(-1), abortChecker_(abortChecker) {
+                           IAbortChecker const *abortChecker,
+                           const EncryptionParams &encryptionParams)
+    : WdtSocket(port, abortChecker, encryptionParams), dest_(dest) {
   memset(&sa_, 0, sizeof(sa_));
   const auto &options = WdtOptions::get();
   if (options.ipv6) {
@@ -73,14 +74,14 @@ ErrorCode ClientSocket::connect() {
     int retValue = fcntl(fd_, F_SETFL, sockArg);
     if (retValue == -1) {
       PLOG(ERROR) << "Could not make the socket non-blocking " << port_;
-      this->close();
+      closeConnection();
       continue;
     }
 
     if (::connect(fd_, info->ai_addr, info->ai_addrlen) != 0) {
       if (errno != EINPROGRESS) {
         PLOG(INFO) << "Error connecting on " << host << " " << port;
-        this->close();
+        closeConnection();
         continue;
       }
       auto startTime = Clock::now();
@@ -91,7 +92,7 @@ ErrorCode ClientSocket::connect() {
         if (abortChecker_->shouldAbort()) {
           LOG(ERROR) << "Transfer aborted during connect " << port_ << " "
                      << fd_;
-          this->close();
+          closeConnection();
           return ABORT;
         }
         // we need this loop because poll() can return before any file handles
@@ -102,7 +103,7 @@ ErrorCode ClientSocket::connect() {
         int timeElapsed = durationMillis(Clock::now() - startTime);
         if (timeElapsed >= connectTimeout) {
           VLOG(1) << "connect() timed out" << host << " " << port;
-          this->close();
+          closeConnection();
           return CONN_ERROR_RETRYABLE;
         }
         int pollTimeout =
@@ -121,7 +122,7 @@ ErrorCode ClientSocket::connect() {
             continue;
           }
           PLOG(ERROR) << "poll() failed " << host << " " << port << " " << fd_;
-          this->close();
+          closeConnection();
           return CONN_ERROR;
         }
         break;
@@ -132,13 +133,13 @@ ErrorCode ClientSocket::connect() {
       socklen_t len = sizeof(connectResult);
       if (getsockopt(fd_, SOL_SOCKET, SO_ERROR, &connectResult, &len) < 0) {
         PLOG(WARNING) << "getsockopt() failed";
-        this->close();
+        closeConnection();
         continue;
       }
       if (connectResult != 0) {
         LOG(WARNING) << "connect did not succeed on " << host << " " << port
                      << " : " << strerrorStr(connectResult);
-        this->close();
+        closeConnection();
         continue;
       }
     }
@@ -149,7 +150,7 @@ ErrorCode ClientSocket::connect() {
     retValue = fcntl(fd_, F_SETFL, sockArg);
     if (retValue == -1) {
       PLOG(ERROR) << "Could not make the socket blocking " << port_;
-      this->close();
+      closeConnection();
       continue;
     }
     VLOG(1) << "Successful connect on " << fd_;
@@ -173,43 +174,8 @@ int ClientSocket::getUnackedBytes() const {
   return SocketUtils::getUnackedBytes(fd_);
 }
 
-int ClientSocket::getFd() const {
-  VLOG(1) << "fd is " << fd_;
-  return fd_;
-}
-
-int ClientSocket::getPort() const {
-  return port_;
-}
-
 const std::string &ClientSocket::getPeerIp() const {
   return peerIp_;
-}
-
-int ClientSocket::read(char *buf, int nbyte, bool tryFull) {
-  return SocketUtils::readWithAbortCheck(fd_, buf, nbyte, abortChecker_,
-                                         tryFull);
-}
-
-int ClientSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
-                                  bool tryFull) {
-  return SocketUtils::readWithAbortCheckAndTimeout(
-      fd_, buf, nbyte, abortChecker_, timeoutMs, tryFull);
-}
-
-int ClientSocket::write(const char *buf, int nbyte, bool tryFull) {
-  return SocketUtils::writeWithAbortCheck(fd_, buf, nbyte, abortChecker_,
-                                          tryFull);
-}
-
-void ClientSocket::close() {
-  if (fd_ >= 0) {
-    VLOG(1) << "Closing socket : " << fd_;
-    if (::close(fd_) < 0) {
-      VLOG(1) << "Socket close failed for fd " << fd_;
-    }
-    fd_ = -1;
-  }
 }
 
 void ClientSocket::shutdown() {
@@ -219,7 +185,6 @@ void ClientSocket::shutdown() {
 }
 
 ClientSocket::~ClientSocket() {
-  this->close();
 }
 }
 }  // end namespace facebook::wdt

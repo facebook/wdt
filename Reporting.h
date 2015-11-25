@@ -10,6 +10,7 @@
 
 #include <wdt/ErrorCodes.h>
 #include <wdt/WdtOptions.h>
+#include <wdt/util/EncryptionUtils.h>
 
 #include <algorithm>
 #include <vector>
@@ -90,6 +91,9 @@ class TransferStats {
 
   /// id of the owner object
   std::string id_;
+
+  /// encryption type used
+  EncryptionType encryptionType_{ENC_NONE};
 
   /// mutex to support synchronized access
   std::unique_ptr<folly::RWSpinLock> mutex_{nullptr};
@@ -310,6 +314,16 @@ class TransferStats {
     folly::RWSpinLock::WriteHolder lock(mutex_.get());
     effectiveHeaderBytes_ -= headerBytes;
     effectiveDataBytes_ -= dataBytes;
+  }
+
+  void setEncryptionType(EncryptionType encryptionType) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    encryptionType_ = encryptionType;
+  }
+
+  EncryptionType getEncryptionType() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return encryptionType_;
   }
 
   TransferStats &operator+=(const TransferStats &stats);

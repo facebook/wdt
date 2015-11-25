@@ -107,16 +107,7 @@ int SocketUtils::getUnackedBytes(int fd) {
 /* static */
 int64_t SocketUtils::readWithAbortCheck(int fd, char *buf, int64_t nbyte,
                                         IAbortChecker const *abortChecker,
-                                        bool tryFull) {
-  const auto &options = WdtOptions::get();
-  return readWithAbortCheckAndTimeout(fd, buf, nbyte, abortChecker,
-                                      options.read_timeout_millis, tryFull);
-}
-
-/* static */
-int64_t SocketUtils::readWithAbortCheckAndTimeout(
-    int fd, char *buf, int64_t nbyte, IAbortChecker const *abortChecker,
-    int timeoutMs, bool tryFull) {
+                                        int timeoutMs, bool tryFull) {
   START_PERF_TIMER
   int64_t numRead =
       ioWithAbortCheck(read, fd, buf, nbyte, abortChecker, timeoutMs, tryFull);
@@ -127,11 +118,10 @@ int64_t SocketUtils::readWithAbortCheckAndTimeout(
 /* static */
 int64_t SocketUtils::writeWithAbortCheck(int fd, const char *buf, int64_t nbyte,
                                          IAbortChecker const *abortChecker,
-                                         bool tryFull) {
-  const auto &options = WdtOptions::get();
+                                         int timeoutMs, bool tryFull) {
   START_PERF_TIMER
-  int64_t written = ioWithAbortCheck(write, fd, buf, nbyte, abortChecker,
-                                     options.write_timeout_millis, tryFull);
+  int64_t written =
+      ioWithAbortCheck(write, fd, buf, nbyte, abortChecker, timeoutMs, tryFull);
   RECORD_PERF_RESULT(PerfStatReport::SOCKET_WRITE)
   return written;
 }

@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.22.1511240)
+project("WDT" LANGUAGES C CXX VERSION 1.23.1511251)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -73,6 +73,7 @@ set (FOLLY_CPP_SRC
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
 add_library(wdtlib_min
+util/WdtSocket.cpp
 util/ClientSocket.cpp
 util/EncryptionUtils.cpp
 util/DirectorySourceQueue.cpp
@@ -120,6 +121,7 @@ find_library(GLOG_LIBRARY glog)
 # Gflags
 find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h)
 find_library(GFLAGS_LIBRARY gflags)
+find_library(CRYPTO_LIBRARY crypto)
 
 # You can also add jemalloc to the list if you have it/want it
 target_link_libraries(wdtlib_min
@@ -127,6 +129,7 @@ target_link_libraries(wdtlib_min
   ${GLOG_LIBRARY}
   ${GFLAGS_LIBRARY}
   ${Boost_LIBRARIES}
+  ${CRYPTO_LIBRARY}
   ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
 )
 
@@ -280,6 +283,10 @@ if (BUILD_TESTING)
   add_executable(wdt_fd_test  test/FdTest.cpp)
   target_link_libraries(wdt_fd_test wdt4tests)
   add_test(NAME WdtFdTests COMMAND wdt_fd_test)
+
+  add_executable(encryption_test  test/EncryptionTest.cpp)
+  target_link_libraries(encryption_test wdt4tests)
+  add_test(NAME EncryptionTests COMMAND encryption_test)
 
   add_executable(file_reader_test  test/FileReaderTest.cpp)
   target_link_libraries(file_reader_test wdt4tests)

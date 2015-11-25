@@ -26,10 +26,11 @@ transfer() {
 }
 
 STARTING_PORT=22356
-WDT_OPTS="-ipv6 -start_port=$STARTING_PORT -read_timeout_millis=100 \
+WDTBIN_OPTS="-ipv6 -start_port=$STARTING_PORT -read_timeout_millis=100 \
 -write_timeout_millis=100 -connect_timeout_millis=100 -transfer_id=wdt \
 -max_accept_retries=10"
-WDT_BIN="_bin/wdt/wdt $WDT_OPTS"
+extendWdtOptions
+WDT_BIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/tmp/wdtTest_$USER
 
