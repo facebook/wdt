@@ -6,11 +6,10 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/Sender.h>
+#include <wdt/Wdt.h>
 #include <wdt/Receiver.h>
-#include <wdt/Protocol.h>
 #include <wdt/WdtResourceController.h>
-#include <wdt/util/WdtFlags.h>
+
 #include <chrono>
 #include <future>
 #include <folly/String.h>
@@ -26,9 +25,9 @@
 #define ADDITIONAL_SENDER_SETUP
 #endif
 
-// This can be the fbonly version (extended flags/options)
-#ifndef FLAGS
-#define FLAGS WdtFlags
+// This can be the fbonly (FbWdt) version (extended initialization, and options)
+#ifndef WDTCLASS
+#define WDTCLASS Wdt
 #endif
 
 // Flags not already in WdtOptions.h/WdtFlags.cpp.inc
@@ -79,7 +78,11 @@ DEFINE_int32(test_only_encryption_type, 0,
 DEFINE_string(test_only_encryption_secret, "",
               "Test only encryption secret, to test url encoding/decoding");
 
+DEFINE_string(app_name, "wdt", "Identifier used for reporting (scuba, at fb)");
+
 using namespace facebook::wdt;
+
+// TODO: move this to some util and/or delete
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
@@ -89,15 +92,14 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
 std::mutex abortMutex;
 std::condition_variable abortCondVar;
 
-void setUpAbort(WdtBase &senderOrReceiver) {
+std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
   int abortSeconds = FLAGS_abort_after_seconds;
   if (abortSeconds <= 0) {
-    return;
+    return nullptr;
   }
   LOG(INFO) << "Setting up abort " << abortSeconds << " seconds.";
   static std::atomic<bool> abortTrigger{false};
-  senderOrReceiver.setAbortChecker(
-      std::make_shared<WdtAbortChecker>(abortTrigger));
+  auto res = std::make_shared<WdtAbortChecker>(abortTrigger);
   auto lambda = [=] {
     LOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
     std::unique_lock<std::mutex> lk(abortMutex);
@@ -111,6 +113,11 @@ void setUpAbort(WdtBase &senderOrReceiver) {
   };
   // we want to run in bg, not block
   static std::future<void> abortThread = std::async(std::launch::async, lambda);
+  return res;
+}
+
+void setAbortChecker(WdtBase &senderOrReceiver) {
+  senderOrReceiver.setAbortChecker(setupAbortChecker());
 }
 
 void cancelAbort() {
@@ -166,9 +173,10 @@ int main(int argc, char *argv[]) {
   }
   signal(SIGPIPE, SIG_IGN);
 
-  FLAGS::initializeFromFlags();
+  // Might be a sub class (fbonly wdtCmdLine.cpp)
+  Wdt &wdt = WDTCLASS::initializeWdt(FLAGS_app_name);
   if (FLAGS_print_options) {
-    FLAGS::printOptions(std::cout);
+    wdt.printWdtOptions(std::cout);
     return 0;
   }
 
@@ -233,7 +241,7 @@ int main(int argc, char *argv[]) {
                                           /* do produce the real secret*/ false)
               << std::endl;
     std::cout.flush();
-    setUpAbort(receiver);
+    setAbortChecker(receiver);
     if (!FLAGS_recovery_id.empty()) {
       WdtOptions::getMutable().enable_download_resumption = true;
       receiver.setRecoveryId(FLAGS_recovery_id);
@@ -265,14 +273,10 @@ int main(int argc, char *argv[]) {
     LOG(INFO) << "Making Sender with encryption set = "
               << req.encryptionData.isSet();
 
-    Sender sender(req);
-    WdtTransferRequest processedRequest = sender.init();
-    LOG(INFO) << "Starting sender with details "
-              << processedRequest.generateUrl(true);
-    ADDITIONAL_SENDER_SETUP
-    setUpAbort(sender);
-    std::unique_ptr<TransferReport> report = sender.transfer();
-    retCode = report->getSummary().getErrorCode();
+    // TODO: find something more useful for namespace (userid ? directory?)
+    // (shardid at fb)
+    retCode = wdt.wdtSend(WdtResourceController::kGlobalNamespace, req,
+                          setupAbortChecker());
   }
   cancelAbort();
   LOG(INFO) << "Returning with code " << retCode << " "

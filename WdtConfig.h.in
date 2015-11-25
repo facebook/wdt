@@ -25,3 +25,4 @@
 #if (defined(HAS_POSIX_MEMALIGN) && defined(O_DIRECT)) || defined(F_NOCACHE)
 #define WDT_SUPPORTS_ODIRECT 1
 #endif
+#cmakedefine WDT_HAS_SOCKIOS_H

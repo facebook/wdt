@@ -100,6 +100,7 @@ WdtResourceController.cpp
 )
 add_library(wdtlib
 util/WdtFlags.cpp
+Wdt.cpp
 )
 target_link_libraries(wdtlib wdtlib_min)
 
@@ -193,7 +194,7 @@ include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-add_executable(wdt wdtCmdLine.cpp util/WdtFlags.cpp)
+add_executable(wdt wdtCmdLine.cpp util/WdtFlags.cpp Wdt.cpp)
 set_target_properties(wdt PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
 
 target_link_libraries(wdt wdtlib_min)

@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 using namespace std;
 
 namespace facebook {
@@ -55,7 +54,6 @@ TEST(FdTest, FdTestBasic) {
 TEST(FdTest, FdTestBasicResumption) {
   basicTest(true);
 }
-
 }
 }  // namespace end
 

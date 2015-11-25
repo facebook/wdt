@@ -14,7 +14,7 @@ const int64_t kDelTimeToSleepMillis = 100;
 namespace facebook {
 namespace wdt {
 
-const std::string WdtResourceController::kGlobalNamespace("Global");
+const char *const WdtResourceController::kGlobalNamespace("Global");
 
 void WdtControllerBase::updateMaxReceiversLimit(int64_t maxNumReceivers) {
   GuardLock lock(controllerMutex_);
