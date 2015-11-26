@@ -34,10 +34,71 @@ const SenderThread::StateFunction SenderThread::stateMap_[] = {
     &SenderThread::processWaitCmd, &SenderThread::processErrCmd,
     &SenderThread::processAbortCmd, &SenderThread::processVersionMismatch};
 
+std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
+    const int port, IAbortChecker const *abortChecker, ErrorCode &errCode) {
+  auto startTime = Clock::now();
+  const auto &options = WdtOptions::get();
+  int connectAttempts = 0;
+  std::unique_ptr<ClientSocket> socket;
+  const EncryptionParams &encryptionData =
+      wdtParent_->transferRequest_.encryptionData;
+  if (!wdtParent_->socketCreator_) {
+    // socket creator not set, creating ClientSocket
+    socket = folly::make_unique<ClientSocket>(wdtParent_->destHost_, port,
+                                              abortChecker, encryptionData);
+  } else {
+    socket = wdtParent_->socketCreator_(wdtParent_->destHost_, port,
+                                        abortChecker, encryptionData);
+  }
+  double retryInterval = options.sleep_millis;
+  int maxRetries = options.max_retries;
+  if (maxRetries < 1) {
+    LOG(ERROR) << "Invalid max_retries " << maxRetries << " using 1 instead";
+    maxRetries = 1;
+  }
+  for (int i = 1; i <= maxRetries; ++i) {
+    ++connectAttempts;
+    errCode = socket->connect();
+    if (errCode == OK) {
+      break;
+    } else if (errCode == CONN_ERROR) {
+      return nullptr;
+    }
+    if (wdtParent_->getCurAbortCode() != OK) {
+      errCode = ABORT;
+      return nullptr;
+    }
+    if (i != maxRetries) {
+      // sleep between attempts but not after the last
+      VLOG(1) << "Sleeping after failed attempt " << i;
+      usleep(retryInterval * 1000);
+    }
+  }
+  double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
+  if (errCode != OK) {
+    LOG(ERROR) << "Unable to connect to " << wdtParent_->destHost_ << " "
+               << port << " despite " << connectAttempts << " retries in "
+               << elapsedSecsConn << " seconds.";
+    errCode = CONN_ERROR;
+    return nullptr;
+  }
+  ((connectAttempts > 1) ? LOG(WARNING) : LOG(INFO))
+      << "Connection took " << connectAttempts << " attempt(s) and "
+      << elapsedSecsConn << " seconds. port " << port;
+  return socket;
+}
+
 SenderState SenderThread::connect() {
   VLOG(1) << *this << " entered CONNECT state";
   if (socket_) {
-    socket_->close();
+    ErrorCode socketErrCode = socket_->getNonRetryableErrCode();
+    if (socketErrCode != OK) {
+      LOG(ERROR) << *this << "Socket has non-retryable error "
+                 << errorCodeToStr(socketErrCode);
+      threadStats_.setLocalErrorCode(socketErrCode);
+      return END;
+    }
+    socket_->closeConnection();
   }
   const auto &options = WdtOptions::get();
   if (numReconnectWithoutProgress_ >= options.max_transfer_retries) {
@@ -48,8 +109,7 @@ SenderState SenderThread::connect() {
     return END;
   }
   ErrorCode code;
-  socket_ =
-      wdtParent_->connectToReceiver(port_, socketAbortChecker_.get(), code);
+  socket_ = connectToReceiver(port_, socketAbortChecker_.get(), code);
   if (code == ABORT) {
     threadStats_.setLocalErrorCode(ABORT);
     if (wdtParent_->getCurAbortCode() == VERSION_MISMATCH) {
@@ -152,7 +212,7 @@ SenderState SenderThread::sendSettings() {
     return CONNECT;
   }
   threadStats_.addHeaderBytes(toWrite);
-  return sendFileChunks ? READ_FILE_CHUNKS : SEND_BLOCKS;
+  return (sendFileChunks ? READ_FILE_CHUNKS : SEND_BLOCKS);
 }
 
 SenderState SenderThread::sendBlocks() {
@@ -375,8 +435,10 @@ ErrorCode SenderThread::readNextReceiverCmd() {
       return SOCKET_READ_ERROR;
     }
     WDT_CHECK_LT(numRead, 0);
-    PLOG(ERROR) << "Failed to read receiver cmd " << numRead;
-    if (errno != EAGAIN) {
+    ErrorCode errCode = socket_->getReadErrCode();
+    LOG(ERROR) << "Failed to read receiver cmd " << numRead << " "
+               << errorCodeToStr(errCode);
+    if (errCode != WDT_TIMEOUT) {
       // not timed out
       return SOCKET_READ_ERROR;
     }
@@ -410,7 +472,7 @@ ErrorCode SenderThread::readNextReceiverCmd() {
   // readWithTimeout internally checks for abort periodically
   int numRead = socket_->readWithTimeout(buf_, 1, readTimeout);
   if (numRead != 1) {
-    PLOG(ERROR) << "Failed to read receiver cmd " << numRead;
+    LOG(ERROR) << "Failed to read receiver cmd " << numRead;
     return SOCKET_READ_ERROR;
   }
   return OK;
@@ -689,6 +751,9 @@ void SenderThread::start() {
     state = (this->*stateMap_[state])();
   }
 
+  EncryptionType encryptionType =
+      (socket_ ? socket_->getEncryptionType() : ENC_NONE);
+  threadStats_.setEncryptionType(encryptionType);
   double totalTime = durationSeconds(Clock::now() - startTime);
   LOG(INFO) << "Port " << port_ << " done. " << threadStats_
             << " Total throughput = "

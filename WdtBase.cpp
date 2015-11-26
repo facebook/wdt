@@ -284,7 +284,16 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   // beware of the return above, add future params processing above the return
 }
 
-string WdtTransferRequest::generateUrl(bool genFull, bool forLogging) const {
+string WdtTransferRequest::genWdtUrlWithSecret() const {
+  return generateUrlInternal(false, false);
+}
+
+string WdtTransferRequest::getLogSafeString() const {
+  return generateUrlInternal(true, true);
+}
+
+string WdtTransferRequest::generateUrlInternal(bool genFull,
+                                               bool forLogging) const {
   if (errorCode == ERROR || errorCode == URI_PARSE_ERROR) {
     LOG(ERROR) << "Transfer request has errors present ";
     return errorCodeToStr(errorCode);

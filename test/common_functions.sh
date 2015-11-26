@@ -267,4 +267,21 @@ signalHandler() {
   wdtExit 1
 }
 
+extendWdtOptions() {
+  if [ ! -z "$NO_ENCRYPT" ]; then
+    echo "Encryption is disabled for this test"
+    WDTBIN_OPTS="$WDTBIN_OPTS -encryption_type=none"
+  elif [ ! -z "$OFB_ENCRYPT" ]; then
+    echo "OFB Encryption is enabled for this test"
+    WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD -encryption_type=aes128ofb"
+  else
+    echo "CTR Encryption is enabled for this test"
+    WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD -encryption_type=aes128ctr"
+  fi
+}
+
 trap signalHandler SIGINT
+ENCRYPTION_KEY=`cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | \
+head -n 1`
+EXTRA_ENCRYPTION_CMD="-test_only_encryption_secret $ENCRYPTION_KEY"
+ENCRYPTION_ENABLED=0

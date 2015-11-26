@@ -156,3 +156,7 @@ WDT_OPT(overwrite, bool, "Allow the receiver to overwrite existing files");
 WDT_OPT(drain_extra_ms, int32,
         "Extra time buffer to account for network when sender waits for "
         "receiver to finish processing buffered data");
+WDT_OPT(
+    encryption_type, string,
+    "Encryption type to use. WDT currently only "
+    "supports aes128ctr and aes128ofb. A value of none disables encryption");

@@ -148,11 +148,11 @@ TEST(RequestSerializationTest, UrlTests) {
     }
   }
   {
-    WdtTransferRequest request(123, 5, "/my/dir");
+    WdtTransferRequest request(123, 5, "");
     request.hostName = "host1";
     request.transferId = "tid1";
     request.protocolVersion = 753;
-    string serialized = request.generateUrl(true);
+    string serialized = request.genWdtUrlWithSecret();
     LOG(INFO) << "Serialized " << serialized;
     WdtTransferRequest deser(serialized);
     EXPECT_EQ(deser.hostName, "host1");
@@ -163,17 +163,17 @@ TEST(RequestSerializationTest, UrlTests) {
       EXPECT_EQ(deser.ports[i], 123 + i);
     }
     EXPECT_EQ(deser.errorCode, OK);
-    EXPECT_EQ(deser.generateUrl(true), serialized);
+    EXPECT_EQ(deser.genWdtUrlWithSecret(), serialized);
     EXPECT_EQ(deser, request);
   }
   {
-    WdtTransferRequest transferRequest(24689, 1, "dir1/dir2");
+    WdtTransferRequest transferRequest(24689, 1, "");
     // Lets not populate anything else
     transferRequest.hostName = "localhost";
-    string serializedString = transferRequest.generateUrl(true);
+    string serializedString = transferRequest.genWdtUrlWithSecret();
     LOG(INFO) << serializedString;
     WdtTransferRequest dummy(serializedString);
-    LOG(INFO) << dummy.generateUrl();
+    LOG(INFO) << dummy.getLogSafeString();
     EXPECT_EQ(transferRequest, dummy);
   }
   {
@@ -223,13 +223,13 @@ TEST(RequestSerializationTest, UrlTests) {
     }
     EXPECT_EQ(transferRequest.ports, expectedPorts);
     EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
-    EXPECT_EQ(transferRequest.generateUrl(), "URI_PARSE_ERROR");
+    EXPECT_EQ(transferRequest.genWdtUrlWithSecret(), "URI_PARSE_ERROR");
   }
   {
     string url = "wdt://";
     WdtTransferRequest transferRequest(url);
     EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
-    EXPECT_EQ(transferRequest.generateUrl(), "URI_PARSE_ERROR");
+    EXPECT_EQ(transferRequest.genWdtUrlWithSecret(), "URI_PARSE_ERROR");
   }
 }
 
@@ -246,8 +246,7 @@ TEST(TransferRequestTest, Encryption1) {
   }
   {
     WdtTransferRequest req(123, 3, "/foo/bar");
-    string ser = req.generateUrl(true);
-    LOG(INFO) << "Url without e= " << ser;
+    LOG(INFO) << "Url without e= " << req.getLogSafeString();
     WdtTransferRequest req2(123, 3, "/foo/ba2");
     EXPECT_FALSE(req2 == req);
     req2.directory = "/foo/bar";
@@ -258,7 +257,7 @@ TEST(TransferRequestTest, Encryption1) {
   {
     // TODO: hostname is mandatory in url yet not in constructor,
     // while directory isn't and yet is
-    WdtTransferRequest req(123, 3, "/data/dir1");
+    WdtTransferRequest req(123, 3, "");
     req.hostName = "host1";
     EXPECT_EQ(req.errorCode, OK);
     req.encryptionData = EncryptionParams(ENC_AES128_CTR, "barFOO");
@@ -270,11 +269,12 @@ TEST(TransferRequestTest, Encryption1) {
     binary.push_back(0xfe);
     const string secret(binary);
     req.encryptionData = EncryptionParams(ENC_AES128_CTR, secret);
-    string ser = req.generateUrl(/* with dir */ true, /* with secret */ false);
+    string ser = req.genWdtUrlWithSecret();
     LOG(INFO) << "Url with e= " << ser;
     EXPECT_EQ(ser,
-              "wdt://host1:123?dir=/data/dir1&e=1:464f4f62617235360001fffe"
-              "&id=&num_ports=3&recpv=22");
+              "wdt://host1:123?e=1:464f4f62617235360001fffe"
+              "&id=&num_ports=3&recpv=" +
+                  std::to_string(Protocol::protocol_version));
     WdtTransferRequest unser(ser);
     EXPECT_EQ(unser.errorCode, OK);
     EXPECT_EQ(unser.encryptionData.getType(), ENC_AES128_CTR);

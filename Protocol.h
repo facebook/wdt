@@ -9,6 +9,7 @@
 #pragma once
 
 #include <wdt/ErrorCodes.h>
+#include <wdt/util/EncryptionUtils.h>
 
 #include <folly/Range.h>
 #include <stddef.h>
@@ -238,6 +239,8 @@ class Protocol {
   static const int CHECKPOINT_OFFSET_VERSION;
   /// version from which checkpoint started including seq-id
   static const int CHECKPOINT_SEQ_ID_VERSION;
+  /// version from which wdt supports encryption
+  static const int ENCRYPTION_V1_VERSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
@@ -257,6 +260,7 @@ class Protocol {
                // <num_checkpoints><checkpoint1><checkpoint2>..., and since the
                // number of checkpoints for local checkpoint is 1, we can treat
                // 0x01 to be a separate cmd
+    ENCRYPTION_CMD = 0x65,  // (e)ncryption
   };
 
   /// Max size of sender or receiver id
@@ -284,11 +288,13 @@ class Protocol {
   static const int64_t kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
   /// max size of version encoding
   static const int64_t kMaxVersion = 10;
+  /// max size of encryption cmd(1 byte for cmd, 1 byte for
+  /// encryption type, rest for initialization vector)
+  static const int64_t kMaxEncryption = 1 + 1 + 1 + kAESBlockSize;
 
   static_assert(kMinBufLength <= kMaxHeader && kMaxSettings <= kMaxHeader,
                 "Minimum buffer size is kMaxHeader. Header and Settings cmd "
                 "must fit within the buffer");
-
   /**
    * Return the library version, including protocol.
    * For debugging/identification purpose.
@@ -368,6 +374,20 @@ class Protocol {
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeSettings(int protocolVersion, char *src, int64_t &off,
                              int64_t max, Settings &settings);
+
+  /// encodes encryption info into dest+off
+  /// moves the off into dest pointer, not going past max
+  /// @return false if there isn't enough room to encode
+  static void encodeEncryptionSettings(char *dest, int64_t &off, int64_t max,
+                                       const EncryptionType encryptionType,
+                                       const std::string &iv);
+
+  /// decodes from src+off and consumes/moves off but not past max
+  /// sets settings
+  /// @return false if there isn't enough data in src+off to src+max
+  static bool decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
+                                       EncryptionType &encryptionType,
+                                       std::string &iv);
 
   /// encodes totalNumBytes into dest+off
   /// moves the off into dest pointer, not going past max

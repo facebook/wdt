@@ -30,7 +30,7 @@ The possible options to this script are
 -p start port
 "
 
-#protocol versions, used to check version verification
+#protocol versions, used to check version negotiation 
 #version 0 represents default version
 SENDER_PROTOCOL_VERSION=0
 RECEIVER_PROTOCOL_VERSION=0
@@ -61,6 +61,14 @@ setBinaries
 echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
 version $RECEIVER_PROTOCOL_VERSION"
 
+if [ $RECEIVER_PROTOCOL_VERSION -ne 0 ] && [ $RECEIVER_PROTOCOL_VERSION -lt 23 \
+] && [ -z $NO_ENCRYPT ]; then
+  echo "Can not support encryption for receiver with version \
+$RECEIVER_PROTOCOL_VERSION"
+  # exit with 0 to make the test pass
+  exit 0
+fi
+
 threads=4
 ERROR_COUNT=25
 TEST_COUNT=0
@@ -75,8 +83,9 @@ WDTBIN_OPTS="-enable_perf_stat_collection -ipv6 -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
 -progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
--treat_fewer_port_as_error \
+-treat_fewer_port_as_error -exit_on_bad_flags=false \
 -connect_timeout_millis 100 -transfer_id $$ -num_ports=$threads"
+extendWdtOptions
 WDTBIN_SERVER="$WDT_RECEIVER $WDTBIN_OPTS \
   -protocol_version=$RECEIVER_PROTOCOL_VERSION"
 WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS -destination $HOSTNAME \

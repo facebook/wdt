@@ -10,6 +10,8 @@ from random import randint
 import shutil
 import tempfile
 import errno
+import string
+import random
 
 def get_wdt_version():
     dummy_cmd = "_bin/wdt/wdt --version"
@@ -135,3 +137,6 @@ def search_in_logs(root_dir, i, str):
         print("Found {0} in {1}".format(str, server_log))
         found = True
     return found
+
+def generate_encryption_key():
+    return ''.join(random.choice(string.lowercase) for i in range(16))

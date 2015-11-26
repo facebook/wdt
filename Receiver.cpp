@@ -10,6 +10,7 @@
 #include <wdt/util/FileWriter.h>
 #include <wdt/util/ServerSocket.h>
 #include <wdt/util/SocketUtils.h>
+#include <wdt/util/EncryptionUtils.h>
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
@@ -129,6 +130,34 @@ WdtTransferRequest Receiver::init() {
   auto numThreads = transferRequest_.ports.size();
   fileCreator_.reset(
       new FileCreator(destDir_, numThreads, transferLogManager_));
+
+  EncryptionType encryptionType = parseEncryptionType(options.encryption_type);
+  // is encryption enabled?
+  bool encrypt = (encryptionType != ENC_NONE &&
+                  protocolVersion_ >= Protocol::ENCRYPTION_V1_VERSION);
+  if (encrypt) {
+    LOG(INFO) << "Encryption is enabled for this transfer";
+    if (!transferRequest_.encryptionData.isSet()) {
+      LOG(INFO) << "Receiver generating encryption key for type "
+                << encryptionTypeToStr(encryptionType);
+      transferRequest_.encryptionData =
+          EncryptionParams::generateEncryptionParams(encryptionType);
+    }
+    if (!transferRequest_.encryptionData.isSet()) {
+      LOG(ERROR) << "Unable to generate encryption key for type "
+                 << encryptionTypeToStr(encryptionType);
+      transferRequest_.errorCode = ENCRYPTION_ERROR;
+      return transferRequest_;
+    }
+  } else {
+    if (encryptionType != ENC_NONE) {
+      LOG(WARNING) << "Encryption is enabled, but protocol version is "
+                   << protocolVersion_
+                   << ", minimum version required for encryption is "
+                   << Protocol::ENCRYPTION_V1_VERSION;
+    }
+    transferRequest_.encryptionData.erase();
+  }
   threadsController_ = new ThreadsController(numThreads);
   threadsController_->setNumFunnels(ReceiverThread::NUM_FUNNELS);
   threadsController_->setNumBarriers(ReceiverThread::NUM_BARRIERS);

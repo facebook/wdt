@@ -152,12 +152,13 @@ struct WdtTransferRequest {
   /// Constructor to construct the request object from a url string
   explicit WdtTransferRequest(const std::string& uriString);
 
-  // TODO: split into generateUrlWithSecret()...
-  /**
-   * Serialize this structure into a url string containing all fields
-   * Will only put the real encoded secret if forLogging is set to false
-   */
-  std::string generateUrl(bool genFull = false, bool forLogging = true) const;
+  /// @return    generates wdt connection url and has encryption secret.
+  ///            Returned secret should not be logged
+  std::string genWdtUrlWithSecret() const;
+
+  /// @return    returns a string describing this request. This string can be
+  ///            logged
+  std::string getLogSafeString() const;
 
   /// Serialize the ports into uri
   void serializePorts(WdtUri& wdtUri) const;
@@ -183,6 +184,13 @@ struct WdtTransferRequest {
   const static std::string NUM_PORTS_PARAM;
   /// Encryption parameters (proto:key for now, certificate,... potentially)
   const static std::string ENCRYPTION_PARAM;
+
+ private:
+  /**
+   * Serialize this structure into a url string containing all fields
+   * Will only put the real encoded secret if forLogging is set to false
+   */
+  std::string generateUrlInternal(bool genFull, bool forLogging) const;
 };
 
 /**

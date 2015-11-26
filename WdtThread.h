@@ -9,7 +9,10 @@
 #pragma once
 #include <wdt/Reporting.h>
 #include <wdt/ErrorCodes.h>
+#include <wdt/Protocol.h>
 #include <wdt/util/ThreadsController.h>
+#include <wdt/util/WdtSocket.h>
+#include <folly/Bits.h>
 #include <thread>
 #include <memory>
 
@@ -22,8 +25,11 @@ class ThreadsController;
 class WdtThread {
  public:
   /// Constructor for wdt thread
-  WdtThread(int threadIndex, int protocolVersion, ThreadsController *controller)
-      : threadIndex_(threadIndex), threadProtocolVersion_(protocolVersion) {
+  WdtThread(int threadIndex, int port, int protocolVersion,
+            ThreadsController *controller)
+      : threadIndex_(threadIndex),
+        port_(port),
+        threadProtocolVersion_(protocolVersion) {
     controller_ = controller;
   }
   /// Starts a thread which runs the wdt functionality
@@ -63,6 +69,9 @@ class WdtThread {
 
   /// Index of this thread with respect to other threads
   const int threadIndex_;
+
+  /// port number for this thread
+  const int port_;
 
   /// Copy of the protocol version that might be changed
   int threadProtocolVersion_;

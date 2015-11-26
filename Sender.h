@@ -130,7 +130,8 @@ class Sender : public WdtBase {
 
   typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
       const std::string &dest, const int port,
-      IAbortChecker const *abortChecker);
+      IAbortChecker const *abortChecker,
+      const EncryptionParams &encryptionParams);
 
   /**
    * Sets socket creator
@@ -146,10 +147,6 @@ class Sender : public WdtBase {
   /// Get the sum of all the thread transfer stats
   TransferStats getGlobalTransferStats() const;
 
-  /// General utility used by sender threads to connect to receiver
-  std::unique_ptr<ClientSocket> connectToReceiver(
-      const int port, IAbortChecker const *abortChecker, ErrorCode &errCode);
-
   /// Method responsible for sending one source to the destination
   virtual TransferStats sendOneByteSource(
       const std::unique_ptr<ClientSocket> &socket,
@@ -158,7 +155,7 @@ class Sender : public WdtBase {
   /// Returns true if file chunks need to be read
   bool isSendFileChunks() const;
 
-  /// Retruns true if file chunks been received by a thread
+  /// Returns true if file chunks been received by a thread
   bool isFileChunksReceived();
 
   /// Sender thread calls this method to set the file chunks info received

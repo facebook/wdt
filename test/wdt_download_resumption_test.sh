@@ -96,6 +96,14 @@ setBinaries
 echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
 version $RECEIVER_PROTOCOL_VERSION"
 
+if [ $RECEIVER_PROTOCOL_VERSION -ne 0 ] && [ $RECEIVER_PROTOCOL_VERSION -lt 23 \
+] && [ -z $NO_ENCRYPT ]; then
+  echo "Can not support encryption for receiver with version \
+$RECEIVER_PROTOCOL_VERSION"
+  # exit with 0 to make the test pass
+  exit 0
+fi
+
 threads=4
 ERROR_COUNT=5
 
@@ -104,13 +112,15 @@ SENDER_ID="123456"
 RECEIVER_ID="123456"
 
 WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
--avg_mbytes_per_sec=80 -max_mbytes_per_sec=90 -run_as_daemon=false \
+-max_mbytes_per_sec=90 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -treat_fewer_port_as_error \
 -resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection \
--connect_timeout_millis 100"
-WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS"
-WDTBIN_SERVER="$WDT_RECEIVER $WDTBIN_OPTS"
+-connect_timeout_millis 100 \
+-exit_on_bad_flags=false"
+extendWdtOptions
+WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS -buffer_size=2097152"
+WDTBIN_SERVER="$WDT_RECEIVER $WDTBIN_OPTS -avg_mbytes_per_sec=80 "
 
 BASEDIR=/dev/shm/wdtTest_$USER
 

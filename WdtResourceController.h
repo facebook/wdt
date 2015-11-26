@@ -227,7 +227,7 @@ class WdtResourceController : public WdtControllerBase {
   virtual ~WdtResourceController() override;
 
   /// Default global namespace
-  static const std::string kGlobalNamespace;
+  static const char *const kGlobalNamespace;
 
  protected:
   typedef std::shared_ptr<WdtNamespaceController> NamespaceControllerPtr;
