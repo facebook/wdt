@@ -435,8 +435,10 @@ ErrorCode SenderThread::readNextReceiverCmd() {
       return SOCKET_READ_ERROR;
     }
     WDT_CHECK_LT(numRead, 0);
-    PLOG(ERROR) << "Failed to read receiver cmd " << numRead;
-    if (errno != EAGAIN) {
+    ErrorCode errCode = socket_->getReadErrCode();
+    LOG(ERROR) << "Failed to read receiver cmd " << numRead << " "
+               << errorCodeToStr(errCode);
+    if (errCode != WDT_TIMEOUT) {
       // not timed out
       return SOCKET_READ_ERROR;
     }
@@ -470,7 +472,7 @@ ErrorCode SenderThread::readNextReceiverCmd() {
   // readWithTimeout internally checks for abort periodically
   int numRead = socket_->readWithTimeout(buf_, 1, readTimeout);
   if (numRead != 1) {
-    PLOG(ERROR) << "Failed to read receiver cmd " << numRead;
+    LOG(ERROR) << "Failed to read receiver cmd " << numRead;
     return SOCKET_READ_ERROR;
   }
   return OK;

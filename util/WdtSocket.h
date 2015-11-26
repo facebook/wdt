@@ -48,6 +48,12 @@ class WdtSocket {
   /// @return     possible non-retryable error
   ErrorCode getNonRetryableErrCode() const;
 
+  /// @return     read error code
+  ErrorCode getReadErrCode() const;
+
+  /// @return     write error code
+  ErrorCode getWriteErrCode() const;
+
   virtual ~WdtSocket();
 
  protected:
@@ -55,9 +61,9 @@ class WdtSocket {
 
   int writeInternal(char *buf, int nbyte, int timeoutMs, bool retry);
 
-  ErrorCode readEncryptionSettingsOnce();
+  void readEncryptionSettingsOnce(int timeoutMs);
 
-  ErrorCode writeEncryptionSettingsOnce();
+  void writeEncryptionSettingsOnce();
 
   int port_{-1};
   IAbortChecker const *abortChecker_;

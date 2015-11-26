@@ -53,6 +53,7 @@ namespace wdt {
   X(INVALID_CHECKPOINT)      /** Received checkpoint is invalid */             \
   X(NO_PROGRESS)             /** Transfer has not progressed */                \
   X(TRANSFER_LOG_ACQUIRE_ERROR) /** Failed to acquire lock for transfer log */ \
+  X(WDT_TIMEOUT)                /** Socket operation timed out  */             \
   X(UNEXPECTED_CMD_ERROR)       /** Unexpected cmd received */                 \
   X(ENCRYPTION_ERROR)           /** Error related to encryption */
 
