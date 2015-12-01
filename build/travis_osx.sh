@@ -8,7 +8,9 @@ uname -a
 echo $HOSTNAME
 mkdir $HOME/bin || true
 brew update
-brew outdated openssl || brew upgrade openssl
+brew install openssl || true
+brew link --force openssl || true
+openssl version -a
 CMAKE_BASE=cmake-3.3.2-Darwin-x86_64
 cd ..
 CMAKE_BIN_DIR=`pwd`/$CMAKE_BASE/CMake.app/Contents/bin
