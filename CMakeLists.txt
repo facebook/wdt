@@ -121,7 +121,9 @@ find_library(GLOG_LIBRARY glog)
 # Gflags
 find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h)
 find_library(GFLAGS_LIBRARY gflags)
-find_library(CRYPTO_LIBRARY crypto)
+# OpenSSL's crypto lib
+find_package(OpenSSL REQUIRED)
+include_directories(${OPENSSL_INCLUDE_DIR})
 
 # You can also add jemalloc to the list if you have it/want it
 target_link_libraries(wdtlib_min
@@ -129,7 +131,7 @@ target_link_libraries(wdtlib_min
   ${GLOG_LIBRARY}
   ${GFLAGS_LIBRARY}
   ${Boost_LIBRARIES}
-  ${CRYPTO_LIBRARY}
+  ${OPENSSL_CRYPTO_LIBRARY}
   ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
 )
 

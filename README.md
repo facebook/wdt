@@ -86,6 +86,8 @@ glog (google logging library)
 Parts of Facebook's Folly open source library (as set in the CMakefile)
 Mostly conv, threadlocal and checksum support.
 
+For encryption, the crypto lib part of openssl-1.x
+
 You can build and embed wdt as a library with as little as a C++11 compiler
 and glog - and you could macro away glog or replace it by printing to stderr if
 needed.
