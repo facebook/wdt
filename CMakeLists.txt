@@ -190,6 +190,7 @@ if (NOT FOLLY_HAVE_BITS_FUNCTEXCEPT)
 endif()
 
 add_library(folly4wdt ${FOLLY_CPP_SRC})
+target_link_libraries(folly4wdt ${GLOG_LIBRARY})
 
 # Order is important - inside fb we want the above
 # folly-config.h to be picked up instead of the fbcode one
