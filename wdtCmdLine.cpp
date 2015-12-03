@@ -276,7 +276,11 @@ int main(int argc, char *argv[]) {
                           setupAbortChecker());
   }
   cancelAbort();
-  LOG(INFO) << "Returning with code " << retCode << " "
-            << errorCodeToStr(retCode);
+  if (retCode == OK) {
+    LOG(INFO) << "Returning with OK exit code";
+  } else {
+    LOG(ERROR) << "Returning with code " << retCode << " "
+               << errorCodeToStr(retCode);
+  }
   return retCode;
 }

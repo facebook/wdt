@@ -59,11 +59,12 @@ def main():
 
     run_test("basic file list", "")
     run_test("file list with direct reads", "-odirect_reads")
-    run_test("file list with open early", "-open_files_during_discovery")
+    run_test("file list with all open early", "-open_files_during_discovery -1")
+    run_test("file list with 1 open early", "-open_files_during_discovery 1")
     run_test("file list with open early and direct reads",
-            "-open_files_during_discovery -odirect_reads")
+            "-open_files_during_discovery -1 -odirect_reads")
     run_test("failed transfer with  open early and direct reads",
-            "-open_files_during_discovery -odirect_reads",
+            "-open_files_during_discovery -1 -odirect_reads",
             True)
 
     os.remove(os.path.join(src_dir, "file0"))

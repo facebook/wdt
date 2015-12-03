@@ -13,6 +13,7 @@
 #include <string>
 #include <unistd.h>
 #include <set>
+
 namespace facebook {
 namespace wdt {
 /**
@@ -293,9 +294,12 @@ class WdtOptions {
   bool resume_using_dir_tree{false};
 
   /**
-   * If true, files are opened when they are discovered
+   * If > 0 will open up to that number of files during discovery
+   * if 0 will not open any file during discovery
+   * if < 0 will try to open all the files during discovery (which may fail
+   * with too many open files errors)
    */
-  bool open_files_during_discovery{false};
+  int open_files_during_discovery{0};
 
   /**
    * If true, we send url that works with older version(<19)
@@ -332,6 +336,8 @@ class WdtOptions {
    * @return    whether directory tree based resumption is enabled
    */
   bool isDirectoryTreeBasedResumption() const;
+
+  // NOTE: any option added here should also be added to util/WdtFlags.cpp.inc
 
   /**
    * Since this is a singleton copy constructor

@@ -384,7 +384,12 @@ class DirectorySourceQueue : public SourceQueue {
   double directoryTime_{0};
   /// abort checker
   IAbortChecker const *abortChecker_;
-
+  /**
+   * Count and trigger of files to open (negative is keep opening until we run
+   * out of fd, positiveis how many files we can still open, 0 is stop opening
+   * files)
+   */
+  int32_t openFilesDuringDiscovery_{0};
   const WdtOptions &options_;
 };
 }

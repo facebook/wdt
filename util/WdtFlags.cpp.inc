@@ -11,7 +11,7 @@
  * When STANDALONE_APP is not defined then all the flags are
  * prefixed with wdt_.
  * The default values for the flags are picked from the corresponding
- * WdtOptions.
+ * WdtOptions. Flags added here should exist as options in WdtOptions.h
  * There are multiple checks which check if the flags are defined or not,
  * and undefine/redefine them. This is because this file can be
  * included multiple times for e.g. WdtFlags.cpp included this file
@@ -148,8 +148,9 @@ WDT_OPT(resume_using_dir_tree, bool,
         "If true, destination directory tree is trusted during resumption. So, "
         "only the remaining portion of the files are transferred. This is only "
         "supported if preallocation and block mode are disabled");
-WDT_OPT(open_files_during_discovery, bool,
-        "If true, files are opened when they are discovered");
+WDT_OPT(open_files_during_discovery, int32,
+        "If >0 up to that many files are opened when they are discovered."
+        "0 for none. -1 for trying to open all the files during discovery");
 WDT_OPT(url_backward_compatibility, bool,
         "If true, we send url that works with older version(<19)");
 WDT_OPT(overwrite, bool, "Allow the receiver to overwrite existing files");
