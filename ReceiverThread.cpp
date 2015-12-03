@@ -852,9 +852,8 @@ ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
 }
 
 void ReceiverThread::start() {
-  INIT_PERF_STAT_REPORT
   auto guard = folly::makeGuard([&] {
-    perfReport_ = *perfStatReport;
+    perfReport_ = *wdt__perfStatReportThreadLocal;
     controller_->deRegisterThread(threadIndex_);
     controller_->executeAtEnd([&]() { wdtParent_->endCurGlobalSession(); });
     EncryptionType encryptionType =

@@ -301,7 +301,7 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
             << currentThroughput << "Mbps.";
 }
 
-folly::ThreadLocalPtr<PerfStatReport> perfStatReport;
+folly::ThreadLocal<PerfStatReport> wdt__perfStatReportThreadLocal;
 
 const std::string PerfStatReport::statTypeDescription_[] = {
     "Socket Read", "Socket Write", "File Open", "File Close", "File Read",

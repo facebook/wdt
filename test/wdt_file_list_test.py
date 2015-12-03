@@ -2,21 +2,32 @@
 
 import os
 from common_utils import *
-
-def run_test(name, sender_extra_flags):
+skip_tests = set()
+def run_test(name, sender_extra_flags, fail_transfer=False):
     global wdt_receiver, wdtbin, test_count, root_dir
+    sender_extra_flags += " --enable_perf_stat_collection"
     print("{0}. Testing {1}".format(test_count, name))
     receiver_cmd = "{0} -directory {1}/dst{2}".format(
             wdt_receiver, root_dir, test_count)
     (receiver_process, connection_url) = start_receiver(
             receiver_cmd, root_dir, test_count)
+    if fail_transfer is True:
+        connection_url += "&id=blah1234"
     sender_cmd = ("{0} -directory {1}/src -connection_url \'{2}\' -manifest "
                   "{1}/file_list {3}").format(
-                          wdtbin, root_dir, connection_url, test_count,
-                          sender_extra_flags)
+                          wdtbin, root_dir, connection_url, sender_extra_flags)
     transfer_status = run_sender(sender_cmd, root_dir, test_count)
     transfer_status |= receiver_process.wait()
-    check_transfer_status(transfer_status, root_dir, test_count)
+    if fail_transfer is True:
+        if not transfer_status:
+            print("test was expected to fail but succeeded")
+            exit(transfer_status + 1)
+        else:
+            skip_tests.add(test_count)
+    else:
+        check_transfer_status(transfer_status, root_dir, test_count)
+    fail_errors = ["PROTOCOL_ERROR", "Bad file descriptor"]
+    check_logs_for_errors(root_dir, test_count, fail_errors)
     test_count += 1
 
 def main():
@@ -51,11 +62,14 @@ def main():
     run_test("file list with open early", "-open_files_during_discovery")
     run_test("file list with open early and direct reads",
             "-open_files_during_discovery -odirect_reads")
+    run_test("failed transfer with  open early and direct reads",
+            "-open_files_during_discovery -odirect_reads",
+            True)
 
     os.remove(os.path.join(src_dir, "file0"))
     open(os.path.join(src_dir, "file1"), 'a').truncate(1025)
 
-    status = verify_transfer_success(root_dir, range(test_count))
+    status = verify_transfer_success(root_dir, range(test_count), skip_tests)
     exit(status)
 
 if __name__ == "__main__":

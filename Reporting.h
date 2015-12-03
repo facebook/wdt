@@ -490,8 +490,6 @@ class ProgressReporter {
   bool isTty_;
 };
 
-#define INIT_PERF_STAT_REPORT perfStatReport.reset(new PerfStatReport);
-
 #define START_PERF_TIMER                               \
   Clock::time_point startTimePERF;                     \
   if (WdtOptions::get().enable_perf_stat_collection) { \
@@ -501,7 +499,7 @@ class ProgressReporter {
 #define RECORD_PERF_RESULT(statType)                                 \
   if (WdtOptions::get().enable_perf_stat_collection) {               \
     int64_t duration = durationMicros(Clock::now() - startTimePERF); \
-    perfStatReport->addPerfStat(statType, duration);                 \
+    wdt__perfStatReportThreadLocal->addPerfStat(statType, duration); \
   }
 
 /// class representing perf stat collection
@@ -556,6 +554,6 @@ class PerfStatReport {
   int networkTimeoutMillis_;
 };
 
-extern folly::ThreadLocalPtr<PerfStatReport> perfStatReport;
+extern folly::ThreadLocal<PerfStatReport> wdt__perfStatReportThreadLocal;
 }
 }

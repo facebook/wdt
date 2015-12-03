@@ -727,7 +727,6 @@ SenderState SenderThread::processVersionMismatch() {
 }
 
 void SenderThread::start() {
-  INIT_PERF_STAT_REPORT
   Clock::time_point startTime = Clock::now();
   auto completionGuard = folly::makeGuard([&] {
     ThreadTransferHistory &transferHistory = getTransferHistory();
@@ -759,7 +758,7 @@ void SenderThread::start() {
             << " Total throughput = "
             << threadStats_.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
-  perfReport_ = *perfStatReport;
+  perfReport_ = *wdt__perfStatReportThreadLocal;
   return;
 }
 

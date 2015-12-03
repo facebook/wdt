@@ -179,7 +179,7 @@ ErrorCode ThreadTransferHistory::validateCheckpoint(
 
 void ThreadTransferHistory::markSourceAsFailed(
     std::unique_ptr<ByteSource> &source, const Checkpoint *checkpoint) {
-  auto metadata = source->getMetaData();
+  auto &metadata = source->getMetaData();
   bool validCheckpoint = false;
   if (checkpoint != nullptr) {
     if (checkpoint->hasSeqId) {

@@ -46,6 +46,20 @@ def check_transfer_status(status, root_dir, test_count):
         print("Transfer failed {0}".format(status))
         exit(status)
 
+def check_logs_for_errors(root_dir, test_count, fail_errors):
+    log_file = "%s/server%s.log" % (root_dir, test_count)
+    server_log_contents = open(log_file).read()
+    log_file = "%s/client%s.log" % (root_dir, test_count)
+    client_log_contents = open(log_file).read()
+
+    for fail_error in fail_errors:
+        if fail_error in server_log_contents:
+            print("%s found in logs %s" % (fail_error, log_file))
+            exit(1)
+        if fail_error in client_log_contents:
+            print("%s found in logs %s" % (fail_error, log_file))
+            exit(1)
+
 def create_directory(root_dir):
     # race condition during stress test can happen even if we check first
     try:
@@ -96,11 +110,14 @@ def create_md5_for_directory(src_dir, md5_file_name):
     for line in lines:
         md5_in.write(line + "\n")
 
-def verify_transfer_success(root_dir, test_ids):
+def verify_transfer_success(root_dir, test_ids, skip_tests=set()):
     src_md5_path = os.path.join(root_dir, "src.md5")
     create_md5_for_directory(os.path.join(root_dir, "src"), src_md5_path)
     status = 0
     for i in test_ids:
+        if i in skip_tests:
+            print("Skipping verification of test %s" % (i))
+            continue
         print("Verifying correctness for test {0}".format(i))
         print("Should be no diff")
         dst_dir = os.path.join(root_dir, "dst{0}".format(i))

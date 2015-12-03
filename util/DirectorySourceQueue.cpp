@@ -162,6 +162,12 @@ DirectorySourceQueue::~DirectorySourceQueue() {
   // destructor.
   clearSourceQueue();
   for (SourceMetaData *fileData : sharedFileData_) {
+    if (fileData->needToClose && fileData->fd >= 0) {
+      int ret = ::close(fileData->fd);
+      if (ret) {
+        PLOG(ERROR) << "Failed to close file " << fileData->fullPath;
+      }
+    }
     delete fileData;
   }
 }
