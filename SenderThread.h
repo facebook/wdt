@@ -277,6 +277,8 @@ class SenderThread : public WdtThread {
   int negotiatedProtocol_{-1};
 
   /// Pointer to client socket to maintain connection to the receiver
+  /// Note: this must be deleted while still on the same thread it was created
+  /// (for fbonly / btm / thrift / eventbase reasons)
   std::unique_ptr<ClientSocket> socket_;
 
   /// Buffer used by the sender thread to read/write data

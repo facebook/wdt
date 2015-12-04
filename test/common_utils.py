@@ -13,11 +13,32 @@ import errno
 import string
 import random
 
+# defaults (and file global)
+receiver_binary = "_bin/wdt/wdt"
+sender_binary = receiver_binary
+
+def get_env(name):
+    if name in os.environ:
+        return os.environ[name]
+
+def set_binaries():
+    global receiver_binary, sender_binary
+    sender = get_env('WDT_SENDER')
+    if sender:
+        sender_binary = sender
+    receiver = get_env('WDT_RECEIVER')
+    if receiver:
+        receiver_binary = receiver
+    print("Sender: " + sender_binary + " Receiver: " + receiver_binary)
+
+
 def get_wdt_version():
-    dummy_cmd = "_bin/wdt/wdt --version"
+    global receiver_binary
+    dummy_cmd = receiver_binary + " --version"
     dummy_process = subprocess.Popen(dummy_cmd.split(),
                                      stdout=subprocess.PIPE)
     protocol_string = dummy_process.stdout.readline().strip()
+    print("Receiver " + receiver_binary + " version is " + protocol_string)
     return protocol_string.split()[4]
 
 def start_receiver(receiver_cmd, root_dir, test_count):
@@ -38,6 +59,18 @@ def run_sender(sender_cmd, root_dir, test_count):
     print("Sender: " + sender_cmd)
     # return code of system is shifted by 8 bytes
     return os.system(sender_cmd) >> 8
+
+
+def run_sender_arg(sender_arg, root_dir, test_count):
+    global sender_binary
+    return run_sender(sender_binary + " " + sender_arg, root_dir, test_count)
+
+def start_receiver_arg(receiver_arg, root_dir, test_count):
+    global receiver_binary
+    print("Starting receiver " + receiver_binary)
+    return start_receiver(receiver_binary + " " + receiver_arg,
+                          root_dir, test_count)
+
 
 def check_transfer_status(status, root_dir, test_count):
     if status:

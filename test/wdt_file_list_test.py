@@ -1,22 +1,23 @@
 #! /usr/bin/env python
 
-import os
 from common_utils import *
+
 skip_tests = set()
+
 def run_test(name, sender_extra_flags, fail_transfer=False):
-    global wdt_receiver, wdtbin, test_count, root_dir
-    sender_extra_flags += " --enable_perf_stat_collection"
+    global wdt_receiver_arg, wdt_sender_arg, test_count, root_dir
     print("{0}. Testing {1}".format(test_count, name))
-    receiver_cmd = "{0} -directory {1}/dst{2}".format(
-            wdt_receiver, root_dir, test_count)
-    (receiver_process, connection_url) = start_receiver(
-            receiver_cmd, root_dir, test_count)
+    receiver_arg = "{0} -directory {1}/dst{2}".format(
+            wdt_receiver_arg, root_dir, test_count)
+    (receiver_process, connection_url) = start_receiver_arg(
+            receiver_arg, root_dir, test_count)
     if fail_transfer is True:
         connection_url += "&id=blah1234"
-    sender_cmd = ("{0} -directory {1}/src -connection_url \'{2}\' -manifest "
+    sender_arg = ("{0} -directory {1}/src -connection_url \'{2}\' -manifest "
                   "{1}/file_list {3}").format(
-                          wdtbin, root_dir, connection_url, sender_extra_flags)
-    transfer_status = run_sender(sender_cmd, root_dir, test_count)
+                          wdt_sender_arg, root_dir, connection_url,
+                      sender_extra_flags)
+    transfer_status = run_sender_arg(sender_arg, root_dir, test_count)
     transfer_status |= receiver_process.wait()
     if fail_transfer is True:
         if not transfer_status:
@@ -30,8 +31,10 @@ def run_test(name, sender_extra_flags, fail_transfer=False):
     check_logs_for_errors(root_dir, test_count, fail_errors)
     test_count += 1
 
+
 def main():
-    global wdt_receiver, wdtbin, test_count, root_dir
+    global wdt_receiver_arg, wdt_sender_arg, test_count, root_dir
+    set_binaries()
     root_dir = create_test_directory("/tmp")
     src_dir = root_dir + "/src"
     # create random files
@@ -52,9 +55,10 @@ def main():
     file_list_in.close()
     print("Done with set-up")
 
-    wdtbin_opts = "-full_reporting"
-    wdtbin = "_bin/wdt/wdt " + wdtbin_opts
-    wdt_receiver = wdtbin + " -start_port 0 -num_ports 2"
+    wdtbin_opts = " -full_reporting --enable_perf_stat_collection "
+
+    wdt_receiver_arg = wdtbin_opts + " -start_port 0 -num_ports 2"
+    wdt_sender_arg = wdtbin_opts
     test_count = 0
 
     run_test("basic file list", "")

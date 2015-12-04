@@ -109,6 +109,8 @@ SenderState SenderThread::connect() {
     return END;
   }
   ErrorCode code;
+  // TODO cleanup more but for now avoid having 2 socket object live per port
+  socket_ = nullptr;
   socket_ = connectToReceiver(port_, socketAbortChecker_.get(), code);
   if (code == ABORT) {
     threadStats_.setLocalErrorCode(ABORT);
@@ -728,14 +730,9 @@ SenderState SenderThread::processVersionMismatch() {
 
 void SenderThread::start() {
   Clock::time_point startTime = Clock::now();
-  auto completionGuard = folly::makeGuard([&] {
-    ThreadTransferHistory &transferHistory = getTransferHistory();
-    transferHistory.markNotInUse();
-    controller_->deRegisterThread(threadIndex_);
-    controller_->executeAtEnd([&]() { wdtParent_->endCurTransfer(); });
-  });
   controller_->executeAtStart([&]() { wdtParent_->startNewTransfer(); });
   SenderState state = CONNECT;
+
   while (state != END) {
     ErrorCode abortCode = wdtParent_->getCurAbortCode();
     if (abortCode != OK) {
@@ -759,6 +756,15 @@ void SenderThread::start() {
             << threadStats_.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
   perfReport_ = *wdt__perfStatReportThreadLocal;
+
+  ThreadTransferHistory &transferHistory = getTransferHistory();
+  transferHistory.markNotInUse();
+  controller_->deRegisterThread(threadIndex_);
+  controller_->executeAtEnd([&]() { wdtParent_->endCurTransfer(); });
+  // Important to delete the socket before the thread dies for sub class
+  // of clientsocket which have thread local data
+  socket_ = nullptr;
+
   return;
 }
 
