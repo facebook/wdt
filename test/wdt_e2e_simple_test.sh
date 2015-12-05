@@ -103,18 +103,18 @@ if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
 fi
 
 
-CMD="$WDTBIN -minloglevel=0 -directory $DIR/dst 2> $DIR/server.log | head -1 | \
-    xargs -I URL $WDTBIN -directory $DIR/src -connection_url URL \
-    -odirect_reads=$USE_ODIRECT 2>&1 | tee $DIR/client1.log"
+CMD="$WDTBIN -minloglevel=0 -directory $DIR/dst 2> $DIR/server.log | \
+    $WDTBIN -directory $DIR/src -odirect_reads=$USE_ODIRECT - 2>&1 | \
+    tee $DIR/client1.log"
 echo "First transfer: $CMD"
 eval $CMD
 STATUS=$?
 # TODO check for $? / crash... though diff will indirectly find that case
 
 if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
-  CMD="$WDTBIN -minloglevel=0 -directory $DIR/dst_symlinks 2>> $DIR/server.log |\
-    head -1 | xargs -I URL $WDTBIN -follow_symlinks -directory $DIR/src \
-    -connection_url URL -odirect_reads=$USE_ODIRECT 2>&1 | tee $DIR/client2.log"
+  CMD="$WDTBIN -minloglevel=0 -directory $DIR/dst_symlinks 2>> $DIR/server.log \
+   | $WDTBIN -follow_symlinks -directory $DIR/src \
+    -odirect_reads=$USE_ODIRECT - 2>&1 | tee $DIR/client2.log"
   echo "Second transfer: $CMD"
   eval $CMD
   # TODO check for $? / crash... though diff will indirectly find that case

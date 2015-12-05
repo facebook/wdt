@@ -206,6 +206,19 @@ custom_unittest(
 )
 
 custom_unittest(
+  name = 'wdt_stdin_test',
+  command = [
+      "wdt/test/wdt_stdin_test.sh",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+
+
+custom_unittest(
   name = 'wdte2e_simple_xfs',
   command = [
       "wdt/test/wdt_e2e_xfs_test.sh",

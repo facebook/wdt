@@ -31,6 +31,9 @@
 #endif
 
 // Flags not already in WdtOptions.h/WdtFlags.cpp.inc
+DEFINE_bool(fork, false,
+            "If true, forks the receiver, if false, no forking/stay in fg");
+
 DEFINE_bool(run_as_daemon, false,
             "If true, run the receiver as never ending process");
 
@@ -53,7 +56,9 @@ DEFINE_int32(
 
 DEFINE_string(connection_url, "",
               "Provide the connection string to connect to receiver"
-              " (incl. transfer_id and other parameters)");
+              " (incl. transfer_id and other parameters)."
+              " Deprecated: use - arg instead for safe encryption key"
+              " transmission");
 
 DECLARE_bool(logtostderr);  // default of standard glog is off - let's set it on
 
@@ -144,21 +149,33 @@ extern GFLAGS_DLL_DECL void (*gflags_exitfunc)(int);
 
 bool badGflagFound = false;
 
+static std::string usage;
+void printUsage() {
+  std::cerr << usage << std::endl;
+}
+
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
   google::SetArgv(argc, const_cast<const char **>(argv));
   google::SetVersionString(Protocol::getFullVersion());
-  std::string usage("WDT Warp-speed Data Transfer. v ");
+  usage.assign("WDT Warp-speed Data Transfer. v ");
   usage.append(google::VersionString());
-  usage.append(". Sample usage:\n\t");
+  usage.append(". Sample usage:\nTo transfer from srchost to desthost:\n\t");
+  usage.append("ssh dsthost ");
   usage.append(google::ProgramInvocationShortName());
-  usage.append(" # for a server/receiver\n\t");
+  usage.append(" -directory destdir | ssh srchost ");
   usage.append(google::ProgramInvocationShortName());
-  usage.append(" -connection_url url_produced_by_receiver # for a sender");
+  usage.append(" -directory srcdir -");
+  usage.append("\nPassing - as the argument to wdt means start the sender and"
+               " read the");
+  usage.append("\nconnection URL produced by the receiver, including encryption"
+               " key, from stdin.");
+  usage.append("\nUse --help to see all the options.");
   google::SetUsageMessage(usage);
   google::gflags_exitfunc = [](int code) {
     if (FLAGS_exit_on_bad_flags) {
+      printUsage();
       exit(code);
     }
     badGflagFound = true;
@@ -168,7 +185,22 @@ int main(int argc, char *argv[]) {
   if (badGflagFound) {
     LOG(ERROR) << "Continuing despite bad flags";
   }
+  // Only non -flag argument allowed so far is "-" meaning
+  // Read url from stdin and start a sender
+  if (argc > 2 || (argc == 2 && (argv[1][0]!='-' || argv[1][1]!='\0'))) {
+    printUsage();
+    std::cerr << "Error: argument should be - (to read url from stdin) "
+              << "or no arguments" << std::endl;
+    exit(1);
+  }
   signal(SIGPIPE, SIG_IGN);
+
+  std::string connectUrl;
+  if (argc == 2) {
+    std::getline(std::cin, connectUrl);
+  } else {
+    connectUrl = FLAGS_connection_url;
+  }
 
   // Might be a sub class (fbonly wdtCmdLine.cpp)
   Wdt &wdt = WDTCLASS::initializeWdt(FLAGS_app_name);
@@ -195,7 +227,7 @@ int main(int argc, char *argv[]) {
   // General case : Sender or Receiver
   const auto &options = WdtOptions::get();
   std::unique_ptr<WdtTransferRequest> reqPtr;
-  if (FLAGS_connection_url.empty()) {
+  if (connectUrl.empty()) {
     reqPtr = folly::make_unique<WdtTransferRequest>(
         options.start_port, options.num_ports, FLAGS_directory);
     reqPtr->hostName = FLAGS_destination;
@@ -206,9 +238,9 @@ int main(int argc, char *argv[]) {
                            FLAGS_test_only_encryption_secret);
     }
   } else {
-    reqPtr = folly::make_unique<WdtTransferRequest>(FLAGS_connection_url);
+    reqPtr = folly::make_unique<WdtTransferRequest>(connectUrl);
     if (reqPtr->errorCode != OK) {
-      LOG(ERROR) << "Invalid url \"" << FLAGS_connection_url
+      LOG(ERROR) << "Invalid url \"" << connectUrl
                  << "\" : " << errorCodeToStr(reqPtr->errorCode);
       return ERROR;
     }
@@ -220,7 +252,7 @@ int main(int argc, char *argv[]) {
     req.protocolVersion = FLAGS_protocol_version;
   }
 
-  if (FLAGS_destination.empty() && FLAGS_connection_url.empty()) {
+  if (FLAGS_destination.empty() && connectUrl.empty()) {
     Receiver receiver(req);
     WdtTransferRequest augmentedReq = receiver.init();
     if (augmentedReq.errorCode == FEWER_PORTS) {
@@ -238,6 +270,19 @@ int main(int argc, char *argv[]) {
     // on stdout: the one with secret:
     std::cout << augmentedReq.genWdtUrlWithSecret() << std::endl;
     std::cout.flush();
+    if (FLAGS_fork) {
+      pid_t cpid = fork();
+      if (cpid == -1){
+        perror("Failed to fork()");
+        exit(1);
+      }
+      if (cpid > 0){
+        LOG(INFO) << "Detaching receiver";
+        exit(0);
+      }
+      close(0);
+      close(1);
+    }
     setAbortChecker(receiver);
     if (!FLAGS_recovery_id.empty()) {
       WdtOptions::getMutable().enable_download_resumption = true;

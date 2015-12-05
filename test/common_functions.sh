@@ -1,3 +1,5 @@
+#### TODO : make this work on  MacOS
+
 IPTABLE_LOCK_FILE="/tmp/wdt.iptable.lock"
 
 setTcOptions() {
@@ -69,6 +71,15 @@ setBinaries() {
     WDT_RECEIVER="_bin/wdt/wdt"
   fi
   echo "Sender binary : $WDT_SENDER, Receiver binary : $WDT_RECEIVER"
+}
+
+setDirectory() {
+  BASEDIR=/dev/shm/wdtTest_$USER
+  mkdir -p "$BASEDIR"
+  DIR=$(mktemp -d "$BASEDIR/XXXXX")
+  SRC_DIR="$DIR/src"
+  echo "Testing in $DIR - src dir $SRC_DIR"
+  mkdir "$SRC_DIR"
 }
 
 simulateNetworkGlitchesByRejecting() {

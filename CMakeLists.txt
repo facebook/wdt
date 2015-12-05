@@ -311,6 +311,10 @@ if (BUILD_TESTING)
   add_test(NAME WdtBasicE2E COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_e2e_simple_test.sh")
 
+# Doesn't work on a mac:
+#  add_test(NAME WdtStdinManifestAndUrl COMMAND
+#    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_stdin_test.sh")
+
   add_test(NAME WdtBasicE2Exfs COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_e2e_xfs_test.sh")
 
