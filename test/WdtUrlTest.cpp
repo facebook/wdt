@@ -129,7 +129,7 @@ TEST(RequestSerializationTest, UrlTests) {
       EXPECT_EQ(uri.getErrorCode(), OK);
       EXPECT_EQ(transferRequest.hostName, "::1");
       EXPECT_EQ(transferRequest.ports,
-                WdtBase::genPortsVector(24689, options.num_ports));
+                WdtTransferRequest::genPortsVector(24689, options.num_ports));
     }
     {
       uri = "wdt://[::1]?num_ports=10";
@@ -137,14 +137,15 @@ TEST(RequestSerializationTest, UrlTests) {
       EXPECT_EQ(uri.getErrorCode(), OK);
       EXPECT_EQ(transferRequest.hostName, "::1");
       EXPECT_EQ(transferRequest.ports,
-                WdtBase::genPortsVector(options.start_port, 10));
+                WdtTransferRequest::genPortsVector(options.start_port, 10));
     }
     {
       uri = "wdt://[::1]:24689?start_port=22356&ports=1,2,3,4";
       WdtTransferRequest transferRequest(uri.generateUrl());
       EXPECT_EQ(uri.getErrorCode(), OK);
       EXPECT_EQ(transferRequest.hostName, "::1");
-      EXPECT_EQ(transferRequest.ports, WdtBase::genPortsVector(1, 4));
+      EXPECT_EQ(transferRequest.ports,
+                WdtTransferRequest::genPortsVector(1, 4));
     }
   }
   {

@@ -61,7 +61,6 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
   dirQueue_->setFollowSymlinks(options.follow_symlinks);
   dirQueue_->setBlockSizeMbytes(options.block_size_mbytes);
   progressReportIntervalMillis_ = options.progress_report_interval_millis;
-  progressReporter_ = folly::make_unique<ProgressReporter>();
 }
 
 // TODO: argghhhh
@@ -89,7 +88,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir,
       folly::make_unique<TransferHistoryController>(*dirQueue_);
 }
 
-WdtTransferRequest Sender::init() {
+const WdtTransferRequest &Sender::init() {
   VLOG(1) << "Sender Init() with encryption set = "
           << transferRequest_.encryptionData.isSet();
   // TODO cleanup / most not necessary / duplicate state
@@ -327,6 +326,10 @@ ErrorCode Sender::start() {
             << transferRequest_.ports << "]";
   startTime_ = Clock::now();
   downloadResumptionEnabled_ = options.enable_download_resumption;
+  if (!progressReporter_) {
+    VLOG(1) << "No progress reporter provided, making a default one";
+    progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
+  }
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
   if (throttler_) {

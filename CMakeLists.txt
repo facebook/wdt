@@ -85,6 +85,7 @@ WdtThread.cpp
 util/ThreadsController.cpp
 ReceiverThread.cpp
 Receiver.cpp
+WdtTransferRequest.cpp
 Reporting.cpp
 util/ThreadTransferHistory.cpp
 SenderThread.cpp

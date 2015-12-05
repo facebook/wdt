@@ -481,6 +481,7 @@ cpp_library (
     "Receiver.cpp",
     "Throttler.cpp",
     "WdtOptions.cpp",
+    "WdtTransferRequest.cpp",
     "Reporting.cpp",
     "ErrorCodes.cpp",
     "util/FileWriter.cpp",

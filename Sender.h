@@ -54,7 +54,7 @@ class Sender : public WdtBase {
          const std::vector<FileInfo> &srcFileInfo);
 
   /// Setup before start (@see WdtBase.h)
-  WdtTransferRequest init() override;
+  const WdtTransferRequest &init() override;
 
   /**
    * If the transfer has not finished, then it is aborted. finish() is called to

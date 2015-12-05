@@ -11,6 +11,7 @@
 #include <wdt/ErrorCodes.h>
 #include <wdt/WdtOptions.h>
 #include <wdt/util/EncryptionUtils.h>
+#include <wdt/WdtTransferRequest.h>
 
 #include <algorithm>
 #include <vector>
@@ -436,7 +437,8 @@ class TransferReport {
  */
 class ProgressReporter {
  public:
-  ProgressReporter() {
+  explicit ProgressReporter(const WdtTransferRequest &transferRequest)
+      : transferRequest_(transferRequest) {
     isTty_ = isatty(STDOUT_FILENO);
   }
 
@@ -463,6 +465,11 @@ class ProgressReporter {
 
   virtual ~ProgressReporter() {
   }
+
+ protected:
+  /// Reference to the wdt transfer request for the wdt bas
+  /// object using the progress reporter
+  const WdtTransferRequest &transferRequest_;
 
  private:
   /**

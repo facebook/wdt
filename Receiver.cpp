@@ -116,7 +116,7 @@ void Receiver::endCurGlobalSession() {
   hasNewTransferStarted_.store(false);
 }
 
-WdtTransferRequest Receiver::init() {
+const WdtTransferRequest &Receiver::init() {
   const auto &options = WdtOptions::get();
   backlog_ = options.backlog;
   bufferSize_ = options.buffer_size;
@@ -327,7 +327,7 @@ ErrorCode Receiver::transferAsync() {
   int progressReportIntervalMillis = options.progress_report_interval_millis;
   if (!progressReporter_ && progressReportIntervalMillis > 0) {
     // if progress reporter has not been set, use the default one
-    progressReporter_ = folly::make_unique<ProgressReporter>();
+    progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
   }
   return start();
 }
