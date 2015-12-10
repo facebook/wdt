@@ -53,7 +53,6 @@ source `dirname "$0"`/common_functions.sh
 DO_VERIFY=1
 # echo e | $NC was used to stop daemon servers
 #NC="nc -4" # ipv4 only
-REALPATH=/mnt/vol/engshare/svnroot/tfb/trunk/www/scripts/bin/realpath
 
 # Verbose:
 #WDTBIN="_bin/wdt/wdt -minloglevel 0"
@@ -116,7 +115,7 @@ cp -R wdt folly /usr/bin /usr/lib $DIR/src
 # Removing symlinks which point to the same source tree
 for link in `find -L $DIR/src -xtype l`
 do
-  real_path=`$REALPATH $link`;
+  real_path=`readlink -e $link`;
   if [[ $real_path =~ ^$DIR/src/* ]]
   then
     echo "Removing symlink $link"
