@@ -55,7 +55,8 @@ namespace wdt {
   X(TRANSFER_LOG_ACQUIRE_ERROR) /** Failed to acquire lock for transfer log */ \
   X(WDT_TIMEOUT)                /** Socket operation timed out  */             \
   X(UNEXPECTED_CMD_ERROR)       /** Unexpected cmd received */                 \
-  X(ENCRYPTION_ERROR)           /** Error related to encryption */
+  X(ENCRYPTION_ERROR)           /** Error related to encryption */             \
+  X(ALREADY_EXISTS)             /** Create attempt for existing id */
 
 enum ErrorCode {
 #define X(A) A,

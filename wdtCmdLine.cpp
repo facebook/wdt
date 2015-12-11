@@ -167,10 +167,12 @@ int main(int argc, char *argv[]) {
   usage.append(" -directory destdir | ssh srchost ");
   usage.append(google::ProgramInvocationShortName());
   usage.append(" -directory srcdir -");
-  usage.append("\nPassing - as the argument to wdt means start the sender and"
-               " read the");
-  usage.append("\nconnection URL produced by the receiver, including encryption"
-               " key, from stdin.");
+  usage.append(
+      "\nPassing - as the argument to wdt means start the sender and"
+      " read the");
+  usage.append(
+      "\nconnection URL produced by the receiver, including encryption"
+      " key, from stdin.");
   usage.append("\nUse --help to see all the options.");
   google::SetUsageMessage(usage);
   google::gflags_exitfunc = [](int code) {
@@ -187,7 +189,7 @@ int main(int argc, char *argv[]) {
   }
   // Only non -flag argument allowed so far is "-" meaning
   // Read url from stdin and start a sender
-  if (argc > 2 || (argc == 2 && (argv[1][0]!='-' || argv[1][1]!='\0'))) {
+  if (argc > 2 || (argc == 2 && (argv[1][0] != '-' || argv[1][1] != '\0'))) {
     printUsage();
     std::cerr << "Error: argument should be - (to read url from stdin) "
               << "or no arguments" << std::endl;
@@ -272,11 +274,11 @@ int main(int argc, char *argv[]) {
     std::cout.flush();
     if (FLAGS_fork) {
       pid_t cpid = fork();
-      if (cpid == -1){
+      if (cpid == -1) {
         perror("Failed to fork()");
         exit(1);
       }
-      if (cpid > 0){
+      if (cpid > 0) {
         LOG(INFO) << "Detaching receiver";
         exit(0);
       }

@@ -54,6 +54,35 @@ TEST(FdTest, FdTestBasic) {
 TEST(FdTest, FdTestBasicResumption) {
   basicTest(true);
 }
+
+TEST(DupSend, DuplicateSend) {
+  auto &opts = WdtOptions::getMutable();
+  opts.skip_writes = true;
+  opts.enable_download_resumption = false;
+  // Tmpfile (deleted)
+  FILE *tmp = tmpfile();
+  EXPECT_NE(tmp, nullptr);
+  // We keep the fd around
+  int fd = fileno(tmp);
+  LOG(INFO) << "tmp file fd " << fd;
+  fclose(tmp);
+  WdtTransferRequest req(/* start port */ 0, /* num ports */ 3, "/tmp/wdtTest");
+  Receiver r(req);
+  req = r.init();
+  EXPECT_EQ(OK, req.errorCode);
+  EXPECT_EQ(OK, r.transferAsync());
+  // Not even using the actual name (which we don't know)
+  req.fileInfo.push_back(FileInfo("notexisting23r4", 0, fd));
+  Sender s(req);
+  req = s.init();
+  EXPECT_EQ(OK, req.errorCode);
+  ErrorCode ret1 = s.transferAsync();
+  EXPECT_EQ(OK, ret1);
+  ErrorCode ret2 = s.transferAsync();
+  EXPECT_EQ(ALREADY_EXISTS, ret2);
+  auto report = s.finish();
+  EXPECT_EQ(OK, report->getSummary().getErrorCode());
+}
 }
 }  // namespace end
 

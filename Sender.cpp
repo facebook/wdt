@@ -317,7 +317,14 @@ std::unique_ptr<TransferReport> Sender::transfer() {
 }
 
 ErrorCode Sender::start() {
-  setTransferStatus(ONGOING);
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (transferStatus_ != NOT_STARTED) {
+      LOG(ERROR) << "duplicate start() call detected " << transferStatus_;
+      return ALREADY_EXISTS;
+    }
+    transferStatus_ = ONGOING;
+  }
   const auto &options = WdtOptions::get();
   const bool twoPhases = options.two_phases;
   WDT_CHECK(!(twoPhases && options.enable_download_resumption))

@@ -78,14 +78,15 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
                << wdtNamespace << " " << secondKey;
     return errCode;
   }
-  auto senderReleaseGuard = folly::makeGuard(
-      [&] { wdtController->releaseSender(wdtNamespace, secondKey); });
-
   wdtSetAbortSocketCreatorAndReporter(wdtNamespace, sender.get(), req,
                                       abortChecker);
 
   auto transferReport = sender->transfer();
-  return transferReport->getSummary().getErrorCode();
+  ErrorCode ret = transferReport->getSummary().getErrorCode();
+  wdtController->releaseSender(wdtNamespace, secondKey);
+  LOG(INFO) << "wdtSend for " << wdtNamespace << " " << secondKey << " "
+            << " ended with " << errorCodeToStr(ret);
+  return ret;
 }
 
 ErrorCode Wdt::wdtSetAbortSocketCreatorAndReporter(

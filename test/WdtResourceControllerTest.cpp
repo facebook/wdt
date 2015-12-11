@@ -69,6 +69,16 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
                         transferRequest, senderPtr);
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
+    if (index == 1) {
+      code = createSender(wdtNamespace, transferRequest.transferId,
+                          transferRequest, senderPtr);
+      EXPECT_EQ(code, ALREADY_EXISTS);
+      EXPECT_EQ(senderPtr, nullptr);
+      code = createReceiver(wdtNamespace, transferRequest.transferId,
+                            transferRequest, receiverPtr);
+      EXPECT_EQ(code, ALREADY_EXISTS);
+      EXPECT_EQ(receiverPtr, nullptr);
+    }
   }
   EXPECT_EQ(getAllReceivers(wdtNamespace).size(), index);
   EXPECT_EQ(getAllSenders(wdtNamespace).size(), index);
