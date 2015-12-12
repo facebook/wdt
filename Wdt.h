@@ -70,7 +70,8 @@ class Wdt {
    */
   virtual ErrorCode wdtSend(
       const std::string &wdtNamespace, const WdtTransferRequest &wdtRequest,
-      std::shared_ptr<IAbortChecker> abortChecker = nullptr);
+      std::shared_ptr<IAbortChecker> abortChecker = nullptr,
+      bool terminateExistingOne = false);
 
   virtual ErrorCode printWdtOptions(std::ostream &out);
 

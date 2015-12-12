@@ -63,6 +63,8 @@ ErrorCode WdtNamespaceController::createReceiver(
     auto it = receiversMap_.find(identifier);
     if (it != receiversMap_.end()) {
       LOG(ERROR) << "Receiver already created for transfer " << identifier;
+      // Return it so the old one can potentially be aborted
+      receiver = it->second;
       return ALREADY_EXISTS;
     }
     // Check for quotas
@@ -89,6 +91,8 @@ ErrorCode WdtNamespaceController::createSender(
     auto it = sendersMap_.find(identifier);
     if (it != sendersMap_.end()) {
       LOG(ERROR) << "Sender already created for transfer " << identifier;
+      // Return it so the old one can potentially be aborted
+      sender = it->second;
       return ALREADY_EXISTS;
     }
     /// Check for quotas
@@ -121,6 +125,7 @@ ErrorCode WdtNamespaceController::releaseReceiver(
     --numReceivers_;
   }
   // receiver will be deleted and logs printed by the destructor
+  // if no other thread has the shared pointer, that is...
   LOG(INFO) << "Released the receiver with id " << receiver->getTransferId();
   return OK;
 }
@@ -321,10 +326,11 @@ ErrorCode WdtResourceController::createSender(
   }
   ErrorCode code =
       controller->createSender(wdtOperationRequest, identifier, sender);
-  if (!sender) {
+  if (code != OK) {
     GuardLock lock(controllerMutex_);
     --numSenders_;
-    LOG(ERROR) << "Failed in creating sender for " << wdtNamespace;
+    LOG(ERROR) << "Failed in creating sender for " << wdtNamespace << " "
+               << errorCodeToStr(code);
   } else {
     LOG(INFO) << "Successfully added a sender for " << wdtNamespace;
   }
@@ -357,10 +363,11 @@ ErrorCode WdtResourceController::createReceiver(
   }
   ErrorCode code =
       controller->createReceiver(wdtOperationRequest, identifier, receiver);
-  if (!receiver) {
+  if (code != OK) {
     GuardLock lock(controllerMutex_);
     --numReceivers_;
-    LOG(ERROR) << "Failed in creating receiver for " << wdtNamespace;
+    LOG(ERROR) << "Failed in creating receiver for " << wdtNamespace << " "
+               << errorCodeToStr(code);
   } else {
     LOG(INFO) << "Successfully added a receiver for " << wdtNamespace;
   }

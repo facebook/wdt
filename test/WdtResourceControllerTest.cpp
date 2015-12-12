@@ -70,14 +70,16 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
     ASSERT_TRUE(code == OK);
     ASSERT_TRUE(senderPtr != nullptr);
     if (index == 1) {
+      SenderPtr oldSender;
       code = createSender(wdtNamespace, transferRequest.transferId,
-                          transferRequest, senderPtr);
+                          transferRequest, oldSender);
       EXPECT_EQ(code, ALREADY_EXISTS);
-      EXPECT_EQ(senderPtr, nullptr);
+      EXPECT_EQ(senderPtr, oldSender);
+      ReceiverPtr oldReceiver;
       code = createReceiver(wdtNamespace, transferRequest.transferId,
-                            transferRequest, receiverPtr);
+                            transferRequest, oldReceiver);
       EXPECT_EQ(code, ALREADY_EXISTS);
-      EXPECT_EQ(receiverPtr, nullptr);
+      EXPECT_EQ(receiverPtr, oldReceiver);
     }
   }
   EXPECT_EQ(getAllReceivers(wdtNamespace).size(), index);
@@ -92,8 +94,8 @@ void WdtResourceControllerTest::AddObjectsWithNoLimitsTest() {
   code = releaseReceiver(wdtNamespace, getTransferId(transferPrefix, 0));
   ASSERT_TRUE(code == OK);
 
-  ASSERT_TRUE(numSenders_ == numSenders - 1);
-  ASSERT_TRUE(numReceivers_ == numReceivers - 1);
+  EXPECT_EQ(numSenders_, numSenders - 1);
+  EXPECT_EQ(numReceivers_, numReceivers - 1);
 }
 
 void WdtResourceControllerTest::MultipleNamespacesTest() {
