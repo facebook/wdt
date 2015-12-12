@@ -216,7 +216,16 @@ custom_unittest(
   ],
 )
 
-
+custom_unittest(
+  name = 'wdt_lock_failfast_test',
+  command = [
+      "wdt/test/wdt_lock_failfast.sh",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
 
 custom_unittest(
   name = 'wdte2e_simple_xfs',

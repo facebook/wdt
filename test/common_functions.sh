@@ -241,7 +241,7 @@ verifyTransferAndCleanup() {
   STATUS=0
   (cd "$DIR/dst${TEST_COUNT}" ; ( find . -type f -print0 | xargs -0 "$MD5SUM" \
     | sort | grep -v "\.wdt\.log\$") > "../dst${TEST_COUNT}.md5s" )
-  echo "Verifying correctness for test $((TEST_COUNT + 1))"
+  echo "Verifying correctness for test $TEST_COUNT"
   echo "Should be no diff"
   USE_OTHER_SRC=$1
   if [ "$USE_OTHER_SRC" == "true" ]; then

@@ -113,8 +113,9 @@ std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
       abortTrigger.store(true);
     }
   };
-  // we want to run in bg, not block
-  static std::future<void> abortThread = std::async(std::launch::async, lambda);
+  // Run this in a separate thread concurrently with sender/receiver
+  std::thread abortThread(lambda);
+  abortThread.detach();
   return res;
 }
 
@@ -200,6 +201,10 @@ int main(int argc, char *argv[]) {
   std::string connectUrl;
   if (argc == 2) {
     std::getline(std::cin, connectUrl);
+    if (connectUrl.empty()) {
+      LOG(ERROR) << "Sender unable to read connection url from stdin - exiting";
+      return URI_PARSE_ERROR;
+    }
   } else {
     connectUrl = FLAGS_connection_url;
   }
@@ -256,15 +261,21 @@ int main(int argc, char *argv[]) {
 
   if (FLAGS_destination.empty() && connectUrl.empty()) {
     Receiver receiver(req);
+    if (!FLAGS_recovery_id.empty()) {
+      WdtOptions::getMutable().enable_download_resumption = true;
+      receiver.setRecoveryId(FLAGS_recovery_id);
+    }
     WdtTransferRequest augmentedReq = receiver.init();
-    if (augmentedReq.errorCode == FEWER_PORTS) {
+    retCode = augmentedReq.errorCode;
+    if (retCode == FEWER_PORTS) {
       if (FLAGS_treat_fewer_port_as_error) {
         LOG(ERROR) << "Receiver could not bind to all the ports";
         return FEWER_PORTS;
       }
+      retCode = OK;
     } else if (augmentedReq.errorCode != OK) {
-      LOG(ERROR) << "Error setting up receiver";
-      return augmentedReq.errorCode;
+      LOG(ERROR) << "Error setting up receiver " << errorCodeToStr(retCode);
+      return retCode;
     }
     // In the log:
     LOG(INFO) << "Starting receiver with connection url "
@@ -286,10 +297,6 @@ int main(int argc, char *argv[]) {
       close(1);
     }
     setAbortChecker(receiver);
-    if (!FLAGS_recovery_id.empty()) {
-      WdtOptions::getMutable().enable_download_resumption = true;
-      receiver.setRecoveryId(FLAGS_recovery_id);
-    }
     if (!FLAGS_run_as_daemon) {
       retCode = receiver.transferAsync();
       if (retCode == OK) {

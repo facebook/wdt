@@ -128,8 +128,32 @@ const WdtTransferRequest &Receiver::init() {
               << bufferSize_ << " instead";
   }
   auto numThreads = transferRequest_.ports.size();
+  // This creates the destination directory (which is needed for transferLogMgr)
   fileCreator_.reset(
       new FileCreator(destDir_, numThreads, transferLogManager_));
+  // Make sure we can get the lock on the transfer log manager early
+  // so if we can't we don't generate a valid but useless url and end up
+  // starting a sender doomed to fail
+  if (options.enable_download_resumption) {
+    WDT_CHECK(!options.skip_writes)
+        << "Can not skip transfers with download resumption turned on";
+    if (options.resume_using_dir_tree) {
+      WDT_CHECK(!options.shouldPreallocateFiles())
+          << "Can not resume using directory tree if preallocation is enabled";
+    }
+    ErrorCode errCode = transferLogManager_.openLog();
+    if (errCode != OK) {
+      LOG(ERROR) << "Failed to open transfer log " << errorCodeToStr(errCode);
+      transferRequest_.errorCode = errCode;
+      return transferRequest_;
+    }
+    ErrorCode code = transferLogManager_.parseAndMatch(
+        recoveryId_, getTransferConfig(), fileChunksInfo_);
+    if (code == OK && options.resume_using_dir_tree) {
+      WDT_CHECK(fileChunksInfo_.empty());
+      traverseDestinationDir(fileChunksInfo_);
+    }
+  }
 
   EncryptionType encryptionType = parseEncryptionType(options.encryption_type);
   // is encryption enabled?
@@ -412,27 +436,7 @@ ErrorCode Receiver::start() {
   startTime_ = Clock::now();
   LOG(INFO) << "Starting (receiving) server on ports [ "
             << transferRequest_.ports << "] Target dir : " << destDir_;
-  const auto &options = WdtOptions::get();
   // TODO do the init stuff here
-  if (options.enable_download_resumption) {
-    WDT_CHECK(!options.skip_writes)
-        << "Can not skip transfers with download resumption turned on";
-    if (options.resume_using_dir_tree) {
-      WDT_CHECK(!options.shouldPreallocateFiles())
-          << "Can not resume using directory tree if preallocation is enabled";
-    }
-    ErrorCode errCode = transferLogManager_.openLog();
-    if (errCode != OK) {
-      LOG(ERROR) << "Failed to open transfer log " << errorCodeToStr(errCode);
-      return errCode;
-    }
-    ErrorCode code = transferLogManager_.parseAndMatch(
-        recoveryId_, getTransferConfig(), fileChunksInfo_);
-    if (code == OK && options.resume_using_dir_tree) {
-      WDT_CHECK(fileChunksInfo_.empty());
-      traverseDestinationDir(fileChunksInfo_);
-    }
-  }
   if (!throttler_) {
     configureThrottler();
   } else {
