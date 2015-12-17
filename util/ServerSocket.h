@@ -40,7 +40,10 @@ class ServerSocket : public WdtSocket {
   int getBackLog() const;
   /// Destroy the active connection and the listening fd
   /// if done by the same thread who owned the socket
-  void closeAll();
+  /// This call should be avoided. correct end should be using closeConnetion()
+  /// as this does not properly logically close the socket and is meant for
+  //  abort/errors only.
+  void closeAllNoCheck();
 
  private:
   const int backlog_;

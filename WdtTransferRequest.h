@@ -195,9 +195,6 @@ struct WdtTransferRequest {
 
   /// Names of the get parameters for different fields
   const static std::string TRANSFER_ID_PARAM;
-  /// Legacy protocol version. Need this because older wdt needs protocol
-  /// version to be present in the url and it needs the key to be "protocol"
-  const static std::string LEGACY_PROTOCOL_VERSION_PARAM;
   /** Constant for for the protocol version get parameter in uri */
   const static std::string RECEIVER_PROTOCOL_VERSION_PARAM;
   const static std::string DIRECTORY_PARAM;

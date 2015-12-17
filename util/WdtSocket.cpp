@@ -2,6 +2,7 @@
 #include <wdt/util/SocketUtils.h>
 #include <wdt/Protocol.h>
 #include <folly/Bits.h>
+#include <folly/String.h>  // for humanify
 
 namespace facebook {
 namespace wdt {
@@ -110,7 +111,8 @@ int WdtSocket::readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull) {
   return numRead;
 }
 
-int WdtSocket::writeInternal(char *buf, int nbyte, int timeoutMs, bool retry) {
+int WdtSocket::writeInternal(const char *buf, int nbyte, int timeoutMs,
+                             bool retry) {
   int count = 0;
   int written = 0;
   while (written < nbyte) {
@@ -205,21 +207,101 @@ int WdtSocket::write(char *buf, int nbyte, bool retry) {
   return written;
 }
 
-void WdtSocket::closeConnection() {
-  if (fd_ < 0) {
-    return;
+ErrorCode WdtSocket::shutdownWrites() {
+  ErrorCode code = finalizeWrites(true);
+  if (::shutdown(fd_, SHUT_WR) < 0) {
+    if (code == OK) {
+      PLOG(WARNING) << "Socket shutdown failed for fd " << fd_;
+      code = ERROR;
+    }
   }
+  return code;
+}
+
+ErrorCode WdtSocket::expectEndOfStream() {
+  return finalizeReads(true);
+}
+
+// TODO: Seems like we need to reset/clear encry/decr even on errors as we
+// reuse/restart/recycle encryption objects and sockets (more correctness
+// analysis of error cases needed)
+
+ErrorCode WdtSocket::finalizeReads(bool doTagIOs) {
+  VLOG(1) << "Finalizing reads/encryption " << port_ << " " << fd_;
+  const int toRead = decryptor_.expectsTag();
+  std::string tag;
+  ErrorCode code = OK;
+  if (toRead && doTagIOs) {
+    tag.resize(toRead);
+    int read = readInternal(&(tag.front()), tag.size(),
+                            options_.read_timeout_millis, true);
+    if (read != toRead) {
+      LOG(ERROR) << "Unable to read tag at end of stream got " << read
+                 << " needed " << toRead << " " << folly::humanify(tag);
+      tag.clear();
+      code = ENCRYPTION_ERROR;
+    }
+  }
+  decryptor_.setTag(tag);
+  if (!decryptor_.finish()) {
+    code = ENCRYPTION_ERROR;
+  }
+  readsFinalized_ = true;
+  return code;
+}
+
+ErrorCode WdtSocket::finalizeWrites(bool doTagIOs) {
+  VLOG(1) << "Finalizing writes/encryption " << port_ << " " << fd_;
+  ErrorCode code = OK;
+  if (!encryptor_.finish()) {
+    code = ENCRYPTION_ERROR;
+  }
+  const std::string &tag = encryptor_.getTag();
+  if (!tag.empty() && doTagIOs) {
+    const int timeoutMs = WdtOptions::get().write_timeout_millis;
+    const int expected = tag.size();
+    if (writeInternal(tag.data(), tag.size(), timeoutMs, false) != expected) {
+      PLOG(ERROR) << "Encryption Tag write error";
+      code = ENCRYPTION_ERROR;
+    }
+  }
+  writesFinalized_ = true;
+  return code;
+}
+
+ErrorCode WdtSocket::closeConnection() {
+  return closeConnectionInternal(true);
+}
+void WdtSocket::closeNoCheck() {
+  closeConnectionInternal(false);
+}
+
+ErrorCode WdtSocket::closeConnectionInternal(bool doTagIOs) {
   VLOG(1) << "Closing socket " << port_ << " " << fd_;
-  if (::close(fd_) != 0) {
-    LOG(ERROR) << "Failed to close socket " << fd_ << " " << port_;
+  if (fd_ < 0) {
+    return OK;
   }
+  ErrorCode errorCode = getNonRetryableErrCode();
+  if (!writesFinalized_) {
+    errorCode = getMoreInterestingError(errorCode, finalizeWrites(doTagIOs));
+  }
+  if (!readsFinalized_) {
+    errorCode = getMoreInterestingError(errorCode, finalizeReads(doTagIOs));
+  }
+  if (::close(fd_) != 0) {
+    PLOG(ERROR) << "Failed to close socket " << fd_ << " " << port_;
+    errorCode = getMoreInterestingError(ERROR, errorCode);
+  }
+  // This looks like a reset() make it explicit (and check it's complete)
   fd_ = -1;
   readErrorCode_ = OK;
   writeErrorCode_ = OK;
   encryptionSettingsRead_ = false;
   encryptionSettingsWritten_ = false;
-  encryptor_.finish();
-  decryptor_.finish();
+  writesFinalized_ = false;
+  readsFinalized_ = false;
+  VLOG(1) << "Error code from close " << errorCodeToStr(errorCode);
+  return errorCode;
 }
 
 int WdtSocket::getFd() const {
@@ -245,16 +327,18 @@ ErrorCode WdtSocket::getWriteErrCode() const {
 ErrorCode WdtSocket::getNonRetryableErrCode() const {
   ErrorCode errCode = OK;
   if (readErrorCode_ != OK && readErrorCode_ != SOCKET_READ_ERROR &&
-      readErrorCode_ != WDT_TIMEOUT) {
+      readErrorCode_ != WDT_TIMEOUT && readErrorCode_ != ENCRYPTION_ERROR) {
     errCode = getMoreInterestingError(errCode, readErrorCode_);
   }
-  if (writeErrorCode_ != OK && writeErrorCode_ != SOCKET_WRITE_ERROR) {
+  if (writeErrorCode_ != OK && writeErrorCode_ != SOCKET_WRITE_ERROR &&
+      writeErrorCode_ != ENCRYPTION_ERROR) {
     errCode = getMoreInterestingError(errCode, writeErrorCode_);
   }
   return errCode;
 }
 
 WdtSocket::~WdtSocket() {
+  VLOG(1) << "~WdtSocket " << port_ << " " << fd_;
   closeConnection();
 }
 }

@@ -558,10 +558,13 @@ SenderState SenderThread::processDoneCmd() {
   buf_[0] = Protocol::DONE_CMD;
   socket_->write(buf_, 1);
 
-  socket_->shutdown();
-  auto numRead = socket_->read(buf_, Protocol::kMinBufLength);
-  if (numRead != 0) {
-    LOG(WARNING) << "EOF not found when expected";
+  socket_->shutdownWrites();
+  ErrorCode retCode = socket_->expectEndOfStream();
+  if (retCode != OK) {
+    LOG(WARNING) << "Logical EOF not found when expected "
+                 << errorCodeToStr(retCode);
+    // TODO: consider making this encryption error as it means acks could be
+    // compromised
     return END;
   }
   VLOG(1) << "done with transfer, port " << port_;

@@ -32,6 +32,6 @@ if __name__ == "__main__":
     generate_random_files(src_dir, 140 * 1024 * 1024)
     test("none")
     test("aes128ctr")
-    test("aes128ofb")
+    test("aes128gcm")
     status = verify_transfer_success(root_dir, range(test_count))
     exit(status)

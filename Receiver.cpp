@@ -160,7 +160,8 @@ const WdtTransferRequest &Receiver::init() {
   bool encrypt = (encryptionType != ENC_NONE &&
                   protocolVersion_ >= Protocol::ENCRYPTION_V1_VERSION);
   if (encrypt) {
-    LOG(INFO) << "Encryption is enabled for this transfer";
+    LOG(INFO) << encryptionTypeToStr(encryptionType)
+              << " encryption is enabled for this transfer ";
     if (!transferRequest_.encryptionData.isSet()) {
       LOG(INFO) << "Receiver generating encryption key for type "
                 << encryptionTypeToStr(encryptionType);
@@ -342,6 +343,7 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
     LOG(INFO) << "Transfer not started, setting the error code to ERROR";
     transferReport->setErrorCode(ERROR);
   }
+  VLOG(1) << "Summary code " << errCode;
   return transferReport;
 }
 

@@ -133,7 +133,7 @@ string WdtBase::generateTransferId() {
     std::lock_guard<std::mutex> lock(mutex);
     transferId = to_string(randomEngine());
   }
-  LOG(INFO) << "Generated a transfer id " << transferId;
+  VLOG(1) << "Generated a transfer id " << transferId;
   return transferId;
 }
 }

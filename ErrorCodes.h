@@ -24,7 +24,8 @@ namespace wdt {
 #define WDT_CHECK_LT CHECK_LT
 #define WDT_CHECK_GE CHECK_GE
 #define WDT_CHECK_GT CHECK_GT
-// Note : All the new errors should be defined at the end
+// Note : All the new errors should be defined at the end - but see also
+// getMoreInterestingError implementation for error priorities for reporting
 #define ERRORS                                                                 \
   X(OK)                      /** No error  */                                  \
   X(ERROR)                   /** Generic error  */                             \

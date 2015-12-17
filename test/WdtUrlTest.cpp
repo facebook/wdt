@@ -247,7 +247,7 @@ TEST(TransferRequestTest, Encryption1) {
   }
   {
     WdtTransferRequest req(123, 3, "/foo/bar");
-    LOG(INFO) << "Url without e= " << req.getLogSafeString();
+    LOG(INFO) << "Url without enc= " << req.getLogSafeString();
     WdtTransferRequest req2(123, 3, "/foo/ba2");
     EXPECT_FALSE(req2 == req);
     req2.directory = "/foo/bar";
@@ -273,7 +273,7 @@ TEST(TransferRequestTest, Encryption1) {
     string ser = req.genWdtUrlWithSecret();
     LOG(INFO) << "Url with e= " << ser;
     EXPECT_EQ(ser,
-              "wdt://host1:123?e=1:464f4f62617235360001fffe"
+              "wdt://host1:123?enc=1:464f4f62617235360001fffe"
               "&id=&num_ports=3&recpv=" +
                   std::to_string(Protocol::protocol_version));
     WdtTransferRequest unser(ser);

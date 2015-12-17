@@ -26,7 +26,7 @@ class ClientSocket : public WdtSocket {
   int getUnackedBytes() const;
   /// @return   peer-ip of the connected socket
   const std::string &getPeerIp() const;
-  virtual void shutdown();
+  /// shutdown() is now on WdtSocket as shutdownWrites()
   virtual ~ClientSocket();
 
  protected:

@@ -33,8 +33,24 @@ class WdtSocket {
   /// write timeout
   int write(char *buf, int nbyte, bool retry = false);
 
-  /// closes current connection
-  virtual void closeConnection();
+  /// writes the tag/mac (for gcm) and shuts down the write half of the
+  /// underlying socket
+  virtual ErrorCode shutdownWrites();
+
+  /// expect logical and physical end of stream: read the tag and finialize
+  virtual ErrorCode expectEndOfStream();
+
+  /**
+   * Normal closing of the current connection.
+   * may return ENCRYPTION_ERROR if the stream is corrupt (gcm mode)
+   */
+  virtual ErrorCode closeConnection();
+
+  /**
+   * Close unexpectedly (will not read/write the checksum).
+   * This api is to be avoided/elminated.
+   */
+  void closeNoCheck();
 
   /// @return     current fd
   int getFd() const;
@@ -57,13 +73,22 @@ class WdtSocket {
   virtual ~WdtSocket();
 
  protected:
+  // TODO: doc would be nice... (for tryFull, retry...)
+
   int readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull);
 
-  int writeInternal(char *buf, int nbyte, int timeoutMs, bool retry);
+  int writeInternal(const char *buf, int nbyte, int timeoutMs, bool retry);
 
   void readEncryptionSettingsOnce(int timeoutMs);
 
   void writeEncryptionSettingsOnce();
+
+  /// If doTagIOs] is false will not try to read/write the final encryption tag
+  virtual ErrorCode closeConnectionInternal(bool doTagIOs);
+
+  ErrorCode finalizeWrites(bool doTagIOs);
+
+  ErrorCode finalizeReads(bool doTagIOs);
 
   int port_{-1};
   IAbortChecker const *abortChecker_;
@@ -88,6 +113,10 @@ class WdtSocket {
 
   /// options
   const WdtOptions &options_;
+  /// Have we already completed encryption and wrote the tag
+  bool writesFinalized_{false};
+  /// Have we already read the tag and completed decryption
+  bool readsFinalized_{false};
 };
 }
 }

@@ -28,10 +28,11 @@ ServerSocket::ServerSocket(int port, int backlog,
   supportUnencryptedPeer_ = true;
 }
 
-void ServerSocket::closeAll() {
+void ServerSocket::closeAllNoCheck() {
   VLOG(1) << "Destroying server socket (port, listen fd, fd)" << port_ << ", "
           << listeningFds_ << ", " << fd_;
-  closeConnection();
+  closeNoCheck();
+  // We don't care about listen error, the error that matters is encryption err
   for (auto listeningFd : listeningFds_) {
     if (listeningFd >= 0) {
       int ret = ::close(listeningFd);
@@ -46,7 +47,7 @@ void ServerSocket::closeAll() {
 }
 
 ServerSocket::~ServerSocket() {
-  closeAll();
+  closeAllNoCheck();
 }
 
 int ServerSocket::listenInternal(struct addrinfo *info,

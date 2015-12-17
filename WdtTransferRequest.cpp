@@ -198,19 +198,14 @@ std::vector<int32_t> WdtTransferRequest::genPortsVector(int32_t startPort,
   return ports;
 }
 
-// hard-coding
-const int WdtTransferRequest::LEGACY_PROTCOL_VERSION = 16;
-
 const string WdtTransferRequest::TRANSFER_ID_PARAM{"id"};
-// legacy protocol version
-const string WdtTransferRequest::LEGACY_PROTOCOL_VERSION_PARAM{"protocol"};
 /** RECeiver's Protocol Version */
 const string WdtTransferRequest::RECEIVER_PROTOCOL_VERSION_PARAM{"recpv"};
 const string WdtTransferRequest::DIRECTORY_PARAM{"dir"};
 const string WdtTransferRequest::PORTS_PARAM{"ports"};
 const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
 const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
-const string WdtTransferRequest::ENCRYPTION_PARAM{"e"};
+const string WdtTransferRequest::ENCRYPTION_PARAM{"enc"};
 
 WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
                                        const string& directory) {
@@ -312,11 +307,6 @@ string WdtTransferRequest::generateUrlInternal(bool genFull,
   wdtUri.setQueryParam(TRANSFER_ID_PARAM, transferId);
   wdtUri.setQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
-  const auto& options = WdtOptions::get();
-  if (options.url_backward_compatibility) {
-    wdtUri.setQueryParam(LEGACY_PROTOCOL_VERSION_PARAM,
-                         folly::to<string>(LEGACY_PROTCOL_VERSION));
-  }
   serializePorts(wdtUri);
   if (genFull) {
     wdtUri.setQueryParam(DIRECTORY_PARAM, directory);
@@ -345,8 +335,7 @@ void WdtTransferRequest::serializePorts(WdtUri& wdtUri) const {
     }
     prevPort = ports[i];
   }
-  const auto& options = WdtOptions::get();
-  if (hasHoles || options.url_backward_compatibility) {
+  if (hasHoles) {
     wdtUri.setQueryParam(PORTS_PARAM, getSerializedPortsList());
   } else {
     wdtUri.setPort(ports[0]);
