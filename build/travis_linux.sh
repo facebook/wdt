@@ -11,7 +11,7 @@ export PATH=$HOME/bin:$PATH
 export LD_LIBRARY_PATH=$HOME/lib:$LD_LIBRARY_PATH
 openssl version
 which openssl
-ldd openssl
+ldd `which openssl`
 if [[ "$CXX" == "clang++" ]] ; then
   export CC=clang-3.6
   export CXX=clang++-3.6

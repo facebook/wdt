@@ -23,6 +23,7 @@ addons:
       - clang-3.6
       - libboost-system1.55-dev
       - libssl-dev
+      - openssl-1.0.1f
 
 script:
   # Debug
