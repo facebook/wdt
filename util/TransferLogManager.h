@@ -240,6 +240,10 @@ class TransferLogManager {
   /// fsync transfer log
   void fsync();
 
+  /// Check log or directory hasn't been removed under us
+  /// TODO: consider calling periodically from the thread for early warning
+  ErrorCode checkLog();
+
   /// closes transfer log
   void close();
 
