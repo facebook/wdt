@@ -24,7 +24,7 @@ wget --no-check-certificate https://cmake.org/files/v3.3/cmake-3.3.2-Linux-x86_6
 sh cmake-3.3.2-Linux-x86_64.sh --prefix=$HOME --skip-license
 OPENSSL_VERSION=openssl-1.0.1q
 wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
-tar xfz $OPENSSL_VERSION
+tar xfz $OPENSSL_VERSION.tar.gz
 ( cd $OPENSSL_VERSION ; ./config --prefix=$HOME; make ; make install )
 which openssl
 openssl version
