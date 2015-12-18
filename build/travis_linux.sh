@@ -26,7 +26,7 @@ OPENSSL_VERSION=openssl-1.0.1q
 wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
 tar xfz $OPENSSL_VERSION.tar.gz
 ls -l $HOME/bin
-( cd $OPENSSL_VERSION ; ./config --prefix=$HOME; make ; make install )
+( cd $OPENSSL_VERSION ; ./config --prefix=$HOME threads shared; make ; make install )
 which openssl
 $HOME/bin/openssl version
 ldd $HOME/bin/openssl
