@@ -178,12 +178,6 @@ const std::string &ClientSocket::getPeerIp() const {
   return peerIp_;
 }
 
-void ClientSocket::shutdown() {
-  if (::shutdown(fd_, SHUT_WR) < 0) {
-    VLOG(1) << "Socket shutdown failed for fd " << fd_;
-  }
-}
-
 ClientSocket::~ClientSocket() {
 }
 }

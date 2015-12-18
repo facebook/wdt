@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.23.1511252)
+project("WDT" LANGUAGES C CXX VERSION 1.24.1512180)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -85,6 +85,7 @@ WdtThread.cpp
 util/ThreadsController.cpp
 ReceiverThread.cpp
 Receiver.cpp
+WdtTransferRequest.cpp
 Reporting.cpp
 util/ThreadTransferHistory.cpp
 SenderThread.cpp
@@ -121,7 +122,9 @@ find_library(GLOG_LIBRARY glog)
 # Gflags
 find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h)
 find_library(GFLAGS_LIBRARY gflags)
-find_library(CRYPTO_LIBRARY crypto)
+# OpenSSL's crypto lib
+find_package(OpenSSL REQUIRED)
+include_directories(${OPENSSL_INCLUDE_DIR})
 
 # You can also add jemalloc to the list if you have it/want it
 target_link_libraries(wdtlib_min
@@ -129,7 +132,7 @@ target_link_libraries(wdtlib_min
   ${GLOG_LIBRARY}
   ${GFLAGS_LIBRARY}
   ${Boost_LIBRARIES}
-  ${CRYPTO_LIBRARY}
+  ${OPENSSL_CRYPTO_LIBRARY}
   ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
 )
 
@@ -188,6 +191,7 @@ if (NOT FOLLY_HAVE_BITS_FUNCTEXCEPT)
 endif()
 
 add_library(folly4wdt ${FOLLY_CPP_SRC})
+target_link_libraries(folly4wdt ${GLOG_LIBRARY})
 
 # Order is important - inside fb we want the above
 # folly-config.h to be picked up instead of the fbcode one
@@ -306,6 +310,13 @@ if (BUILD_TESTING)
 
   add_test(NAME WdtBasicE2E COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_e2e_simple_test.sh")
+
+# Doesn't work on a mac:
+#  add_test(NAME WdtStdinManifestAndUrl COMMAND
+#    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_stdin_test.sh")
+
+  add_test(NAME WdtLockFailFast COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_lock_failfast.sh")
 
   add_test(NAME WdtBasicE2Exfs COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_e2e_xfs_test.sh")

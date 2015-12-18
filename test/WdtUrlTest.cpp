@@ -129,7 +129,7 @@ TEST(RequestSerializationTest, UrlTests) {
       EXPECT_EQ(uri.getErrorCode(), OK);
       EXPECT_EQ(transferRequest.hostName, "::1");
       EXPECT_EQ(transferRequest.ports,
-                WdtBase::genPortsVector(24689, options.num_ports));
+                WdtTransferRequest::genPortsVector(24689, options.num_ports));
     }
     {
       uri = "wdt://[::1]?num_ports=10";
@@ -137,14 +137,15 @@ TEST(RequestSerializationTest, UrlTests) {
       EXPECT_EQ(uri.getErrorCode(), OK);
       EXPECT_EQ(transferRequest.hostName, "::1");
       EXPECT_EQ(transferRequest.ports,
-                WdtBase::genPortsVector(options.start_port, 10));
+                WdtTransferRequest::genPortsVector(options.start_port, 10));
     }
     {
       uri = "wdt://[::1]:24689?start_port=22356&ports=1,2,3,4";
       WdtTransferRequest transferRequest(uri.generateUrl());
       EXPECT_EQ(uri.getErrorCode(), OK);
       EXPECT_EQ(transferRequest.hostName, "::1");
-      EXPECT_EQ(transferRequest.ports, WdtBase::genPortsVector(1, 4));
+      EXPECT_EQ(transferRequest.ports,
+                WdtTransferRequest::genPortsVector(1, 4));
     }
   }
   {
@@ -246,7 +247,7 @@ TEST(TransferRequestTest, Encryption1) {
   }
   {
     WdtTransferRequest req(123, 3, "/foo/bar");
-    LOG(INFO) << "Url without e= " << req.getLogSafeString();
+    LOG(INFO) << "Url without enc= " << req.getLogSafeString();
     WdtTransferRequest req2(123, 3, "/foo/ba2");
     EXPECT_FALSE(req2 == req);
     req2.directory = "/foo/bar";
@@ -272,7 +273,7 @@ TEST(TransferRequestTest, Encryption1) {
     string ser = req.genWdtUrlWithSecret();
     LOG(INFO) << "Url with e= " << ser;
     EXPECT_EQ(ser,
-              "wdt://host1:123?e=1:464f4f62617235360001fffe"
+              "wdt://host1:123?enc=1:464f4f62617235360001fffe"
               "&id=&num_ports=3&recpv=" +
                   std::to_string(Protocol::protocol_version));
     WdtTransferRequest unser(ser);

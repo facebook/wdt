@@ -58,6 +58,7 @@ DirectorySourceQueue::DirectorySourceQueue(const string &rootDir,
     : abortChecker_(abortChecker), options_(WdtOptions::get()) {
   setRootDir(rootDir);
   fileSourceBufferSize_ = options_.buffer_size;
+  openFilesDuringDiscovery_ = options_.open_files_during_discovery;
 }
 
 void DirectorySourceQueue::setIncludePattern(const string &includePattern) {
@@ -162,6 +163,12 @@ DirectorySourceQueue::~DirectorySourceQueue() {
   // destructor.
   clearSourceQueue();
   for (SourceMetaData *fileData : sharedFileData_) {
+    if (fileData->needToClose && fileData->fd >= 0) {
+      int ret = ::close(fileData->fd);
+      if (ret) {
+        PLOG(ERROR) << "Failed to close file " << fileData->fullPath;
+      }
+    }
     delete fileData;
   }
 }
@@ -426,9 +433,14 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   metadata->fd = fileInfo.fd;
   metadata->directReads = fileInfo.directReads;
   metadata->size = fileInfo.fileSize;
-  if (options_.open_files_during_discovery && metadata->fd < 0) {
+  if ((openFilesDuringDiscovery_ != 0) && (metadata->fd < 0)) {
     metadata->fd = FileUtil::openForRead(fullPath, metadata->directReads);
     metadata->needToClose = (metadata->fd >= 0);
+    // works for -1 up to 4B files
+    if (--openFilesDuringDiscovery_ == 0) {
+      LOG(WARNING) << "Already opened " << options_.open_files_during_discovery
+                   << " files, will open the reminder as they are sent";
+    }
   }
   std::unique_lock<std::mutex> lock(mutex_);
   sharedFileData_.emplace_back(metadata);

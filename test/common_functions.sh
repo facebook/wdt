@@ -1,3 +1,5 @@
+#### TODO : make this work on  MacOS
+
 IPTABLE_LOCK_FILE="/tmp/wdt.iptable.lock"
 
 setTcOptions() {
@@ -69,6 +71,15 @@ setBinaries() {
     WDT_RECEIVER="_bin/wdt/wdt"
   fi
   echo "Sender binary : $WDT_SENDER, Receiver binary : $WDT_RECEIVER"
+}
+
+setDirectory() {
+  BASEDIR=/dev/shm/wdtTest_$USER
+  mkdir -p "$BASEDIR"
+  DIR=$(mktemp -d "$BASEDIR/XXXXX")
+  SRC_DIR="$DIR/src"
+  echo "Testing in $DIR - src dir $SRC_DIR"
+  mkdir "$SRC_DIR"
 }
 
 simulateNetworkGlitchesByRejecting() {
@@ -230,7 +241,7 @@ verifyTransferAndCleanup() {
   STATUS=0
   (cd "$DIR/dst${TEST_COUNT}" ; ( find . -type f -print0 | xargs -0 "$MD5SUM" \
     | sort | grep -v "\.wdt\.log\$") > "../dst${TEST_COUNT}.md5s" )
-  echo "Verifying correctness for test $((TEST_COUNT + 1))"
+  echo "Verifying correctness for test $TEST_COUNT"
   echo "Should be no diff"
   USE_OTHER_SRC=$1
   if [ "$USE_OTHER_SRC" == "true" ]; then
@@ -268,20 +279,26 @@ signalHandler() {
 }
 
 extendWdtOptions() {
-  if [ ! -z "$NO_ENCRYPT" ]; then
+# TODO: rework this to just use a type...
+  if [ ! -z "$WDT_NO_ENCRYPT" ]; then
     echo "Encryption is disabled for this test"
     WDTBIN_OPTS="$WDTBIN_OPTS -encryption_type=none"
-  elif [ ! -z "$OFB_ENCRYPT" ]; then
-    echo "OFB Encryption is enabled for this test"
-    WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD -encryption_type=aes128ofb"
-  else
+  elif [ ! -z "$WDT_CTR_ENCRYPT" ]; then
     echo "CTR Encryption is enabled for this test"
     WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD -encryption_type=aes128ctr"
+  elif [ ! -z "$WDT_GCM_ENCRYPT" ]; then
+    echo "GCM Encryption is enabled for this test"
+    WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD -encryption_type=aes128gcm"
+  else
+    echo "Default Encryption is enabled for this test $EXTRA_ENCRYPTION_CMD"
+    WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD"
   fi
 }
 
 trap signalHandler SIGINT
-ENCRYPTION_KEY=`cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | \
-head -n 1`
-EXTRA_ENCRYPTION_CMD="-test_only_encryption_secret $ENCRYPTION_KEY"
+# Note this is not meant to be an example of a secure key, it's just for tests
+# (thus the test_only in the option name) - the normal way is through the URL
+# which generates a crypto. Add _secret for _secr in case of single digit pid.
+TEST_ONLY_ENCRYPTION_KEY=$(echo not_a_key_$$_secret | fold -b -w 16 | head -n 1)
+EXTRA_ENCRYPTION_CMD="-test_only_encryption_secret $TEST_ONLY_ENCRYPTION_KEY"
 ENCRYPTION_ENABLED=0

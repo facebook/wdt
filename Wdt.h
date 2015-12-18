@@ -70,19 +70,33 @@ class Wdt {
    */
   virtual ErrorCode wdtSend(
       const std::string &wdtNamespace, const WdtTransferRequest &wdtRequest,
-      std::shared_ptr<IAbortChecker> abortChecker = nullptr);
+      std::shared_ptr<IAbortChecker> abortChecker = nullptr,
+      bool terminateExistingOne = false);
 
   virtual ErrorCode printWdtOptions(std::ostream &out);
 
  protected:
+  /// Set to true when the single instance is initialized
   bool initDone_{false};
+
+  /**
+   * Set to true when settings are applied to avoid applying again
+   * This is needed because you can call wdtSend() independent of the thrift
+   * service
+   */
   bool settingsApplied_{false};
+
+  /// App name which is used in scuba reporting
   std::string appName_;
+
   WdtOptions &options_;
+
   /// responsible for initializing openssl
   WdtCryptoIntializer cryptoInitializer_;
+
   // Internal initialization so sub classes can share the code
   virtual ErrorCode initializeWdtInternal(const std::string &appName);
+
   // Optionally set socket creator and progress reporter (used for fb)
   virtual ErrorCode wdtSetAbortSocketCreatorAndReporter(
       const std::string &wdtNamespace, Sender *sender,
@@ -91,18 +105,23 @@ class Wdt {
 
   // Internal singleton creator/holder
   static Wdt &getWdtInternal();
+
   /**
    * Apply the possibly changed settings, eg throttler.
    * Automatically called for you.
    */
   ErrorCode applySettings();
+
   /// Private constructor (TODO options to be returned by initializeFromFlags)
   explicit Wdt(WdtOptions &opts) : options_(opts) {
   }
+
   Wdt() = delete;
+
   /// Not copyable
   Wdt(const Wdt &) = delete;
   Wdt &operator=(const Wdt &) = delete;
+
   /// Virtual Destructor (for class hierarchy)
   virtual ~Wdt() {
   }

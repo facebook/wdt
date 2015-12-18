@@ -55,7 +55,8 @@ ErrorCode Wdt::printWdtOptions(std::ostream &out) {
 
 ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
                        const WdtTransferRequest &req,
-                       std::shared_ptr<IAbortChecker> abortChecker) {
+                       std::shared_ptr<IAbortChecker> abortChecker,
+                       bool terminateExistingOne) {
   if (!settingsApplied_) {
     applySettings();
   }
@@ -73,19 +74,29 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   const std::string secondKey = req.hostName;
   ErrorCode errCode =
       wdtController->createSender(wdtNamespace, secondKey, req, sender);
+  if (errCode == ALREADY_EXISTS && terminateExistingOne) {
+    LOG(WARNING) << "Found pre-existing sender for " << wdtNamespace << " "
+                 << secondKey << " aborting it and making a new one";
+    sender->abort(ABORTED_BY_APPLICATION);
+    // This may log an error too
+    wdtController->releaseSender(wdtNamespace, secondKey);
+    // Try#2
+    errCode = wdtController->createSender(wdtNamespace, secondKey, req, sender);
+  }
   if (errCode != OK) {
     LOG(ERROR) << "Failed to create sender " << errorCodeToStr(errCode) << " "
                << wdtNamespace << " " << secondKey;
     return errCode;
   }
-  auto senderReleaseGuard = folly::makeGuard(
-      [&] { wdtController->releaseSender(wdtNamespace, secondKey); });
-
   wdtSetAbortSocketCreatorAndReporter(wdtNamespace, sender.get(), req,
                                       abortChecker);
 
   auto transferReport = sender->transfer();
-  return transferReport->getSummary().getErrorCode();
+  ErrorCode ret = transferReport->getSummary().getErrorCode();
+  wdtController->releaseSender(wdtNamespace, secondKey);
+  LOG(INFO) << "wdtSend for " << wdtNamespace << " " << secondKey << " "
+            << " ended with " << errorCodeToStr(ret);
+  return ret;
 }
 
 ErrorCode Wdt::wdtSetAbortSocketCreatorAndReporter(

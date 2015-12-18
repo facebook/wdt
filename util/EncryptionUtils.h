@@ -18,7 +18,7 @@ namespace wdt {
 /// AES encryption block size
 const int kAESBlockSize = 16;
 
-enum EncryptionType { ENC_NONE, ENC_AES128_CTR, ENC_AES128_OFB, NUM_ENC_TYPES };
+enum EncryptionType { ENC_NONE, ENC_AES128_CTR, ENC_AES128_GCM, NUM_ENC_TYPES };
 
 /// @return  string description for encryption type
 std::string encryptionTypeToStr(EncryptionType encryptionType);
@@ -87,13 +87,29 @@ class EncryptionParams {
  private:
   EncryptionType type_;
   std::string data_;
+  std::string tag_;
 };
 
 /// base class to share code between encyptor and decryptor
 class AESBase {
+ public:
+  const std::string& getTag() const {
+    return tag_;
+  }
+  void setTag(const std::string& tag) {
+    tag_ = tag;
+  }
+  /// @returns 0 if no tag for the algorithm or the size in bytes
+  //  for now only gcm produces/requires tag (hmac) of 128bits (16 bytes)
+  size_t expectsTag() const {
+    return (type_ == ENC_AES128_GCM) ? kAESBlockSize : 0;
+  }
+
  protected:
   /// @return   cipher for a encryption type
   const EVP_CIPHER* getCipher(const EncryptionType encryptionType);
+  EncryptionType type_{ENC_NONE};
+  std::string tag_;
 };
 
 /// encryptor class

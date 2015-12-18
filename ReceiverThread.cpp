@@ -100,7 +100,7 @@ ReceiverThread::ReceiverThread(Receiver *wdtParent, int threadIndex,
 
 /**LISTEN STATE***/
 ReceiverState ReceiverThread::listen() {
-  VLOG(1) << *this << " entered LISTEN state ";
+  VLOG(1) << *this << " entered LISTEN state";
   const auto &options = WdtOptions::get();
   const bool doActualWrites = !options.skip_writes;
   int32_t port = socket_->getPort();
@@ -131,11 +131,11 @@ ReceiverState ReceiverThread::listen() {
 
 /***ACCEPT_FIRST_CONNECTION***/
 ReceiverState ReceiverThread::acceptFirstConnection() {
-  VLOG(1) << *this << " entered ACCEPT_FIRST_CONNECTION state ";
+  VLOG(1) << *this << " entered ACCEPT_FIRST_CONNECTION state";
 
   const auto &options = WdtOptions::get();
   reset();
-  socket_->closeConnection();
+  socket_->closeNoCheck();
   auto timeout = options.accept_timeout_millis;
   int acceptAttempts = 0;
   while (true) {
@@ -173,7 +173,7 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
 
 /***ACCEPT_WITH_TIMEOUT STATE***/
 ReceiverState ReceiverThread::acceptWithTimeout() {
-  LOG(INFO) << *this << " entered ACCEPT_WITH_TIMEOUT state ";
+  LOG(INFO) << *this << " entered ACCEPT_WITH_TIMEOUT state";
   const auto &options = WdtOptions::get();
 
   // check socket status
@@ -184,7 +184,7 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
     threadStats_.setLocalErrorCode(socketErrCode);
     return END;
   }
-  socket_->closeConnection();
+  socket_->closeNoCheck();
 
   auto timeout = options.accept_window_millis;
   if (senderReadTimeout_ > 0) {
@@ -224,7 +224,7 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
 
 /***SEND_LOCAL_CHECKPOINT STATE***/
 ReceiverState ReceiverThread::sendLocalCheckpoint() {
-  LOG(INFO) << *this << " entered SEND_LOCAL_CHECKPOINT state ";
+  LOG(INFO) << *this << " entered SEND_LOCAL_CHECKPOINT state";
   std::vector<Checkpoint> checkpoints;
   if (doneSendFailure_) {
     // in case SEND_DONE failed, a special checkpoint(-1) is sent to signal this
@@ -258,7 +258,7 @@ ReceiverState ReceiverThread::sendLocalCheckpoint() {
 
 /***READ_NEXT_CMD***/
 ReceiverState ReceiverThread::readNextCmd() {
-  VLOG(1) << *this << " entered READ_NEXT_CMD state ";
+  VLOG(1) << *this << " entered READ_NEXT_CMD state";
   oldOffset_ = off_;
   numRead_ = readAtLeast(*socket_, buf_ + off_, bufferSize_ - off_,
                          Protocol::kMinBufLength, numRead_);
@@ -288,7 +288,7 @@ ReceiverState ReceiverThread::readNextCmd() {
 
 /***PROCESS_SETTINGS_CMD***/
 ReceiverState ReceiverThread::processSettingsCmd() {
-  VLOG(1) << *this << " entered PROCESS_SETTINGS_CMD state ";
+  VLOG(1) << *this << " entered PROCESS_SETTINGS_CMD state";
   Settings settings;
   int senderProtocolVersion;
 
@@ -354,7 +354,7 @@ ReceiverState ReceiverThread::processSettingsCmd() {
 
 /***PROCESS_FILE_CMD***/
 ReceiverState ReceiverThread::processFileCmd() {
-  VLOG(1) << *this << " entered PROCESS_FILE_CMD state ";
+  VLOG(1) << *this << " entered PROCESS_FILE_CMD state";
   const auto &options = WdtOptions::get();
   // following block needs to be executed for the first file cmd. There is no
   // harm in executing it more than once. number of blocks equal to 0 is a good
@@ -566,7 +566,7 @@ ReceiverState ReceiverThread::processFileCmd() {
 }
 
 ReceiverState ReceiverThread::processDoneCmd() {
-  VLOG(1) << *this << " entered PROCESS_DONE_CMD state ";
+  VLOG(1) << *this << " entered PROCESS_DONE_CMD state";
   if (numRead_ != Protocol::kMinBufLength) {
     LOG(ERROR) << "Unexpected state for done command"
                << " off_: " << off_ << " numRead_: " << numRead_;
@@ -595,7 +595,7 @@ ReceiverState ReceiverThread::processDoneCmd() {
 }
 
 ReceiverState ReceiverThread::processSizeCmd() {
-  VLOG(1) << *this << " entered PROCESS_SIZE_CMD state ";
+  VLOG(1) << *this << " entered PROCESS_SIZE_CMD state";
   int64_t totalSenderBytes;
   bool success = Protocol::decodeSize(
       buf_, off_, oldOffset_ + Protocol::kMaxSize, totalSenderBytes);
@@ -612,7 +612,7 @@ ReceiverState ReceiverThread::processSizeCmd() {
 }
 
 ReceiverState ReceiverThread::sendFileChunks() {
-  LOG(INFO) << *this << " entered SEND_FILE_CHUNKS state ";
+  LOG(INFO) << *this << " entered SEND_FILE_CHUNKS state";
   WDT_CHECK(senderReadTimeout_ > 0);  // must have received settings
   int waitingTimeMillis = senderReadTimeout_ / kWaitTimeoutFactor;
   auto execFunnel = controller_->getFunnel(SEND_FILE_CHUNKS_FUNNEL);
@@ -733,7 +733,7 @@ ReceiverState ReceiverThread::sendGlobalCheckpoint() {
 }
 
 ReceiverState ReceiverThread::sendAbortCmd() {
-  LOG(INFO) << *this << " entered SEND_ABORT_CMD state ";
+  LOG(INFO) << *this << " entered SEND_ABORT_CMD state";
   int64_t offset = 0;
   buf_[offset++] = Protocol::ABORT_CMD;
   Protocol::encodeAbort(buf_, offset, threadProtocolVersion_,
@@ -753,7 +753,7 @@ ReceiverState ReceiverThread::sendAbortCmd() {
 }
 
 ReceiverState ReceiverThread::sendDoneCmd() {
-  VLOG(1) << *this << " entered SEND_DONE_CMD state ";
+  VLOG(1) << *this << " entered SEND_DONE_CMD state";
   buf_[0] = Protocol::DONE_CMD;
   if (socket_->write(buf_, 1) != 1) {
     PLOG(ERROR) << "unable to send DONE " << threadIndex_;
@@ -771,26 +771,26 @@ ReceiverState ReceiverThread::sendDoneCmd() {
     threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
-
-  read = socket_->read(buf_, Protocol::kMinBufLength);
-  if (read != 0) {
-    LOG(ERROR) << *this << " EOF not found where expected";
+  ErrorCode code = socket_->expectEndOfStream();
+  if (code != OK) {
+    LOG(ERROR) << *this << " error while processing logical end of stream "
+               << errorCodeToStr(code);
     doneSendFailure_ = true;
-    threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
+    threadStats_.setLocalErrorCode(code);
     return ACCEPT_WITH_TIMEOUT;
   }
-  socket_->closeConnection();
-  LOG(INFO) << *this << " got ack for DONE. Transfer finished";
+  threadStats_.setLocalErrorCode(socket_->closeConnection());
+  LOG(INFO) << *this << " got ack for DONE and logical eof. Transfer finished";
   return END;
 }
 
 ReceiverState ReceiverThread::finishWithError() {
-  LOG(INFO) << *this << " entered FINISH_WITH_ERROR state ";
+  LOG(INFO) << *this << " entered FINISH_WITH_ERROR state";
   // should only be in this state if there is some error
   WDT_CHECK(threadStats_.getLocalErrorCode() != OK);
 
   // close the socket, so that sender receives an error during connect
-  socket_->closeAll();
+  socket_->closeAllNoCheck();
   auto cv = controller_->getCondition(WAIT_FOR_FINISH_OR_CHECKPOINT_CV);
   auto guard = cv->acquire();
   wdtParent_->addCheckpoint(checkpoint_);
@@ -815,7 +815,7 @@ ReceiverState ReceiverThread::checkForFinishOrNewCheckpoints() {
 }
 
 ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
-  LOG(INFO) << *this << " entered WAIT_FOR_FINISH_OR_NEW_CHECKPOINT state ";
+  LOG(INFO) << *this << " entered WAIT_FOR_FINISH_OR_NEW_CHECKPOINT state";
   // should only be called if the are no errors
   WDT_CHECK(threadStats_.getLocalErrorCode() == OK);
   auto cv = controller_->getCondition(WAIT_FOR_FINISH_OR_CHECKPOINT_CV);
@@ -852,16 +852,6 @@ ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
 }
 
 void ReceiverThread::start() {
-  INIT_PERF_STAT_REPORT
-  auto guard = folly::makeGuard([&] {
-    perfReport_ = *perfStatReport;
-    controller_->deRegisterThread(threadIndex_);
-    controller_->executeAtEnd([&]() { wdtParent_->endCurGlobalSession(); });
-    EncryptionType encryptionType =
-        (socket_ ? socket_->getEncryptionType() : ENC_NONE);
-    threadStats_.setEncryptionType(encryptionType);
-    LOG(INFO) << *this << threadStats_;
-  });
   if (!buf_) {
     LOG(ERROR) << "error allocating " << bufferSize_;
     threadStats_.setLocalErrorCode(MEMORY_ALLOCATION_ERROR);
@@ -876,14 +866,17 @@ void ReceiverThread::start() {
       threadStats_.setLocalErrorCode(ABORT);
       break;
     }
-    if (state == FAILED) {
-      return;
-    }
-    if (state == END) {
-      return;
+    if (state == FAILED || state == END) {
+      break;
     }
     state = (this->*stateMap_[state])();
   }
+  perfReport_ = *wdt__perfStatReportThreadLocal;
+  controller_->deRegisterThread(threadIndex_);
+  controller_->executeAtEnd([&]() { wdtParent_->endCurGlobalSession(); });
+  WDT_CHECK(socket_.get());
+  threadStats_.setEncryptionType(socket_->getEncryptionType());
+  LOG(INFO) << *this << threadStats_;
 }
 
 int32_t ReceiverThread::getPort() const {

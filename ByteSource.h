@@ -18,6 +18,13 @@ namespace wdt {
 
 /// struct representing file level data shared between blocks
 struct SourceMetaData {
+  SourceMetaData() {
+  }
+
+  /// Delete copy constructor and assignment operator
+  SourceMetaData(const SourceMetaData &that) = delete;
+  SourceMetaData &operator=(const SourceMetaData &that) = delete;
+
   /// full filepath
   std::string fullPath;
   /// relative pathname
@@ -43,15 +50,6 @@ struct SourceMetaData {
   int fd{-1};
   /// If true, fd was opened by wdt and must be closed after transfer finish
   bool needToClose{false};
-
-  ~SourceMetaData() {
-    if (needToClose && fd >= 0) {
-      int ret = ::close(fd);
-      if (ret) {
-        PLOG(ERROR) << "Failed to close file " << relPath;
-      }
-    }
-  }
 };
 
 class ByteSource {

@@ -1,0 +1,579 @@
+import os
+
+wdt_compiler_flags = [
+  "-Wextra",
+  "-Wsign-compare",
+  "-Wno-unused-parameter",
+  "-Wunused-variable",
+    #"-Wconversion",
+    #"-Wmaybe-uninitialized", not working because of D955599
+    #"-Iwdt",
+]
+
+
+cpp_library(
+  name = 'inc',
+  headers = [
+      "util/WdtFlags.cpp.inc",
+      "wdtCmdLine.cpp",
+  ],
+)
+
+cpp_unittest(
+  name = 'protocol_test',
+  srcs = [ 'test/ProtocolTest.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_unittest(
+  name = 'encryption_test',
+  srcs = [ 'test/EncryptionTest.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_binary(
+  name = 'option_type_test_long_flags',
+  srcs = [
+    'test/OptionTypeTest.cpp',
+  ],
+  deps = [
+      ":wdtlib",
+  ],
+  external_deps = [ ("gtest", None) ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_binary(
+  name = 'option_type_test_short_flags',
+  srcs = [
+    'test/OptionTypeTest.cpp',
+  ],
+  deps = [
+      ":wdtlib_short_flags",
+  ],
+  external_deps = [ ("gtest", None) ],
+  output_subdir = 'short_flags',
+  preprocessor_flags = [
+    "-DSTANDALONE_APP"
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+custom_unittest(
+  name = 'option_type_test',
+  command = [
+      "wdt/test/wdt_option_type_test.sh"
+  ],
+  type = 'simple',
+  deps = [
+      ':option_type_test_long_flags',
+      ':option_type_test_short_flags',
+  ],
+)
+
+cpp_unittest(
+  name = 'filereader_test',
+  srcs = [ 'test/FileReaderTest.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+
+cpp_unittest(
+  name = 'threadscontroller_test',
+  srcs = [ 'test/ThreadsControllerTest.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_unittest(
+  name = 'resource_controller_test',
+  srcs = [ 'test/WdtResourceControllerTest.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_unittest(
+  name = 'wdt_url_test',
+  srcs = [ 'test/WdtUrlTest.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_unittest(
+  name = 'wdt_fd_test',
+  srcs = [ 'test/FdTest.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+custom_unittest(
+  name = 'wdt_rand_gen_test',
+  command = [
+      "wdt/test/wdt_rand_gen_test.sh"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'receiver_throttler_ref_count_test',
+  command = [
+      "wdt/test/receiver_throttler_ref_count_test.sh"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+    name='transfer_log_lock_test',
+    command=[
+        "wdt/test/transfer_log_lock_test.sh"
+    ],
+    type='simple',
+    deps=[
+        ':wdt',
+    ],
+)
+
+custom_unittest(
+    name='error_codes_test',
+    command=[
+        "wdt/test/wdt_error_codes_test.sh"
+    ],
+    type='simple',
+    deps=[
+        ':wdt',
+    ],
+    tags=['serialize'],
+)
+
+custom_unittest(
+    name='wdte2e',
+    command=[
+        "wdt/test/wdt_e2e_test.sh"
+    ],
+    type='simple',
+    deps=[
+        ':wdt',
+    ],
+    tags=['serialize'],
+)
+
+custom_unittest(
+  name = 'wdte2e_simple',
+  command = [
+      "wdt/test/wdt_e2e_simple_test.sh",
+      "-d", "/dev/shm/wdtTest_" + os.environ['USER']
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'wdte2e_simple_odirect',
+  command = [
+      "wdt/test/wdt_e2e_simple_test.sh",
+      "-o", "true"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['serialize'],
+)
+
+custom_unittest(
+  name = 'wdt_stdin_test',
+  command = [
+      "wdt/test/wdt_stdin_test.sh",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'wdt_lock_failfast_test',
+  command = [
+      "wdt/test/wdt_lock_failfast.sh",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'wdte2e_simple_xfs',
+  command = [
+      "wdt/test/wdt_e2e_xfs_test.sh",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'wdt_file_list_test',
+  command = [
+      "wdt/test/wdt_file_list_test.py",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'wdt_overwrite_test',
+  command = [
+      "wdt/test/wdt_overwrite_test.py",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'slow_receiver_test',
+  command = [
+      "wdt/test/wdt_slow_receiver_test.py",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['extended'],
+)
+
+custom_unittest(
+  name = 'wdt_network_script',
+  command = [
+      "wdt/test/wdt_network_test.sh",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_network_script_open_during_disc',
+  command = [
+      "wdt/test/wdt_network_test.sh", "-x", "--open_files_during_discovery 750",
+      "-p", "25800",
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_network_script_protocol_negotiation_1',
+  command = [
+      "wdt/test/wdt_network_test.sh",
+      "-s", "10", "-p", "24100"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_network_script_protocol_negotiation_2',
+  command = [
+      "wdt/test/wdt_network_test.sh",
+      "-r", "10", "-p", "24200"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test_protcol_negotiation_1',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-s", "10", "-p", "25100"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test_protcol_negotiation_2',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-r", "10", "-p", "25200"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test_combination_2',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-c", "2", "-p", "25300"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test_combination_3',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-c", "3", "-p", "25400"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test_combination_4',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-c", "4", "-p", "25500"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test_negotiation_3',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-s", "10", "-c", "3", "-p", "25600"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test_negotiation_4',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-r", "10", "-c", "3", "-p", "25700"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'long_running_mode_test',
+  command = [
+      "wdt/test/wdt_long_running_test.py"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'port_block_test',
+  command = [
+      "wdt/test/wdt_port_block_test.py"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'protocol_negotiation_test',
+  command = [
+      "wdt/test/wdt_protocol_negotiation_test.py"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'bad_server_test',
+  command = [
+      "wdt/test/wdt_bad_server_test.py"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+)
+
+custom_unittest(
+  name = 'global_checkpoint_test',
+  command = [
+      "wdt/test/wdt_global_checkpoint_test.sh"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['serialize', 'disabled'],
+)
+
+cpp_library (
+  name = "wdtlib_min",
+  srcs = [
+    "util/WdtSocket.cpp",
+    "util/ClientSocket.cpp",
+    "util/ServerSocket.cpp",
+    "Protocol.cpp",
+    "util/FileByteSource.cpp",
+    "util/DirectorySourceQueue.cpp",
+    "util/EncryptionUtils.cpp",
+    "util/FileCreator.cpp",
+    "util/SocketUtils.cpp",
+    "WdtThread.cpp",
+    "util/ThreadsController.cpp",
+    "util/ThreadTransferHistory.cpp",
+    "SenderThread.cpp",
+    "Sender.cpp",
+    "ReceiverThread.cpp",
+    "Receiver.cpp",
+    "Throttler.cpp",
+    "WdtOptions.cpp",
+    "WdtTransferRequest.cpp",
+    "Reporting.cpp",
+    "ErrorCodes.cpp",
+    "util/FileWriter.cpp",
+    "util/SerializationUtil.cpp",
+    "util/TransferLogManager.cpp",
+    "WdtBase.cpp",
+    "WdtResourceController.cpp",
+  ],
+  compiler_flags = wdt_compiler_flags,
+  deps = [
+    ":inc",
+    "@/folly:folly",
+  ],
+  external_deps = [ ("openssl", None, "crypto") ],
+)
+
+cpp_library (
+  name = "wdtlib",
+  srcs = [
+    "util/WdtFlags.cpp",
+    "Wdt.cpp",
+  ],
+  deps = [
+    ":wdtlib_min",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_library (
+  name = "wdtlib_short_flags",
+  srcs = [
+    "util/WdtFlags.cpp",
+    "Wdt.cpp",
+  ],
+  deps = [
+    ':wdtlib_min',
+  ],
+  compiler_flags = wdt_compiler_flags,
+  preprocessor_flags = [
+    "-DSTANDALONE_APP"
+  ],
+  output_subdir = 'short_flags',
+)
+
+cpp_binary(
+    name= "wdt",
+    srcs = [
+      "wdtCmdLine.cpp",
+    ],
+    deps = [
+      ":wdtlib_short_flags",
+    ],
+    compiler_flags = wdt_compiler_flags,
+    preprocessor_flags = [
+      "-DSTANDALONE_APP"
+    ],
+)
+
+cpp_binary(
+    name= "wdt_network_test",
+    srcs = [
+      "test/NetworkErrorSimulator.cpp",
+      "wdtCmdLine.cpp",
+    ],
+    deps = [
+      ":wdtlib_short_flags",
+    ],
+    preprocessor_flags = [
+      "-DSTANDALONE_APP"
+    ],
+    output_subdir = 'test',
+    compiler_flags = wdt_compiler_flags,
+)

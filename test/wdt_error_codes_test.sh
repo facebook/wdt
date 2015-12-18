@@ -42,20 +42,20 @@ TEST_COUNT=0
 
 echo "Testing directory permission error"
 SRC_DIR=$DIR/inaccessible_dir
-mkdir $SRC_DIR 
-chmod 000 $SRC_DIR 
-transfer 7 7  # BYTE_SOURCE_READ_ERROR 
+mkdir $SRC_DIR
+chmod 000 $SRC_DIR
+transfer 7 7  # BYTE_SOURCE_READ_ERROR
 
 echo "Testing file permission error"
 SRC_DIR=$DIR/src1
-mkdir $SRC_DIR 
+mkdir $SRC_DIR
 touch $SRC_DIR/inaccessible_file
 chmod 000 $SRC_DIR/inaccessible_file
-transfer 7 7  # BYTE_SOURCE_READ_ERROR 
+transfer 7 7  # BYTE_SOURCE_READ_ERROR
 
 echo "Testing port block and file permission issue"
 blockDportByRejecting $STARTING_PORT
-transfer 7 7 # read error more "interesting" than network error
+transfer 7 7 # read error more "interesting" than transient network error
 undoLastIpTableChange
 
 echo "Test passed, removing $DIR"

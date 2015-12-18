@@ -141,7 +141,7 @@ while {1} {
     if {[catch {exec $timeoutCmd $totalMaxDuration sh -c "set -o pipefail;\
      set -x; date; uname -a;\
      $sudo rm -rf /tmp/wdtTest_$userdir /dev/shm/wdtTest_$userdir wdtTest &&\
-     cd $CDIR/fbsource/fbcode && time hg pull -r master -u &&\
+     cd $CDIR/fbsource/fbcode && time hg pull -r master -u --dest master &&\
      hg log -l 1 && hg log -v -l 1 folly && hg log -v -l 1 wdt &&\
      cd $CDIR/cmake_wdt_build && time make -j 4 && \
      CTEST_OUTPUT_ON_FAILURE=1 time $timeoutCmd $maxTestDuration make test &&\

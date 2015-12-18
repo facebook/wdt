@@ -9,6 +9,7 @@
 #include <wdt/util/EncryptionUtils.h>
 #include <folly/Conv.h>
 #include <folly/SpinLock.h>
+#include <folly/String.h>  // for humanify
 
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
@@ -25,7 +26,7 @@ using std::string;
 static_assert(NUM_ENC_TYPES <= 16, "need to change encoding for types");
 
 const char* const kEncryptionTypeDescriptions[] = {"none", "aes128ctr",
-                                                   "aes128ofb"};
+                                                   "aes128gcm"};
 
 static_assert(NUM_ENC_TYPES ==
                   sizeof(kEncryptionTypeDescriptions) /
@@ -78,7 +79,7 @@ WdtCryptoIntializer::WdtCryptoIntializer() {
 }
 
 WdtCryptoIntializer::~WdtCryptoIntializer() {
-  LOG(INFO) << "Cleaning up openssl";
+  VLOG(1) << "Cleaning up openssl";
   if (CRYPTO_get_locking_callback() != opensslLock) {
     LOG(WARNING) << "Openssl not initialized by wdt";
     return;
@@ -91,11 +92,11 @@ WdtCryptoIntializer::~WdtCryptoIntializer() {
 }
 
 EncryptionType parseEncryptionType(const std::string& str) {
+  if (str == kEncryptionTypeDescriptions[ENC_AES128_GCM]) {
+    return ENC_AES128_GCM;
+  }
   if (str == kEncryptionTypeDescriptions[ENC_AES128_CTR]) {
     return ENC_AES128_CTR;
-  }
-  if (str == kEncryptionTypeDescriptions[ENC_AES128_OFB]) {
-    return ENC_AES128_OFB;
   }
   if (str == kEncryptionTypeDescriptions[ENC_NONE]) {
     return ENC_NONE;
@@ -152,6 +153,8 @@ int fromHex(char c) {
 
 string EncryptionParams::getUrlSafeString() const {
   string res;
+  res.reserve(/* 1 byte type, 1 byte colon */ 2 +
+              /* hex is 2x length */ (2 * data_.length()));
   res.push_back(toHex(type_));
   res.push_back(':');
   for (unsigned char c : data_) {
@@ -253,8 +256,8 @@ const EVP_CIPHER* AESBase::getCipher(const EncryptionType encryptionType) {
   if (encryptionType == ENC_AES128_CTR) {
     return EVP_aes_128_ctr();
   }
-  if (encryptionType == ENC_AES128_OFB) {
-    return EVP_aes_128_ofb();
+  if (encryptionType == ENC_AES128_GCM) {
+    return EVP_aes_128_gcm();
   }
   LOG(ERROR) << "Unknown encryption type " << encryptionType;
   return nullptr;
@@ -264,6 +267,8 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
                          std::string& ivOut) {
   WDT_CHECK(!started_);
 
+  type_ = encryptionData.getType();
+
   const std::string& key = encryptionData.getSecret();
   if (key.length() != kAESBlockSize) {
     LOG(ERROR) << "Encryption key size must be " << kAESBlockSize
@@ -272,6 +277,7 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
   }
 
   ivOut.resize(kAESBlockSize);
+
   uint8_t* ivPtr = (uint8_t*)(&ivOut.front());
   uint8_t* keyPtr = (uint8_t*)(&key.front());
   if (RAND_bytes(ivPtr, kAESBlockSize) != 1) {
@@ -280,13 +286,28 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
   }
 
   EVP_CIPHER_CTX_init(&evpCtx_);
-  const EVP_CIPHER* cipher = getCipher(encryptionData.getType());
+
+  const EVP_CIPHER* cipher = getCipher(type_);
   if (cipher == nullptr) {
     return false;
   }
   int cipherBlockSize = EVP_CIPHER_block_size(cipher);
   WDT_CHECK_EQ(1, cipherBlockSize);
-  if (EVP_EncryptInit(&evpCtx_, cipher, keyPtr, ivPtr) != 1) {
+
+  // Not super clear this is actually needed - but probably if not set
+  // gcm only uses 96 out of the 128 bits of IV. Let's use all of it to
+  // reduce chances of attacks on large data transfers.
+  if (type_ == ENC_AES128_GCM) {
+    if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, nullptr, nullptr) != 1) {
+      LOG(ERROR) << "GCM First init error";
+    }
+    if (EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_SET_IVLEN, ivOut.size(),
+                            nullptr) != 1) {
+      LOG(ERROR) << "Encrypt Init ivlen set failed";
+    }
+  }
+
+  if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, keyPtr, ivPtr) != 1) {
     LOG(ERROR) << "Encrypt Init failed";
     EVP_CIPHER_CTX_cleanup(&evpCtx_);
     return false;
@@ -315,13 +336,27 @@ bool AESEncryptor::finish() {
 
   int outLength;
   int status = EVP_EncryptFinal(&evpCtx_, nullptr, &outLength);
-  EVP_CIPHER_CTX_cleanup(&evpCtx_);
   started_ = false;
   if (status != 1) {
     LOG(ERROR) << "EncryptFinal failed";
+    EVP_CIPHER_CTX_cleanup(&evpCtx_);
     return false;
   }
   WDT_CHECK_EQ(0, outLength);
+  const int tagSize = expectsTag();
+  if (tagSize) {
+    tag_.resize(tagSize);
+    status = EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_GET_TAG, tag_.size(),
+                                 &(tag_.front()));
+    if (status != 1) {
+      LOG(ERROR) << "EncryptFinal Tag extraction error "
+                 << folly::humanify(tag_);
+      tag_.clear();
+    } else {
+      LOG(INFO) << "Encryption finish tag = " << folly::humanify(tag_);
+    }
+  }
+  EVP_CIPHER_CTX_cleanup(&evpCtx_);
   return true;
 }
 
@@ -332,6 +367,8 @@ AESEncryptor::~AESEncryptor() {
 bool AESDecryptor::start(const EncryptionParams& encryptionData,
                          const std::string& iv) {
   WDT_CHECK(!started_);
+
+  type_ = encryptionData.getType();
 
   const std::string& key = encryptionData.getSecret();
   if (key.length() != kAESBlockSize) {
@@ -348,14 +385,26 @@ bool AESDecryptor::start(const EncryptionParams& encryptionData,
   uint8_t* ivPtr = (uint8_t*)(&iv.front());
   uint8_t* keyPtr = (uint8_t*)(&key.front());
   EVP_CIPHER_CTX_init(&evpCtx_);
-  const EVP_CIPHER* cipher = getCipher(encryptionData.getType());
+
+  const EVP_CIPHER* cipher = getCipher(type_);
   if (cipher == nullptr) {
     return false;
   }
   int cipherBlockSize = EVP_CIPHER_block_size(cipher);
   // block size for ctr mode should be 1
   WDT_CHECK_EQ(1, cipherBlockSize);
-  if (EVP_DecryptInit(&evpCtx_, cipher, keyPtr, ivPtr) != 1) {
+
+  if (type_ == ENC_AES128_GCM) {
+    if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, nullptr, nullptr) != 1) {
+      LOG(ERROR) << "GCM Decryptor First init error";
+    }
+    if (EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_SET_IVLEN, iv.size(),
+                            nullptr) != 1) {
+      LOG(ERROR) << "Encrypt Init ivlen set failed";
+    }
+  }
+
+  if (EVP_DecryptInit_ex(&evpCtx_, cipher, nullptr, keyPtr, ivPtr) != 1) {
     LOG(ERROR) << "Decrypt Init failed";
     EVP_CIPHER_CTX_cleanup(&evpCtx_);
     return false;
@@ -381,15 +430,32 @@ bool AESDecryptor::finish() {
   if (!started_) {
     return true;
   }
+  int status;
+  const size_t tagSize = expectsTag();
+  if (tagSize) {
+    if (tag_.size() != tagSize) {
+      LOG(ERROR) << "Need tag for gcm mode " << folly::humanify(tag_);
+      EVP_CIPHER_CTX_cleanup(&evpCtx_);
+      started_ = false;
+      return false;
+    }
+    status = EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_SET_TAG, tag_.size(),
+                                 &(tag_.front()));
+    if (status != 1) {
+      LOG(ERROR) << "Decrypt final tag set error " << folly::humanify(tag_);
+    }
+  }
 
   int outLength = 0;
-  int status = EVP_DecryptFinal(&evpCtx_, nullptr, &outLength);
+  status = EVP_DecryptFinal(&evpCtx_, nullptr, &outLength);
   EVP_CIPHER_CTX_cleanup(&evpCtx_);
   started_ = false;
   if (status != 1) {
     LOG(ERROR) << "DecryptFinal failed " << outLength;
     return false;
   }
+  LOG(INFO) << "Succcesful end of decryption with tag = "
+            << folly::humanify(tag_);
   WDT_CHECK_EQ(0, outLength);
   return true;
 }

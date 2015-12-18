@@ -24,7 +24,8 @@ namespace wdt {
 #define WDT_CHECK_LT CHECK_LT
 #define WDT_CHECK_GE CHECK_GE
 #define WDT_CHECK_GT CHECK_GT
-// Note : All the new errors should be defined at the end
+// Note : All the new errors should be defined at the end - but see also
+// getMoreInterestingError implementation for error priorities for reporting
 #define ERRORS                                                                 \
   X(OK)                      /** No error  */                                  \
   X(ERROR)                   /** Generic error  */                             \
@@ -55,7 +56,8 @@ namespace wdt {
   X(TRANSFER_LOG_ACQUIRE_ERROR) /** Failed to acquire lock for transfer log */ \
   X(WDT_TIMEOUT)                /** Socket operation timed out  */             \
   X(UNEXPECTED_CMD_ERROR)       /** Unexpected cmd received */                 \
-  X(ENCRYPTION_ERROR)           /** Error related to encryption */
+  X(ENCRYPTION_ERROR)           /** Error related to encryption */             \
+  X(ALREADY_EXISTS)             /** Create attempt for existing id */
 
 enum ErrorCode {
 #define X(A) A,

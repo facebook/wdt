@@ -13,6 +13,7 @@
 #include <string>
 #include <unistd.h>
 #include <set>
+
 namespace facebook {
 namespace wdt {
 /**
@@ -224,9 +225,9 @@ class WdtOptions {
   int throughput_update_interval_millis{500};
 
   /**
-   * Flag for turning on/off checksum
+   * Flag for turning on/off checksum. Redundant gcm in ENC_AES128_GCM.
    */
-  bool enable_checksum{true};
+  bool enable_checksum{false};
 
   /**
    * If true, perf stats are collected and reported at the end of transfer
@@ -293,14 +294,12 @@ class WdtOptions {
   bool resume_using_dir_tree{false};
 
   /**
-   * If true, files are opened when they are discovered
+   * If > 0 will open up to that number of files during discovery
+   * if 0 will not open any file during discovery
+   * if < 0 will try to open all the files during discovery (which may fail
+   * with too many open files errors)
    */
-  bool open_files_during_discovery{false};
-
-  /**
-   * If true, we send url that works with older version(<19)
-   */
-  bool url_backward_compatibility{false};
+  int open_files_during_discovery{0};
 
   /**
    * If true, wdt can overwrite existing files
@@ -316,7 +315,7 @@ class WdtOptions {
   /**
    * Encryption type to use
    */
-  std::string encryption_type{encryptionTypeToStr(ENC_AES128_CTR)};
+  std::string encryption_type{encryptionTypeToStr(ENC_AES128_GCM)};
 
   /**
    * @return    whether files should be pre-allocated or not
@@ -332,6 +331,8 @@ class WdtOptions {
    * @return    whether directory tree based resumption is enabled
    */
   bool isDirectoryTreeBasedResumption() const;
+
+  // NOTE: any option added here should also be added to util/WdtFlags.cpp.inc
 
   /**
    * Since this is a singleton copy constructor

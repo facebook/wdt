@@ -109,6 +109,8 @@ SenderState SenderThread::connect() {
     return END;
   }
   ErrorCode code;
+  // TODO cleanup more but for now avoid having 2 socket object live per port
+  socket_ = nullptr;
   socket_ = connectToReceiver(port_, socketAbortChecker_.get(), code);
   if (code == ABORT) {
     threadStats_.setLocalErrorCode(ABORT);
@@ -556,10 +558,13 @@ SenderState SenderThread::processDoneCmd() {
   buf_[0] = Protocol::DONE_CMD;
   socket_->write(buf_, 1);
 
-  socket_->shutdown();
-  auto numRead = socket_->read(buf_, Protocol::kMinBufLength);
-  if (numRead != 0) {
-    LOG(WARNING) << "EOF not found when expected";
+  socket_->shutdownWrites();
+  ErrorCode retCode = socket_->expectEndOfStream();
+  if (retCode != OK) {
+    LOG(WARNING) << "Logical EOF not found when expected "
+                 << errorCodeToStr(retCode);
+    // TODO: consider making this encryption error as it means acks could be
+    // compromised
     return END;
   }
   VLOG(1) << "done with transfer, port " << port_;
@@ -727,16 +732,10 @@ SenderState SenderThread::processVersionMismatch() {
 }
 
 void SenderThread::start() {
-  INIT_PERF_STAT_REPORT
   Clock::time_point startTime = Clock::now();
-  auto completionGuard = folly::makeGuard([&] {
-    ThreadTransferHistory &transferHistory = getTransferHistory();
-    transferHistory.markNotInUse();
-    controller_->deRegisterThread(threadIndex_);
-    controller_->executeAtEnd([&]() { wdtParent_->endCurTransfer(); });
-  });
   controller_->executeAtStart([&]() { wdtParent_->startNewTransfer(); });
   SenderState state = CONNECT;
+
   while (state != END) {
     ErrorCode abortCode = wdtParent_->getCurAbortCode();
     if (abortCode != OK) {
@@ -759,7 +758,16 @@ void SenderThread::start() {
             << " Total throughput = "
             << threadStats_.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
-  perfReport_ = *perfStatReport;
+  perfReport_ = *wdt__perfStatReportThreadLocal;
+
+  ThreadTransferHistory &transferHistory = getTransferHistory();
+  transferHistory.markNotInUse();
+  controller_->deRegisterThread(threadIndex_);
+  controller_->executeAtEnd([&]() { wdtParent_->endCurTransfer(); });
+  // Important to delete the socket before the thread dies for sub class
+  // of clientsocket which have thread local data
+  socket_ = nullptr;
+
   return;
 }
 
