@@ -25,9 +25,12 @@ sh cmake-3.3.2-Linux-x86_64.sh --prefix=$HOME --skip-license
 OPENSSL_VERSION=openssl-1.0.1q
 wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
 tar xfz $OPENSSL_VERSION.tar.gz
+ls -l $HOME/bin
 ( cd $OPENSSL_VERSION ; ./config --prefix=$HOME; make ; make install )
 which openssl
-openssl version
+$HOME/bin/openssl version
+ldd $HOME/bin/openssl
+export OPENSSL_ROOT_DIR=$HOME
 git clone https://github.com/floitsch/double-conversion.git
 (cd double-conversion; cmake -DCMAKE_INSTALL_PREFIX=$HOME .; make -j 4 && make install)
 git clone https://github.com/schuhschuh/gflags.git
