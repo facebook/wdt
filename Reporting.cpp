@@ -49,7 +49,7 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
     localErrCode_ = ERROR;
   }
   localErrCode_ = getMoreInterestingError(localErrCode_, stats.localErrCode_);
-  VLOG(1) << "Local ErrorCode now " << localErrCode_ << " from "
+  VLOG(2) << "Local ErrorCode now " << localErrCode_ << " from "
           << stats.localErrCode_;
   remoteErrCode_ =
       getMoreInterestingError(remoteErrCode_, stats.remoteErrCode_);

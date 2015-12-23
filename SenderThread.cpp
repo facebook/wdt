@@ -98,7 +98,7 @@ SenderState SenderThread::connect() {
       threadStats_.setLocalErrorCode(socketErrCode);
       return END;
     }
-    socket_->closeConnection();
+    socket_->closeNoCheck();
   }
   const auto &options = WdtOptions::get();
   if (numReconnectWithoutProgress_ >= options.max_transfer_retries) {

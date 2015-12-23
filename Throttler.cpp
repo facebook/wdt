@@ -159,7 +159,7 @@ double Throttler::calculateSleep(double deltaProgress,
        */
       double peakThrottlerSleep =
           -1.0 * bytesTokenBucket_ / bucketRateBytesPerSec_;
-      VLOG(1) << "Peak throttler wants to sleep " << peakThrottlerSleep
+      VLOG(2) << "Peak throttler wants to sleep " << peakThrottlerSleep
               << " seconds";
       return peakThrottlerSleep;
     }
@@ -196,7 +196,7 @@ double Throttler::averageThrottler(const Clock::time_point& now) {
   std::chrono::duration<double> elapsedDuration = now - startTime_;
   double elapsedSeconds = elapsedDuration.count();
   if (avgRateBytesPerSec_ <= 0) {
-    VLOG(1) << "There is no rate limit";
+    VLOG(2) << "There is no avg rate limit";
     return -1;
   }
   const double allowedProgressBytes = avgRateBytesPerSec_ * elapsedSeconds;
