@@ -295,7 +295,7 @@ extendWdtOptions() {
   fi
 }
 
-trap signalHandler SIGINT
+trap signalHandler SIGINT SIGTERM
 # Note this is not meant to be an example of a secure key, it's just for tests
 # (thus the test_only in the option name) - the normal way is through the URL
 # which generates a crypto. Add _secret for _secr in case of single digit pid.
