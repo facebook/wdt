@@ -10,12 +10,35 @@ from random import randint
 import shutil
 import tempfile
 import errno
+import string
+import random
+
+# defaults (and file global)
+receiver_binary = "_bin/wdt/wdt"
+sender_binary = receiver_binary
+
+def get_env(name):
+    if name in os.environ:
+        return os.environ[name]
+
+def set_binaries():
+    global receiver_binary, sender_binary
+    sender = get_env('WDT_SENDER')
+    if sender:
+        sender_binary = sender
+    receiver = get_env('WDT_RECEIVER')
+    if receiver:
+        receiver_binary = receiver
+    print("Sender: " + sender_binary + " Receiver: " + receiver_binary)
+
 
 def get_wdt_version():
-    dummy_cmd = "_bin/wdt/wdt --version"
+    global receiver_binary
+    dummy_cmd = receiver_binary + " --version"
     dummy_process = subprocess.Popen(dummy_cmd.split(),
                                      stdout=subprocess.PIPE)
     protocol_string = dummy_process.stdout.readline().strip()
+    print("Receiver " + receiver_binary + " version is " + protocol_string)
     return protocol_string.split()[4]
 
 def start_receiver(receiver_cmd, root_dir, test_count):
@@ -37,12 +60,38 @@ def run_sender(sender_cmd, root_dir, test_count):
     # return code of system is shifted by 8 bytes
     return os.system(sender_cmd) >> 8
 
+
+def run_sender_arg(sender_arg, root_dir, test_count):
+    global sender_binary
+    return run_sender(sender_binary + " " + sender_arg, root_dir, test_count)
+
+def start_receiver_arg(receiver_arg, root_dir, test_count):
+    global receiver_binary
+    print("Starting receiver " + receiver_binary)
+    return start_receiver(receiver_binary + " " + receiver_arg,
+                          root_dir, test_count)
+
+
 def check_transfer_status(status, root_dir, test_count):
     if status:
         with open("{0}/server{1}.log".format(root_dir, test_count), 'r') as fin:
             print(fin.read())
         print("Transfer failed {0}".format(status))
         exit(status)
+
+def check_logs_for_errors(root_dir, test_count, fail_errors):
+    log_file = "%s/server%s.log" % (root_dir, test_count)
+    server_log_contents = open(log_file).read()
+    log_file = "%s/client%s.log" % (root_dir, test_count)
+    client_log_contents = open(log_file).read()
+
+    for fail_error in fail_errors:
+        if fail_error in server_log_contents:
+            print("%s found in logs %s" % (fail_error, log_file))
+            exit(1)
+        if fail_error in client_log_contents:
+            print("%s found in logs %s" % (fail_error, log_file))
+            exit(1)
 
 def create_directory(root_dir):
     # race condition during stress test can happen even if we check first
@@ -94,11 +143,14 @@ def create_md5_for_directory(src_dir, md5_file_name):
     for line in lines:
         md5_in.write(line + "\n")
 
-def verify_transfer_success(root_dir, test_ids):
+def verify_transfer_success(root_dir, test_ids, skip_tests=set()):
     src_md5_path = os.path.join(root_dir, "src.md5")
     create_md5_for_directory(os.path.join(root_dir, "src"), src_md5_path)
     status = 0
     for i in test_ids:
+        if i in skip_tests:
+            print("Skipping verification of test %s" % (i))
+            continue
         print("Verifying correctness for test {0}".format(i))
         print("Should be no diff")
         dst_dir = os.path.join(root_dir, "dst{0}".format(i))
@@ -135,3 +187,6 @@ def search_in_logs(root_dir, i, str):
         print("Found {0} in {1}".format(str, server_log))
         found = True
     return found
+
+def generate_encryption_key():
+    return ''.join(random.choice(string.lowercase) for i in range(16))

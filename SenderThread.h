@@ -76,9 +76,9 @@ class SenderThread : public WdtThread {
   /// Constructor for the sender thread
   SenderThread(Sender *sender, int threadIndex, int32_t port,
                ThreadsController *threadsController)
-      : WdtThread(threadIndex, sender->getProtocolVersion(), threadsController),
+      : WdtThread(threadIndex, port, sender->getProtocolVersion(),
+                  threadsController),
         wdtParent_(sender),
-        port_(port),
         dirQueue_(sender->dirQueue_.get()),
         transferHistoryController_(sender->transferHistoryController_.get()) {
     controller_->registerThread(threadIndex_);
@@ -266,16 +266,19 @@ class SenderThread : public WdtThread {
    */
   ErrorCode readAndVerifySpuriousCheckpoint();
 
+  /// General utility used by sender threads to connect to receiver
+  std::unique_ptr<ClientSocket> connectToReceiver(
+      const int port, IAbortChecker const *abortChecker, ErrorCode &errCode);
+
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];
-
-  /// Port number of this sender thread
-  const int32_t port_;
 
   /// Negotiated protocol of the sender thread
   int negotiatedProtocol_{-1};
 
   /// Pointer to client socket to maintain connection to the receiver
+  /// Note: this must be deleted while still on the same thread it was created
+  /// (for fbonly / btm / thrift / eventbase reasons)
   std::unique_ptr<ClientSocket> socket_;
 
   /// Buffer used by the sender thread to read/write data

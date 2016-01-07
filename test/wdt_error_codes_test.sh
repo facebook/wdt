@@ -26,10 +26,11 @@ transfer() {
 }
 
 STARTING_PORT=22356
-WDT_OPTS="-ipv6 -start_port=$STARTING_PORT -read_timeout_millis=100 \
+WDTBIN_OPTS="-ipv6 -start_port=$STARTING_PORT -read_timeout_millis=100 \
 -write_timeout_millis=100 -connect_timeout_millis=100 -transfer_id=wdt \
 -max_accept_retries=10"
-WDT_BIN="_bin/wdt/wdt $WDT_OPTS"
+extendWdtOptions
+WDT_BIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/tmp/wdtTest_$USER
 
@@ -41,20 +42,20 @@ TEST_COUNT=0
 
 echo "Testing directory permission error"
 SRC_DIR=$DIR/inaccessible_dir
-mkdir $SRC_DIR 
-chmod 000 $SRC_DIR 
-transfer 7 7  # BYTE_SOURCE_READ_ERROR 
+mkdir $SRC_DIR
+chmod 000 $SRC_DIR
+transfer 7 7  # BYTE_SOURCE_READ_ERROR
 
 echo "Testing file permission error"
 SRC_DIR=$DIR/src1
-mkdir $SRC_DIR 
+mkdir $SRC_DIR
 touch $SRC_DIR/inaccessible_file
 chmod 000 $SRC_DIR/inaccessible_file
-transfer 7 7  # BYTE_SOURCE_READ_ERROR 
+transfer 7 7  # BYTE_SOURCE_READ_ERROR
 
 echo "Testing port block and file permission issue"
 blockDportByRejecting $STARTING_PORT
-transfer 7 7 # read error more "interesting" than network error
+transfer 7 7 # read error more "interesting" than transient network error
 undoLastIpTableChange
 
 echo "Test passed, removing $DIR"

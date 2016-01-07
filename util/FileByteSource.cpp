@@ -124,6 +124,8 @@ char *FileByteSource::read(int64_t &size) {
     return nullptr;
   }
   if (numRead == 0) {
+    LOG(ERROR) << "Unexpected EOF on " << metadata_->fullPath
+               << " got 0 bytes instead of " << toRead;
     this->close();
     return nullptr;
   }

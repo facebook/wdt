@@ -19,6 +19,9 @@ If using a vmware image/starting fresh
 ```
  sudo vmware-config-tools.pl  # to setup shared folders
 ```
+
+openssl should already be there but may need update to 1.0.x
+
 # Build Instructions
 __Install Cmake 3.2 or greater.__
 *See directions below for Mac
@@ -119,6 +122,14 @@ git clone https://github.com/floitsch/double-conversion.git
 cd double-conversion; cmake . ; make -j && sudo make install;
 cd ../
 ```
+
+__libcrypto from openssl-1.0.x__
+
+```
+brew update openssl
+```
+
+
 __Build wdt from source__
 
 Get folly source for use during build

@@ -7,9 +7,13 @@ set -o pipefail
 source `dirname "$0"`/common_functions.sh
 
 startNewTransfer() {
+  echo "Starting receiver:"
+  echo "$WDTBIN_SERVER $EXTRA_SERVER_ARGS -directory $DIR/dst${TEST_COUNT}"
   $WDTBIN_SERVER $EXTRA_SERVER_ARGS -directory $DIR/dst${TEST_COUNT} > \
   $DIR/server${TEST_COUNT}.log 2>&1 &
   pidofreceiver=$!
+  echo "Starting sender:"
+  echo "$WDTBIN_CLIENT $EXTRA_CLIENT_ARGS"
   $WDTBIN_CLIENT $EXTRA_CLIENT_ARGS |& tee -a $DIR/client${TEST_COUNT}.log &
   pidofsender=$!
   unset EXTRA_SERVER_ARGS
@@ -28,19 +32,17 @@ The possible options to this script are
 -s sender protocol version
 -r receiver protocol version
 -p start port
+-x extraoptions
 "
 
-#protocol versions, used to check version verification
+#protocol versions, used to check version negotiation
 #version 0 represents default version
 SENDER_PROTOCOL_VERSION=0
 RECEIVER_PROTOCOL_VERSION=0
 STARTING_PORT=24000
 
-if [ "$1" == "-h" ]; then
-  echo "$usage"
-  wdtExit 0
-fi
-while getopts ":s:p:r:h:" opt; do
+EXTRA_OPTIONS=""
+while getopts "x:s:p:r:h" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
@@ -48,10 +50,13 @@ while getopts ":s:p:r:h:" opt; do
     ;;
     p) STARTING_PORT="$OPTARG"
     ;;
-    h) echo "$usage"
-       wdtExit
+    x) EXTRA_OPTIONS="$OPTARG"
     ;;
-    \?) echo "Invalid option -$OPTARG" >&2
+    h) echo "$usage"
+       exit 0
+    ;;
+    \?) echo "$usage"
+       exit 1
     ;;
   esac
 done
@@ -60,6 +65,14 @@ setBinaries
 
 echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
 version $RECEIVER_PROTOCOL_VERSION"
+
+if [ $RECEIVER_PROTOCOL_VERSION -ne 0 ] && [ $RECEIVER_PROTOCOL_VERSION -lt 23 \
+] && [ -z $NO_ENCRYPT ]; then
+  echo "Can not support encryption for receiver with version \
+$RECEIVER_PROTOCOL_VERSION"
+  # exit with 0 to make the test pass
+  exit 0
+fi
 
 threads=4
 ERROR_COUNT=25
@@ -75,8 +88,9 @@ WDTBIN_OPTS="-enable_perf_stat_collection -ipv6 -start_port=$STARTING_PORT \
 -avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
 -progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
--treat_fewer_port_as_error \
--connect_timeout_millis 100 -transfer_id $$ -num_ports=$threads"
+-treat_fewer_port_as_error -exit_on_bad_flags=false \
+-connect_timeout_millis 100 -transfer_id $$ -num_ports=$threads $EXTRA_OPTIONS"
+extendWdtOptions
 WDTBIN_SERVER="$WDT_RECEIVER $WDTBIN_OPTS \
   -protocol_version=$RECEIVER_PROTOCOL_VERSION"
 WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS -destination $HOSTNAME \

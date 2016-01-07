@@ -105,6 +105,7 @@ class FileByteSource : public ByteSource {
       // if the fd is not opened by this source, no need to close it
       VLOG(1) << "No need to close " << getIdentifier()
               << ", this was not opened by FileByteSource";
+      fd_ = -1;
       return;
     }
     if (fd_ >= 0) {

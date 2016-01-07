@@ -22,43 +22,12 @@
 #include <wdt/AbortChecker.h>
 #include <wdt/WdtOptions.h>
 #include <wdt/Protocol.h>
+#include <wdt/WdtTransferRequest.h>
 #include <wdt/SourceQueue.h>
 #include <wdt/util/FileByteSource.h>
 
 namespace facebook {
 namespace wdt {
-/**
- * Users of wdt apis can provide a list of info
- * for files. A info represents a file name with
- * information such as size, and flags
- * to read the file with
- */
-struct FileInfo {
-  /**
-   * Name of the file to be read, generally as relative oath
-   */
-  std::string fileName;
-  /// Size of the file to be read, default is -1
-  int64_t fileSize;
-  /// File descriptor. If this is not -1, then wdt uses this to read
-  int fd{-1};
-  /// Whether read should be done using o_direct. If fd is set, this flag will
-  /// be set automatically to match the fd open mode
-  bool directReads{false};
-  /// Constructor for file info with name and size
-  explicit FileInfo(const std::string &name, int64_t size = -1,
-                    bool directReads = WdtOptions::get().odirect_reads);
-  /**
-   * Constructor with name, size and fd
-   * If this constructor is used, then whether to do direct reads is decided
-   * by fd flags
-   */
-  FileInfo(const std::string &name, int64_t size, int fd);
-  /// Verify that we can align for reading in O_DIRECT and
-  /// the flags make sense
-  void verifyAndFixFlags();
-};
-
 /**
  * SourceQueue that returns all the regular files under a given directory
  * (recursively) as individual FileByteSource objects, sorted by decreasing
@@ -253,16 +222,21 @@ class DirectorySourceQueue : public SourceQueue {
   bool enqueueFiles();
 
   /**
-   * initial creation from either explore or enqueue files - always increment
-   * numentries inside the lock, doesn't check for fail retries
+   * initial creation from either explore or enqueue files, uses
+   * createIntoQueueInternal to create blocks
    *
    * @param fullPath             full path of the file to be added
    * @param fileInfo             Information about file
-   * @param alreadyLocked        whether lock has already been acquired by the
-   *                             calling method
    */
-  void createIntoQueue(const std::string &fullPath, FileInfo &fileInfo,
-                       bool alreadyLocked);
+  void createIntoQueue(const std::string &fullPath, FileInfo &fileInfo);
+
+  /**
+   * initial creation from either explore or enqueue files - always increment
+   * numentries. Lock must be held before calling this.
+   *
+   * @param metadata             file meta-data
+   */
+  void createIntoQueueInternal(SourceMetaData *metadata);
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple
@@ -379,7 +353,12 @@ class DirectorySourceQueue : public SourceQueue {
   double directoryTime_{0};
   /// abort checker
   IAbortChecker const *abortChecker_;
-
+  /**
+   * Count and trigger of files to open (negative is keep opening until we run
+   * out of fd, positiveis how many files we can still open, 0 is stop opening
+   * files)
+   */
+  int32_t openFilesDuringDiscovery_{0};
   const WdtOptions &options_;
 };
 }

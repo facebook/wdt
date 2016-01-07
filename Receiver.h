@@ -39,7 +39,7 @@ class Receiver : public WdtBase {
   Receiver(int port, int numSockets, const std::string &destDir);
 
   /// Setup before starting (@see WdtBase.h)
-  WdtTransferRequest init() override;
+  const WdtTransferRequest &init() override;
 
   /**
    * Joins on the threads spawned by start. This method

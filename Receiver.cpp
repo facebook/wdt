@@ -10,6 +10,7 @@
 #include <wdt/util/FileWriter.h>
 #include <wdt/util/ServerSocket.h>
 #include <wdt/util/SocketUtils.h>
+#include <wdt/util/EncryptionUtils.h>
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
@@ -115,7 +116,7 @@ void Receiver::endCurGlobalSession() {
   hasNewTransferStarted_.store(false);
 }
 
-WdtTransferRequest Receiver::init() {
+const WdtTransferRequest &Receiver::init() {
   const auto &options = WdtOptions::get();
   backlog_ = options.backlog;
   bufferSize_ = options.buffer_size;
@@ -127,8 +128,61 @@ WdtTransferRequest Receiver::init() {
               << bufferSize_ << " instead";
   }
   auto numThreads = transferRequest_.ports.size();
+  // This creates the destination directory (which is needed for transferLogMgr)
   fileCreator_.reset(
       new FileCreator(destDir_, numThreads, transferLogManager_));
+  // Make sure we can get the lock on the transfer log manager early
+  // so if we can't we don't generate a valid but useless url and end up
+  // starting a sender doomed to fail
+  if (options.enable_download_resumption) {
+    WDT_CHECK(!options.skip_writes)
+        << "Can not skip transfers with download resumption turned on";
+    if (options.resume_using_dir_tree) {
+      WDT_CHECK(!options.shouldPreallocateFiles())
+          << "Can not resume using directory tree if preallocation is enabled";
+    }
+    ErrorCode errCode = transferLogManager_.openLog();
+    if (errCode != OK) {
+      LOG(ERROR) << "Failed to open transfer log " << errorCodeToStr(errCode);
+      transferRequest_.errorCode = errCode;
+      return transferRequest_;
+    }
+    ErrorCode code = transferLogManager_.parseAndMatch(
+        recoveryId_, getTransferConfig(), fileChunksInfo_);
+    if (code == OK && options.resume_using_dir_tree) {
+      WDT_CHECK(fileChunksInfo_.empty());
+      traverseDestinationDir(fileChunksInfo_);
+    }
+  }
+
+  EncryptionType encryptionType = parseEncryptionType(options.encryption_type);
+  // is encryption enabled?
+  bool encrypt = (encryptionType != ENC_NONE &&
+                  protocolVersion_ >= Protocol::ENCRYPTION_V1_VERSION);
+  if (encrypt) {
+    LOG(INFO) << encryptionTypeToStr(encryptionType)
+              << " encryption is enabled for this transfer ";
+    if (!transferRequest_.encryptionData.isSet()) {
+      LOG(INFO) << "Receiver generating encryption key for type "
+                << encryptionTypeToStr(encryptionType);
+      transferRequest_.encryptionData =
+          EncryptionParams::generateEncryptionParams(encryptionType);
+    }
+    if (!transferRequest_.encryptionData.isSet()) {
+      LOG(ERROR) << "Unable to generate encryption key for type "
+                 << encryptionTypeToStr(encryptionType);
+      transferRequest_.errorCode = ENCRYPTION_ERROR;
+      return transferRequest_;
+    }
+  } else {
+    if (encryptionType != ENC_NONE) {
+      LOG(WARNING) << "Encryption is enabled, but protocol version is "
+                   << protocolVersion_
+                   << ", minimum version required for encryption is "
+                   << Protocol::ENCRYPTION_V1_VERSION;
+    }
+    transferRequest_.encryptionData.erase();
+  }
   threadsController_ = new ThreadsController(numThreads);
   threadsController_->setNumFunnels(ReceiverThread::NUM_FUNNELS);
   threadsController_->setNumBarriers(ReceiverThread::NUM_BARRIERS);
@@ -289,6 +343,7 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
     LOG(INFO) << "Transfer not started, setting the error code to ERROR";
     transferReport->setErrorCode(ERROR);
   }
+  VLOG(1) << "Summary code " << errCode;
   return transferReport;
 }
 
@@ -298,7 +353,7 @@ ErrorCode Receiver::transferAsync() {
   int progressReportIntervalMillis = options.progress_report_interval_millis;
   if (!progressReporter_ && progressReportIntervalMillis > 0) {
     // if progress reporter has not been set, use the default one
-    progressReporter_ = folly::make_unique<ProgressReporter>();
+    progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
   }
   return start();
 }
@@ -383,27 +438,7 @@ ErrorCode Receiver::start() {
   startTime_ = Clock::now();
   LOG(INFO) << "Starting (receiving) server on ports [ "
             << transferRequest_.ports << "] Target dir : " << destDir_;
-  const auto &options = WdtOptions::get();
   // TODO do the init stuff here
-  if (options.enable_download_resumption) {
-    WDT_CHECK(!options.skip_writes)
-        << "Can not skip transfers with download resumption turned on";
-    if (options.resume_using_dir_tree) {
-      WDT_CHECK(!options.shouldPreallocateFiles())
-          << "Can not resume using directory tree if preallocation is enabled";
-    }
-    ErrorCode errCode = transferLogManager_.openLog();
-    if (errCode != OK) {
-      LOG(ERROR) << "Failed to open transfer log " << errorCodeToStr(errCode);
-      return errCode;
-    }
-    ErrorCode code = transferLogManager_.parseAndMatch(
-        recoveryId_, getTransferConfig(), fileChunksInfo_);
-    if (code == OK && options.resume_using_dir_tree) {
-      WDT_CHECK(fileChunksInfo_.empty());
-      traverseDestinationDir(fileChunksInfo_);
-    }
-  }
   if (!throttler_) {
     configureThrottler();
   } else {

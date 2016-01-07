@@ -18,48 +18,21 @@
 #include <algorithm>
 namespace facebook {
 namespace wdt {
-using std::swap;
 using std::string;
 
-ServerSocket::ServerSocket(int32_t port, int backlog,
-                           IAbortChecker const *abortChecker)
-    : port_(port), backlog_(backlog), fd_(-1), abortChecker_(abortChecker) {
+ServerSocket::ServerSocket(int port, int backlog,
+                           IAbortChecker const *abortChecker,
+                           const EncryptionParams &encryptionParams)
+    : WdtSocket(port, abortChecker, encryptionParams), backlog_(backlog) {
+  // for backward compatibility
+  supportUnencryptedPeer_ = true;
 }
 
-ServerSocket::ServerSocket(ServerSocket &&that) noexcept
-    : backlog_(that.backlog_) {
-  port_ = that.port_;
-  listeningFds_ = std::move(that.listeningFds_);
-  fd_ = that.fd_;
-  abortChecker_ = that.abortChecker_;
-  // A temporary ServerSocket should be changed such that
-  // the fd doesn't get closed when it (temp obj) is getting
-  // destructed and "this" object will remain intact
-  that.fd_ = -1;
-  // It is important that we change the port as well. So that the
-  // socket that has been moved can't even attempt to listen on its port again
-  that.port_ = -1;
-}
-
-ServerSocket &ServerSocket::operator=(ServerSocket &&that) {
-  swap(port_, that.port_);
-  swap(listeningFds_, that.listeningFds_);
-  swap(fd_, that.fd_);
-  swap(abortChecker_, that.abortChecker_);
-  return *this;
-}
-
-void ServerSocket::closeAll() {
+void ServerSocket::closeAllNoCheck() {
   VLOG(1) << "Destroying server socket (port, listen fd, fd)" << port_ << ", "
           << listeningFds_ << ", " << fd_;
-  if (fd_ >= 0) {
-    int ret = ::close(fd_);
-    if (ret != 0) {
-      PLOG(ERROR) << "Error closing fd for server socket. fd: " << fd_
-                  << " port: " << port_;
-    }
-    fd_ = -1;
-  }
+  closeNoCheck();
+  // We don't care about listen error, the error that matters is encryption err
   for (auto listeningFd : listeningFds_) {
     if (listeningFd >= 0) {
       int ret = ::close(listeningFd);
@@ -74,7 +47,7 @@ void ServerSocket::closeAll() {
 }
 
 ServerSocket::~ServerSocket() {
-  closeAll();
+  closeAllNoCheck();
 }
 
 int ServerSocket::listenInternal(struct addrinfo *info,
@@ -307,33 +280,6 @@ std::string ServerSocket::getPeerIp() const {
 std::string ServerSocket::getPeerPort() const {
   // we keep returning the peer port for error printing
   return peerPort_;
-}
-
-int ServerSocket::read(char *buf, int nbyte, bool tryFull) {
-  return SocketUtils::readWithAbortCheck(fd_, buf, nbyte, abortChecker_,
-                                         tryFull);
-}
-
-int ServerSocket::write(const char *buf, int nbyte, bool tryFull) {
-  return SocketUtils::writeWithAbortCheck(fd_, buf, nbyte, abortChecker_,
-                                          tryFull);
-}
-
-int ServerSocket::closeCurrentConnection() {
-  int retValue = 0;
-  if (fd_ >= 0) {
-    retValue = ::close(fd_);
-    fd_ = -1;
-  }
-  return retValue;
-}
-
-int ServerSocket::getFd() const {
-  return fd_;
-}
-
-int32_t ServerSocket::getPort() const {
-  return port_;
 }
 
 int ServerSocket::getBackLog() const {

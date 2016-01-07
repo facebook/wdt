@@ -1,18 +1,11 @@
 #! /bin/bash
 
-# This is to regress/test the max ~22000Mbytes/sec transfer rate
-# to get the highest (> 20G) rates you need:
-# a) /dev/shm to be almost empty
-# b) nothing else much running on your dev server
-# c) run this a couple times
-
-# modified from wdt_e2e_test.sh and fbonly/wdt_prof.sh
+# Modified version of wdt_max_send_test.sh to test crypto speed
 
 echo "Run this sender performance test from fbcode/ directory"
 echo "or give full path to wdt binary to use and staging directory"
 
-#set -x
-#set -o pipefail
+set -o pipefail
 
 if [ -z "$1" ]; then
   WDTBIN="_bin/wdt/wdt"
@@ -31,12 +24,12 @@ AWK=gawk
 # TEST_COUNT is an environment variable. It is set up by the python benchmarking
 # script.
 if [ -z $TEST_COUNT ]; then
-  TEST_COUNT=16
+  TEST_COUNT=4
 fi
 
 # WDT_THROUGHPUT is an env var. Set it to overwrite the expected 16Gbyte/sec
 if [ -z $WDT_THROUGHPUT ]; then
-  WDT_THROUGHPUT=16000
+  WDT_THROUGHPUT=5000
 fi
 
 
@@ -47,10 +40,11 @@ else
     echo "Will self connect to HOSTNAME=$HOSTNAME"
 fi
 
+ENC_TYPE=aes128ctr
+CRC=false
+
 REMOTE=$HOSTNAME
 SKIP_WRITES="true"
-
-# TODO: switch to url
 
 # Without throttling:
 #WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_sockets 13"
@@ -63,15 +57,9 @@ echo "Using $NUM_THREADS threads (on each sender, receiver) for $NUM_CPU CPUs"
 
 # With, still gets almost same max (21G) with throttling set high enough
 WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_ports $NUM_THREADS
--transfer_id=$$ -encryption_type=none
--exit_on_bad_flags=false
---avg_mbytes_per_sec=26000 --max_mbytes_per_sec=26001 --enable_checksum=false"
-CLIENT_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
-%Mmax)k\n%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps\nCLIENT_PROFILE %U \
-%S %e"
-SERVER_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
-%Mmax)k\n%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps\nSERVER_PROFILE %U \
-%S %e"
+-transfer_id=$$ -encryption_type=$ENC_TYPE --enable_checksum=$CRC
+-exit_on_bad_flags=false"
+
 
 WDTNAME=`basename $WDTBIN`
 WDTCMD="$WDTBIN $WDTBIN_OPTS"
@@ -104,9 +92,6 @@ echo "Done with staging src test files"
 
 #set -e
 
-/usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst -run_as_daemon=true -skip_writes=$SKIP_WRITES > \
-$DIR/server.log 2>&1 &
-
 # wait for server to be up
 #while [ `/bin/true | nc $REMOTE 22356; echo $?` -eq 1 ]
 #do
@@ -122,23 +107,21 @@ do
   # every other run will be two_phases
   [ $(($i % 2)) -eq 0 ] && TWO_PHASE_ARG="-two_phases"
 
-  /usr/bin/time -f "$CLIENT_PROFILE_FORMAT" $WDTCMD -directory $DIR/src \
-  -destination $REMOTE $TWO_PHASE_ARG |& tee $DIR/client$i.log
+  set -x
+  time $WDTCMD -directory $DIR/dst$i -skip_writes=$SKIP_WRITES 2> \
+    $DIR/server$i.log | time $WDTCMD -directory $DIR/src \
+  $TWO_PHASE_ARG - |& tee $DIR/client$i.log
+  set +x
   THROUGHPUT=`$AWK 'match($0, /.*Total sender throughput = ([0-9.]+)/, res) \
   {print res[1]} END {}' $DIR/client$i.log`
+  echo "Server log:"
+  cat $DIR/server$i.log
   echo "THROUGHPUT $THROUGHPUT"
   TRANSFER_TIME=`$AWK 'match($0, /.*Total sender time = ([0-9.]+)/, res) \
   {print res[1]} END {}' $DIR/client$i.log`
   echo "TRANSFER_TIME $TRANSFER_TIME"
 done
 
-pkill -x $WDTNAME
-# echo -n e | nc $REMOTE 22356 # end command is gone
-
-echo "Server logs:"
-cat $DIR/server.log
-
-# Todo : count how many runs are above X... and which
 
 MAXRATE=`$AWK 'BEGIN {max=0} match($0, /.*Total sender throughput = ([0-9.]+)/, res) {rate=res[1]; if (rate>max) max=rate} END {print int(max+.5)}' $DIR/client*.log`
 

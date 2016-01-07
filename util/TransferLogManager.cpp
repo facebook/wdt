@@ -241,19 +241,20 @@ ErrorCode TransferLogManager::openLog() {
   WDT_CHECK(options.enable_download_resumption);
 
   int openFlags = O_CREAT | O_RDWR;
-  fd_ = ::open(getFullPath(LOG_NAME).c_str(), openFlags, 0644);
+  const std::string logPath = getFullPath(LOG_NAME);
+  fd_ = ::open(logPath.c_str(), openFlags, 0644);
   if (fd_ < 0) {
-    PLOG(ERROR) << "Could not open wdt log";
+    PLOG(ERROR) << "Could not open wdt log " << logPath;
     return BYTE_SOURCE_READ_ERROR;
   }
   // try to acquire file lock
   if (::flock(fd_, LOCK_EX | LOCK_NB) != 0) {
-    PLOG(ERROR) << "Failed to acquire transfer log lock " << rootDir_ << " "
+    PLOG(ERROR) << "Failed to acquire transfer log lock " << logPath << " "
                 << fd_;
     close();
     return TRANSFER_LOG_ACQUIRE_ERROR;
   }
-  LOG(INFO) << "Transfer log opened";
+  LOG(INFO) << "Transfer log opened and lock acquired on " << logPath;
   if (!options.resume_using_dir_tree) {
     // start writer thread
     writerThread_ = std::thread(&TransferLogManager::writeEntriesToDisk, this);
@@ -262,10 +263,40 @@ ErrorCode TransferLogManager::openLog() {
   return OK;
 }
 
+ErrorCode TransferLogManager::checkLog() {
+  if (fd_ < 0) {
+    LOG(WARNING) << "No log to check";
+    return ERROR;
+  }
+  const std::string fullLogName = getFullPath(LOG_NAME);
+  struct stat stat1, stat2;
+  if (stat(fullLogName.c_str(), &stat1)) {
+    PLOG(ERROR) << "CORRUPTION! Can't stat log file " << fullLogName
+                << " (deleted under us)";
+    exit(TRANSFER_LOG_ACQUIRE_ERROR);
+    return ERROR;
+  }
+  if (fstat(fd_, &stat2)) {
+    PLOG(ERROR) << "Unable to stat log by fd " << fd_;
+    exit(TRANSFER_LOG_ACQUIRE_ERROR);
+    return ERROR;
+  }
+  if (stat1.st_ino != stat2.st_ino) {
+    LOG(ERROR) << "CORRUPTION! log file " << fullLogName << " changed "
+               << " old/open fd inode " << stat2.st_ino << " on fs "
+               << stat1.st_ino;
+    exit(TRANSFER_LOG_ACQUIRE_ERROR);
+    return ERROR;
+  }
+  LOG(INFO) << fullLogName << " still ok with " << stat1.st_ino;
+  return OK;
+}
+
 void TransferLogManager::close() {
   if (fd_ < 0) {
     return;
   }
+  checkLog();
   if (::close(fd_) != 0) {
     PLOG(ERROR) << "Failed to close wdt log " << fd_;
   } else {
@@ -462,6 +493,7 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
 }
 
 void TransferLogManager::unlink() {
+  WDT_CHECK_LT(fd_, 0) << "Unlink called before closeLog!";
   LOG(INFO) << "unlinking " << LOG_NAME;
   std::string fullLogName = getFullPath(LOG_NAME);
   if (::unlink(fullLogName.c_str()) != 0) {
@@ -470,6 +502,7 @@ void TransferLogManager::unlink() {
 }
 
 void TransferLogManager::renameBuggyLog() {
+  WDT_CHECK_LT(fd_, 0) << "renameBuggyLog called before closeLog!";
   LOG(INFO) << "Renaming " << LOG_NAME << " to " << BUGGY_LOG_NAME;
   if (::rename(getFullPath(LOG_NAME).c_str(),
                getFullPath(BUGGY_LOG_NAME).c_str()) != 0) {

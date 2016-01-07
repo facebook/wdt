@@ -45,13 +45,14 @@ The possible options to this script are
 
 echo "Run from ~/fbcode - or fbmake runtests"
 
+source `dirname "$0"`/common_functions.sh
+
 # Set DO_VERIFY:
 # to 1 : slow/expensive but checks correctness
 # to 0 : fast for repeated benchmarking not for correctness
 DO_VERIFY=1
 # echo e | $NC was used to stop daemon servers
 #NC="nc -4" # ipv4 only
-REALPATH=/mnt/vol/engshare/svnroot/tfb/trunk/www/scripts/bin/realpath
 
 # Verbose:
 #WDTBIN="_bin/wdt/wdt -minloglevel 0"
@@ -92,6 +93,7 @@ WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
 "-avg_mbytes_per_sec=$avg_rate -max_mbytes_per_sec=$max_rate "\
 "-num_ports=$threads -throttler_log_time_millis=200 -enable_checksum=true "\
 "-transfer_id=$$"
+extendWdtOptions
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/wdtTest_$USER
@@ -113,7 +115,7 @@ cp -R wdt folly /usr/bin /usr/lib $DIR/src
 # Removing symlinks which point to the same source tree
 for link in `find -L $DIR/src -xtype l`
 do
-  real_path=`$REALPATH $link`;
+  real_path=`readlink -e $link`;
   if [[ $real_path =~ ^$DIR/src/* ]]
   then
     echo "Removing symlink $link"

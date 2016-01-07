@@ -8,16 +8,42 @@
  */
 #pragma once
 
+#include <openssl/evp.h>
 #include <string>
 #include <wdt/ErrorCodes.h>
 
 namespace facebook {
 namespace wdt {
 
-enum EncryptionType { ENC_NONE, ENC_AES128_CTR, NUM_ENC_TYPES };
+/// AES encryption block size
+const int kAESBlockSize = 16;
+
+enum EncryptionType { ENC_NONE, ENC_AES128_CTR, ENC_AES128_GCM, NUM_ENC_TYPES };
+
+/// @return  string description for encryption type
+std::string encryptionTypeToStr(EncryptionType encryptionType);
+
+/// @return  encryption type for the input string
+EncryptionType parseEncryptionType(const std::string& str);
+
+/// class responsible for initializing openssl
+class WdtCryptoIntializer {
+ public:
+  WdtCryptoIntializer();
+  ~WdtCryptoIntializer();
+};
 
 class EncryptionParams {
  public:
+  /**
+   * Generates encryption params
+   *
+   * @param type       type of encryption
+   *
+   * @return           generated encryption params
+   */
+  static EncryptionParams generateEncryptionParams(EncryptionType type);
+
   // Returns a string safe to print in logs (doesn't contain the secret but
   // a hash of it instead)
   std::string getLogSafeString() const;
@@ -31,7 +57,7 @@ class EncryptionParams {
     return type_;
   }
   /// Returns the data/secret part or empty upon error
-  const std::string &getSecret() const {
+  const std::string& getSecret() const {
     return data_;
   }
   /// isSet()
@@ -44,10 +70,10 @@ class EncryptionParams {
   }
 
   /// Normal constructor when we have data
-  EncryptionParams(EncryptionType type, const std::string &data);
+  EncryptionParams(EncryptionType type, const std::string& data);
 
   /// Tests equality
-  bool operator==(const EncryptionParams &that) const;
+  bool operator==(const EncryptionParams& that) const;
 
   /// Erase (clears the object - call as soon as you don't need secret anymore)
   void erase();
@@ -55,12 +81,115 @@ class EncryptionParams {
   ~EncryptionParams();
 
   /// Reconstructs an EncryptionParams object from a previous getUrlSafeString()
-  static ErrorCode unserialize(const std::string &urlSafeStr,
-                               EncryptionParams &result);
+  static ErrorCode unserialize(const std::string& urlSafeStr,
+                               EncryptionParams& result);
 
  private:
   EncryptionType type_;
   std::string data_;
+  std::string tag_;
+};
+
+/// base class to share code between encyptor and decryptor
+class AESBase {
+ public:
+  const std::string& getTag() const {
+    return tag_;
+  }
+  void setTag(const std::string& tag) {
+    tag_ = tag;
+  }
+  /// @returns 0 if no tag for the algorithm or the size in bytes
+  //  for now only gcm produces/requires tag (hmac) of 128bits (16 bytes)
+  size_t expectsTag() const {
+    return (type_ == ENC_AES128_GCM) ? kAESBlockSize : 0;
+  }
+
+ protected:
+  /// @return   cipher for a encryption type
+  const EVP_CIPHER* getCipher(const EncryptionType encryptionType);
+  EncryptionType type_{ENC_NONE};
+  std::string tag_;
+};
+
+/// encryptor class
+class AESEncryptor : public AESBase {
+ public:
+  /**
+   * should be called before starting to encrypt
+   *
+   * @param encryptionData  encryption info
+   * @param ivOut           this is set to generated initialization vector
+   *
+   * @return    whether start was successful
+   */
+  bool start(const EncryptionParams& encryptionData, std::string& ivOut);
+
+  /**
+   * encrypts data. should be called after start
+   *
+   * @param in        data ptr to encrypt
+   * @param inLength  input data length
+   * @param out       encrypted string is written here
+   *
+   * @return    whether the string was successfully encrypted
+   */
+  bool encrypt(const uint8_t* in, const int inLength, uint8_t* out);
+
+  /**
+   * should be called after all the encryption is done. After this call,
+   * encryptor object can be reused.
+   *
+   * @return    whether the finish was successfully
+   */
+  bool finish();
+
+  /// destructor
+  virtual ~AESEncryptor();
+
+ private:
+  EVP_CIPHER_CTX evpCtx_;
+  bool started_{false};
+};
+
+/// decryptor class
+class AESDecryptor : public AESBase {
+ public:
+  /**
+   * should be called before starting to decrypt
+   *
+   * @param encryptionData  encryption info
+   * @param iv              initialization vector
+   *
+   * @return    whether start was successful
+   */
+  bool start(const EncryptionParams& encryptionData, const std::string& iv);
+
+  /**
+   * decrypts data. should be called after start
+   *
+   * @param in        data ptr to decrypt
+   * @param inLength  input data length
+   * @param out       decrypted string is written here
+   *
+   * @return    whether the string was successfully decrypted
+   */
+  bool decrypt(const uint8_t* in, const int inLength, uint8_t* out);
+
+  /**
+   * should be called after all the decryption is done. After this call,
+   * decryptor object can be reused.
+   *
+   * @return    whether the finish was successfully
+   */
+  bool finish();
+
+  /// destructor
+  virtual ~AESDecryptor();
+
+ private:
+  EVP_CIPHER_CTX evpCtx_;
+  bool started_{false};
 };
 }
 }  // End of namespaces

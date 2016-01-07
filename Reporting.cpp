@@ -49,8 +49,15 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
     localErrCode_ = ERROR;
   }
   localErrCode_ = getMoreInterestingError(localErrCode_, stats.localErrCode_);
+  VLOG(2) << "Local ErrorCode now " << localErrCode_ << " from "
+          << stats.localErrCode_;
   remoteErrCode_ =
       getMoreInterestingError(remoteErrCode_, stats.remoteErrCode_);
+  if (stats.localErrCode_ == OK && stats.remoteErrCode_ == OK) {
+    // encryption type valid only if error code is OK
+    // TODO: verify whether all successful threads have same encryption types
+    encryptionType_ = stats.encryptionType_;
+  }
   return *this;
 }
 
@@ -85,7 +92,9 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
      << ". Total bytes = " << (stats.dataBytes_ + stats.headerBytes_)
      << ". Wasted bytes due to failure = "
      << (stats.dataBytes_ - stats.effectiveDataBytes_) << " ("
-     << failureOverhead << "% overhead).";
+     << failureOverhead << "% overhead)"
+     << ". Encryption type = " << encryptionTypeToStr(stats.encryptionType_)
+     << ".";
   return os;
 }
 
@@ -171,6 +180,8 @@ TransferReport::TransferReport(TransferStats&& globalStats)
   const int64_t numBytesSend = summary_.getTotalSenderBytes();
   const int64_t numBytesReceived = summary_.getEffectiveDataBytes();
   ErrorCode summaryErrorCode = summary_.getLocalErrorCode();
+  VLOG(1) << "Summary Error Code " << summaryErrorCode;
+  // TODO this is messy and error (ah!) prone
   if (numBlocksSend == -1 || numBlocksSend != numBlocksReceived) {
     LOG(ERROR) << "Did not receive all the blocks sent by the sender "
                << numBlocksSend << " " << numBlocksReceived;
@@ -181,7 +192,13 @@ TransferReport::TransferReport(TransferStats&& globalStats)
                << numBytesSend << " " << numBytesReceived;
     summaryErrorCode = getMoreInterestingError(summaryErrorCode, ERROR);
   } else {
-    summaryErrorCode = OK;
+    // We got all the bytes... but if we have an encryption error we should
+    // make it stick (unlike the connection error on a single port...)
+    if (summaryErrorCode != OK && summaryErrorCode != ENCRYPTION_ERROR) {
+      LOG(WARNING) << "All bytes received, turning "
+                   << errorCodeToStr(summaryErrorCode) << " into local OK";
+      summaryErrorCode = OK;
+    }
   }
   // only the local error code is set here. Any remote error means transfer
   // failure. Since, getErrorCode checks both local and remote codes, it will
@@ -294,7 +311,7 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
             << currentThroughput << "Mbps.";
 }
 
-folly::ThreadLocalPtr<PerfStatReport> perfStatReport;
+folly::ThreadLocal<PerfStatReport> wdt__perfStatReportThreadLocal;
 
 const std::string PerfStatReport::statTypeDescription_[] = {
     "Socket Read", "Socket Write", "File Open", "File Close", "File Read",
