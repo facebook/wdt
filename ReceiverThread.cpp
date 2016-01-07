@@ -198,17 +198,7 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
   if (code != OK) {
     LOG(ERROR) << "accept() failed with timeout " << timeout;
     threadStats_.setLocalErrorCode(code);
-    if (doneSendFailure_) {
-      // if SEND_DONE_CMD state had already been reached, we do not need to
-      // wait for other threads to end
-      return END;
-    }
     return FINISH_WITH_ERROR;
-  }
-
-  if (doneSendFailure_) {
-    // no need to reset any session variables in this case
-    return SEND_LOCAL_CHECKPOINT;
   }
 
   numRead_ = off_ = 0;
@@ -226,16 +216,8 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
 ReceiverState ReceiverThread::sendLocalCheckpoint() {
   LOG(INFO) << *this << " entered SEND_LOCAL_CHECKPOINT state";
   std::vector<Checkpoint> checkpoints;
-  if (doneSendFailure_) {
-    // in case SEND_DONE failed, a special checkpoint(-1) is sent to signal this
-    // condition
-    Checkpoint localCheckpoint(socket_->getPort());
-    localCheckpoint.numBlocks = -1;
-    checkpoints.emplace_back(localCheckpoint);
-  } else {
-    VLOG(1) << *this << " sending local checkpoint " << checkpoint_;
-    checkpoints.emplace_back(checkpoint_);
-  }
+  VLOG(1) << *this << " sending local checkpoint " << checkpoint_;
+  checkpoints.emplace_back(checkpoint_);
 
   int64_t off = 0;
   const int checkpointLen =
@@ -250,9 +232,6 @@ ReceiverState ReceiverThread::sendLocalCheckpoint() {
     return ACCEPT_WITH_TIMEOUT;
   }
   threadStats_.addHeaderBytes(checkpointLen);
-  if (doneSendFailure_) {
-    return SEND_DONE_CMD;
-  }
   return READ_NEXT_CMD;
 }
 
@@ -757,7 +736,6 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   buf_[0] = Protocol::DONE_CMD;
   if (socket_->write(buf_, 1) != 1) {
     PLOG(ERROR) << "unable to send DONE " << threadIndex_;
-    doneSendFailure_ = true;
     threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
@@ -767,7 +745,6 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   auto read = socket_->read(buf_, 1);
   if (read != 1 || buf_[0] != Protocol::DONE_CMD) {
     LOG(ERROR) << *this << " did not receive ack for DONE";
-    doneSendFailure_ = true;
     threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
@@ -775,7 +752,6 @@ ReceiverState ReceiverThread::sendDoneCmd() {
   if (code != OK) {
     LOG(ERROR) << *this << " error while processing logical end of stream "
                << errorCodeToStr(code);
-    doneSendFailure_ = true;
     threadStats_.setLocalErrorCode(code);
     return ACCEPT_WITH_TIMEOUT;
   }
@@ -907,7 +883,6 @@ ErrorCode ReceiverThread::init() {
 void ReceiverThread::reset() {
   numRead_ = off_ = 0;
   checkpointIndex_ = pendingCheckpointIndex_ = 0;
-  doneSendFailure_ = false;
   senderReadTimeout_ = senderWriteTimeout_ = -1;
   curConnectionVerified_ = false;
   threadStats_.reset();

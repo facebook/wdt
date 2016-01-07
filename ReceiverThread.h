@@ -329,13 +329,6 @@ class ReceiverThread : public WdtThread {
   /// the server socket
   bool curConnectionVerified_{false};
 
-  /**
-   * Whether SEND_DONE_CMD state has already failed for this session or not.
-   * This has to be separately handled, because session barrier is
-   * implemented before sending done cmd
-   */
-  bool doneSendFailure_{false};
-
   /// Checkpoints that have not been sent back to the sender
   std::vector<Checkpoint> newCheckpoints_;
 };
