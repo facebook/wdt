@@ -93,7 +93,7 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
 
 std::mutex abortMutex;
 std::condition_variable abortCondVar;
-
+bool isAbortCancelled = false;
 std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
   int abortSeconds = FLAGS_abort_after_seconds;
   if (abortSeconds <= 0) {
@@ -105,8 +105,10 @@ std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
   auto lambda = [=] {
     LOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
     std::unique_lock<std::mutex> lk(abortMutex);
-    if (abortCondVar.wait_for(lk, std::chrono::seconds(abortSeconds)) ==
-        std::cv_status::no_timeout) {
+    bool isNotAbort =
+        abortCondVar.wait_for(lk, std::chrono::seconds(abortSeconds),
+                              [&]() -> bool { return isAbortCancelled; });
+    if (isNotAbort) {
       LOG(INFO) << "Already finished normally, no abort.";
     } else {
       LOG(INFO) << "Requesting abort.";
@@ -114,8 +116,7 @@ std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
     }
   };
   // Run this in a separate thread concurrently with sender/receiver
-  std::thread abortThread(lambda);
-  abortThread.detach();
+  static auto f = std::async(std::launch::async, lambda);
   return res;
 }
 
@@ -126,6 +127,7 @@ void setAbortChecker(WdtBase &senderOrReceiver) {
 void cancelAbort() {
   {
     std::unique_lock<std::mutex> lk(abortMutex);
+    isAbortCancelled = true;
     abortCondVar.notify_one();
   }
   std::this_thread::yield();

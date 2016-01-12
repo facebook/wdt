@@ -255,8 +255,16 @@ ErrorCode TransferLogManager::openLog() {
     return TRANSFER_LOG_ACQUIRE_ERROR;
   }
   LOG(INFO) << "Transfer log opened and lock acquired on " << logPath;
+  return OK;
+}
+
+ErrorCode TransferLogManager::startThread() {
+  const auto &options = WdtOptions::get();
   if (!options.resume_using_dir_tree) {
     // start writer thread
+    if (resumptionStatus_ != OK) {
+      return resumptionStatus_;
+    }
     writerThread_ = std::thread(&TransferLogManager::writeEntriesToDisk, this);
     LOG(INFO) << "Log writer thread started";
   }
@@ -310,7 +318,7 @@ void TransferLogManager::closeLog() {
   if (fd_ < 0) {
     return;
   }
-  if (!options.resume_using_dir_tree) {
+  if (!options.resume_using_dir_tree && writerThread_.joinable()) {
     // stop writer thread
     {
       std::lock_guard<std::mutex> lock(mutex_);

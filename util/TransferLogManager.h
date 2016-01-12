@@ -129,6 +129,9 @@ class TransferLogManager {
    */
   ErrorCode openLog();
 
+  /// Start the log writer thread
+  ErrorCode startThread();
+
   /**
    * In case of log based resumption, signals to the writer thread to finish.
    * Waits for the writer thread to finish. Closes the transfer log.

@@ -445,6 +445,10 @@ ErrorCode Receiver::start() {
     LOG(INFO) << "Throttler set externally. Throttler : " << *throttler_;
   }
   setTransferStatus(ONGOING);
+  const auto &options = WdtOptions::get();
+  if (options.enable_download_resumption) {
+    transferLogManager_.startThread();
+  }
   while (true) {
     for (auto &receiverThread : receiverThreads_) {
       receiverThread->startThread();
