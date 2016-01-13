@@ -335,16 +335,24 @@ class WdtOptions {
   // NOTE: any option added here should also be added to util/WdtFlags.cpp.inc
 
   /**
-   * Since this is a singleton copy constructor
-   * and assignment operator are deleted
+   * Initialize the fields of this object from another src one. ie makes 1 copy
+   * explictly.
+   */
+  void copyInto(const WdtOptions& src);
+  /**
+   * This used to be a singleton (which as always is a pretty bad idea)
+   * so copy constructor and assignment operator were deleted
+   * We still want to avoid accidental copying around of a fairly
+   * big object thus the copyInto pattern above
    */
   WdtOptions(const WdtOptions&) = delete;
-  WdtOptions& operator=(const WdtOptions&) = delete;
-
   WdtOptions() {
   }
   ~WdtOptions() {
   }
+
+ private:
+  WdtOptions& operator=(const WdtOptions&) = default;
 };
 }
 }

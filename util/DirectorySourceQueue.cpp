@@ -20,6 +20,11 @@
 #include <regex>
 #include <fcntl.h>
 
+// NOTE: this should remain standalone code and not use WdtOptions directly
+// also note this is used not just by the Sender but also by the receiver
+// (so code like opening files during discovery is disabled by default and
+// no reading the config directly from the options and only set by the Sender)
+
 namespace facebook {
 namespace wdt {
 
@@ -55,10 +60,8 @@ void FileInfo::verifyAndFixFlags() {
 
 DirectorySourceQueue::DirectorySourceQueue(const string &rootDir,
                                            IAbortChecker const *abortChecker)
-    : abortChecker_(abortChecker), options_(WdtOptions::get()) {
+    : abortChecker_(abortChecker) {
   setRootDir(rootDir);
-  fileSourceBufferSize_ = options_.buffer_size;
-  openFilesDuringDiscovery_ = options_.open_files_during_discovery;
 }
 
 void DirectorySourceQueue::setIncludePattern(const string &includePattern) {
@@ -380,13 +383,14 @@ bool DirectorySourceQueue::explore() {
     }
     closedir(dirPtr);
   }
-  LOG(INFO) << "Number of files explored: " << numEntries_
-            << ", errors: " << std::boolalpha << hasError;
+  LOG(INFO) << "Number of files explored: " << numEntries_ << " opened "
+            << numFilesOpened_ << " with direct " << numFilesOpenedWithDirect_
+            << " errors " << std::boolalpha << hasError;
   return !hasError;
 }
 
 void DirectorySourceQueue::smartNotify(int32_t addedSource) {
-  if (addedSource >= options_.num_ports) {
+  if (addedSource >= numClientThreads_) {
     conditionNotEmpty_.notify_all();
     return;
   }
@@ -435,10 +439,14 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   metadata->size = fileInfo.fileSize;
   if ((openFilesDuringDiscovery_ != 0) && (metadata->fd < 0)) {
     metadata->fd = FileUtil::openForRead(fullPath, metadata->directReads);
+    ++numFilesOpened_;
+    if (metadata->directReads) {
+      ++numFilesOpenedWithDirect_;
+    }
     metadata->needToClose = (metadata->fd >= 0);
     // works for -1 up to 4B files
     if (--openFilesDuringDiscovery_ == 0) {
-      LOG(WARNING) << "Already opened " << options_.open_files_during_discovery
+      LOG(WARNING) << "Already opened " << numFilesOpened_
                    << " files, will open the reminder as they are sent";
     }
   }

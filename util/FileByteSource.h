@@ -138,10 +138,10 @@ class FileByteSource : public ByteSource {
 
  private:
   struct Buffer {
-    explicit Buffer(int64_t size, bool isMemAligned) : size_(size) {
-      isMemAligned_ = false;
+    explicit Buffer(int64_t size, bool isMemAligned)
+        : data_(nullptr), size_(size), isMemAligned_(false) {
       if (!isMemAligned) {
-        data_ = new char[size + 1];
+        data_ = new char[size];
         return;
       }
 #ifdef WDT_SUPPORTS_ODIRECT
@@ -159,6 +159,8 @@ class FileByteSource : public ByteSource {
         LOG(ERROR) << "Memalign memory failed " << strerrorStr(ret);
       }
       isMemAligned_ = true;
+#else
+      LOG(FATAL) << "Requested alignement on platform which doesn't support it";
 #endif
     }
 
@@ -169,9 +171,9 @@ class FileByteSource : public ByteSource {
       }
       delete[] data_;
     }
-    bool isMemAligned_;
     char *data_;
     int64_t size_;
+    bool isMemAligned_;
   };
 
   /**

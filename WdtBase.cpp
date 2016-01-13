@@ -14,7 +14,13 @@ using namespace std;
 namespace facebook {
 namespace wdt {
 
+// TODO: force callers to pass options in
 WdtBase::WdtBase() : abortCheckerCallback_(this) {
+  options_.copyInto(WdtOptions::get());
+}
+
+void WdtBase::setWdtOptions(const WdtOptions& src) {
+  options_.copyInto(src);
 }
 
 WdtBase::~WdtBase() {

@@ -67,6 +67,7 @@ bool WdtOptions::isDirectoryTreeBasedResumption() const {
   return enable_download_resumption && resume_using_dir_tree;
 }
 
+/* static */
 const WdtOptions& WdtOptions::get() {
   return getMutable();
 }
@@ -74,6 +75,10 @@ const WdtOptions& WdtOptions::get() {
 WdtOptions& WdtOptions::getMutable() {
   static WdtOptions opt;
   return opt;
+}
+
+void WdtOptions::copyInto(const WdtOptions& src) {
+  *this = src;
 }
 }
 }

@@ -40,7 +40,11 @@ void basicTest(bool resumption) {
   // Not even using the actual name (which we don't know)
   req.fileInfo.push_back(FileInfo("notexisting23r4", 0, fd));
   Sender s(req);
+  // setWdtOptions not needed if change of option happens before sender cstror
+  // but this indirectly tests that API (but need to manually see
+  // "entered READ_FILE_CHUNKS" in the logs) TODO: test that programatically
   opts.enable_download_resumption = resumption;
+  s.setWdtOptions(opts);
   req = s.init();
   EXPECT_EQ(OK, req.errorCode);
   auto report = s.transfer();

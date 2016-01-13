@@ -47,20 +47,22 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
     : queueAbortChecker_(this), destHost_(destHost) {
   LOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   srcDir_ = srcDir;
-  const auto &options = WdtOptions::get();
-  int port = options.start_port;
-  int numSockets = options.num_ports;
+  int port = options_.start_port;
+  int numSockets = options_.num_ports;
   for (int i = 0; i < numSockets; i++) {
     transferRequest_.ports.push_back(port + i);
   }
   dirQueue_.reset(new DirectorySourceQueue(srcDir_, &queueAbortChecker_));
   VLOG(3) << "Configuring the  directory queue";
-  dirQueue_->setIncludePattern(options.include_regex);
-  dirQueue_->setExcludePattern(options.exclude_regex);
-  dirQueue_->setPruneDirPattern(options.prune_dir_regex);
-  dirQueue_->setFollowSymlinks(options.follow_symlinks);
-  dirQueue_->setBlockSizeMbytes(options.block_size_mbytes);
-  progressReportIntervalMillis_ = options.progress_report_interval_millis;
+  dirQueue_->setIncludePattern(options_.include_regex);
+  dirQueue_->setExcludePattern(options_.exclude_regex);
+  dirQueue_->setPruneDirPattern(options_.prune_dir_regex);
+  dirQueue_->setFollowSymlinks(options_.follow_symlinks);
+  dirQueue_->setBlockSizeMbytes(options_.block_size_mbytes);
+  dirQueue_->setFileSourceBufferSize(options_.buffer_size);
+  dirQueue_->setNumClientThreads(numSockets);
+  dirQueue_->setOpenFilesDuringDiscovery(options_.open_files_during_discovery);
+  progressReportIntervalMillis_ = options_.progress_report_interval_millis;
 }
 
 // TODO: argghhhh
@@ -225,8 +227,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
             << " existing transfer report";
     return getTransferReport();
   }
-  const auto &options = WdtOptions::get();
-  const bool twoPhases = options.two_phases;
+  const bool twoPhases = options_.two_phases;
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
   for (auto &senderThread : senderThreads_) {
@@ -265,14 +266,14 @@ std::unique_ptr<TransferReport> Sender::finish() {
     } else {
       transferHistory.returnUnackedSourcesToQueue();
     }
-    if (WdtOptions::get().full_reporting) {
+    if (options_.full_reporting) {
       std::vector<TransferStats> stats = transferHistory.popAckedSourceStats();
       transferredSourceStats.insert(transferredSourceStats.end(),
                                     std::make_move_iterator(stats.begin()),
                                     std::make_move_iterator(stats.end()));
     }
   }
-  if (WdtOptions::get().full_reporting) {
+  if (options_.full_reporting) {
     validateTransferStats(transferredSourceStats,
                           dirQueue_->getFailedSourceStats());
   }
@@ -287,7 +288,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
   if (progressReportEnabled) {
     progressReporter_->end(transferReport);
   }
-  if (options.enable_perf_stat_collection) {
+  if (options_.enable_perf_stat_collection) {
     PerfStatReport report;
     for (auto &senderThread : senderThreads_) {
       report += senderThread->getPerfReport();
@@ -325,14 +326,13 @@ ErrorCode Sender::start() {
     }
     transferStatus_ = ONGOING;
   }
-  const auto &options = WdtOptions::get();
-  const bool twoPhases = options.two_phases;
-  WDT_CHECK(!(twoPhases && options.enable_download_resumption))
+  const bool twoPhases = options_.two_phases;
+  WDT_CHECK(!(twoPhases && options_.enable_download_resumption))
       << "Two phase is not supported with download resumption";
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
             << transferRequest_.ports << "]";
   startTime_ = Clock::now();
-  downloadResumptionEnabled_ = options.enable_download_resumption;
+  downloadResumptionEnabled_ = options_.enable_download_resumption;
   if (!progressReporter_) {
     VLOG(1) << "No progress reporter provided, making a default one";
     progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
@@ -414,7 +414,6 @@ TransferStats Sender::sendOneByteSource(
     const std::unique_ptr<ClientSocket> &socket,
     const std::unique_ptr<ByteSource> &source, ErrorCode transferStatus) {
   TransferStats stats;
-  auto &options = WdtOptions::get();
   char headerBuf[Protocol::kMaxHeader];
   int64_t off = 0;
   headerBuf[off++] = Protocol::FILE_CMD;
@@ -463,7 +462,7 @@ TransferStats Sender::sendOneByteSource(
     }
     WDT_CHECK(buffer && size > 0);
     if (protocolVersion_ >= Protocol::CHECKSUM_VERSION &&
-        options.enable_checksum) {
+        options_.enable_checksum) {
       checksum = folly::crc32c((const uint8_t *)buffer, size, checksum);
     }
     if (throttler_) {
@@ -522,7 +521,7 @@ TransferStats Sender::sendOneByteSource(
         << totalThrottlerBytes << " " << (actualSize + totalThrottlerBytes);
   }
   if (protocolVersion_ >= Protocol::CHECKSUM_VERSION &&
-      options.enable_checksum) {
+      options_.enable_checksum) {
     off = 0;
     headerBuf[off++] = Protocol::FOOTER_CMD;
     Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum);
@@ -545,7 +544,7 @@ TransferStats Sender::sendOneByteSource(
 void Sender::reportProgress() {
   WDT_CHECK(progressReportIntervalMillis_ > 0);
   int throughputUpdateIntervalMillis =
-      WdtOptions::get().throughput_update_interval_millis;
+      options_.throughput_update_interval_millis;
   WDT_CHECK(throughputUpdateIntervalMillis >= 0);
   int throughputUpdateInterval =
       throughputUpdateIntervalMillis / progressReportIntervalMillis_;

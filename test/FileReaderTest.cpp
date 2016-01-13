@@ -182,10 +182,9 @@ TEST(FileByteSource, FILEINFO_ODIRECT) {
 
 TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
   auto& options = WdtOptions::getMutable();
-  int64_t originalBufferSize = 255 * 1024;
-  options.buffer_size = originalBufferSize;
-  int64_t blockSize = options.block_size_mbytes * 1024 * 1024;
-  int64_t fileSize = 5 * blockSize + kDiskBlockSize / 5;
+  const int64_t originalBufferSize = 255 * 1024;
+  const int64_t blockSize = options.block_size_mbytes * 1024 * 1024;
+  const int64_t fileSize = 5 * blockSize + kDiskBlockSize / 5;
   // 5 blocks long file and reading at least 2 blocks
   int64_t sizeToRead = blockSize;
   const int64_t numFiles = 5;
@@ -197,6 +196,7 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
   std::atomic<bool> shouldAbort{false};
   WdtAbortChecker queueAbortChecker(shouldAbort);
   DirectorySourceQueue Q("/tmp", &queueAbortChecker);
+  Q.setFileSourceBufferSize(originalBufferSize);
   std::vector<FileInfo> files;
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);
@@ -286,7 +286,9 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
   }
   std::atomic<bool> shouldAbort{false};
   WdtAbortChecker queueAbortChecker(shouldAbort);
+  const int64_t bufferSize = options.buffer_size;
   DirectorySourceQueue Q("/tmp", &queueAbortChecker);
+  Q.setFileSourceBufferSize(bufferSize);
   std::vector<FileInfo> files;
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);
@@ -295,7 +297,6 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
   Q.setFileInfo(files);
   Q.buildQueueSynchronously();
   ErrorCode code;
-  int64_t bufferSize = options.buffer_size;
   std::thread t([&]() {
     while (true) {
       auto byteSource = Q.getNextSource(code);

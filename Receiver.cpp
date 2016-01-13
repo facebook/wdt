@@ -84,8 +84,8 @@ void Receiver::startNewGlobalSession(const std::string &peerIp) {
     throttler_->registerTransfer();
   }
   startTime_ = Clock::now();
-  const auto &options = WdtOptions::get();
-  if (options.enable_download_resumption) {
+  if (options_.enable_download_resumption) {
+    transferLogManager_.startThread();
     bool verifySuccessful = transferLogManager_.verifySenderIp(peerIp);
     if (!verifySuccessful) {
       fileChunksInfo_.clear();
@@ -117,13 +117,12 @@ void Receiver::endCurGlobalSession() {
 }
 
 const WdtTransferRequest &Receiver::init() {
-  const auto &options = WdtOptions::get();
-  backlog_ = options.backlog;
-  bufferSize_ = options.buffer_size;
+  backlog_ = options_.backlog;
+  bufferSize_ = options_.buffer_size;
   if (bufferSize_ < Protocol::kMaxHeader) {
     // round up to even k
     bufferSize_ = 2 * 1024 * ((Protocol::kMaxHeader - 1) / (2 * 1024) + 1);
-    LOG(INFO) << "Specified -buffer_size " << options.buffer_size
+    LOG(INFO) << "Specified -buffer_size " << options_.buffer_size
               << " smaller than " << Protocol::kMaxHeader << " using "
               << bufferSize_ << " instead";
   }
@@ -134,11 +133,11 @@ const WdtTransferRequest &Receiver::init() {
   // Make sure we can get the lock on the transfer log manager early
   // so if we can't we don't generate a valid but useless url and end up
   // starting a sender doomed to fail
-  if (options.enable_download_resumption) {
-    WDT_CHECK(!options.skip_writes)
+  if (options_.enable_download_resumption) {
+    WDT_CHECK(!options_.skip_writes)
         << "Can not skip transfers with download resumption turned on";
-    if (options.resume_using_dir_tree) {
-      WDT_CHECK(!options.shouldPreallocateFiles())
+    if (options_.resume_using_dir_tree) {
+      WDT_CHECK(!options_.shouldPreallocateFiles())
           << "Can not resume using directory tree if preallocation is enabled";
     }
     ErrorCode errCode = transferLogManager_.openLog();
@@ -149,13 +148,13 @@ const WdtTransferRequest &Receiver::init() {
     }
     ErrorCode code = transferLogManager_.parseAndMatch(
         recoveryId_, getTransferConfig(), fileChunksInfo_);
-    if (code == OK && options.resume_using_dir_tree) {
+    if (code == OK && options_.resume_using_dir_tree) {
       WDT_CHECK(fileChunksInfo_.empty());
       traverseDestinationDir(fileChunksInfo_);
     }
   }
 
-  EncryptionType encryptionType = parseEncryptionType(options.encryption_type);
+  EncryptionType encryptionType = parseEncryptionType(options_.encryption_type);
   // is encryption enabled?
   bool encrypt = (encryptionType != ENC_NONE &&
                   protocolVersion_ >= Protocol::ENCRYPTION_V1_VERSION);
@@ -267,12 +266,11 @@ const std::vector<FileChunksInfo> &Receiver::getFileChunksInfo() const {
 }
 
 int64_t Receiver::getTransferConfig() const {
-  auto &options = WdtOptions::get();
   int64_t config = 0;
-  if (options.shouldPreallocateFiles()) {
+  if (options_.shouldPreallocateFiles()) {
     config = 1;
   }
-  if (options.resume_using_dir_tree) {
+  if (options_.resume_using_dir_tree) {
     config |= (1 << 1);
   }
   return config;
@@ -291,7 +289,6 @@ std::unique_ptr<TransferReport> Receiver::finish() {
                  << "transfer report";
     return getTransferReport();
   }
-  const auto &options = WdtOptions::get();
   if (!isJoinable_) {
     // TODO: don't complain about this when coming from runForever()
     LOG(WARNING) << "The receiver is not joinable. The threads will never"
@@ -317,7 +314,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     report->setTotalTime(durationSeconds(Clock::now() - startTime_));
     progressReporter_->end(report);
   }
-  if (options.enable_perf_stat_collection) {
+  if (options_.enable_perf_stat_collection) {
     PerfStatReport globalPerfReport;
     for (auto &receiverThread : receiverThreads_) {
       globalPerfReport += receiverThread->getPerfReport();
@@ -348,9 +345,8 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
 }
 
 ErrorCode Receiver::transferAsync() {
-  const auto &options = WdtOptions::get();
   isJoinable_ = true;
-  int progressReportIntervalMillis = options.progress_report_interval_millis;
+  int progressReportIntervalMillis = options_.progress_report_interval_millis;
   if (!progressReporter_ && progressReportIntervalMillis > 0) {
     // if progress reporter has not been set, use the default one
     progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
@@ -359,8 +355,7 @@ ErrorCode Receiver::transferAsync() {
 }
 
 ErrorCode Receiver::runForever() {
-  const auto &options = WdtOptions::get();
-  WDT_CHECK(!options.enable_download_resumption)
+  WDT_CHECK(!options_.enable_download_resumption)
       << "Transfer resumption not supported in long running mode";
 
   // Enforce the full reporting to be false in the daemon mode.
@@ -376,12 +371,11 @@ ErrorCode Receiver::runForever() {
 }
 
 void Receiver::progressTracker() {
-  const auto &options = WdtOptions::get();
   // Progress tracker will check for progress after the time specified
   // in milliseconds.
-  int progressReportIntervalMillis = options.progress_report_interval_millis;
+  int progressReportIntervalMillis = options_.progress_report_interval_millis;
   int throughputUpdateIntervalMillis =
-      WdtOptions::get().throughput_update_interval_millis;
+      options_.throughput_update_interval_millis;
   if (progressReportIntervalMillis <= 0 || throughputUpdateIntervalMillis < 0 ||
       !isJoinable_) {
     return;
@@ -445,10 +439,6 @@ ErrorCode Receiver::start() {
     LOG(INFO) << "Throttler set externally. Throttler : " << *throttler_;
   }
   setTransferStatus(ONGOING);
-  const auto &options = WdtOptions::get();
-  if (options.enable_download_resumption) {
-    transferLogManager_.startThread();
-  }
   while (true) {
     for (auto &receiverThread : receiverThreads_) {
       receiverThread->startThread();
@@ -479,15 +469,14 @@ ErrorCode Receiver::start() {
 }
 
 void Receiver::addTransferLogHeader(bool isBlockMode, bool isSenderResuming) {
-  const auto &options = WdtOptions::get();
-  if (!options.enable_download_resumption) {
+  if (!options_.enable_download_resumption) {
     return;
   }
   bool invalidationEntryNeeded = false;
   if (!isSenderResuming) {
     LOG(INFO) << "Sender is not in resumption mode. Invalidating directory.";
     invalidationEntryNeeded = true;
-  } else if (options.resume_using_dir_tree && isBlockMode) {
+  } else if (options_.resume_using_dir_tree && isBlockMode) {
     LOG(INFO) << "Sender is running in block mode, but receiver is running in "
                  "size based resumption mode. Invalidating directory.";
     invalidationEntryNeeded = true;
@@ -498,15 +487,14 @@ void Receiver::addTransferLogHeader(bool isBlockMode, bool isSenderResuming) {
   bool isInconsistentDirectory =
       (transferLogManager_.getResumptionStatus() == INCONSISTENT_DIRECTORY);
   bool shouldWriteHeader =
-      (!options.resume_using_dir_tree || !isInconsistentDirectory);
+      (!options_.resume_using_dir_tree || !isInconsistentDirectory);
   if (shouldWriteHeader) {
     transferLogManager_.writeLogHeader();
   }
 }
 
 void Receiver::fixAndCloseTransferLog(bool transferSuccess) {
-  const auto &options = WdtOptions::get();
-  if (!options.enable_download_resumption) {
+  if (!options_.enable_download_resumption) {
     return;
   }
 
@@ -516,7 +504,7 @@ void Receiver::fixAndCloseTransferLog(bool transferSuccess) {
       (transferLogManager_.getResumptionStatus() == INVALID_LOG);
   if (transferSuccess && isInconsistentDirectory) {
     // write log header to validate directory in case of success
-    WDT_CHECK(options.resume_using_dir_tree);
+    WDT_CHECK(options_.resume_using_dir_tree);
     transferLogManager_.writeLogHeader();
   }
   transferLogManager_.closeLog();
@@ -526,7 +514,7 @@ void Receiver::fixAndCloseTransferLog(bool transferSuccess) {
   if (isInvalidLog) {
     transferLogManager_.renameBuggyLog();
   }
-  if (!options.keep_transfer_log) {
+  if (!options_.keep_transfer_log) {
     transferLogManager_.unlink();
   }
 }

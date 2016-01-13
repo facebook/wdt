@@ -122,7 +122,24 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param fileSourceBufferSize  buffers size
    */
-  void setFileSourceBufferSize(const int64_t fileSourceBufferSize);
+  void setFileSourceBufferSize(int64_t fileSourceBufferSize);
+
+  /**
+   * Sets the number of consumer threads for this queue. used as threshold
+   * between notify and notifyAll
+   */
+  void setNumClientThreads(int64_t numClientThreads) {
+    numClientThreads_ = numClientThreads;
+  }
+
+  /**
+   * Sets the count and trigger for files to open during discovery
+   * (negative is keep opening until we run out of fd, positive is how
+   * many files we can still open, 0 is stop opening files)
+   */
+  void setOpenFilesDuringDiscovery(int64_t openFilesDuringDiscovery) {
+    openFilesDuringDiscovery_ = openFilesDuringDiscovery;
+  }
 
   /**
    * Stat the FileInfo input files (if their size aren't already specified) and
@@ -267,9 +284,11 @@ class DirectorySourceQueue : public SourceQueue {
 
   /**
    * buffer size to use when creating individual FileByteSource objects
-   * (returned by getNextSource).
+   * (returned by getNextSource). This is set by sender from
+   * WdtOptions::buffer_size using setFileSourceBufferSize. The default value
+   * is just for unit tests.
    */
-  int64_t fileSourceBufferSize_;
+  int64_t fileSourceBufferSize_{16384};
 
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<FileInfo> fileInfo_;
@@ -359,7 +378,13 @@ class DirectorySourceQueue : public SourceQueue {
    * files)
    */
   int32_t openFilesDuringDiscovery_{0};
-  const WdtOptions &options_;
+
+  // Number of files opened
+  int64_t numFilesOpened_{0};
+  // Number of files opened with odirect
+  int64_t numFilesOpenedWithDirect_{0};
+  // Number of consumer threads (to tell between notify/notifyall)
+  int64_t numClientThreads_{1};
 };
 }
 }

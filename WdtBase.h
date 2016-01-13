@@ -43,6 +43,9 @@ class WdtBase {
    */
   virtual const WdtTransferRequest& init() = 0;
 
+  /// Sets other options than global/singleton ones - call this before init()
+  void setWdtOptions(const WdtOptions& src);
+
   /// Destructor
   virtual ~WdtBase();
 
@@ -166,6 +169,9 @@ class WdtBase {
 
   /// Controller for wdt threads shared between base and threads
   ThreadsController* threadsController_{nullptr};
+
+  /// Options/config used by this object
+  WdtOptions options_;
 
  private:
   folly::RWSpinLock abortCodeLock_;

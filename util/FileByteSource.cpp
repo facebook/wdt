@@ -104,44 +104,57 @@ char *FileByteSource::read(int64_t &size) {
   if (hasError() || finished()) {
     return nullptr;
   }
-  int64_t expectedRead =
-      (int64_t)std::min<int64_t>(buffer_->size_, size_ - bytesRead_);
-  int64_t toRead = expectedRead;
+  int64_t offsetRemainder = 0;
   if (alignedReadNeeded_) {
-    toRead =
-        ((expectedRead + kDiskBlockSize - 1) / kDiskBlockSize) * kDiskBlockSize;
+    offsetRemainder = (offset_ + bytesRead_) % kDiskBlockSize;
   }
-  // actualRead is guaranteed to be <= buffer_->size_
-  WDT_CHECK(toRead <= buffer_->size_) << "Attempting to read " << toRead
-                                      << " while buffer size is "
-                                      << buffer_->size_;
+  int64_t logicalRead = (int64_t)std::min<int64_t>(
+      buffer_->size_ - offsetRemainder, size_ - bytesRead_);
+  int64_t physicalRead = logicalRead;
+  if (alignedReadNeeded_) {
+    physicalRead = ((logicalRead + offsetRemainder + kDiskBlockSize - 1) /
+                    kDiskBlockSize) *
+                   kDiskBlockSize;
+  }
+  const int64_t seekPos = (offset_ + bytesRead_) - offsetRemainder;
   START_PERF_TIMER
-  int64_t numRead = ::pread(fd_, buffer_->data_, toRead, offset_ + bytesRead_);
+  int64_t numRead = ::pread(fd_, buffer_->data_, physicalRead, seekPos);
+  RECORD_PERF_RESULT(PerfStatReport::FILE_READ)
   if (numRead < 0) {
-    PLOG(ERROR) << "failure while reading file " << metadata_->fullPath;
+    PLOG(ERROR) << "Failure while reading file " << metadata_->fullPath
+                << " need align " << alignedReadNeeded_ << " physicalRead "
+                << physicalRead << " offset " << offset_ << " seepPos "
+                << seekPos << " offsetRemainder " << offsetRemainder
+                << " bytesRead " << bytesRead_;
     this->close();
     transferStats_.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
     return nullptr;
   }
   if (numRead == 0) {
-    LOG(ERROR) << "Unexpected EOF on " << metadata_->fullPath
-               << " got 0 bytes instead of " << toRead;
+    LOG(ERROR) << "Unexpected EOF on " << metadata_->fullPath << " need align "
+               << alignedReadNeeded_ << " physicalRead " << physicalRead
+               << " offset " << offset_ << " seepPos " << seekPos
+               << " offsetRemainder " << offsetRemainder << " bytesRead "
+               << bytesRead_;
     this->close();
     return nullptr;
   }
-  RECORD_PERF_RESULT(PerfStatReport::FILE_READ)
   // Can only happen in case of O_DIRECT and when
   // we are trying to read the last chunk of file
   // or we are reading in multiples of disk block size
   // from a sub block of the file smaller than disk block
   // size
-  if (numRead > expectedRead) {
+  size = numRead - offsetRemainder;
+  if (size > logicalRead) {
     WDT_CHECK(alignedReadNeeded_);
-    numRead = expectedRead;
+    size = logicalRead;
   }
-  bytesRead_ += numRead;
-  size = numRead;
-  return buffer_->data_;
+  bytesRead_ += size;
+  VLOG(1) << "Size " << size << " need align " << alignedReadNeeded_
+          << " physicalRead " << physicalRead << " offset " << offset_
+          << " seepPos " << seekPos << " offsetRemainder " << offsetRemainder
+          << " bytesRead " << bytesRead_;
+  return buffer_->data_ + offsetRemainder;
 }
 }
 }
