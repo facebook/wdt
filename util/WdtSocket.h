@@ -70,6 +70,12 @@ class WdtSocket {
   /// @return     write error code
   ErrorCode getWriteErrCode() const;
 
+  /// saves decryptor ctx after offset
+  void saveDecryptorCtx(const int offset);
+
+  /// verify whether the given tag matches previously saved context
+  bool verifyTag(std::string &tag);
+
   virtual ~WdtSocket();
 
  protected:
@@ -117,6 +123,12 @@ class WdtSocket {
   bool writesFinalized_{false};
   /// Have we already read the tag and completed decryption
   bool readsFinalized_{false};
+
+  const int OFFSET_NOT_SET = -1;
+  const int CTX_SAVED = -2;
+
+  /// offset after which decryptor ctx should be saved
+  int ctxSaveOffset_{OFFSET_NOT_SET};
 };
 }
 }

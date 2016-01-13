@@ -178,6 +178,10 @@ const std::string &ClientSocket::getPeerIp() const {
   return peerIp_;
 }
 
+std::string ClientSocket::computeCurEncryptionTag() {
+  return encryptor_.computeCurrentTag();
+}
+
 ClientSocket::~ClientSocket() {
 }
 }

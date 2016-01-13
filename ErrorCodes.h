@@ -57,7 +57,8 @@ namespace wdt {
   X(WDT_TIMEOUT)                /** Socket operation timed out  */             \
   X(UNEXPECTED_CMD_ERROR)       /** Unexpected cmd received */                 \
   X(ENCRYPTION_ERROR)           /** Error related to encryption */             \
-  X(ALREADY_EXISTS)             /** Create attempt for existing id */
+  X(ALREADY_EXISTS)             /** Create attempt for existing id */          \
+  X(GLOBAL_CHECKPOINT_ABORT)    /** Abort due to global checkpoint */
 
 enum ErrorCode {
 #define X(A) A,

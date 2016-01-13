@@ -26,6 +26,8 @@ class ClientSocket : public WdtSocket {
   int getUnackedBytes() const;
   /// @return   peer-ip of the connected socket
   const std::string &getPeerIp() const;
+  /// @return   current encryptor tag
+  std::string computeCurEncryptionTag();
   /// shutdown() is now on WdtSocket as shutdownWrites()
   virtual ~ClientSocket();
 

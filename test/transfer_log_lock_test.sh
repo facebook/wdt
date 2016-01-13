@@ -2,8 +2,6 @@
 
 source `dirname "$0"`/common_functions.sh
 
-set -o pipefail
-
 BASEDIR=/tmp/wdtTest_$USER
 
 mkdir -p $BASEDIR

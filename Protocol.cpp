@@ -32,6 +32,7 @@ const int Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION = 13;
 const int Protocol::CHECKPOINT_OFFSET_VERSION = 16;
 const int Protocol::CHECKPOINT_SEQ_ID_VERSION = 21;
 const int Protocol::ENCRYPTION_V1_VERSION = 23;
+const int Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION = 25;
 
 const std::string Protocol::getFullVersion() {
   std::string fullVersion(WDT_VERSION_STR);
@@ -509,16 +510,26 @@ bool Protocol::decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
 }
 
 void Protocol::encodeFooter(char *dest, int64_t &off, int64_t max,
-                            int32_t checksum) {
-  encodeInt(dest, off, checksum);
+                            int32_t checksum, const std::string &tag) {
+  if (tag.empty()) {
+    encodeInt(dest, off, checksum);
+  } else {
+    encodeString(dest, off, tag);
+  }
   WDT_CHECK(off <= max) << "Memory corruption:" << off << " " << max;
 }
 
 bool Protocol::decodeFooter(char *src, int64_t &off, int64_t max,
-                            int32_t &checksum) {
+                            int32_t &checksum, std::string &tag, bool isTag) {
   folly::ByteRange br((uint8_t *)(src + off), max);
   try {
-    checksum = decodeInt(br);
+    if (isTag) {
+      if (!decodeString(br, src, max, tag)) {
+        return false;
+      }
+    } else {
+      checksum = decodeInt(br);
+    }
   } catch (const std::exception &ex) {
     LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;

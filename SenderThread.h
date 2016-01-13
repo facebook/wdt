@@ -57,20 +57,18 @@ class SenderThread : public WdtThread {
 
   /// abort checker passed to client sockets. This checks both global sender
   /// abort and whether global checkpoint has been received or not
-  class SocketAbortChecker : public WdtBase::AbortChecker {
+  class SocketAbortChecker : public IAbortChecker {
    public:
-    explicit SocketAbortChecker(WdtBase *wdtBase,
-                                ThreadTransferHistory &transferHistory)
-        : AbortChecker(wdtBase), transferHistory_(transferHistory) {
+    explicit SocketAbortChecker(SenderThread *threadPtr)
+        : threadPtr_(threadPtr) {
     }
 
     bool shouldAbort() const {
-      return AbortChecker::shouldAbort() ||
-             transferHistory_.isGlobalCheckpointReceived();
+      return (threadPtr_->getThreadAbortCode() != OK);
     }
 
    private:
-    ThreadTransferHistory &transferHistory_;
+    SenderThread *threadPtr_{nullptr};
   };
 
   /// Constructor for the sender thread
@@ -83,8 +81,7 @@ class SenderThread : public WdtThread {
         transferHistoryController_(sender->transferHistoryController_.get()) {
     controller_->registerThread(threadIndex_);
     transferHistoryController_->addThreadHistory(port_, threadStats_);
-    socketAbortChecker_ =
-        folly::make_unique<SocketAbortChecker>(sender, getTransferHistory());
+    socketAbortChecker_ = folly::make_unique<SocketAbortChecker>(this);
     threadStats_.setId(folly::to<std::string>(threadIndex_));
   }
 
@@ -102,6 +99,10 @@ class SenderThread : public WdtThread {
   /// Get the port sender thread is connecting to
   int getPort() const override;
 
+  /// returns current abort code. checks for both global abort and abort due to
+  /// receive of global checkpoint
+  ErrorCode getThreadAbortCode();
+
   /// Destructor of the sender thread
   ~SenderThread() {
   }
@@ -116,6 +117,9 @@ class SenderThread : public WdtThread {
 
   /// Special abort checker for the client socket
   std::unique_ptr<SocketAbortChecker> socketAbortChecker_{nullptr};
+
+  /// sets the correct footer type depending on the checksum and encryption type
+  void setFooterType();
 
   /// The main entry point of the thread
   void start() override;
@@ -269,6 +273,10 @@ class SenderThread : public WdtThread {
   /// General utility used by sender threads to connect to receiver
   std::unique_ptr<ClientSocket> connectToReceiver(
       const int port, IAbortChecker const *abortChecker, ErrorCode &errCode);
+
+  /// Method responsible for sending one source to the destination
+  TransferStats sendOneByteSource(const std::unique_ptr<ByteSource> &source,
+                                  ErrorCode transferStatus);
 
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];

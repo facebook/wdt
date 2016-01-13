@@ -41,7 +41,19 @@ def get_wdt_version():
     print("Receiver " + receiver_binary + " version is " + protocol_string)
     return protocol_string.split()[4]
 
+def extend_wdt_options(receiver_cmd):
+    encryption_type = get_env('ENCRYPTION_TYPE')
+    if encryption_type:
+        print("encryption_type " + encryption_type)
+        receiver_cmd = receiver_cmd + " -encryption_type=" + encryption_type
+    enable_checksum = get_env('ENABLE_CHECKSUM')
+    if enable_checksum:
+        print("enable_checksum " + enable_checksum)
+        receiver_cmd = receiver_cmd + " -enable_checksum=" + enable_checksum
+    return receiver_cmd
+
 def start_receiver(receiver_cmd, root_dir, test_count):
+    receiver_cmd = extend_wdt_options(receiver_cmd)
     print("Receiver: " + receiver_cmd)
     server_log = "{0}/server{1}.log".format(root_dir, test_count)
     receiver_process = subprocess.Popen(receiver_cmd.split(),

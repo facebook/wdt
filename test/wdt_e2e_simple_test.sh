@@ -4,6 +4,8 @@
 # Smaller/minimal version of wdt_e2e_simple_test.sh
 #
 
+source `dirname "$0"`/common_functions.sh
+
 echo "Run from the cmake build dir (or ~/fbcode - or fbmake runtests)"
 
 BASEDIR=/tmp/wdtTest_$USER
@@ -51,7 +53,8 @@ echo "WDT_TEST_SYMLINKS=$WDT_TEST_SYMLINKS"
 # Normal:
 WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
 "-avg_mbytes_per_sec=3000 -max_mbytes_per_sec=3500 -start_port=0 "\
-"-num_ports=4 -throttler_log_time_millis=200 -enable_checksum=true"
+"-num_ports=4 -throttler_log_time_millis=200"
+extendWdtOptions
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 MD5SUM=`which md5sum`
 STATUS=$?

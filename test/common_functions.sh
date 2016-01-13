@@ -279,21 +279,20 @@ signalHandler() {
 }
 
 extendWdtOptions() {
-# TODO: rework this to just use a type...
-  if [ ! -z "$WDT_NO_ENCRYPT" ]; then
-    echo "Encryption is disabled for this test"
-    WDTBIN_OPTS="$WDTBIN_OPTS -encryption_type=none"
-  elif [ ! -z "$WDT_CTR_ENCRYPT" ]; then
-    echo "CTR Encryption is enabled for this test"
-    WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD -encryption_type=aes128ctr"
-  elif [ ! -z "$WDT_GCM_ENCRYPT" ]; then
-    echo "GCM Encryption is enabled for this test"
-    WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD -encryption_type=aes128gcm"
-  else
-    echo "Default Encryption is enabled for this test $EXTRA_ENCRYPTION_CMD"
-    WDTBIN_OPTS="$WDTBIN_OPTS $EXTRA_ENCRYPTION_CMD"
+  WDTBIN_OPTS+=" $EXTRA_ENCRYPTION_CMD"
+  if [ ! -z "$ENCRYPTION_TYPE" ]; then
+    echo "encryption_type $ENCRYPTION_TYPE"
+    WDTBIN_OPTS+=" -encryption_type=$ENCRYPTION_TYPE"
+  fi
+  if [ ! -z "$ENABLE_CHECKSUM" ]; then
+    echo "enable_checksum $ENABLE_CHECKSUM"
+    WDTBIN_OPTS+=" -enable_checksum=$ENABLE_CHECKSUM"
   fi
 }
+
+# without the following line, wdt piped to tee effectively has exit status of
+# tee. source : http://petereisentraut.blogspot.com/2010/11/pipefail.html
+set -o pipefail
 
 trap signalHandler SIGINT SIGTERM
 # Note this is not meant to be an example of a secure key, it's just for tests

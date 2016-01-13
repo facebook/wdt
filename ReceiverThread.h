@@ -270,6 +270,12 @@ class ReceiverThread : public WdtThread {
    */
   ReceiverState finishWithError();
 
+  /// marks a block a verified
+  void markBlockVerified(const BlockDetails &blockDetails);
+
+  /// verifies received blocks which are not already verified
+  void markReceivedBlocksVerified();
+
   /// Mapping from receiver states to state functions
   static const StateFunction stateMap_[];
 
@@ -321,9 +327,6 @@ class ReceiverThread : public WdtThread {
   /// Checkpoint local to the thread, updated regularly
   Checkpoint checkpoint_;
 
-  /// whether checksum verification is enabled or not
-  bool enableChecksum_{false};
-
   /// whether settings have been received and verified for the current
   /// connection. This is used to determine round robin order for polling in
   /// the server socket
@@ -331,6 +334,9 @@ class ReceiverThread : public WdtThread {
 
   /// Checkpoints that have not been sent back to the sender
   std::vector<Checkpoint> newCheckpoints_;
+
+  /// list of received blocks which have not yet been verified
+  std::vector<BlockDetails> blocksWaitingVerification_;
 };
 }
 }

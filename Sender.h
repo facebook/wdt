@@ -147,11 +147,6 @@ class Sender : public WdtBase {
   /// Get the sum of all the thread transfer stats
   TransferStats getGlobalTransferStats() const;
 
-  /// Method responsible for sending one source to the destination
-  virtual TransferStats sendOneByteSource(
-      const std::unique_ptr<ClientSocket> &socket,
-      const std::unique_ptr<ByteSource> &source, ErrorCode transferStatus);
-
   /// Returns true if file chunks need to be read
   bool isSendFileChunks() const;
 

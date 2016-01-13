@@ -76,6 +76,15 @@ class WdtThread {
   /// Copy of the protocol version that might be changed
   int threadProtocolVersion_;
 
+  /// possible footer types
+  enum FooterType {
+    NO_FOOTER,
+    CHECKSUM_FOOTER,
+    ENC_TAG_FOOTER,
+  };
+
+  FooterType footerType_{NO_FOOTER};
+
   /// Transfer stats for this thread
   TransferStats threadStats_{true};
 

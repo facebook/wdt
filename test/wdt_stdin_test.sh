@@ -1,7 +1,5 @@
 #! /bin/bash
 
-set -o pipefail
-
 source `dirname "$0"`/common_functions.sh
 
 setBinaries
@@ -9,6 +7,7 @@ setDirectory
 generateRandomFiles $SRC_DIR 16384
 
 WDTBIN_OPTS="-start_port 0 -fork -abort_after_seconds 3"
+extendWdtOptions
 
 TEST_COUNT=0
 # Test stdin pipe:

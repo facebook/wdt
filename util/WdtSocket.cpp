@@ -171,8 +171,23 @@ int WdtSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
   if (!encrypt) {
     return numRead;
   }
+  int numDecrypted = 0;
+  if (ctxSaveOffset_ >= 0) {
+    if (ctxSaveOffset_ <= numRead) {
+      if (!decryptor_.decrypt(buf, ctxSaveOffset_, buf)) {
+        readErrorCode_ = ENCRYPTION_ERROR;
+        return -1;
+      }
+      decryptor_.saveContext();
+      numDecrypted = ctxSaveOffset_;
+      ctxSaveOffset_ = CTX_SAVED;
+    } else {
+      ctxSaveOffset_ -= numRead;
+    }
+  }
   // have to decrypt data
-  if (!decryptor_.decrypt((uint8_t *)buf, numRead, (uint8_t *)buf)) {
+  if (!decryptor_.decrypt((buf + numDecrypted), (numRead - numDecrypted),
+                          (buf + numDecrypted))) {
     readErrorCode_ = ENCRYPTION_ERROR;
     return -1;
   }
@@ -195,7 +210,7 @@ int WdtSocket::write(char *buf, int nbyte, bool retry) {
     return -1;
   }
   bool encrypt = encryptionParams_.isSet();
-  if (encrypt && !encryptor_.encrypt((uint8_t *)buf, nbyte, (uint8_t *)buf)) {
+  if (encrypt && !encryptor_.encrypt(buf, nbyte, buf)) {
     writeErrorCode_ = ENCRYPTION_ERROR;
     return -1;
   }
@@ -228,7 +243,7 @@ ErrorCode WdtSocket::expectEndOfStream() {
 
 ErrorCode WdtSocket::finalizeReads(bool doTagIOs) {
   VLOG(1) << "Finalizing reads/encryption " << port_ << " " << fd_;
-  const int toRead = decryptor_.expectsTag();
+  const int toRead = encryptionTypeToTagLen(encryptionParams_.getType());
   std::string tag;
   ErrorCode code = OK;
   if (toRead && doTagIOs) {
@@ -242,10 +257,10 @@ ErrorCode WdtSocket::finalizeReads(bool doTagIOs) {
       code = ENCRYPTION_ERROR;
     }
   }
-  decryptor_.setTag(tag);
-  if (!decryptor_.finish()) {
+  if (!decryptor_.finish(tag)) {
     code = ENCRYPTION_ERROR;
   }
+  ctxSaveOffset_ = OFFSET_NOT_SET;
   readsFinalized_ = true;
   return code;
 }
@@ -253,10 +268,10 @@ ErrorCode WdtSocket::finalizeReads(bool doTagIOs) {
 ErrorCode WdtSocket::finalizeWrites(bool doTagIOs) {
   VLOG(1) << "Finalizing writes/encryption " << port_ << " " << fd_;
   ErrorCode code = OK;
-  if (!encryptor_.finish()) {
+  std::string tag;
+  if (!encryptor_.finish(tag)) {
     code = ENCRYPTION_ERROR;
   }
-  const std::string &tag = encryptor_.getTag();
   if (!tag.empty() && doTagIOs) {
     const int timeoutMs = WdtOptions::get().write_timeout_millis;
     const int expected = tag.size();
@@ -335,6 +350,18 @@ ErrorCode WdtSocket::getNonRetryableErrCode() const {
     errCode = getMoreInterestingError(errCode, writeErrorCode_);
   }
   return errCode;
+}
+
+void WdtSocket::saveDecryptorCtx(const int offset) {
+  WDT_CHECK_EQ(OFFSET_NOT_SET, ctxSaveOffset_);
+  ctxSaveOffset_ = offset;
+}
+
+bool WdtSocket::verifyTag(std::string &tag) {
+  WDT_CHECK_EQ(CTX_SAVED, ctxSaveOffset_);
+  bool status = decryptor_.verifyTag(tag);
+  ctxSaveOffset_ = OFFSET_NOT_SET;
+  return status;
 }
 
 WdtSocket::~WdtSocket() {

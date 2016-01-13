@@ -40,7 +40,7 @@ else
     echo "Will self connect to HOSTNAME=$HOSTNAME"
 fi
 
-ENC_TYPE=aes128ctr
+ENC_TYPE=aes128gcm
 CRC=false
 
 REMOTE=$HOSTNAME

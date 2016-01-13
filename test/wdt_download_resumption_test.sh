@@ -2,8 +2,6 @@
 
 source `dirname "$0"`/common_functions.sh
 
-set -o pipefail
-
 startNewTransfer() {
   $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} -start_port=$STARTING_PORT \
   -transfer_id=$RECEIVER_ID -protocol_version=$RECEIVER_PROTOCOL_VERSION \

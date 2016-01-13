@@ -247,7 +247,7 @@ TEST(TransferRequestTest, Encryption1) {
   }
   {
     WdtTransferRequest req(123, 3, "/foo/bar");
-    LOG(INFO) << "Url without enc= " << req.getLogSafeString();
+    LOG(INFO) << "Url without encr= " << req.getLogSafeString();
     WdtTransferRequest req2(123, 3, "/foo/ba2");
     EXPECT_FALSE(req2 == req);
     req2.directory = "/foo/bar";

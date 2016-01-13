@@ -185,6 +185,7 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
     return END;
   }
   socket_->closeNoCheck();
+  blocksWaitingVerification_.clear();
 
   auto timeout = options.accept_window_millis;
   if (senderReadTimeout_ > 0) {
@@ -317,9 +318,26 @@ ReceiverState ReceiverThread::processSettingsCmd() {
   }
   senderReadTimeout_ = settings.readTimeoutMillis;
   senderWriteTimeout_ = settings.writeTimeoutMillis;
-  enableChecksum_ = settings.enableChecksum;
   isBlockMode_ = !settings.blockModeDisabled;
   curConnectionVerified_ = true;
+
+  // determine footer type
+  EncryptionType encryptionType = socket_->getEncryptionType();
+  if (threadProtocolVersion_ >=
+          Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION &&
+      encryptionTypeToTagLen(encryptionType)) {
+    if (settings.enableChecksum) {
+      LOG(ERROR) << *this << "Checksum can not be enabled with gcm encryption";
+      threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
+      return FINISH_WITH_ERROR;
+    }
+    footerType_ = ENC_TAG_FOOTER;
+  } else if (settings.enableChecksum) {
+    footerType_ = CHECKSUM_FOOTER;
+  } else {
+    footerType_ = NO_FOOTER;
+  }
+
   if (settings.sendFileChunks) {
     // We only move to SEND_FILE_CHUNKS state, if download resumption is enabled
     // in the sender side
@@ -385,6 +403,7 @@ ReceiverState ReceiverThread::processFileCmd() {
                                        << blockDetails.seqId << " "
                                        << threadProtocolVersion_;
   threadStats_.addHeaderBytes(headerBytes);
+  threadStats_.addEffectiveBytes(headerBytes, 0);
   if (!success) {
     LOG(ERROR) << "Error decoding at"
                << " ooff:" << oldOffset_ << " off_: " << off_
@@ -401,10 +420,8 @@ ReceiverState ReceiverThread::processFileCmd() {
   auto &fileCreator = wdtParent_->getFileCreator();
   FileWriter writer(threadIndex_, &blockDetails, fileCreator.get());
   auto writtenGuard = folly::makeGuard([&] {
-    if (threadProtocolVersion_ >= Protocol::CHECKPOINT_OFFSET_VERSION) {
-      // considering partially written block contents as valid, this bypasses
-      // checksum verification
-      // TODO: Make sure checksum verification work with checkpoint offsets
+    if (threadProtocolVersion_ >= Protocol::CHECKPOINT_OFFSET_VERSION &&
+        footerType_ == NO_FOOTER) {
       checkpoint_.setLastBlockDetails(blockDetails.seqId, blockDetails.offset,
                                       writer.getTotalWritten());
       threadStats_.addEffectiveBytes(headerBytes, writer.getTotalWritten());
@@ -421,8 +438,13 @@ ReceiverState ReceiverThread::processFileCmd() {
   if (remainingData >= blockDetails.dataSize) {
     toWrite = blockDetails.dataSize;
   }
+  bool decryptorCtxSaved = false;
+  if (footerType_ == ENC_TAG_FOOTER && remainingData <= blockDetails.dataSize) {
+    decryptorCtxSaved = true;
+    socket_->saveDecryptorCtx(blockDetails.dataSize - remainingData);
+  }
   threadStats_.addDataBytes(toWrite);
-  if (enableChecksum_) {
+  if (footerType_ == CHECKSUM_FOOTER) {
     checksum = folly::crc32c((const uint8_t *)(buf_ + off_), toWrite, checksum);
   }
   auto throttler = wdtParent_->getThrottler();
@@ -457,7 +479,7 @@ ReceiverState ReceiverThread::processFileCmd() {
       throttler->limit(nres);
     }
     threadStats_.addDataBytes(nres);
-    if (enableChecksum_) {
+    if (footerType_ == CHECKSUM_FOOTER) {
       checksum = folly::crc32c((const uint8_t *)buf_, nres, checksum);
     }
     code = writer.write(buf_, nres);
@@ -498,7 +520,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   } else {
     numRead_ = off_ = 0;
   }
-  if (enableChecksum_) {
+  if (footerType_ != NO_FOOTER) {
     // have to read footer cmd
     oldOffset_ = off_;
     numRead_ = readAtLeast(*socket_, buf_ + off_, bufferSize_ - off_,
@@ -516,32 +538,64 @@ ReceiverState ReceiverThread::processFileCmd() {
       return FINISH_WITH_ERROR;
     }
     int32_t receivedChecksum;
+    std::string receivedTag;
     bool success = Protocol::decodeFooter(
-        buf_, off_, oldOffset_ + Protocol::kMaxFooter, receivedChecksum);
+        buf_, off_, oldOffset_ + Protocol::kMaxFooter, receivedChecksum,
+        receivedTag, (footerType_ == ENC_TAG_FOOTER));
     if (!success) {
       LOG(ERROR) << "Unable to decode footer cmd";
       threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return FINISH_WITH_ERROR;
     }
-    if (checksum != receivedChecksum) {
-      LOG(ERROR) << "Checksum mismatch " << checksum << " " << receivedChecksum
-                 << " port " << socket_->getPort() << " file "
-                 << blockDetails.fileName;
-      threadStats_.setLocalErrorCode(CHECKSUM_MISMATCH);
-      return ACCEPT_WITH_TIMEOUT;
+    if (footerType_ == CHECKSUM_FOOTER) {
+      if (checksum != receivedChecksum) {
+        LOG(ERROR) << "Checksum mismatch " << checksum << " "
+                   << receivedChecksum << " port " << socket_->getPort()
+                   << " file " << blockDetails.fileName;
+        threadStats_.setLocalErrorCode(CHECKSUM_MISMATCH);
+        return ACCEPT_WITH_TIMEOUT;
+      }
+      markBlockVerified(blockDetails);
+    }
+    if (footerType_ == ENC_TAG_FOOTER) {
+      blocksWaitingVerification_.emplace_back(blockDetails);
+      if (decryptorCtxSaved) {
+        if (!socket_->verifyTag(receivedTag)) {
+          LOG(ERROR) << *this << "GCM encryption tag mismatch "
+                     << folly::humanify(receivedTag) << " file "
+                     << blockDetails.fileName;
+          threadStats_.setLocalErrorCode(ENCRYPTION_ERROR);
+          return ACCEPT_WITH_TIMEOUT;
+        }
+        markReceivedBlocksVerified();
+      }
     }
     int64_t msgLen = off_ - oldOffset_;
     numRead_ -= msgLen;
+  } else {
+    markBlockVerified(blockDetails);
   }
-  auto &transferLogManager = wdtParent_->getTransferLogManager();
+  return READ_NEXT_CMD;
+}
+
+void ReceiverThread::markBlockVerified(const BlockDetails &blockDetails) {
+  const WdtOptions &options = WdtOptions::get();
   if (options.isLogBasedResumption()) {
+    TransferLogManager &transferLogManager =
+        wdtParent_->getTransferLogManager();
     transferLogManager.addBlockWriteEntry(
         blockDetails.seqId, blockDetails.offset, blockDetails.dataSize);
   }
-  threadStats_.addEffectiveBytes(headerBytes, blockDetails.dataSize);
+  threadStats_.addEffectiveBytes(0, blockDetails.dataSize);
   threadStats_.incrNumBlocks();
   checkpoint_.incrNumBlocks();
-  return READ_NEXT_CMD;
+}
+
+void ReceiverThread::markReceivedBlocksVerified() {
+  for (const BlockDetails &blockDetails : blocksWaitingVerification_) {
+    markBlockVerified(blockDetails);
+  }
+  blocksWaitingVerification_.clear();
 }
 
 ReceiverState ReceiverThread::processDoneCmd() {
@@ -754,6 +808,8 @@ ReceiverState ReceiverThread::sendDoneCmd() {
                << errorCodeToStr(code);
     threadStats_.setLocalErrorCode(code);
     return ACCEPT_WITH_TIMEOUT;
+  } else if (footerType_ == ENC_TAG_FOOTER) {
+    markReceivedBlocksVerified();
   }
   threadStats_.setLocalErrorCode(socket_->closeConnection());
   LOG(INFO) << *this << " got ack for DONE and logical eof. Transfer finished";

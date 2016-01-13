@@ -1,7 +1,5 @@
 #! /bin/bash
 
-set -o pipefail
-
 source `dirname "$0"`/common_functions.sh
 
 BASEDIR=/dev/shm/wdtTest_$USER

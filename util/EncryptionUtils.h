@@ -26,6 +26,10 @@ std::string encryptionTypeToStr(EncryptionType encryptionType);
 /// @return  encryption type for the input string
 EncryptionType parseEncryptionType(const std::string& str);
 
+/// @returns 0 if no tag for the algorithm or the size in bytes
+///  for now only gcm produces/requires tag (hmac) of 128bits (16 bytes)
+size_t encryptionTypeToTagLen(EncryptionType type);
+
 /// class responsible for initializing openssl
 class WdtCryptoIntializer {
  public:
@@ -92,24 +96,17 @@ class EncryptionParams {
 
 /// base class to share code between encyptor and decryptor
 class AESBase {
- public:
-  const std::string& getTag() const {
-    return tag_;
-  }
-  void setTag(const std::string& tag) {
-    tag_ = tag;
-  }
-  /// @returns 0 if no tag for the algorithm or the size in bytes
-  //  for now only gcm produces/requires tag (hmac) of 128bits (16 bytes)
-  size_t expectsTag() const {
-    return (type_ == ENC_AES128_GCM) ? kAESBlockSize : 0;
-  }
+ protected:
+  /// evpCtx_ is copied into ctxOut
+  /// @return     whether the cloning was successful
+  bool cloneCtx(EVP_CIPHER_CTX* ctxOut) const;
 
  protected:
   /// @return   cipher for a encryption type
   const EVP_CIPHER* getCipher(const EncryptionType encryptionType);
   EncryptionType type_{ENC_NONE};
-  std::string tag_;
+  EVP_CIPHER_CTX evpCtx_;
+  bool started_{false};
 };
 
 /// encryptor class
@@ -134,22 +131,25 @@ class AESEncryptor : public AESBase {
    *
    * @return    whether the string was successfully encrypted
    */
-  bool encrypt(const uint8_t* in, const int inLength, uint8_t* out);
+  bool encrypt(const char* in, const int inLength, char* out);
 
   /**
    * should be called after all the encryption is done. After this call,
-   * encryptor object can be reused.
+   * encryptor object can be reused. tagOut is set to the generated tag
    *
    * @return    whether the finish was successfully
    */
-  bool finish();
+  bool finish(std::string& tagOut);
+
+  /// return current tag
+  std::string computeCurrentTag();
 
   /// destructor
   virtual ~AESEncryptor();
 
  private:
-  EVP_CIPHER_CTX evpCtx_;
-  bool started_{false};
+  static bool finishInternal(EVP_CIPHER_CTX& ctx, const EncryptionType type,
+                             std::string& tagOut);
 };
 
 /// decryptor class
@@ -174,7 +174,7 @@ class AESDecryptor : public AESBase {
    *
    * @return    whether the string was successfully decrypted
    */
-  bool decrypt(const uint8_t* in, const int inLength, uint8_t* out);
+  bool decrypt(const char* in, const int inLength, char* out);
 
   /**
    * should be called after all the decryption is done. After this call,
@@ -182,14 +182,26 @@ class AESDecryptor : public AESBase {
    *
    * @return    whether the finish was successfully
    */
-  bool finish();
+  bool finish(const std::string& tag);
+
+  /// saves current cipher context
+  bool saveContext();
+
+  /// verify whether the given tag matches previously saved context
+  bool verifyTag(const std::string& tag);
 
   /// destructor
   virtual ~AESDecryptor();
 
  private:
-  EVP_CIPHER_CTX evpCtx_;
-  bool started_{false};
+  static bool finishInternal(EVP_CIPHER_CTX& ctx, const EncryptionType type,
+                             const std::string& tag);
+
+  /// saved cipher ctx
+  EVP_CIPHER_CTX savedCtx_;
+
+  /// whether ctx has been saved
+  bool ctxSaved_{false};
 };
 }
 }  // End of namespaces

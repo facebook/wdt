@@ -1,9 +1,5 @@
 #! /bin/bash
 
-# without the following line, wdt piped to tee effectively has exit status of
-# tee. source : http://petereisentraut.blogspot.com/2010/11/pipefail.html
-set -o pipefail
-
 source `dirname "$0"`/common_functions.sh
 
 startNewTransfer() {
