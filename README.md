@@ -53,7 +53,7 @@ Sender side: (discover and sends all files in a directory tree to destination)
 [=================================================] 100% 588.8 Mbytes/s
 I0720 21:48:08.446014 3245296 Sender.cpp:314] Total sender time = 2.68699
 seconds (0.00640992 dirTime). Transfer summary : Transfer status = OK. Number
-of files transferred = 1887. Data Mbytes = 1582.08. Header kBytes = 62.083
+of files transferred = 1887. Data Mbytes = 1582.08. Header Kbytes = 62.083
 (0.00383215% overhead). Total bytes = 1658999858. Wasted bytes due to
 failure = 0 (0% overhead). Total sender throughput = 588.816 Mbytes/sec
 (590.224 Mbytes/sec pure transf rate)

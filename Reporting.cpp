@@ -87,7 +87,7 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
     os << " Number of blocks transferred = " << stats.numBlocks_ << ".";
   }
   os << " Data Mbytes = " << stats.effectiveDataBytes_ / kMbToB
-     << ". Header kBytes = " << stats.headerBytes_ / 1024. << " ("
+     << ". Header Kbytes = " << stats.headerBytes_ / 1024. << " ("
      << headerOverhead << "% overhead)"
      << ". Total bytes = " << (stats.dataBytes_ + stats.headerBytes_)
      << ". Wasted bytes due to failure = "
@@ -306,7 +306,7 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
                                    double averageThroughput,
                                    double currentThroughput) {
   LOG(INFO) << "wdt transfer progress " << (effectiveDataBytes / kMbToB)
-            << " Mb, completed " << progress << "%, Average throughput "
+            << " Mbytes, completed " << progress << "%, Average throughput "
             << averageThroughput << " Mbytes/s, Recent throughput "
             << currentThroughput << " Mbytes/s";
 }
