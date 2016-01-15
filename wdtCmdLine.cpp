@@ -82,6 +82,8 @@ DEFINE_string(test_only_encryption_secret, "",
 
 DEFINE_string(app_name, "wdt", "Identifier used for reporting (scuba, at fb)");
 
+DECLARE_bool(help);
+
 using namespace facebook::wdt;
 
 // TODO: move this to some util and/or delete
@@ -179,6 +181,12 @@ int main(int argc, char *argv[]) {
   usage.append("\nUse --help to see all the options.");
   google::SetUsageMessage(usage);
   google::gflags_exitfunc = [](int code) {
+    if (code == 0 || FLAGS_help) {
+      // By default gflags exit 1 with --help and 0 for --version (good)
+      // let's also exit(0) for --help to be like most gnu command line
+      exit(0);
+    }
+    // error cases:
     if (FLAGS_exit_on_bad_flags) {
       printUsage();
       exit(code);
