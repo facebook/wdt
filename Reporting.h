@@ -333,7 +333,9 @@ class TransferStats {
 };
 
 /**
- * class representing entire client transfer report
+ * Class representing entire client transfer report.
+ * Unit are mebibyte (MiB), ie 1048576 bytes which we call "Mbytes"
+ * for familiarity
  */
 class TransferReport {
  public:
@@ -388,7 +390,7 @@ class TransferReport {
   int64_t getTotalFileSize() const {
     return totalFileSize_;
   }
-  /// @return   recent throughput in mbps
+  /// @return   recent throughput in Mbytes/sec
   double getCurrentThroughputMBps() const {
     return currentThroughput_ / kMbToB;
   }
@@ -449,7 +451,7 @@ class ProgressReporter {
   /**
    * This method gets called repeatedly with interval defined by
    * progress_report_interval. If stdout is a terminal, then it displays
-   * transfer progress in stdout. Example output [===>    ] 30% 5.00 MBytes/sec.
+   * transfer progress in stdout. Example output [===>    ] 30% 5.00 Mbytes/sec.
    * Else, it prints progress details in stdout.
    *
    * @param report                current transfer report

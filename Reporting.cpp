@@ -307,8 +307,8 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
                                    double currentThroughput) {
   LOG(INFO) << "wdt transfer progress " << (effectiveDataBytes / kMbToB)
             << " Mb, completed " << progress << "%, Average throughput "
-            << averageThroughput << " Mbps, Recent throughput "
-            << currentThroughput << "Mbps.";
+            << averageThroughput << " Mbytes/s, Recent throughput "
+            << currentThroughput << " Mbytes/s";
 }
 
 folly::ThreadLocal<PerfStatReport> wdt__perfStatReportThreadLocal;

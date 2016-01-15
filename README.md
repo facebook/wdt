@@ -28,6 +28,14 @@ at any given point some threads are reading while others are writing, and data
 is buffered on both paths - keeping each subsystem busy while minimizing
 kernel to userspace switches.
 
+## Terminology
+WDT uses "Mbytes" everywhere in its output as 1024*1024 bytes = 1048576 bytes
+(technically this should be the new mebibyte (MiB) standard but it felt
+Mbytes is be more in line with what other tools are using, clearer, easier
+to read and matching what a traditional "megabyte" used to mean in historical
+memory units where the address lines are binary and thus power of two and not
+of ten)
+
 ## Example
 
 While WDT is primarily a library, we also have a small command line tool
@@ -56,8 +64,6 @@ a linux distribution), but not much data (~1.5Gbyte), the maximum
 speed isn't as good as it would with more data (as there is still a TCP ramp
 up time even though it's faster because of parallelization) like when we use
 it in our production use cases.
-
-See "wcp.sh" (which installs as "wcp") for a more detailed example.
 
 ## Performance/Results
 

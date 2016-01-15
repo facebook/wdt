@@ -149,7 +149,7 @@ class DirectorySourceQueue : public SourceQueue {
    */
   void setFileInfo(const std::vector<FileInfo> &fileInfo);
 
-  /// @param blockSizeMbytes    block size in mbytes
+  /// @param blockSizeMbytes    block size in Mbytes
   void setBlockSizeMbytes(int64_t blockSizeMbytes);
 
   /// Get the file info in this directory queue

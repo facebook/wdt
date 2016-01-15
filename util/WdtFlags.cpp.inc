@@ -39,15 +39,15 @@ WDT_OPT(block_size_mbytes, double,
         "Size of the blocks that files will be divided in, specify negative "
         "to disable the file splitting mode");
 WDT_OPT(avg_mbytes_per_sec, double,
-        "Target transfer rate in mbytes/sec that should be "
+        "Target transfer rate in Mbytes/sec that should be "
         "maintained, specify negative for unlimited");
 WDT_OPT(max_mbytes_per_sec, double,
-        "Peak transfer rate in mbytes/sec that should be "
+        "Peak transfer rate in Mbytes/sec that should be "
         "maintained, specify negative for unlimited and 0 for "
         "auto configure. In auto configure mode peak rate will "
         "be 1.2 times average rate");
 WDT_OPT(throttler_bucket_limit, double,
-        "Limit of burst in mbytes to control how "
+        "Limit of burst in Mbytes to control how "
         "much data you can send at unlimited speed. Unless "
         "you specify a peak rate of -1, wdt will either use "
         "your burst limit (if not 0) or max burst possible at a time "
