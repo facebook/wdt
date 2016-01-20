@@ -144,6 +144,9 @@ class Sender : public WdtBase {
   friend class SenderThread;
   friend class QueueAbortChecker;
 
+  /// Validate the transfer request
+  ErrorCode validateTransferRequest() override;
+
   /// Get the sum of all the thread transfer stats
   TransferStats getGlobalTransferStats() const;
 

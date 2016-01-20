@@ -46,15 +46,7 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
 
 Receiver::Receiver(const WdtTransferRequest &transferRequest) {
   LOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
-  // TODO: move to init and validate input transfer request (like empty dir)
-  // and ports and pv - issue#95
   transferRequest_ = transferRequest;
-  if (getTransferId().empty()) {
-    setTransferId(WdtBase::generateTransferId());
-  }
-  // TODO clean that up too - take from transferId_
-  setProtocolVersion(transferRequest.protocolVersion);
-  setDir(transferRequest.directory);
 }
 
 Receiver::Receiver(int port, int numSockets, const std::string &destDir)
@@ -117,8 +109,18 @@ void Receiver::endCurGlobalSession() {
 }
 
 const WdtTransferRequest &Receiver::init() {
+  if (validateTransferRequest() != OK) {
+    LOG(ERROR) << "Couldn't validate the transfer request "
+               << transferRequest_.getLogSafeString();
+    return transferRequest_;
+  }
   backlog_ = options_.backlog;
   bufferSize_ = options_.buffer_size;
+  if (getTransferId().empty()) {
+    setTransferId(WdtBase::generateTransferId());
+  }
+  setProtocolVersion(transferRequest_.protocolVersion);
+  setDir(transferRequest_.directory);
   if (bufferSize_ < Protocol::kMaxHeader) {
     // round up to even k
     bufferSize_ = 2 * 1024 * ((Protocol::kMaxHeader - 1) / (2 * 1024) + 1);

@@ -35,7 +35,6 @@ class WdtResourceControllerTest : public WdtResourceController {
   void AddObjectsWithLimitsTest();
   void InvalidNamespaceTest();
   void ReleaseStaleTest();
-  void RequestSerializationTest();
 
  private:
   string getTransferId(const string &wdtNamespace, int index) {

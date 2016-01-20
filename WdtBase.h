@@ -131,6 +131,9 @@ class WdtBase {
     THREADS_JOINED,  // threads joined
   };
 
+  /// Validate the transfer request
+  virtual ErrorCode validateTransferRequest();
+
   /// @return current transfer status
   TransferStatus getTransferStatus();
 

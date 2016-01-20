@@ -58,7 +58,8 @@ namespace wdt {
   X(UNEXPECTED_CMD_ERROR)       /** Unexpected cmd received */                 \
   X(ENCRYPTION_ERROR)           /** Error related to encryption */             \
   X(ALREADY_EXISTS)             /** Create attempt for existing id */          \
-  X(GLOBAL_CHECKPOINT_ABORT)    /** Abort due to global checkpoint */
+  X(GLOBAL_CHECKPOINT_ABORT)    /** Abort due to global checkpoint */          \
+  X(INVALID_REQUEST) /** Request for creation of wdt object invalid */
 
 enum ErrorCode {
 #define X(A) A,

@@ -7,7 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/Receiver.h>
-
+#include <wdt/Sender.h>
 #include <folly/Random.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -231,6 +231,31 @@ TEST(RequestSerializationTest, UrlTests) {
     WdtTransferRequest transferRequest(url);
     EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
     EXPECT_EQ(transferRequest.genWdtUrlWithSecret(), "URI_PARSE_ERROR");
+  }
+  {
+    string url = "wdt://localhost:22355?num_ports=3";
+    WdtTransferRequest transferRequest(url);
+    Receiver receiver(transferRequest);
+    auto retTransferRequest = receiver.init();
+    EXPECT_EQ(retTransferRequest.errorCode, INVALID_REQUEST);
+  }
+  {
+    string url = "wdt://localhost:22355";
+    WdtTransferRequest transferRequest(url);
+    Sender sender(transferRequest);
+    auto retTransferRequest = sender.init();
+    EXPECT_EQ(retTransferRequest.errorCode, INVALID_REQUEST);
+  }
+  {
+    string url = "wdt://localhost:22355?num_ports=3";
+    WdtTransferRequest transferRequest(url);
+    EXPECT_EQ(transferRequest.errorCode, OK);
+    transferRequest.directory = "blah";
+    // Artificial error
+    transferRequest.errorCode = ERROR;
+    Receiver receiver(transferRequest);
+    auto retTransferRequest = receiver.init();
+    EXPECT_EQ(retTransferRequest.errorCode, ERROR);
   }
 }
 

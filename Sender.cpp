@@ -90,9 +90,27 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir,
       folly::make_unique<TransferHistoryController>(*dirQueue_);
 }
 
+ErrorCode Sender::validateTransferRequest() {
+  ErrorCode code = WdtBase::validateTransferRequest();
+  // If the request is still valid check for other
+  // sender specific validations
+  if (code == OK && transferRequest_.hostName.empty()) {
+    LOG(ERROR) << "Transfer request validation failed for wdt sender "
+               << transferRequest_.getLogSafeString();
+    code = INVALID_REQUEST;
+  }
+  transferRequest_.errorCode = code;
+  return code;
+}
+
 const WdtTransferRequest &Sender::init() {
   VLOG(1) << "Sender Init() with encryption set = "
           << transferRequest_.encryptionData.isSet();
+  if (validateTransferRequest() != OK) {
+    LOG(ERROR) << "Couldn't validate the transfer request "
+               << transferRequest_.getLogSafeString();
+    return transferRequest_;
+  }
   // TODO cleanup / most not necessary / duplicate state
   transferRequest_.protocolVersion = protocolVersion_;
   transferRequest_.directory = srcDir_;

@@ -106,6 +106,24 @@ WdtBase::TransferStatus WdtBase::getTransferStatus() {
   return transferStatus_;
 }
 
+ErrorCode WdtBase::validateTransferRequest() {
+  ErrorCode code = transferRequest_.errorCode;
+  if (code != OK) {
+    LOG(ERROR) << "WDT object initiated with erroneous transfer request "
+               << transferRequest_.getLogSafeString();
+    return code;
+  }
+  if (transferRequest_.directory.empty() ||
+      (transferRequest_.protocolVersion < 0) ||
+      transferRequest_.ports.empty()) {
+    LOG(ERROR) << "Transfer request validation failed for wdt object "
+               << transferRequest_.getLogSafeString();
+    code = INVALID_REQUEST;
+    transferRequest_.errorCode = code;
+  }
+  return code;
+}
+
 void WdtBase::setTransferStatus(TransferStatus transferStatus) {
   std::lock_guard<std::mutex> lock(mutex_);
   transferStatus_ = transferStatus;

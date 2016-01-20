@@ -124,6 +124,9 @@ void testFileRead(int64_t fileSize, int64_t bufferSize, bool directReads) {
   testReadSize(file.getSize(), byteSource);
 }
 
+// All the tests here have to run any operation on the FileByteSource
+// in a thread because FileByteSource has thread local buffer
+
 TEST(FileByteSource, ODIRECT_NONMULTIPLE) {
   if (!canSupportODirect()) {
     LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
@@ -133,6 +136,43 @@ TEST(FileByteSource, ODIRECT_NONMULTIPLE) {
   int64_t bufferSize = 511;
   std::thread t(&testFileRead, fileSize, bufferSize, true);
   t.join();
+}
+
+TEST(FileByteSource, ODIRECT_NONMULTIPLE_OFFSET) {
+  if (!canSupportODirect()) {
+    LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
+    return;
+  }
+  for (int numTests = 0; numTests < 10; ++numTests) {
+    std::thread t([=]() {
+      int64_t fileSize = kDiskBlockSize + 10;
+      int64_t bufferSize = fileSize * 2;
+      if (numTests % 2 == 0) {
+        int fraction = folly::Random::rand32() % (fileSize / 2);
+        bufferSize = fileSize / fraction;
+      }
+      int64_t offset = folly::Random::rand32() % fileSize;
+      RandomFile file(fileSize);
+      auto metaData = file.getMetaData();
+      metaData->directReads = true;
+      FileByteSource byteSource(metaData, metaData->size, offset, bufferSize);
+      ErrorCode code = byteSource.open();
+      EXPECT_EQ(code, OK);
+      testBufferSize(bufferSize, alignedBufferNeeded(), byteSource);
+      int64_t totalSizeRead = 0;
+      while (true) {
+        int64_t size;
+        char* data = byteSource.read(size);
+        if (size <= 0) {
+          break;
+        }
+        WDT_CHECK(data);
+        totalSizeRead += size;
+      }
+      EXPECT_EQ(totalSizeRead, fileSize - offset);
+    });
+    t.join();
+  }
 }
 
 TEST(FileByteSource, SMALL_MULTIPLE_ODIRECT) {
