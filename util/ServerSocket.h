@@ -22,7 +22,7 @@ typedef struct addrinfo *addrInfoList;
 
 class ServerSocket : public WdtSocket {
  public:
-  ServerSocket(int port, int backlog, IAbortChecker const *abortChecker,
+  ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
                const EncryptionParams &encryptionParams);
   virtual ~ServerSocket();
   /// Sets up listening socket (first wildcard type (ipv4 or ipv6 depending

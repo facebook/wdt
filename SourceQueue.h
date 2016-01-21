@@ -37,12 +37,14 @@ class SourceQueue {
    * The method will block until it's able to get the next available source
    * or be sure consumption of all sources has finished.
    *
+   * @param threadCtx context of the caller thread
    * @param status    this variable is set to true, if the transfer has already
    *
    * @return          New ByteSource to consume or nullptr if there are
    *                  no more sources to read from (equivalent to finished()).
    */
-  virtual std::unique_ptr<ByteSource> getNextSource(ErrorCode &status) = 0;
+  virtual std::unique_ptr<ByteSource> getNextSource(ThreadCtx *threadCtx,
+                                                    ErrorCode &status) = 0;
 
   /// @return         total number of files processed/enqueued
   virtual int64_t getCount() const = 0;

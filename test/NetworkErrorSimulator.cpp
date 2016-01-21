@@ -10,8 +10,8 @@
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <thread>
-#include <folly/Random.h>
 #include <wdt/WdtOptions.h>
+#include <wdt/test/TestCommon.h>
 
 namespace facebook {
 namespace wdt {
@@ -28,7 +28,7 @@ void simulateNetworkError() {
     usleep(kSimulatorSleepDurationMillis * 1000);
     auto &options = facebook::wdt::WdtOptions::getMutable();
 
-    int fd = 3 + folly::Random::rand32(2 * options.num_ports + 1);
+    int fd = 3 + rand32() % (2 * options.num_ports + 1);
     // close the chosen socket
     if (shutdown(fd, SHUT_WR) < 0) {
       PLOG(WARNING) << "socket shutdown failed for fd " << fd;

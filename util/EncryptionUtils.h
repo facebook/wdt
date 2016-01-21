@@ -131,7 +131,7 @@ class AESEncryptor : public AESBase {
    *
    * @return    whether the string was successfully encrypted
    */
-  bool encrypt(const char* in, const int inLength, char* out);
+  bool encrypt(const char* in, int inLength, char* out);
 
   /**
    * should be called after all the encryption is done. After this call,
@@ -148,7 +148,7 @@ class AESEncryptor : public AESBase {
   virtual ~AESEncryptor();
 
  private:
-  static bool finishInternal(EVP_CIPHER_CTX& ctx, const EncryptionType type,
+  static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
                              std::string& tagOut);
 };
 
@@ -174,7 +174,7 @@ class AESDecryptor : public AESBase {
    *
    * @return    whether the string was successfully decrypted
    */
-  bool decrypt(const char* in, const int inLength, char* out);
+  bool decrypt(const char* in, int inLength, char* out);
 
   /**
    * should be called after all the decryption is done. After this call,
@@ -194,7 +194,7 @@ class AESDecryptor : public AESBase {
   virtual ~AESDecryptor();
 
  private:
-  static bool finishInternal(EVP_CIPHER_CTX& ctx, const EncryptionType type,
+  static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
                              const std::string& tag);
 
   /// saved cipher ctx

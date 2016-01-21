@@ -7,9 +7,6 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/util/ServerSocket.h>
-#include <wdt/util/SocketUtils.h>
-#include <wdt/Reporting.h>
-#include <wdt/WdtOptions.h>
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <poll.h>
@@ -20,10 +17,9 @@ namespace facebook {
 namespace wdt {
 using std::string;
 
-ServerSocket::ServerSocket(int port, int backlog,
-                           IAbortChecker const *abortChecker,
+ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
                            const EncryptionParams &encryptionParams)
-    : WdtSocket(port, abortChecker, encryptionParams), backlog_(backlog) {
+    : WdtSocket(threadCtx, port, encryptionParams), backlog_(backlog) {
   // for backward compatibility
   supportUnencryptedPeer_ = true;
 }
@@ -119,11 +115,10 @@ ErrorCode ServerSocket::listen() {
   }
   struct addrinfo sa;
   memset(&sa, 0, sizeof(sa));
-  const auto &options = WdtOptions::get();
-  if (options.ipv6) {
+  if (threadCtx_.getOptions().ipv6) {
     sa.ai_family = AF_INET6;
   }
-  if (options.ipv4) {
+  if (threadCtx_.getOptions().ipv4) {
     sa.ai_family = AF_INET;
   }
   sa.ai_socktype = SOCK_STREAM;
@@ -153,7 +148,7 @@ ErrorCode ServerSocket::listen() {
     }
 
     std::string host, port;
-    if (SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen, host, port)) {
+    if (getNameInfo(info->ai_addr, info->ai_addrlen, host, port)) {
       // even if getnameinfo fail, we can still continue. Error is logged inside
       // SocketUtils
       WDT_CHECK(port_ == folly::to<int32_t>(port));
@@ -258,12 +253,10 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
         PLOG(ERROR) << "accept error";
         return CONN_ERROR;
       }
-      SocketUtils::getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_,
-                               peerPort_);
+      getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_, peerPort_);
       VLOG(1) << "New connection, fd : " << fd_ << " from " << peerIp_ << " "
               << peerPort_;
-      SocketUtils::setReadTimeout(fd_);
-      SocketUtils::setWriteTimeout(fd_);
+      setSocketTimeouts();
       return OK;
     }
     lastCheckedPollIndex_ = (lastCheckedPollIndex_ + 1) % numFds;

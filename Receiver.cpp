@@ -9,7 +9,6 @@
 #include <wdt/Receiver.h>
 #include <wdt/util/FileWriter.h>
 #include <wdt/util/ServerSocket.h>
-#include <wdt/util/SocketUtils.h>
 #include <wdt/util/EncryptionUtils.h>
 
 #include <folly/Conv.h>
@@ -44,7 +43,8 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
   return checkpoints;
 }
 
-Receiver::Receiver(const WdtTransferRequest &transferRequest) {
+Receiver::Receiver(const WdtTransferRequest &transferRequest)
+    : transferLogManager_(options_) {
   LOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
   transferRequest_ = transferRequest;
 }
@@ -55,7 +55,7 @@ Receiver::Receiver(int port, int numSockets, const std::string &destDir)
 
 void Receiver::traverseDestinationDir(
     std::vector<FileChunksInfo> &fileChunksInfo) {
-  DirectorySourceQueue dirQueue(destDir_, &abortCheckerCallback_);
+  DirectorySourceQueue dirQueue(options_, destDir_, &abortCheckerCallback_);
   dirQueue.buildQueueSynchronously();
   auto &discoveredFilesInfo = dirQueue.getDiscoveredFilesMetaData();
   for (auto &fileInfo : discoveredFilesInfo) {
@@ -114,20 +114,13 @@ const WdtTransferRequest &Receiver::init() {
                << transferRequest_.getLogSafeString();
     return transferRequest_;
   }
+  checkAndUpdateBufferSize();
   backlog_ = options_.backlog;
-  bufferSize_ = options_.buffer_size;
   if (getTransferId().empty()) {
     setTransferId(WdtBase::generateTransferId());
   }
   setProtocolVersion(transferRequest_.protocolVersion);
   setDir(transferRequest_.directory);
-  if (bufferSize_ < Protocol::kMaxHeader) {
-    // round up to even k
-    bufferSize_ = 2 * 1024 * ((Protocol::kMaxHeader - 1) / (2 * 1024) + 1);
-    LOG(INFO) << "Specified -buffer_size " << options_.buffer_size
-              << " smaller than " << Protocol::kMaxHeader << " using "
-              << bufferSize_ << " instead";
-  }
   auto numThreads = transferRequest_.ports.size();
   // This creates the destination directory (which is needed for transferLogMgr)
   fileCreator_.reset(
@@ -317,7 +310,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     progressReporter_->end(report);
   }
   if (options_.enable_perf_stat_collection) {
-    PerfStatReport globalPerfReport;
+    PerfStatReport globalPerfReport(options_);
     for (auto &receiverThread : receiverThreads_) {
       globalPerfReport += receiverThread->getPerfReport();
     }

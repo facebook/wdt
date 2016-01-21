@@ -8,7 +8,6 @@
  */
 #include <wdt/util/FileCreator.h>
 #include <wdt/ErrorCodes.h>
-#include <wdt/Reporting.h>
 
 #include <string.h>
 #include <sys/stat.h>
@@ -19,16 +18,16 @@
 namespace facebook {
 namespace wdt {
 
-bool FileCreator::setFileSize(int fd, int64_t fileSize) {
+bool FileCreator::setFileSize(ThreadCtx &threadCtx, int fd, int64_t fileSize) {
   struct stat fileStat;
   if (fstat(fd, &fileStat) != 0) {
     PLOG(ERROR) << "fstat() failed for " << fd;
     return false;
   }
-  auto &options = WdtOptions::get();
   if (fileStat.st_size > fileSize) {
     // existing file is larger than required
-    int64_t sizeToTruncate = (options.shouldPreallocateFiles() ? fileSize : 0);
+    int64_t sizeToTruncate =
+        (threadCtx.getOptions().shouldPreallocateFiles() ? fileSize : 0);
     if (ftruncate(fd, sizeToTruncate) != 0) {
       PLOG(ERROR) << "ftruncate() failed for " << fd << " " << sizeToTruncate;
       return false;
@@ -37,7 +36,7 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
   if (fileSize == 0) {
     return true;
   }
-  if (!options.shouldPreallocateFiles()) {
+  if (!threadCtx.getOptions().shouldPreallocateFiles()) {
     // pre-allocation is disabled
     return true;
   }
@@ -53,15 +52,15 @@ bool FileCreator::setFileSize(int fd, int64_t fileSize) {
 #endif
 }
 
-int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
-  const auto &options = WdtOptions::get();
+int FileCreator::openAndSetSize(ThreadCtx &threadCtx,
+                                BlockDetails const *blockDetails) {
   int fd;
   const bool doCreate = (blockDetails->allocationStatus == NOT_EXISTS);
   const bool isTooLarge = (blockDetails->allocationStatus == EXISTS_TOO_LARGE);
   if (doCreate) {
-    fd = createFile(blockDetails->fileName);
+    fd = createFile(threadCtx, blockDetails->fileName);
   } else {
-    fd = openExistingFile(blockDetails->fileName);
+    fd = openExistingFile(threadCtx, blockDetails->fileName);
   }
   if (fd < 0) {
     return -1;
@@ -69,11 +68,11 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
   if (blockDetails->allocationStatus == EXISTS_CORRECT_SIZE) {
     return fd;
   }
-  if (!setFileSize(fd, blockDetails->fileSize)) {
+  if (!setFileSize(threadCtx, fd, blockDetails->fileSize)) {
     close(fd);
     return -1;
   }
-  if (options.isLogBasedResumption()) {
+  if (threadCtx.getOptions().isLogBasedResumption()) {
     if (isTooLarge) {
       LOG(WARNING) << "File size smaller in the sender side "
                    << blockDetails->fileName
@@ -92,9 +91,9 @@ int FileCreator::openAndSetSize(BlockDetails const *blockDetails) {
   return fd;
 }
 
-int FileCreator::openForFirstBlock(int threadIndex,
+int FileCreator::openForFirstBlock(ThreadCtx &threadCtx,
                                    BlockDetails const *blockDetails) {
-  int fd = openAndSetSize(blockDetails);
+  int fd = openAndSetSize(threadCtx, blockDetails);
   {
     folly::SpinLockGuard guard(lock_);
     auto it = fileStatusMap_.find(blockDetails->seqId);
@@ -102,7 +101,7 @@ int FileCreator::openForFirstBlock(int threadIndex,
     it->second = fd >= 0 ? ALLOCATED : FAILED;
   }
   std::unique_lock<std::mutex> waitLock(allocationMutex_);
-  threadConditionVariables_[threadIndex].notify_all();
+  threadConditionVariables_[threadCtx.getThreadIndex()].notify_all();
   return fd;
 }
 
@@ -125,7 +124,7 @@ bool FileCreator::waitForAllocationFinish(int allocatingThreadIndex,
   }
 }
 
-int FileCreator::openForBlocks(int threadIndex,
+int FileCreator::openForBlocks(ThreadCtx &threadCtx,
                                BlockDetails const *blockDetails) {
   lock_.lock();
   auto it = fileStatusMap_.find(blockDetails->seqId);
@@ -136,28 +135,30 @@ int FileCreator::openForBlocks(int threadIndex,
   }
   if (it == fileStatusMap_.end()) {
     // allocation has not started for this file
-    fileStatusMap_.insert(std::make_pair(blockDetails->seqId, threadIndex));
+    fileStatusMap_.insert(
+        std::make_pair(blockDetails->seqId, threadCtx.getThreadIndex()));
     lock_.unlock();
-    return openForFirstBlock(threadIndex, blockDetails);
+    return openForFirstBlock(threadCtx, blockDetails);
   }
-  auto status = it->second;
+  auto statusOrThreadIdx = it->second;
   lock_.unlock();
-  if (status == FAILED) {
+  if (statusOrThreadIdx == FAILED) {
     // allocation failed previously
     return -1;
   }
-  if (status != ALLOCATED) {
+  if (statusOrThreadIdx != ALLOCATED) {
     // allocation in progress
-    if (!waitForAllocationFinish(it->second, blockDetails->seqId)) {
+    if (!waitForAllocationFinish(statusOrThreadIdx, blockDetails->seqId)) {
       return -1;
     }
   }
-  return openExistingFile(blockDetails->fileName);
+  return openExistingFile(threadCtx, blockDetails->fileName);
 }
 
 using std::string;
 
-int FileCreator::openExistingFile(const string &relPathStr) {
+int FileCreator::openExistingFile(ThreadCtx &threadCtx,
+                                  const string &relPathStr) {
   // This should have been validated earlier and errored out
   // instead of crashing here
   WDT_CHECK(!relPathStr.empty());
@@ -167,9 +168,11 @@ int FileCreator::openExistingFile(const string &relPathStr) {
   const string path = rootDir_ + relPathStr;
 
   int openFlags = O_WRONLY;
-  START_PERF_TIMER
-  int res = open(path.c_str(), openFlags, 0644);
-  RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
+  int res;
+  {
+    PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
+    res = open(path.c_str(), openFlags, 0644);
+  }
   if (res < 0) {
     PLOG(ERROR) << "failed opening file " << path;
     return -1;
@@ -178,7 +181,7 @@ int FileCreator::openExistingFile(const string &relPathStr) {
   return res;
 }
 
-int FileCreator::createFile(const string &relPathStr) {
+int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
   CHECK(!relPathStr.empty());
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
@@ -192,16 +195,22 @@ int FileCreator::createFile(const string &relPathStr) {
   std::string dir;
   if (p) {
     dir.assign(relPathStr.data(), p);
-    START_PERF_TIMER
-    const bool dirSuccess1 = createDirRecursively(dir);
-    RECORD_PERF_RESULT(PerfStatReport::DIRECTORY_CREATE)
+    bool dirSuccess1;
+    {
+      PerfStatCollector statCollector(threadCtx,
+                                      PerfStatReport::DIRECTORY_CREATE);
+      dirSuccess1 = createDirRecursively(dir);
+    }
     if (!dirSuccess1) {
       // retry with force
       LOG(ERROR) << "failed to create dir " << dir << " recursively, "
                  << "trying to force directory creation";
-      START_PERF_TIMER
-      const bool dirSuccess2 = createDirRecursively(dir, true /* force */);
-      RECORD_PERF_RESULT(PerfStatReport::DIRECTORY_CREATE)
+      bool dirSuccess2;
+      {
+        PerfStatCollector statCollector(threadCtx,
+                                        PerfStatReport::DIRECTORY_CREATE);
+        dirSuccess2 = createDirRecursively(dir, true /* force */);
+      }
       if (!dirSuccess2) {
         LOG(ERROR) << "failed to create dir " << dir << " recursively";
         return -1;
@@ -209,11 +218,11 @@ int FileCreator::createFile(const string &relPathStr) {
     }
   }
   int openFlags = O_CREAT | O_WRONLY;
-  auto &options = WdtOptions::get();
   // When doing download resumption we sometime open files that do already
   // exist and we need to overwrite them anyway (files which have been
   // discarded from the log for some reason)
-  if (options.overwrite || options.enable_download_resumption) {
+  if (threadCtx.getOptions().overwrite ||
+      threadCtx.getOptions().enable_download_resumption) {
     // Make sure file size resumption will not get messed up if we
     // expect to create this file
     openFlags |= O_TRUNC;
@@ -222,9 +231,11 @@ int FileCreator::createFile(const string &relPathStr) {
     // the file happens to already exist
     openFlags |= O_EXCL;
   }
-  START_PERF_TIMER
-  int res = open(path.c_str(), openFlags, 0644);
-  RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
+  int res;
+  {
+    PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
+    res = open(path.c_str(), openFlags, 0644);
+  }
   if (res < 0) {
     if (dir.empty()) {
       PLOG(ERROR) << "failed creating file " << path;
@@ -232,18 +243,20 @@ int FileCreator::createFile(const string &relPathStr) {
     }
     PLOG(ERROR) << "failed creating file " << path << ", trying to "
                 << "force directory creation";
+    bool dirSuccess;
     {
-      START_PERF_TIMER
-      const bool dirSuccess = createDirRecursively(dir, true /* force */);
-      RECORD_PERF_RESULT(PerfStatReport::DIRECTORY_CREATE)
-      if (!dirSuccess) {
-        LOG(ERROR) << "failed to create dir " << dir << " recursively";
-        return -1;
-      }
+      PerfStatCollector statCollector(threadCtx,
+                                      PerfStatReport::DIRECTORY_CREATE);
+      dirSuccess = createDirRecursively(dir, true /* force */);
     }
-    START_PERF_TIMER
-    res = open(path.c_str(), openFlags, 0644);
-    RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
+    if (!dirSuccess) {
+      LOG(ERROR) << "failed to create dir " << dir << " recursively";
+      return -1;
+    }
+    {
+      PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
+      res = open(path.c_str(), openFlags, 0644);
+    }
     if (res < 0) {
       PLOG(ERROR) << "failed creating file " << path;
       return -1;

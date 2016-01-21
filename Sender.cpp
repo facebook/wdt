@@ -12,7 +12,6 @@
 #include <wdt/Throttler.h>
 
 #include <wdt/util/ClientSocket.h>
-#include <wdt/util/SocketUtils.h>
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
@@ -52,14 +51,14 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
   for (int i = 0; i < numSockets; i++) {
     transferRequest_.ports.push_back(port + i);
   }
-  dirQueue_.reset(new DirectorySourceQueue(srcDir_, &queueAbortChecker_));
+  dirQueue_.reset(
+      new DirectorySourceQueue(options_, srcDir_, &queueAbortChecker_));
   VLOG(3) << "Configuring the  directory queue";
   dirQueue_->setIncludePattern(options_.include_regex);
   dirQueue_->setExcludePattern(options_.exclude_regex);
   dirQueue_->setPruneDirPattern(options_.prune_dir_regex);
   dirQueue_->setFollowSymlinks(options_.follow_symlinks);
   dirQueue_->setBlockSizeMbytes(options_.block_size_mbytes);
-  dirQueue_->setFileSourceBufferSize(options_.buffer_size);
   dirQueue_->setNumClientThreads(numSockets);
   dirQueue_->setOpenFilesDuringDiscovery(options_.open_files_during_discovery);
   progressReportIntervalMillis_ = options_.progress_report_interval_millis;
@@ -307,10 +306,11 @@ std::unique_ptr<TransferReport> Sender::finish() {
     progressReporter_->end(transferReport);
   }
   if (options_.enable_perf_stat_collection) {
-    PerfStatReport report;
+    PerfStatReport report(options_);
     for (auto &senderThread : senderThreads_) {
       report += senderThread->getPerfReport();
     }
+    report += dirQueue_->getPerfReport();
     LOG(INFO) << report;
   }
   double directoryTime;
@@ -344,6 +344,7 @@ ErrorCode Sender::start() {
     }
     transferStatus_ = ONGOING;
   }
+  checkAndUpdateBufferSize();
   const bool twoPhases = options_.two_phases;
   WDT_CHECK(!(twoPhases && options_.enable_download_resumption))
       << "Two phase is not supported with download resumption";
@@ -424,7 +425,7 @@ void Sender::validateTransferStats(
   WDT_CHECK(sourceNumBlocks == threadNumBlocks);
 }
 
-void Sender::setSocketCreator(const SocketCreator socketCreator) {
+void Sender::setSocketCreator(Sender::ISocketCreator *socketCreator) {
   socketCreator_ = socketCreator;
 }
 

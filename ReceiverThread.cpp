@@ -31,9 +31,9 @@ int64_t readAtLeast(ServerSocket &s, char *buf, int64_t max, int64_t atLeast,
                     int64_t len) {
   VLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
           << atLeast << " from " << s.getFd();
-  CHECK_GE(len, 0);
-  CHECK_GT(atLeast, 0);
-  CHECK_LE(atLeast, max);
+  WDT_CHECK_GE(len, 0);
+  WDT_CHECK_GT(atLeast, 0);
+  WDT_CHECK_LE(atLeast, max);
   int count = 0;
   while (len < atLeast) {
     // because we want to process data as soon as it arrives, tryFull option for
@@ -91,24 +91,23 @@ const ReceiverThread::StateFunction ReceiverThread::stateMap_[] = {
 
 ReceiverThread::ReceiverThread(Receiver *wdtParent, int threadIndex,
                                int32_t port, ThreadsController *controller)
-    : WdtThread(threadIndex, port, wdtParent->getProtocolVersion(), controller),
-      wdtParent_(wdtParent),
-      bufferSize_(wdtParent->bufferSize_) {
+    : WdtThread(wdtParent->options_, threadIndex, port,
+                wdtParent->getProtocolVersion(), controller),
+      wdtParent_(wdtParent) {
   controller_->registerThread(threadIndex_);
-  buf_ = new char[bufferSize_];
+  threadCtx_->setAbortChecker(&wdtParent_->abortCheckerCallback_);
 }
 
 /**LISTEN STATE***/
 ReceiverState ReceiverThread::listen() {
   VLOG(1) << *this << " entered LISTEN state";
-  const auto &options = WdtOptions::get();
-  const bool doActualWrites = !options.skip_writes;
+  const bool doActualWrites = !options_.skip_writes;
   int32_t port = socket_->getPort();
   VLOG(1) << "Server Thread for port " << port << " with backlog "
           << socket_->getBackLog() << " on " << wdtParent_->getDir()
           << " writes = " << doActualWrites;
 
-  for (int retry = 1; retry < options.max_retries; ++retry) {
+  for (int retry = 1; retry < options_.max_retries; ++retry) {
     ErrorCode code = socket_->listen();
     if (code == OK) {
       break;
@@ -118,7 +117,7 @@ ReceiverState ReceiverThread::listen() {
     }
     LOG(INFO) << "Sleeping after failed attempt " << retry;
     /* sleep override */
-    usleep(options.sleep_millis * 1000);
+    usleep(options_.sleep_millis * 1000);
   }
   // one more/last try (stays true if it worked above)
   if (socket_->listen() != OK) {
@@ -133,10 +132,9 @@ ReceiverState ReceiverThread::listen() {
 ReceiverState ReceiverThread::acceptFirstConnection() {
   VLOG(1) << *this << " entered ACCEPT_FIRST_CONNECTION state";
 
-  const auto &options = WdtOptions::get();
   reset();
   socket_->closeNoCheck();
-  auto timeout = options.accept_timeout_millis;
+  auto timeout = options_.accept_timeout_millis;
   int acceptAttempts = 0;
   while (true) {
     // Move to timeout state if some other thread was successful
@@ -144,7 +142,7 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
     if (wdtParent_->hasNewTransferStarted()) {
       return ACCEPT_WITH_TIMEOUT;
     }
-    if (acceptAttempts == options.max_accept_retries) {
+    if (acceptAttempts == options_.max_accept_retries) {
       LOG(ERROR) << "unable to accept after " << acceptAttempts << " attempts";
       threadStats_.setLocalErrorCode(CONN_ERROR);
       return FAILED;
@@ -174,7 +172,6 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
 /***ACCEPT_WITH_TIMEOUT STATE***/
 ReceiverState ReceiverThread::acceptWithTimeout() {
   LOG(INFO) << *this << " entered ACCEPT_WITH_TIMEOUT state";
-  const auto &options = WdtOptions::get();
 
   // check socket status
   ErrorCode socketErrCode = socket_->getNonRetryableErrCode();
@@ -187,7 +184,7 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
   socket_->closeNoCheck();
   blocksWaitingVerification_.clear();
 
-  auto timeout = options.accept_window_millis;
+  auto timeout = options_.accept_window_millis;
   if (senderReadTimeout_ > 0) {
     // transfer is in progress and we have already got sender settings
     timeout = std::max(senderReadTimeout_, senderWriteTimeout_) +
@@ -240,7 +237,8 @@ ReceiverState ReceiverThread::sendLocalCheckpoint() {
 ReceiverState ReceiverThread::readNextCmd() {
   VLOG(1) << *this << " entered READ_NEXT_CMD state";
   oldOffset_ = off_;
-  numRead_ = readAtLeast(*socket_, buf_ + off_, bufferSize_ - off_,
+  // TODO: we shouldn't have off_ here and buffer/size inside buffer.
+  numRead_ = readAtLeast(*socket_, buf_ + off_, bufSize_ - off_,
                          Protocol::kMinBufLength, numRead_);
   if (numRead_ < Protocol::kMinBufLength) {
     LOG(ERROR) << "socket read failure " << Protocol::kMinBufLength << " "
@@ -352,11 +350,10 @@ ReceiverState ReceiverThread::processSettingsCmd() {
 /***PROCESS_FILE_CMD***/
 ReceiverState ReceiverThread::processFileCmd() {
   VLOG(1) << *this << " entered PROCESS_FILE_CMD state";
-  const auto &options = WdtOptions::get();
   // following block needs to be executed for the first file cmd. There is no
   // harm in executing it more than once. number of blocks equal to 0 is a good
   // approximation for first file cmd. Did not want to introduce another boolean
-  if (options.enable_download_resumption && threadStats_.getNumBlocks() == 0) {
+  if (options_.enable_download_resumption && threadStats_.getNumBlocks() == 0) {
     auto sendChunksFunnel = controller_->getFunnel(SEND_FILE_CHUNKS_FUNNEL);
     auto state = sendChunksFunnel->getStatus();
     if (state == FUNNEL_START) {
@@ -386,8 +383,8 @@ ReceiverState ReceiverThread::processFileCmd() {
 
   if (headerLen > numRead_) {
     int64_t end = oldOffset_ + numRead_;
-    numRead_ = readAtLeast(*socket_, buf_ + end, bufferSize_ - end, headerLen,
-                           numRead_);
+    numRead_ =
+        readAtLeast(*socket_, buf_ + end, bufSize_ - end, headerLen, numRead_);
   }
   if (numRead_ < headerLen) {
     LOG(ERROR) << "Unable to read full header " << headerLen << " " << numRead_;
@@ -418,7 +415,7 @@ ReceiverState ReceiverThread::processFileCmd() {
           << " size:" << blockDetails.dataSize << " ooff:" << oldOffset_
           << " off_: " << off_ << " numRead_: " << numRead_;
   auto &fileCreator = wdtParent_->getFileCreator();
-  FileWriter writer(threadIndex_, &blockDetails, fileCreator.get());
+  FileWriter writer(*threadCtx_, &blockDetails, fileCreator.get());
   auto writtenGuard = folly::makeGuard([&] {
     if (threadProtocolVersion_ >= Protocol::CHECKPOINT_OFFSET_VERSION &&
         footerType_ == NO_FOOTER) {
@@ -452,7 +449,7 @@ ReceiverState ReceiverThread::processFileCmd() {
     // We might be reading more than we require for this file but
     // throttling should make sense for any additional bytes received
     // on the network
-    throttler->limit(toWrite + headerBytes);
+    throttler->limit(*threadCtx_, toWrite + headerBytes);
   }
   ErrorCode code = writer.write(buf_ + off_, toWrite);
   if (code != OK) {
@@ -468,7 +465,7 @@ ReceiverState ReceiverThread::processFileCmd() {
                  << " port : " << socket_->getPort();
       return FAILED;
     }
-    int64_t nres = readAtMost(*socket_, buf_, bufferSize_,
+    int64_t nres = readAtMost(*socket_, buf_, bufSize_,
                               blockDetails.dataSize - writer.getTotalWritten());
     if (nres <= 0) {
       break;
@@ -476,7 +473,7 @@ ReceiverState ReceiverThread::processFileCmd() {
     if (throttler) {
       // We only know how much we have read after we are done calling
       // readAtMost. Call throttler with the bytes read off_ the wire.
-      throttler->limit(nres);
+      throttler->limit(*threadCtx_, nres);
     }
     threadStats_.addDataBytes(nres);
     if (footerType_ == CHECKSUM_FOOTER) {
@@ -504,7 +501,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   if (remainingData > 0) {
     // if we need to read more anyway, let's move the data
     numRead_ = remainingData;
-    if ((remainingData < Protocol::kMaxHeader) && (off_ > (bufferSize_ / 2))) {
+    if ((remainingData < Protocol::kMaxHeader) && (off_ > (bufSize_ / 2))) {
       // rare so inefficient is ok
       VLOG(3) << "copying extra " << remainingData << " leftover bytes @ "
               << off_;
@@ -523,7 +520,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   if (footerType_ != NO_FOOTER) {
     // have to read footer cmd
     oldOffset_ = off_;
-    numRead_ = readAtLeast(*socket_, buf_ + off_, bufferSize_ - off_,
+    numRead_ = readAtLeast(*socket_, buf_ + off_, bufSize_ - off_,
                            Protocol::kMinBufLength, numRead_);
     if (numRead_ < Protocol::kMinBufLength) {
       LOG(ERROR) << "socket read failure " << Protocol::kMinBufLength << " "
@@ -579,8 +576,7 @@ ReceiverState ReceiverThread::processFileCmd() {
 }
 
 void ReceiverThread::markBlockVerified(const BlockDetails &blockDetails) {
-  const WdtOptions &options = WdtOptions::get();
-  if (options.isLogBasedResumption()) {
+  if (options_.isLogBasedResumption()) {
     TransferLogManager &transferLogManager =
         wdtParent_->getTransferLogManager();
     transferLogManager.addBlockWriteEntry(
@@ -684,7 +680,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
         buf_[off++] = Protocol::CHUNKS_CMD;
         const auto &fileChunksInfo = wdtParent_->getFileChunksInfo();
         const int64_t numParsedChunksInfo = fileChunksInfo.size();
-        Protocol::encodeChunksCmd(buf_, off, bufferSize_, numParsedChunksInfo);
+        Protocol::encodeChunksCmd(buf_, off, bufSize_, numParsedChunksInfo);
         int written = socket_->write(buf_, off);
         if (written > 0) {
           threadStats_.addHeaderBytes(written);
@@ -703,7 +699,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
         while (numEntriesWritten < numParsedChunksInfo) {
           off = sizeof(int32_t);
           int64_t numEntriesEncoded = Protocol::encodeFileChunksInfoList(
-              buf_, off, bufferSize_, numEntriesWritten, fileChunksInfo);
+              buf_, off, bufSize_, numEntriesWritten, fileChunksInfo);
           int32_t dataSize = folly::Endian::little(off - sizeof(int32_t));
           folly::storeUnaligned<int32_t>(buf_, dataSize);
           written = socket_->write(buf_, off);
@@ -747,12 +743,12 @@ ReceiverState ReceiverThread::sendGlobalCheckpoint() {
   // leave space for length
   off_ += sizeof(int16_t);
   auto oldOffset = off_;
-  Protocol::encodeCheckpoints(threadProtocolVersion_, buf_, off_, bufferSize_,
+  Protocol::encodeCheckpoints(threadProtocolVersion_, buf_, off_, bufSize_,
                               newCheckpoints_);
   int16_t length = off_ - oldOffset;
   folly::storeUnaligned<int16_t>(buf_ + 1, folly::Endian::little(length));
 
-  auto written = socket_->write(buf_, off_);
+  int written = socket_->write(buf_, off_);
   if (written != off_) {
     LOG(ERROR) << "unable to write error checkpoints";
     threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
@@ -862,9 +858,11 @@ ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
         guard.notifyOne();
         return state;
       }
-      START_PERF_TIMER
-      guard.wait(timeoutMillis);
-      RECORD_PERF_RESULT(PerfStatReport::RECEIVER_WAIT_SLEEP)
+      {
+        PerfStatCollector statCollector(*threadCtx_,
+                                        PerfStatReport::RECEIVER_WAIT_SLEEP);
+        guard.wait(timeoutMillis);
+      }
       state = checkForFinishOrNewCheckpoints();
       if (state != WAIT_FOR_FINISH_OR_NEW_CHECKPOINT) {
         guard.notifyOne();
@@ -884,8 +882,8 @@ ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
 }
 
 void ReceiverThread::start() {
-  if (!buf_) {
-    LOG(ERROR) << "error allocating " << bufferSize_;
+  if (buf_ == nullptr) {
+    LOG(ERROR) << "Unable to allocate buffer";
     threadStats_.setLocalErrorCode(MEMORY_ALLOCATION_ERROR);
     return;
   }
@@ -903,7 +901,6 @@ void ReceiverThread::start() {
     }
     state = (this->*stateMap_[state])();
   }
-  perfReport_ = *wdt__perfStatReportThreadLocal;
   controller_->deRegisterThread(threadIndex_);
   controller_->executeAtEnd([&]() { wdtParent_->endCurGlobalSession(); });
   WDT_CHECK(socket_.get());
@@ -919,9 +916,8 @@ ErrorCode ReceiverThread::init() {
   const EncryptionParams &encryptionData =
       wdtParent_->transferRequest_.encryptionData;
   socket_ = folly::make_unique<ServerSocket>(
-      port_, wdtParent_->backlog_, &(wdtParent_->abortCheckerCallback_),
-      encryptionData);
-  int max_retries = WdtOptions::get().max_retries;
+      *threadCtx_, port_, wdtParent_->backlog_, encryptionData);
+  int max_retries = options_.max_retries;
   for (int retries = 0; retries < max_retries; retries++) {
     if (socket_->listen() == OK) {
       break;
@@ -948,7 +944,6 @@ void ReceiverThread::reset() {
 }
 
 ReceiverThread::~ReceiverThread() {
-  delete[] buf_;
 }
 }
 }

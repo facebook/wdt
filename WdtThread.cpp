@@ -18,7 +18,7 @@ TransferStats WdtThread::moveStats() {
 }
 
 const PerfStatReport &WdtThread::getPerfReport() const {
-  return perfReport_;
+  return threadCtx_->getPerfReport();
 }
 
 const TransferStats &WdtThread::getTransferStats() const {

@@ -8,7 +8,6 @@
  */
 #include <wdt/WdtResourceController.h>
 
-#include <folly/Random.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>

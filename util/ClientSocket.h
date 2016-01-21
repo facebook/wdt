@@ -17,13 +17,9 @@ namespace facebook {
 namespace wdt {
 class ClientSocket : public WdtSocket {
  public:
-  ClientSocket(const std::string &dest, const int port,
-               IAbortChecker const *abortChecker,
+  ClientSocket(ThreadCtx &threadCtx, const std::string &dest, int port,
                const EncryptionParams &encryptionParams);
   virtual ErrorCode connect();
-  /// @return   number of unacked bytes in send buffer, returns -1 in case it
-  ///           fails to get unacked bytes for this socket
-  int getUnackedBytes() const;
   /// @return   peer-ip of the connected socket
   const std::string &getPeerIp() const;
   /// @return   current encryptor tag

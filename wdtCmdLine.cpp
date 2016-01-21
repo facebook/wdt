@@ -225,24 +225,24 @@ int main(int argc, char *argv[]) {
     wdt.printWdtOptions(std::cout);
     return 0;
   }
+  WdtOptions &options = wdt.getWdtOptions();
 
   ErrorCode retCode = OK;
 
   // Odd ball case of log parsing
   if (FLAGS_parse_transfer_log) {
     // Log parsing mode
-    WdtOptions::getMutable().enable_download_resumption = true;
-    TransferLogManager transferLogManager;
+    options.enable_download_resumption = true;
+    TransferLogManager transferLogManager(options);
     transferLogManager.setRootDir(FLAGS_directory);
     transferLogManager.openLog();
     bool success = transferLogManager.parseAndPrint();
-    LOG_IF(ERROR, success) << "Transfer log parsing failed";
+    LOG_IF(ERROR, !success) << "Transfer log parsing failed";
     transferLogManager.closeLog();
     return success ? OK : ERROR;
   }
 
   // General case : Sender or Receiver
-  const auto &options = WdtOptions::get();
   std::unique_ptr<WdtTransferRequest> reqPtr;
   if (connectUrl.empty()) {
     reqPtr = folly::make_unique<WdtTransferRequest>(
@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
   if (FLAGS_destination.empty() && connectUrl.empty()) {
     Receiver receiver(req);
     if (!FLAGS_recovery_id.empty()) {
-      WdtOptions::getMutable().enable_download_resumption = true;
+      options.enable_download_resumption = true;
       receiver.setRecoveryId(FLAGS_recovery_id);
     }
     WdtTransferRequest augmentedReq = receiver.init();

@@ -37,21 +37,20 @@ const SenderThread::StateFunction SenderThread::stateMap_[] = {
 std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
     const int port, IAbortChecker const *abortChecker, ErrorCode &errCode) {
   auto startTime = Clock::now();
-  const auto &options = WdtOptions::get();
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket;
   const EncryptionParams &encryptionData =
       wdtParent_->transferRequest_.encryptionData;
   if (!wdtParent_->socketCreator_) {
     // socket creator not set, creating ClientSocket
-    socket = folly::make_unique<ClientSocket>(wdtParent_->destHost_, port,
-                                              abortChecker, encryptionData);
+    socket = folly::make_unique<ClientSocket>(
+        *threadCtx_, wdtParent_->destHost_, port, encryptionData);
   } else {
-    socket = wdtParent_->socketCreator_(wdtParent_->destHost_, port,
-                                        abortChecker, encryptionData);
+    socket = wdtParent_->socketCreator_->makeSocket(
+        *threadCtx_, wdtParent_->destHost_, port, encryptionData);
   }
-  double retryInterval = options.sleep_millis;
-  int maxRetries = options.max_retries;
+  double retryInterval = options_.sleep_millis;
+  int maxRetries = options_.max_retries;
   if (maxRetries < 1) {
     LOG(ERROR) << "Invalid max_retries " << maxRetries << " using 1 instead";
     maxRetries = 1;
@@ -100,8 +99,7 @@ SenderState SenderThread::connect() {
     }
     socket_->closeNoCheck();
   }
-  const auto &options = WdtOptions::get();
-  if (numReconnectWithoutProgress_ >= options.max_transfer_retries) {
+  if (numReconnectWithoutProgress_ >= options_.max_transfer_retries) {
     LOG(ERROR) << "Sender thread reconnected " << numReconnectWithoutProgress_
                << " times without making any progress, giving up. port: "
                << socket_->getPort();
@@ -111,7 +109,7 @@ SenderState SenderThread::connect() {
   ErrorCode code;
   // TODO cleanup more but for now avoid having 2 socket object live per port
   socket_ = nullptr;
-  socket_ = connectToReceiver(port_, socketAbortChecker_.get(), code);
+  socket_ = connectToReceiver(port_, threadCtx_->getAbortChecker(), code);
   if (code == ABORT) {
     threadStats_.setLocalErrorCode(ABORT);
     if (getThreadAbortCode() == VERSION_MISMATCH) {
@@ -191,9 +189,8 @@ SenderState SenderThread::readLocalCheckPoint() {
 
 SenderState SenderThread::sendSettings() {
   VLOG(1) << *this << " entered SEND_SETTINGS state";
-  auto &options = WdtOptions::get();
-  int64_t readTimeoutMillis = options.read_timeout_millis;
-  int64_t writeTimeoutMillis = options.write_timeout_millis;
+  int64_t readTimeoutMillis = options_.read_timeout_millis;
+  int64_t writeTimeoutMillis = options_.write_timeout_millis;
   int64_t off = 0;
   buf_[off++] = Protocol::SETTINGS_CMD;
   bool sendFileChunks = wdtParent_->isSendFileChunks();
@@ -203,7 +200,7 @@ SenderState SenderThread::sendSettings() {
   settings.transferId = wdtParent_->getTransferId();
   settings.enableChecksum = (footerType_ == CHECKSUM_FOOTER);
   settings.sendFileChunks = sendFileChunks;
-  settings.blockModeDisabled = (options.block_size_mbytes <= 0);
+  settings.blockModeDisabled = (options_.block_size_mbytes <= 0);
   Protocol::encodeSettings(threadProtocolVersion_, buf_, off,
                            Protocol::kMaxSettings, settings);
   int64_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
@@ -225,7 +222,8 @@ SenderState SenderThread::sendBlocks() {
     return SEND_SIZE_CMD;
   }
   ErrorCode transferStatus;
-  std::unique_ptr<ByteSource> source = dirQueue_->getNextSource(transferStatus);
+  std::unique_ptr<ByteSource> source =
+      dirQueue_->getNextSource(threadCtx_.get(), transferStatus);
   if (!source) {
     return SEND_DONE_CMD;
   }
@@ -311,7 +309,7 @@ TransferStats SenderThread::sendOneByteSource(
        * with the bytes being written.
        */
       throttlerInstanceBytes += size;
-      wdtParent_->getThrottler()->limit(throttlerInstanceBytes);
+      wdtParent_->getThrottler()->limit(*threadCtx_, throttlerInstanceBytes);
       totalThrottlerBytes += throttlerInstanceBytes;
       throttlerInstanceBytes = 0;
     }
@@ -551,7 +549,6 @@ SenderState SenderThread::readFileChunks() {
 }
 
 ErrorCode SenderThread::readNextReceiverCmd() {
-  const auto &options = WdtOptions::get();
   int numUnackedBytes = socket_->getUnackedBytes();
   int timeToClearSendBuffer = 0;
   Clock::time_point startTime = Clock::now();
@@ -598,7 +595,7 @@ ErrorCode SenderThread::readNextReceiverCmd() {
   // we are assuming that sender and receiver tcp buffer sizes are same. So, we
   // expect another timeToClearSendBuffer milliseconds for receiver to clear its
   // buffer
-  int readTimeout = timeToClearSendBuffer + options.drain_extra_ms;
+  int readTimeout = timeToClearSendBuffer + options_.drain_extra_ms;
   LOG(INFO) << "Send buffer cleared in " << timeToClearSendBuffer
             << "ms, waiting for " << readTimeout
             << "ms for receiver buffer to clear";
@@ -860,7 +857,6 @@ SenderState SenderThread::processVersionMismatch() {
 
 void SenderThread::setFooterType() {
   // determine footer type to use
-  const WdtOptions &options = WdtOptions::get();
   EncryptionType encryptionType =
       wdtParent_->transferRequest_.encryptionData.getType();
   int protocolVersion = wdtParent_->getProtocolVersion();
@@ -868,7 +864,7 @@ void SenderThread::setFooterType() {
       encryptionTypeToTagLen(encryptionType)) {
     footerType_ = ENC_TAG_FOOTER;
   } else if (protocolVersion >= Protocol::CHECKSUM_VERSION &&
-             options.enable_checksum) {
+             options_.enable_checksum) {
     footerType_ = CHECKSUM_FOOTER;
   } else {
     footerType_ = NO_FOOTER;
@@ -877,6 +873,12 @@ void SenderThread::setFooterType() {
 
 void SenderThread::start() {
   Clock::time_point startTime = Clock::now();
+
+  if (buf_ == nullptr) {
+    LOG(ERROR) << "Unable to allocate buffer";
+    threadStats_.setLocalErrorCode(MEMORY_ALLOCATION_ERROR);
+    return;
+  }
 
   setFooterType();
 
@@ -905,7 +907,6 @@ void SenderThread::start() {
             << " Total throughput = "
             << threadStats_.getEffectiveTotalBytes() / totalTime / kMbToB
             << " Mbytes/sec";
-  perfReport_ = *wdt__perfStatReportThreadLocal;
 
   ThreadTransferHistory &transferHistory = getTransferHistory();
   transferHistory.markNotInUse();

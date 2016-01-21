@@ -12,6 +12,7 @@
 #include <wdt/WdtOptions.h>
 #include <wdt/util/EncryptionUtils.h>
 #include <wdt/WdtTransferRequest.h>
+#include <wdt/AbortChecker.h>
 
 #include <algorithm>
 #include <vector>
@@ -24,7 +25,6 @@
 #include <folly/RWSpinLock.h>
 #include <folly/SpinLock.h>
 #include <folly/Memory.h>
-#include <folly/ThreadLocal.h>
 
 namespace facebook {
 namespace wdt {
@@ -55,6 +55,7 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
   return os;
 }
+
 // TODO rename to ThreadResult
 /// class representing statistics related to file transfer
 class TransferStats {
@@ -499,18 +500,6 @@ class ProgressReporter {
   bool isTty_;
 };
 
-#define START_PERF_TIMER                               \
-  Clock::time_point startTimePERF;                     \
-  if (WdtOptions::get().enable_perf_stat_collection) { \
-    startTimePERF = Clock::now();                      \
-  }
-
-#define RECORD_PERF_RESULT(statType)                                 \
-  if (WdtOptions::get().enable_perf_stat_collection) {               \
-    int64_t duration = durationMicros(Clock::now() - startTimePERF); \
-    wdt__perfStatReportThreadLocal->addPerfStat(statType, duration); \
-  }
-
 /// class representing perf stat collection
 class PerfStatReport {
  public:
@@ -533,7 +522,7 @@ class PerfStatReport {
     END
   };
 
-  explicit PerfStatReport();
+  explicit PerfStatReport(const WdtOptions &options);
 
   /**
    * @param statType      stat-type
@@ -562,7 +551,5 @@ class PerfStatReport {
   /// network timeout in milliseconds
   int networkTimeoutMillis_;
 };
-
-extern folly::ThreadLocal<PerfStatReport> wdt__perfStatReportThreadLocal;
 }
 }

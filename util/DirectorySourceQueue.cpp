@@ -58,9 +58,12 @@ void FileInfo::verifyAndFixFlags() {
   }
 }
 
-DirectorySourceQueue::DirectorySourceQueue(const string &rootDir,
-                                           IAbortChecker const *abortChecker)
-    : abortChecker_(abortChecker) {
+DirectorySourceQueue::DirectorySourceQueue(const WdtOptions &options,
+                                           const string &rootDir,
+                                           IAbortChecker const *abortChecker) {
+  threadCtx_ = folly::make_unique<ThreadCtx>(
+      options, /* do not allocate buffer */ false);
+  threadCtx_->setAbortChecker(abortChecker);
   setRootDir(rootDir);
 }
 
@@ -74,12 +77,6 @@ void DirectorySourceQueue::setExcludePattern(const string &excludePattern) {
 
 void DirectorySourceQueue::setPruneDirPattern(const string &pruneDirPattern) {
   pruneDirPattern_ = pruneDirPattern;
-}
-
-void DirectorySourceQueue::setFileSourceBufferSize(
-    const int64_t fileSourceBufferSize) {
-  fileSourceBufferSize_ = fileSourceBufferSize;
-  CHECK(fileSourceBufferSize_ > 0);
 }
 
 void DirectorySourceQueue::setBlockSizeMbytes(int64_t blockSizeMbytes) {
@@ -248,7 +245,7 @@ bool DirectorySourceQueue::explore() {
   std::deque<string> todoList;
   todoList.push_back("");
   while (!todoList.empty()) {
-    if (abortChecker_->shouldAbort()) {
+    if (threadCtx_->getAbortChecker()->shouldAbort()) {
       LOG(ERROR) << "Directory transfer thread aborted";
       hasError = true;
       break;
@@ -270,7 +267,7 @@ bool DirectorySourceQueue::explore() {
     // nastiness of calculating correctly buffer size and race conditions there)
     struct dirent *dirEntryRes = nullptr;
     while (true) {
-      if (abortChecker_->shouldAbort()) {
+      if (threadCtx_->getAbortChecker()->shouldAbort()) {
         break;
       }
       errno = 0;  // yes that's right
@@ -438,7 +435,8 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   metadata->directReads = fileInfo.directReads;
   metadata->size = fileInfo.fileSize;
   if ((openFilesDuringDiscovery_ != 0) && (metadata->fd < 0)) {
-    metadata->fd = FileUtil::openForRead(fullPath, metadata->directReads);
+    metadata->fd =
+        FileUtil::openForRead(*threadCtx_, fullPath, metadata->directReads);
     ++numFilesOpened_;
     if (metadata->directReads) {
       ++numFilesOpenedWithDirect_;
@@ -515,8 +513,8 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
     int64_t remainingBytes = chunk.size();
     do {
       const int64_t size = std::min<int64_t>(remainingBytes, blockSize);
-      std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
-          metadata, size, offset, fileSourceBufferSize_);
+      std::unique_ptr<ByteSource> source =
+          folly::make_unique<FileByteSource>(metadata, size, offset);
       sourceQueue_.push(std::move(source));
       remainingBytes -= size;
       offset += size;
@@ -544,7 +542,7 @@ std::vector<string> &DirectorySourceQueue::getFailedDirectories() {
 
 bool DirectorySourceQueue::enqueueFiles() {
   for (auto &info : fileInfo_) {
-    if (abortChecker_->shouldAbort()) {
+    if (threadCtx_->getAbortChecker()->shouldAbort()) {
       LOG(ERROR) << "Directory transfer thread aborted";
       return false;
     }
@@ -572,6 +570,10 @@ int64_t DirectorySourceQueue::getCount() const {
   return numEntries_;
 }
 
+const PerfStatReport &DirectorySourceQueue::getPerfReport() const {
+  return threadCtx_->getPerfReport();
+}
+
 std::pair<int64_t, ErrorCode> DirectorySourceQueue::getNumBlocksAndStatus()
     const {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -595,7 +597,7 @@ bool DirectorySourceQueue::fileDiscoveryFinished() const {
 }
 
 std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
-    ErrorCode &status) {
+    ThreadCtx *callerThreadCtx, ErrorCode &status) {
   std::unique_ptr<ByteSource> source;
   while (true) {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -621,7 +623,7 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
     VLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
             << " size " << source->getSize();
     // try to open the source
-    if (source->open() == OK) {
+    if (source->open(callerThreadCtx) == OK) {
       lock.lock();
       numBlocksDequeued_++;
       return source;

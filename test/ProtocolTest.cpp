@@ -12,10 +12,6 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include <folly/Random.h>
-
-DEFINE_int32(random_seed, folly::randomNumberSeed(), "random seed");
-
 namespace facebook {
 namespace wdt {
 

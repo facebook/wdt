@@ -8,7 +8,8 @@
  */
 #include <wdt/Receiver.h>
 #include <wdt/Sender.h>
-#include <folly/Random.h>
+#include <wdt/test/TestCommon.h>
+
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -60,8 +61,8 @@ TEST(RequestSerializationTest, UrlTests) {
     vector<string> values;
     WdtUri wdtUri;
     for (int i = 0; i < 100; i++) {
-      keys.push_back(to_string(folly::Random::rand32()));
-      values.push_back(to_string(folly::Random::rand32()));
+      keys.push_back(to_string(rand32()));
+      values.push_back(to_string(rand32()));
     }
     for (size_t i = 0; i < keys.size(); i++) {
       wdtUri.setQueryParam(keys[i], values[i]);

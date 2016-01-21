@@ -298,14 +298,14 @@ class ThreadsController {
 
   /// Returns a funnel executor shared between the threads
   /// If the executor does not exist then it creates one
-  std::shared_ptr<Funnel> getFunnel(const uint64_t funnelIndex);
+  std::shared_ptr<Funnel> getFunnel(uint64_t funnelIndex);
 
   /// Returns a barrier shared between the threads
   /// If the executor does not exist then it creates one
-  std::shared_ptr<Barrier> getBarrier(const uint64_t barrierIndex);
+  std::shared_ptr<Barrier> getBarrier(uint64_t barrierIndex);
 
   /// Get the condition variable wrapper
-  std::shared_ptr<ConditionGuard> getCondition(const uint64_t conditionIndex);
+  std::shared_ptr<ConditionGuard> getCondition(uint64_t conditionIndex);
 
   /*
    * Returns back states of all the threads

@@ -185,9 +185,6 @@ class Receiver : public WdtBase {
   /// Marks when a new transfer has started
   std::atomic<bool> hasNewTransferStarted_{false};
 
-  /// Buffer size used by this receiver
-  int64_t bufferSize_;
-
   /// Backlog used by the sockets
   int backlog_;
 };

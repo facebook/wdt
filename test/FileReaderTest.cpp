@@ -9,9 +9,9 @@
 #include <wdt/util/DirectorySourceQueue.h>
 #include <wdt/util/FileByteSource.h>
 #include <wdt/util/WdtFlags.h>
+#include <wdt/test/TestCommon.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <folly/Random.h>
 #include <fstream>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -100,42 +100,16 @@ void testReadSize(int64_t fileSize, ByteSource& byteSource) {
   EXPECT_EQ(totalSizeRead, fileSize);
 }
 
-void testBufferSize(int64_t originalBufferSize, bool alignedBuffer,
-                    ByteSource& byteSource) {
-  auto newBufferSize = originalBufferSize;
-  auto remainder = newBufferSize % kDiskBlockSize;
-  if (canSupportODirect() && alignedBuffer && remainder != 0) {
-    newBufferSize += (kDiskBlockSize - remainder);
-  }
-  if (canSupportODirect() && alignedBuffer) {
-    EXPECT_EQ(byteSource.getBufferSize() % kDiskBlockSize, 0);
-  }
-  EXPECT_EQ(byteSource.getBufferSize(), newBufferSize);
-}
-
-void testFileRead(int64_t fileSize, int64_t bufferSize, bool directReads) {
+void testFileRead(const WdtOptions& options, int64_t fileSize,
+                  bool directReads) {
   RandomFile file(fileSize);
   auto metaData = file.getMetaData();
   metaData->directReads = directReads;
-  FileByteSource byteSource(metaData, metaData->size, 0, bufferSize);
-  ErrorCode code = byteSource.open();
+  ThreadCtx threadCtx(options, true);
+  FileByteSource byteSource(metaData, metaData->size, 0);
+  ErrorCode code = byteSource.open(&threadCtx);
   EXPECT_EQ(code, OK);
-  testBufferSize(bufferSize, directReads && alignedBufferNeeded(), byteSource);
   testReadSize(file.getSize(), byteSource);
-}
-
-// All the tests here have to run any operation on the FileByteSource
-// in a thread because FileByteSource has thread local buffer
-
-TEST(FileByteSource, ODIRECT_NONMULTIPLE) {
-  if (!canSupportODirect()) {
-    LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
-    return;
-  }
-  int64_t fileSize = kDiskBlockSize * 100 + 10;
-  int64_t bufferSize = 511;
-  std::thread t(&testFileRead, fileSize, bufferSize, true);
-  t.join();
 }
 
 TEST(FileByteSource, ODIRECT_NONMULTIPLE_OFFSET) {
@@ -143,58 +117,29 @@ TEST(FileByteSource, ODIRECT_NONMULTIPLE_OFFSET) {
     LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
     return;
   }
+  ThreadCtx threadCtx(WdtOptions::get(), true);
   for (int numTests = 0; numTests < 10; ++numTests) {
-    std::thread t([=]() {
-      int64_t fileSize = kDiskBlockSize + 10;
-      int64_t bufferSize = fileSize * 2;
-      if (numTests % 2 == 0) {
-        int fraction = folly::Random::rand32() % (fileSize / 2);
-        bufferSize = fileSize / fraction;
-      }
-      int64_t offset = folly::Random::rand32() % fileSize;
-      RandomFile file(fileSize);
-      auto metaData = file.getMetaData();
-      metaData->directReads = true;
-      FileByteSource byteSource(metaData, metaData->size, offset, bufferSize);
-      ErrorCode code = byteSource.open();
-      EXPECT_EQ(code, OK);
-      testBufferSize(bufferSize, alignedBufferNeeded(), byteSource);
-      int64_t totalSizeRead = 0;
-      while (true) {
-        int64_t size;
-        char* data = byteSource.read(size);
-        if (size <= 0) {
-          break;
-        }
-        WDT_CHECK(data);
-        totalSizeRead += size;
-      }
-      EXPECT_EQ(totalSizeRead, fileSize - offset);
-    });
-    t.join();
-  }
-}
+    int64_t fileSize = kDiskBlockSize + (rand32() % kDiskBlockSize);
+    int64_t offset = rand32() % fileSize;
 
-TEST(FileByteSource, SMALL_MULTIPLE_ODIRECT) {
-  if (!canSupportODirect()) {
-    LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
-    return;
+    RandomFile file(fileSize);
+    auto metaData = file.getMetaData();
+    metaData->directReads = true;
+    FileByteSource byteSource(metaData, metaData->size, offset);
+    ErrorCode code = byteSource.open(&threadCtx);
+    EXPECT_EQ(code, OK);
+    int64_t totalSizeRead = 0;
+    while (true) {
+      int64_t size;
+      char* data = byteSource.read(size);
+      if (size <= 0) {
+        break;
+      }
+      WDT_CHECK(data);
+      totalSizeRead += size;
+    }
+    EXPECT_EQ(totalSizeRead, fileSize - offset);
   }
-  int64_t fileSize = 512;
-  int64_t bufferSize = 11;
-  std::thread t(&testFileRead, fileSize, bufferSize, true);
-  t.join();
-}
-
-TEST(FileByteSource, SMALL_NONMULTIPLE_ODIRECT) {
-  if (!canSupportODirect()) {
-    LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
-    return;
-  }
-  int64_t fileSize = 1;
-  int64_t bufferSize = 11;
-  std::thread t(&testFileRead, fileSize, bufferSize, true);
-  t.join();
 }
 
 TEST(FileByteSource, FILEINFO_ODIRECT) {
@@ -204,7 +149,8 @@ TEST(FileByteSource, FILEINFO_ODIRECT) {
   RandomFile file(fileSize);
   std::atomic<bool> shouldAbort{false};
   WdtAbortChecker queueAbortChecker(shouldAbort);
-  DirectorySourceQueue Q("/tmp", &queueAbortChecker);
+  WdtOptions options;
+  DirectorySourceQueue Q(options, "/tmp", &queueAbortChecker);
   std::vector<FileInfo> files;
   FileInfo info(file.getShortName(), sizeToRead);
   info.directReads = true;
@@ -212,17 +158,13 @@ TEST(FileByteSource, FILEINFO_ODIRECT) {
   Q.setFileInfo(files);
   Q.buildQueueSynchronously();
   ErrorCode code;
-  std::thread t([&]() {
-    auto byteSource = Q.getNextSource(code);
-    EXPECT_EQ(byteSource->open(), OK);
-    testReadSize(sizeToRead, *byteSource);
-  });
-  t.join();
+  ThreadCtx threadCtx(options, true);
+  auto byteSource = Q.getNextSource(&threadCtx, code);
+  testReadSize(sizeToRead, *byteSource);
 }
 
 TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
-  auto& options = WdtOptions::getMutable();
-  const int64_t originalBufferSize = 255 * 1024;
+  WdtOptions options;
   const int64_t blockSize = options.block_size_mbytes * 1024 * 1024;
   const int64_t fileSize = 5 * blockSize + kDiskBlockSize / 5;
   // 5 blocks long file and reading at least 2 blocks
@@ -235,8 +177,7 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
   }
   std::atomic<bool> shouldAbort{false};
   WdtAbortChecker queueAbortChecker(shouldAbort);
-  DirectorySourceQueue Q("/tmp", &queueAbortChecker);
-  Q.setFileSourceBufferSize(originalBufferSize);
+  DirectorySourceQueue Q(options, "/tmp", &queueAbortChecker);
   std::vector<FileInfo> files;
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);
@@ -246,74 +187,21 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
   Q.setFileInfo(files);
   Q.buildQueueSynchronously();
   ErrorCode code;
-  std::thread t([&]() {
-    int fileNumber = 0;
-    while (true) {
-      auto byteSource = Q.getNextSource(code);
-      if (!byteSource) {
-        break;
-      }
-      EXPECT_EQ(byteSource->open(), OK);
-      testBufferSize(originalBufferSize,
-                     files[fileNumber].directReads && alignedBufferNeeded(),
-                     *byteSource);
-      testReadSize(sizeToRead, *byteSource);
-      ++fileNumber;
+  int fileNumber = 0;
+  ThreadCtx threadCtx(options, true);
+  while (true) {
+    auto byteSource = Q.getNextSource(&threadCtx, code);
+    if (!byteSource) {
+      break;
     }
-    EXPECT_EQ(fileNumber, numFiles);
-  });
-  t.join();
-}
-
-TEST(FileByteSource, MIXED_FILES) {
-  auto& options = WdtOptions::getMutable();
-  int64_t originalBufferSize = 255 * 1024;
-  options.buffer_size = originalBufferSize;
-  int64_t blockSize = options.block_size_mbytes * 1024 * 1024;
-  int64_t fileSize = 5 * blockSize + kDiskBlockSize / 5;
-  // 5 blocks long file and reading at least 2 blocks
-  int64_t sizeToRead = blockSize;
-  std::vector<RandomFile> randFiles;
-  const int64_t numFiles = 3;
-  randFiles.reserve(numFiles);
-  for (int i = 0; i < numFiles; i++) {
-    randFiles.emplace_back(fileSize);
+    testReadSize(sizeToRead, *byteSource);
+    ++fileNumber;
   }
-  int fileNum = 0;
-  std::vector<FileInfo> filesInfo;
-  for (const auto& f : randFiles) {
-    FileInfo info(f.getShortName(), sizeToRead);
-    if (canSupportODirect() && fileNum % 2 != 0) {
-      info.directReads = true;
-    }
-    fileNum++;
-    filesInfo.push_back(info);
-  }
-  for (int i = 0; i < numFiles; i++) {
-    auto metaData = randFiles[i].getMetaData();
-    metaData->directReads = filesInfo[i].directReads;
-    ByteSource* byteSource = new FileByteSource(metaData, filesInfo[i].fileSize,
-                                                0, originalBufferSize);
-    EXPECT_EQ(byteSource->open(), OK);
-    if (!alignedBufferNeeded() || i == 0) {
-      // First file is regular
-      EXPECT_EQ(byteSource->getBufferSize(), originalBufferSize);
-    } else {
-      EXPECT_EQ(byteSource->getBufferSize() % kDiskBlockSize, 0);
-    }
-    delete byteSource;
-  }
-}
-
-TEST(FileByteSource, REGULAR_READ) {
-  int64_t fileSize = kDiskBlockSize * 10 + 10;
-  int64_t bufferSize = 11;
-  std::thread t(&testFileRead, fileSize, bufferSize, false);
-  t.join();
+  EXPECT_EQ(fileNumber, numFiles);
 }
 
 TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
-  const auto& options = WdtOptions::get();
+  WdtOptions options;
   int64_t blockSize = options.block_size_mbytes * 1024 * 1024;
   int64_t fileSize = 5 * blockSize + kDiskBlockSize / 5;
   // 5 blocks long file and reading at least 2 blocks
@@ -326,9 +214,7 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
   }
   std::atomic<bool> shouldAbort{false};
   WdtAbortChecker queueAbortChecker(shouldAbort);
-  const int64_t bufferSize = options.buffer_size;
-  DirectorySourceQueue Q("/tmp", &queueAbortChecker);
-  Q.setFileSourceBufferSize(bufferSize);
+  DirectorySourceQueue Q(options, "/tmp", &queueAbortChecker);
   std::vector<FileInfo> files;
   for (const auto& f : randFiles) {
     FileInfo info(f.getShortName(), sizeToRead);
@@ -337,18 +223,14 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
   Q.setFileInfo(files);
   Q.buildQueueSynchronously();
   ErrorCode code;
-  std::thread t([&]() {
-    while (true) {
-      auto byteSource = Q.getNextSource(code);
-      if (!byteSource) {
-        break;
-      }
-      EXPECT_EQ(byteSource->open(), OK);
-      EXPECT_EQ(byteSource->getBufferSize(), bufferSize);
-      testReadSize(sizeToRead, *byteSource);
+  ThreadCtx threadCtx(options, true);
+  while (true) {
+    auto byteSource = Q.getNextSource(&threadCtx, code);
+    if (!byteSource) {
+      break;
     }
-  });
-  t.join();
+    testReadSize(sizeToRead, *byteSource);
+  }
 }
 }
 }  // namespaces

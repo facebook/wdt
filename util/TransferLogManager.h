@@ -9,6 +9,7 @@
 #pragma once
 
 #include <wdt/Protocol.h>
+#include <wdt/WdtOptions.h>
 
 #include <string>
 #include <set>
@@ -121,6 +122,9 @@ class TransferLogManager {
   /// 2 bytes for entry size, 1 byte for entry-type, PATH_MAX for file-name, 10
   /// bytes for seq-id, 10 bytes for file-size, 10 bytes for timestamp
   static const int64_t kMaxEntryLength = 2 + 1 + 10 + PATH_MAX + 2 * 10;
+
+  explicit TransferLogManager(const WdtOptions &options) : options_(options) {
+  }
 
   /**
    * Opens the log for reading and writing. In case of log based
@@ -271,6 +275,8 @@ class TransferLogManager {
 
   LogEncoderDecoder encoderDecoder_;
 
+  const WdtOptions &options_;
+
   /// File handler for writing
   int fd_{-1};
   /// root directory
@@ -301,8 +307,9 @@ class TransferLogManager {
 /// class responsible for parsing and fixing transfer log
 class LogParser {
  public:
-  LogParser(LogEncoderDecoder &encoderDecoder, const std::string &rootDir,
-            const std::string &recoveryId, int64_t config, bool parseOnly);
+  LogParser(const WdtOptions &options, LogEncoderDecoder &encoderDecoder,
+            const std::string &rootDir, const std::string &recoveryId,
+            int64_t config, bool parseOnly);
 
   ErrorCode parseLog(int fd, std::string &senderIp,
                      std::vector<FileChunksInfo> &fileChunksInfo);
@@ -341,6 +348,7 @@ class LogParser {
 
   ErrorCode processDirectoryInvalidationEntry(char *buf, int size);
 
+  const WdtOptions &options_;
   LogEncoderDecoder &encoderDecoder_;
   std::string rootDir_;
   std::string recoveryId_;

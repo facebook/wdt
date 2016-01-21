@@ -113,7 +113,7 @@ void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
   bytesTokenBucketLimit_ = bytesTokenBucketLimit;
 }
 
-void Throttler::limit(double deltaProgress) {
+void Throttler::limit(ThreadCtx& threadCtx, double deltaProgress) {
   // now should be before taking the lock
   std::chrono::time_point<Clock> now = Clock::now();
   double sleepTimeSeconds = calculateSleep(deltaProgress, now);
@@ -122,10 +122,9 @@ void Throttler::limit(double deltaProgress) {
   }
   if (sleepTimeSeconds > 0) {
     /* sleep override */
-    START_PERF_TIMER
+    PerfStatCollector statCollector(threadCtx, PerfStatReport::THROTTLER_SLEEP);
     std::this_thread::sleep_for(
         std::chrono::duration<double>(sleepTimeSeconds));
-    RECORD_PERF_RESULT(PerfStatReport::THROTTLER_SLEEP)
   }
 }
 

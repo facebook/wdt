@@ -7,10 +7,10 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/util/ThreadsController.h>
+#include <wdt/test/TestCommon.h>
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <folly/Random.h>
 #include <chrono>
 #include <vector>
 #include <thread>
@@ -68,7 +68,7 @@ TEST(ThreadsController, Barrier) {
     for (int i = 0; i < numThreads; i++) {
       threadUtil.addThread([&barrier, &threadUtil, i]() {
         if (i % 2 == 0) {
-          int seconds = folly::Random::rand32() % 5;
+          int seconds = rand32() % 5;
           threadUtil.threadSleep(seconds * 100);
           barrier.deRegister();
           return;

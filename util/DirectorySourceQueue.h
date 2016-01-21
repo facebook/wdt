@@ -19,8 +19,6 @@
 #include <utility>
 #include <unordered_map>
 
-#include <wdt/AbortChecker.h>
-#include <wdt/WdtOptions.h>
 #include <wdt/Protocol.h>
 #include <wdt/WdtTransferRequest.h>
 #include <wdt/SourceQueue.h>
@@ -44,10 +42,11 @@ class DirectorySourceQueue : public SourceQueue {
    * Call buildQueueSynchronously() or buildQueueAsynchronously() separately
    * to actually recurse over the root directory gather files and sizes.
    *
+   * @param options               options to use
    * @param rootDir               root directory to recurse on
    * @param abortChecker          abort checker
    */
-  DirectorySourceQueue(const std::string &rootDir,
+  DirectorySourceQueue(const WdtOptions &options, const std::string &rootDir,
                        IAbortChecker const *abortChecker);
 
   /**
@@ -81,11 +80,13 @@ class DirectorySourceQueue : public SourceQueue {
   bool fileDiscoveryFinished() const;
 
   /**
-   * @param status  this variable is set to the status of the transfer
+   * @param callerThreadCtx context of the calling thread
+   * @param status          this variable is set to the status of the transfer
    *
    * @return next FileByteSource to consume or nullptr when finished
    */
-  virtual std::unique_ptr<ByteSource> getNextSource(ErrorCode &status) override;
+  virtual std::unique_ptr<ByteSource> getNextSource(ThreadCtx *callerThreadCtx,
+                                                    ErrorCode &status) override;
 
   /// @return         total number of files processed/enqueued
   virtual int64_t getCount() const override;
@@ -95,6 +96,9 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// @return         total number of blocks and status of the transfer
   std::pair<int64_t, ErrorCode> getNumBlocksAndStatus() const;
+
+  /// @return         perf report
+  const PerfStatReport &getPerfReport() const;
 
   /**
    * Sets regex representing files to include for transfer
@@ -116,13 +120,6 @@ class DirectorySourceQueue : public SourceQueue {
    * @param pruneDirPattern         directory exclusion regex
    */
   void setPruneDirPattern(const std::string &pruneDirPattern);
-
-  /**
-   * Sets buffer size to use during creating individual FileByteSource object
-   *
-   * @param fileSourceBufferSize  buffers size
-   */
-  void setFileSourceBufferSize(int64_t fileSourceBufferSize);
 
   /**
    * Sets the number of consumer threads for this queue. used as threshold
@@ -160,7 +157,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param followSymlinks        whether to follow symlink or not
    */
-  void setFollowSymlinks(const bool followSymlinks);
+  void setFollowSymlinks(bool followSymlinks);
 
   /**
    * sets chunks which were sent in some previous transfer
@@ -267,6 +264,8 @@ class DirectorySourceQueue : public SourceQueue {
   /// Removes all elements from the source queue
   void clearSourceQueue();
 
+  std::unique_ptr<ThreadCtx> threadCtx_{nullptr};
+
   /// root directory to recurse on if fileInfo_ is empty
   std::string rootDir_;
 
@@ -281,14 +280,6 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// Block size in mb
   int64_t blockSizeMbytes_{0};
-
-  /**
-   * buffer size to use when creating individual FileByteSource objects
-   * (returned by getNextSource). This is set by sender from
-   * WdtOptions::buffer_size using setFileSourceBufferSize. The default value
-   * is just for unit tests.
-   */
-  int64_t fileSourceBufferSize_{16384};
 
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<FileInfo> fileInfo_;
@@ -370,8 +361,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// Stores the time difference between the start and the end of the
   /// traversal of directory
   double directoryTime_{0};
-  /// abort checker
-  IAbortChecker const *abortChecker_;
+
   /**
    * Count and trigger of files to open (negative is keep opening until we run
    * out of fd, positiveis how many files we can still open, 0 is stop opening

@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include <wdt/Reporting.h>
+#include <wdt/util/CommonImpl.h>
 #include <wdt/Protocol.h>
 
 #include <string>
@@ -63,9 +63,6 @@ class ByteSource {
   /// @return number of bytes in this source
   virtual int64_t getSize() const = 0;
 
-  /// @return size of buffer
-  virtual int64_t getBufferSize() const = 0;
-
   /// @return offset from which to start reading
   virtual int64_t getOffset() const = 0;
 
@@ -97,8 +94,14 @@ class ByteSource {
   /// Advances ByteSource offset by numBytes
   virtual void advanceOffset(int64_t numBytes) = 0;
 
-  /// open the source for reading
-  virtual ErrorCode open() = 0;
+  /**
+   * open the source for reading
+   *
+   * @param threadCtx    context of the calling thread
+   *
+   * @return      error code
+   */
+  virtual ErrorCode open(ThreadCtx *threadCtx) = 0;
 
   /// close the source for reading
   virtual void close() = 0;

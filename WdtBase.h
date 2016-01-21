@@ -53,7 +53,7 @@ class WdtBase {
   /// get aborted after this method has been called based on
   /// whether they are doing read/write on the socket and the timeout for the
   /// socket. Push mode for abort.
-  void abort(const ErrorCode abortCode);
+  void abort(ErrorCode abortCode);
 
   /// clears abort flag
   void clearAbort();
@@ -136,6 +136,9 @@ class WdtBase {
 
   /// @return current transfer status
   TransferStatus getTransferStatus();
+
+  /// corrects buffer size if necessary
+  void checkAndUpdateBufferSize();
 
   /// @param transferStatus   current transfer status
   void setTransferStatus(TransferStatus transferStatus);

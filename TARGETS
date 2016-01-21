@@ -81,7 +81,7 @@ cpp_unittest(
   name = 'filereader_test',
   srcs = [ 'test/FileReaderTest.cpp', ],
   deps = [
-      ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -91,7 +91,7 @@ cpp_unittest(
   name = 'threadscontroller_test',
   srcs = [ 'test/ThreadsControllerTest.cpp', ],
   deps = [
-      ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -109,7 +109,7 @@ cpp_unittest(
   name = 'wdt_url_test',
   srcs = [ 'test/WdtUrlTest.cpp', ],
   deps = [
-      ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -493,7 +493,6 @@ cpp_library (
     "util/DirectorySourceQueue.cpp",
     "util/EncryptionUtils.cpp",
     "util/FileCreator.cpp",
-    "util/SocketUtils.cpp",
     "WdtThread.cpp",
     "util/ThreadsController.cpp",
     "util/ThreadTransferHistory.cpp",
@@ -511,6 +510,7 @@ cpp_library (
     "util/TransferLogManager.cpp",
     "WdtBase.cpp",
     "WdtResourceController.cpp",
+    "util/CommonImpl.cpp",
   ],
   compiler_flags = wdt_compiler_flags,
   deps = [
@@ -548,6 +548,18 @@ cpp_library (
   output_subdir = 'short_flags',
 )
 
+cpp_library (
+  name = "wdtlib4tests",
+  srcs = [
+      "test/TestCommon.cpp"
+  ],
+  deps = [
+    ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+
 cpp_binary(
     name= "wdt",
     srcs = [
@@ -569,10 +581,7 @@ cpp_binary(
       "wdtCmdLine.cpp",
     ],
     deps = [
-      ":wdtlib_short_flags",
-    ],
-    preprocessor_flags = [
-      "-DSTANDALONE_APP"
+      ":wdtlib4tests",
     ],
     output_subdir = 'test',
     compiler_flags = wdt_compiler_flags,

@@ -288,12 +288,6 @@ class ReceiverThread : public WdtThread {
    */
   std::unique_ptr<ServerSocket> socket_{nullptr};
 
-  /// Buffer that receives reads data into from the network
-  char *buf_{nullptr};
-
-  /// Size of the buffer
-  const int64_t bufferSize_;
-
   /// Marks the number of bytes already read in the buffer
   int64_t numRead_{0};
 

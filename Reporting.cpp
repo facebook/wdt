@@ -8,6 +8,7 @@
  */
 #include <wdt/Reporting.h>
 #include <wdt/WdtOptions.h>
+#include <wdt/Protocol.h>
 #include <folly/String.h>
 
 #include <iostream>
@@ -311,19 +312,16 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
             << currentThroughput << " Mbytes/s";
 }
 
-folly::ThreadLocal<PerfStatReport> wdt__perfStatReportThreadLocal;
-
 const std::string PerfStatReport::statTypeDescription_[] = {
     "Socket Read", "Socket Write", "File Open", "File Close", "File Read",
     "File Write", "Sync File Range", "fsync", "File Seek", "Throttler Sleep",
     "Receiver Wait Sleep", "Directory creation", "Ioctl"};
 
-PerfStatReport::PerfStatReport() {
+PerfStatReport::PerfStatReport(const WdtOptions& options) {
   static_assert(
       sizeof(statTypeDescription_) / sizeof(statTypeDescription_[0]) ==
           PerfStatReport::END,
       "Mismatch between number of stat types and number of descriptions");
-  const auto& options = WdtOptions::get();
   networkTimeoutMillis_ =
       std::min<int>(options.read_timeout_millis, options.write_timeout_millis);
 }
@@ -382,7 +380,6 @@ PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
 }
 
 std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
-  const auto& options = WdtOptions::get();
   os << "\n***** PERF STATS *****\n";
   for (int i = 0; i < PerfStatReport::kNumTypes_; i++) {
     if (statReport.count_[i] == 0) {
@@ -390,16 +387,14 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
     }
     double max = statReport.maxValueMicros_[i] / kMicroToMilli;
     double min = statReport.minValueMicros_[i] / kMicroToMilli;
-    double sumPerThread =
-        (statReport.sumMicros_[i] / kMicroToMilli / options.num_ports);
+    double sum = (statReport.sumMicros_[i] / kMicroToMilli);
     double avg = (((double)statReport.sumMicros_[i]) / statReport.count_[i] /
                   kMicroToMilli);
 
     os << std::fixed << std::setprecision(2);
     os << statReport.statTypeDescription_[i] << " : ";
-    os << "Ncalls " << statReport.count_[i] << " Stats in ms : SumPerThread "
-       << sumPerThread << " Min " << min << " Max " << max << " Avg " << avg
-       << " ";
+    os << "Ncalls " << statReport.count_[i] << " Stats in ms : sum " << sum
+       << " Min " << min << " Max " << max << " Avg " << avg << " ";
 
     // One extra bucket for values extending beyond last bucket
     int numBuckets = 1 +

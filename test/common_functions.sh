@@ -228,6 +228,14 @@ verifyTransferAndCleanup() {
     echo "Found md5sum as $MD5SUM"
   fi
 
+  stat $DIR/dst${TEST_COUNT}/.wdt.log
+  if [ $? -eq 0 ]; then
+    # transfer log present, verify for correctness
+    echo "Verifying transfer log in $DIR/dst${TEST_COUNT}"
+    $WDT_RECEIVER -directory $DIR/dst${TEST_COUNT} -parse_transfer_log
+    checkLastCmdStatus
+  fi
+
   if [ ! -f "$DIR/src.md5s" ]; then
     (cd "$DIR/src" ; ( find . -type f -print0 | xargs -0 "$MD5SUM" | sort ) \
       > ../src.md5s )

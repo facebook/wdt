@@ -50,11 +50,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "_bin/wdt")
 
 # Check that we have the Folly source tree
 set(FOLLY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../folly" CACHE path
-    "Folly source tree (folly/ThreadLocal.h should be reachable from there")
+    "Folly source tree (folly/Conv.h should be reachable from there")
 # Check for folly - TODO: this doesn't work well for relative paths
 # (because of relative to build dir vs relative to source tree for -I)
-if(NOT EXISTS "${FOLLY_SOURCE_DIR}/folly/ThreadLocal.h")
-  MESSAGE(FATAL_ERROR "${FOLLY_SOURCE_DIR}/folly/ThreadLocal.h not found
+if(NOT EXISTS "${FOLLY_SOURCE_DIR}/folly/Conv.h")
+  MESSAGE(FATAL_ERROR "${FOLLY_SOURCE_DIR}/folly/Conv.h not found
 Fix using:
 (in a sister directory of the wdt source tree - same level:)
 git clone https://github.com/facebook/folly.git
@@ -68,7 +68,6 @@ set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Checksum.cpp"
-"${FOLLY_SOURCE_DIR}/folly/detail/ThreadLocalDetail.cpp"
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
@@ -91,7 +90,6 @@ util/ThreadTransferHistory.cpp
 SenderThread.cpp
 Sender.cpp
 util/ServerSocket.cpp
-util/SocketUtils.cpp
 Throttler.cpp
 WdtOptions.cpp
 util/FileWriter.cpp
@@ -99,6 +97,7 @@ util/TransferLogManager.cpp
 util/SerializationUtil.cpp
 WdtBase.cpp
 WdtResourceController.cpp
+util/CommonImpl.cpp
 )
 add_library(wdtlib
 util/WdtFlags.cpp
@@ -225,8 +224,7 @@ if (BUILD_TESTING)
 
   # Extra code that we use in tests
   add_library(wdt4tests_min
-    "${FOLLY_SOURCE_DIR}/folly/FileUtil.cpp" # used by Random used by tests
-    "${FOLLY_SOURCE_DIR}/folly/Random.cpp" # used indirectly by tests
+    test/TestCommon.cpp
   )
 
   include(ExternalProject)

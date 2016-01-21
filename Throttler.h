@@ -7,7 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include <wdt/Reporting.h>
+#include <wdt/util/CommonImpl.h>
 #include <folly/Synchronized.h>
 #include <thread>
 #include <glog/logging.h>
@@ -67,7 +67,7 @@ class Throttler {
    * time thread has to sleep and makes it sleep.
    * Also calls the throttler logger to log the stats
    */
-  virtual void limit(double deltaProgress);
+  virtual void limit(ThreadCtx& threadCtx, double deltaProgress);
 
   /**
    * This is thread safe implementation of token bucket

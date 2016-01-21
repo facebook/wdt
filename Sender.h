@@ -107,7 +107,7 @@ class Sender : public WdtBase {
 
   /// Sets whether to follow symlink or not
   /// @param followSymlinks   whether to follow symlinks or not
-  void setFollowSymlinks(const bool followSymlinks);
+  void setFollowSymlinks(bool followSymlinks);
 
   /// Get the destination sender is sending to
   /// @return     destination host-name
@@ -128,17 +128,23 @@ class Sender : public WdtBase {
   /// @return    minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
 
-  typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
-      const std::string &dest, const int port,
-      IAbortChecker const *abortChecker,
-      const EncryptionParams &encryptionParams);
+  /// Interface to make socket
+  class ISocketCreator {
+   public:
+    virtual std::unique_ptr<ClientSocket> makeSocket(
+        ThreadCtx &threadCtx, const std::string &dest, const int port,
+        const EncryptionParams &encryptionParams) = 0;
+
+    virtual ~ISocketCreator() {
+    }
+  };
 
   /**
    * Sets socket creator
    *
    * @param socketCreator   socket-creator to be used
    */
-  void setSocketCreator(const SocketCreator socketCreator);
+  void setSocketCreator(ISocketCreator *socketCreator);
 
  private:
   friend class SenderThread;
@@ -213,7 +219,7 @@ class Sender : public WdtBase {
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
   /// Socket creator used to optionally create different kinds of client socket
-  SocketCreator socketCreator_{nullptr};
+  ISocketCreator *socketCreator_{nullptr};
   /// Whether download resumption is enabled or not
   bool downloadResumptionEnabled_{false};
   /// Flags representing whether file chunks have been received or not

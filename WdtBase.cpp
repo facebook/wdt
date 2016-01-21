@@ -101,6 +101,25 @@ std::string WdtBase::getTransferId() {
   return transferRequest_.transferId;
 }
 
+void WdtBase::checkAndUpdateBufferSize() {
+  int64_t bufSize = options_.buffer_size;
+  if (bufSize < Protocol::kMaxHeader) {
+    bufSize = Protocol::kMaxHeader;
+    LOG(WARNING) << "Specified buffer size " << options_.buffer_size
+                 << " less than " << Protocol::kMaxHeader << ", using "
+                 << bufSize;
+  }
+  if (bufSize % kDiskBlockSize != 0) {
+    int64_t alignedBufSize =
+        ((bufSize + kDiskBlockSize - 1) / kDiskBlockSize) * kDiskBlockSize;
+    LOG(WARNING) << "Buffer size " << bufSize
+                 << " not divisible by disk block size " << kDiskBlockSize
+                 << ", changing it to " << alignedBufSize;
+    bufSize = alignedBufSize;
+  }
+  options_.buffer_size = bufSize;
+}
+
 WdtBase::TransferStatus WdtBase::getTransferStatus() {
   std::lock_guard<std::mutex> lock(mutex_);
   return transferStatus_;
@@ -140,8 +159,7 @@ bool WdtBase::isStale() {
 void WdtBase::configureThrottler() {
   WDT_CHECK(!throttler_);
   VLOG(1) << "Configuring throttler options";
-  const auto& options = WdtOptions::get();
-  throttler_ = Throttler::makeThrottler(options);
+  throttler_ = Throttler::makeThrottler(options_);
   if (throttler_) {
     LOG(INFO) << "Enabling throttling " << *throttler_;
   } else {
