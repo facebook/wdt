@@ -11,7 +11,7 @@ proc version_update {} {
     set basedir [find_base_dir]
     cd [file join $basedir ".."]
     # that script expects to be run from wdt/
-    source [file join build/version_update.tcl]
+    source build/version_update.tcl
 }
 
 
@@ -23,16 +23,16 @@ wdt version bump auto commit
 Test Plan:
 n/a
 
-Reviewers: ldemailly
+Reviewers: svcscm
 
-Reviewed by: ldemailly
+Reviewed by: svcscm
 }
-    puts [exec hg commit -m $commit_msg]
+    puts [exec hg commit -u svcscm@fb.com -m $commit_msg]
     puts "*** Committed"
 }
 
 proc auto_land {} {
-    puts [exec echo y | arc land --ninja]
+    puts [exec hg push --to master -r . --pushvars "BYPASS_REVIEW=true"]
     puts "*** Landed, going back to master:"
     puts [exec hg update master]
 }

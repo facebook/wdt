@@ -45,6 +45,13 @@ git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$CDIR -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on .. && make -j 16 && make install)
 svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 ( cd glog && ./configure --with-gflags=$CDIR --prefix=$CDIR && make -j 16 && make install )
+OPENSSL_VERSION=openssl-1.0.1q
+wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
+tar xfz $OPENSSL_VERSION.tar.gz
+( cd $OPENSSL_VERSION ; ./config --prefix=$CDIR threads shared; make ; make install )
+$CDIR/bin/openssl version
+ldd $CDIR/bin/openssl
+export OPENSSL_ROOT_DIR=$CDIR
 
 mkdir cmake_wdt_build
 cd cmake_wdt_build
