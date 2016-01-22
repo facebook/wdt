@@ -28,6 +28,9 @@ class ClientSocket : public WdtSocket {
   virtual ~ClientSocket();
 
  protected:
+  /// sets the send buffer size for this socket
+  void setSendBufferSize();
+
   const std::string dest_;
   std::string peerIp_;
   struct addrinfo sa_;

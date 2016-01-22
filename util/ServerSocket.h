@@ -46,6 +46,9 @@ class ServerSocket : public WdtSocket {
   void closeAllNoCheck();
 
  private:
+  /// sets the receive buffer size for this socket
+  void setReceiveBufferSize(int fd);
+
   const int backlog_;
   std::vector<int> listeningFds_;
   /// index of the poll-fd last checked. This is used to not try the same fd

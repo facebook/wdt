@@ -56,6 +56,7 @@ int ServerSocket::listenInternal(struct addrinfo *info,
     PLOG(WARNING) << "Error making server socket " << host << " " << port_;
     return -1;
   }
+  setReceiveBufferSize(listeningFd);
   int optval = 1;
   if (setsockopt(listeningFd, SOL_SOCKET, SO_REUSEADDR, &optval,
                  sizeof(optval)) != 0) {
@@ -263,6 +264,21 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
   }
   LOG(ERROR) << "None of the listening fds got a POLLIN event " << port_;
   return CONN_ERROR;
+}
+
+void ServerSocket::setReceiveBufferSize(int fd) {
+  int bufSize = threadCtx_.getOptions().receive_buffer_size;
+  if (bufSize <= 0) {
+    return;
+  }
+  int status =
+      ::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bufSize, sizeof(bufSize));
+  if (status != 0) {
+    PLOG(ERROR) << "Failed to set receive buffer " << port_ << " size "
+                << bufSize << " fd " << fd;
+    return;
+  }
+  VLOG(1) << "Receive buffer size set to " << bufSize << " port " << port_;
 }
 
 std::string ServerSocket::getPeerIp() const {

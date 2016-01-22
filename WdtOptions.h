@@ -318,6 +318,16 @@ class WdtOptions {
   std::string encryption_type{encryptionTypeToStr(ENC_AES128_GCM)};
 
   /**
+   * send buffer size for Sender. If < = 0, buffer size is not set
+   */
+  int send_buffer_size{0};
+
+  /**
+   * receive buffer size for Receiver. If < = 0, buffer size is not set
+   */
+  int receive_buffer_size{0};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;

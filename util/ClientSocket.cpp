@@ -65,6 +65,8 @@ ErrorCode ClientSocket::connect() {
     }
     VLOG(1) << "new socket " << fd_ << " for port " << port_;
 
+    setSendBufferSize();
+
     // make the socket non blocking
     int sockArg = fcntl(fd_, F_GETFL, nullptr);
     sockArg |= O_NONBLOCK;
@@ -172,6 +174,21 @@ const std::string &ClientSocket::getPeerIp() const {
 
 std::string ClientSocket::computeCurEncryptionTag() {
   return encryptor_.computeCurrentTag();
+}
+
+void ClientSocket::setSendBufferSize() {
+  int bufSize = threadCtx_.getOptions().send_buffer_size;
+  if (bufSize <= 0) {
+    return;
+  }
+  int status =
+      ::setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &bufSize, sizeof(bufSize));
+  if (status != 0) {
+    PLOG(ERROR) << "Failed to set send buffer " << port_ << " size " << bufSize
+                << " fd " << fd_;
+    return;
+  }
+  VLOG(1) << "Send buffer size set to " << bufSize << " port " << port_;
 }
 
 ClientSocket::~ClientSocket() {
