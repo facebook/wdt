@@ -679,7 +679,9 @@ ErrorCode SenderThread::readAndVerifySpuriousCheckpoint() {
 
 SenderState SenderThread::processDoneCmd() {
   VLOG(1) << *this << " entered PROCESS_DONE_CMD state";
+  // DONE cmd implies that all the blocks sent till now is acked
   ThreadTransferHistory &transferHistory = getTransferHistory();
+  transferHistory.markAllAcknowledged();
 
   // send ack for DONE
   buf_[0] = Protocol::DONE_CMD;
@@ -693,19 +695,24 @@ SenderState SenderThread::processDoneCmd() {
     threadStats_.setLocalErrorCode(retCode);
     return CONNECT;
   }
-  transferHistory.markAllAcknowledged();
   VLOG(1) << "done with transfer, port " << port_;
   return END;
 }
 
 SenderState SenderThread::processWaitCmd() {
   LOG(INFO) << *this << " entered PROCESS_WAIT_CMD state ";
+  // similar to DONE, WAIT also verifies all the blocks
+  ThreadTransferHistory &transferHistory = getTransferHistory();
+  transferHistory.markAllAcknowledged();
   VLOG(1) << "received WAIT_CMD, port " << port_;
   return READ_RECEIVER_CMD;
 }
 
 SenderState SenderThread::processErrCmd() {
   LOG(INFO) << *this << " entered PROCESS_ERR_CMD state";
+  // similar to DONE, global checkpoint cmd also verifies all the blocks
+  ThreadTransferHistory &transferHistory = getTransferHistory();
+  transferHistory.markAllAcknowledged();
   int64_t toRead = sizeof(int16_t);
   int64_t numRead = socket_->read(buf_, toRead);
   if (numRead != toRead) {

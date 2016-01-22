@@ -907,10 +907,6 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
                   << entrySize;
       return INVALID_LOG;
     }
-    if (numRead == 0) {
-      VLOG(1) << "got EOF, entrySize " << entrySize;
-      break;
-    }
     if (numRead != entrySize) {
       // extra bytes also includes the size entry
       int64_t extraBytes = numRead + sizeof(int16_t);
