@@ -71,7 +71,7 @@ set (FOLLY_CPP_SRC
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
-add_library(wdtlib_min
+add_library(wdt_min
 util/WdtSocket.cpp
 util/ClientSocket.cpp
 util/EncryptionUtils.cpp
@@ -99,11 +99,11 @@ WdtBase.cpp
 WdtResourceController.cpp
 util/CommonImpl.cpp
 )
-add_library(wdtlib
+add_library(wdt
 util/WdtFlags.cpp
 Wdt.cpp
 )
-target_link_libraries(wdtlib wdtlib_min)
+target_link_libraries(wdt wdt_min)
 
 
 
@@ -126,7 +126,7 @@ find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
 # You can also add jemalloc to the list if you have it/want it
-target_link_libraries(wdtlib_min
+target_link_libraries(wdt_min
   folly4wdt
   ${GLOG_LIBRARY}
   ${GFLAGS_LIBRARY}
@@ -200,23 +200,38 @@ include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-add_executable(wdt wdtCmdLine.cpp util/WdtFlags.cpp Wdt.cpp)
-set_target_properties(wdt PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
+add_executable(wdtbin wdtCmdLine.cpp util/WdtFlags.cpp Wdt.cpp)
+set_target_properties(wdtbin PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
 
-target_link_libraries(wdt wdtlib_min)
+target_link_libraries(wdtbin wdt_min)
 
 ### Install rules
-
-install(TARGETS wdt wdtlib wdtlib_min folly4wdt
+set_target_properties(wdtbin PROPERTIES RUNTIME_OUTPUT_NAME "wdt")
+install(TARGETS wdtbin wdt wdt_min folly4wdt
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   )
+
+### Install header files
+
+# Find the . files in the root directory
+
+file(GLOB headers "*.h")
+foreach(header ${headers})
+  install(FILES ${header} DESTINATION include/wdt)
+endforeach()
+
+# Install the .h files in the util with directory structure maintained
+
+install(DIRECTORY "${PROJECT_SOURCE_DIR}/util" DESTINATION include/wdt
+        FILES_MATCHING PATTERN "*.h")
+
 # wcp script
 install(PROGRAMS test/wcp.sh DESTINATION bin RENAME wcp)
 
 
-### Everything below is about testing (and not required to create wdt/wdtlib)
+### Everything below is about testing (and not required to create wdt/wdt)
 
 if (BUILD_TESTING)
 
@@ -260,7 +275,7 @@ if (BUILD_TESTING)
 # so ugly weird hack generating warnings about unknown dir for now:
   target_link_libraries(wdt4tests_min
     "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
-    wdtlib_min
+    wdt_min
   )
 
   add_library(wdt4tests
