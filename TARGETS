@@ -287,7 +287,9 @@ custom_unittest(
 custom_unittest(
   name = 'wdt_network_script_open_during_disc',
   command = [
-      "wdt/test/wdt_network_test.sh", "-x", "--open_files_during_discovery 750",
+      "/bin/env",
+      "EXTRA_WDT_OPTIONS=\"-open_files_during_discovery=750\"",
+      "wdt/test/wdt_network_test.sh",
       "-p", "25800",
   ],
   type = 'simple',

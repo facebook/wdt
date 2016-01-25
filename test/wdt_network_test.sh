@@ -37,16 +37,13 @@ SENDER_PROTOCOL_VERSION=0
 RECEIVER_PROTOCOL_VERSION=0
 STARTING_PORT=24000
 
-EXTRA_OPTIONS=""
-while getopts "x:s:p:r:h" opt; do
+while getopts ":s:p:r:h" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
     r) RECEIVER_PROTOCOL_VERSION="$OPTARG"
     ;;
     p) STARTING_PORT="$OPTARG"
-    ;;
-    x) EXTRA_OPTIONS="$OPTARG"
     ;;
     h) echo "$usage"
        exit 0
@@ -85,7 +82,7 @@ WDTBIN_OPTS="-enable_perf_stat_collection -ipv6 -start_port=$STARTING_PORT \
 -full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
 -progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
 -treat_fewer_port_as_error -exit_on_bad_flags=false \
--connect_timeout_millis 100 -transfer_id $$ -num_ports=$threads $EXTRA_OPTIONS"
+-connect_timeout_millis 100 -transfer_id $$ -num_ports=$threads"
 extendWdtOptions
 WDTBIN_SERVER="$WDT_RECEIVER $WDTBIN_OPTS \
   -protocol_version=$RECEIVER_PROTOCOL_VERSION"

@@ -287,6 +287,7 @@ signalHandler() {
 }
 
 extendWdtOptions() {
+  WDTBIN_OPTS+=" $EXTRA_WDT_OPTIONS"
   WDTBIN_OPTS+=" $EXTRA_ENCRYPTION_CMD"
   if [ ! -z "$ENCRYPTION_TYPE" ]; then
     echo "encryption_type $ENCRYPTION_TYPE"
