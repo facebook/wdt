@@ -137,6 +137,13 @@ class DirectorySourceQueue : public SourceQueue {
   void setOpenFilesDuringDiscovery(int64_t openFilesDuringDiscovery) {
     openFilesDuringDiscovery_ = openFilesDuringDiscovery;
   }
+  /**
+   * If setOpenFilesDuringDiscovery is not zero, open files using direct
+   * mode.
+   */
+  void setDirectReads(bool directReads) {
+    directReads_ = directReads;
+  }
 
   /**
    * Stat the FileInfo input files (if their size aren't already specified) and
@@ -144,13 +151,13 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param fileInfo              files to transferred
    */
-  void setFileInfo(const std::vector<FileInfo> &fileInfo);
+  void setFileInfo(const std::vector<WdtFileInfo> &fileInfo);
 
   /// @param blockSizeMbytes    block size in Mbytes
   void setBlockSizeMbytes(int64_t blockSizeMbytes);
 
   /// Get the file info in this directory queue
-  const std::vector<FileInfo> &getFileInfo() const;
+  const std::vector<WdtFileInfo> &getFileInfo() const;
 
   /**
    * Sets whether to follow symlink or not
@@ -242,7 +249,7 @@ class DirectorySourceQueue : public SourceQueue {
    * @param fullPath             full path of the file to be added
    * @param fileInfo             Information about file
    */
-  void createIntoQueue(const std::string &fullPath, FileInfo &fileInfo);
+  void createIntoQueue(const std::string &fullPath, WdtFileInfo &fileInfo);
 
   /**
    * initial creation from either explore or enqueue files - always increment
@@ -282,7 +289,7 @@ class DirectorySourceQueue : public SourceQueue {
   int64_t blockSizeMbytes_{0};
 
   /// List of files to enqueue instead of recursing over rootDir_.
-  std::vector<FileInfo> fileInfo_;
+  std::vector<WdtFileInfo> fileInfo_;
 
   /// protects initCalled_/initFinished_/sourceQueue_
   mutable std::mutex mutex_;
@@ -365,9 +372,13 @@ class DirectorySourceQueue : public SourceQueue {
   /**
    * Count and trigger of files to open (negative is keep opening until we run
    * out of fd, positiveis how many files we can still open, 0 is stop opening
-   * files)
+   * files).
+   * Sender only (Receiver download resumption directory discovery should not
+   * open files).
    */
   int32_t openFilesDuringDiscovery_{0};
+  /// Should the WdtFileInfo created during discovery have direct read mode set
+  bool directReads_{false};
 
   // Number of files opened
   int64_t numFilesOpened_{0};

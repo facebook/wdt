@@ -20,6 +20,8 @@ namespace wdt {
  * A singleton class managing different options for WDT.
  * There will only be one instance of this class created
  * per creation of sender or receiver or both.
+ * We can now support more than 1 instance of those per process
+ * and attach a different one to sets of Sender/Receivers.
  */
 class WdtOptions {
  public:
@@ -31,10 +33,16 @@ class WdtOptions {
    * A static method that can be called to create
    * the singleton copy of WdtOptions through the lifetime
    * of wdt run.
+   * This is to be avoided, instead use the WdtOptions instance
+   * off each object.
+   * @deprecated
    */
   static const WdtOptions& get();
   /**
-   * Method to get mutable copy of the singleton
+   * Method to get mutable copy of the singleton.
+   * This is to be avoided, instead use the WdtOptions instance
+   * off each object.
+   * @deprecated
    */
   static WdtOptions& getMutable();
 

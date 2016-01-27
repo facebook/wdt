@@ -46,6 +46,7 @@ WdtControllerBase::WdtControllerBase(const string &controllerName) {
   controllerName_ = controllerName;
 }
 
+// TODO: pass options in
 WdtNamespaceController::WdtNamespaceController(const string &wdtNamespace)
     : WdtControllerBase(wdtNamespace) {
   auto &options = WdtOptions::get();
@@ -267,6 +268,7 @@ WdtNamespaceController::~WdtNamespaceController() {
   // release is done by parent shutdown
 }
 
+// TODO: pass options in
 WdtResourceController::WdtResourceController()
     : WdtControllerBase("_root controller_") {
   // set global limits from options

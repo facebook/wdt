@@ -135,16 +135,17 @@ void cancelAbort() {
   std::this_thread::yield();
 }
 
-void readManifest(std::istream &fin, WdtTransferRequest &req) {
+void readManifest(std::istream &fin, WdtTransferRequest &req, bool dfltDirect) {
   std::string line;
   while (std::getline(fin, line)) {
     std::vector<std::string> fields;
     folly::split('\t', line, fields, true);
-    if (fields.empty() || fields.size() > 2) {
+    if (fields.empty() || fields.size() > 3) {
       LOG(FATAL) << "Invalid input manifest: " << line;
     }
     int64_t filesize = fields.size() > 1 ? folly::to<int64_t>(fields[1]) : -1;
-    req.fileInfo.emplace_back(fields[0], filesize);
+    bool odirect = fields.size() > 2 ? folly::to<bool>(fields[2]) : dfltDirect;
+    req.fileInfo.emplace_back(fields[0], filesize, odirect);
   }
 }
 
@@ -323,10 +324,10 @@ int main(int argc, char *argv[]) {
       // Each line should have the filename and optionally
       // the filesize separated by a single space
       if (FLAGS_manifest == "-") {
-        readManifest(std::cin, req);
+        readManifest(std::cin, req, options.odirect_reads);
       } else {
         std::ifstream fin(FLAGS_manifest);
-        readManifest(fin, req);
+        readManifest(fin, req, options.odirect_reads);
         fin.close();
       }
       LOG(INFO) << "Using files lists, number of files " << req.fileInfo.size();

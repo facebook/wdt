@@ -23,7 +23,7 @@ namespace wdt {
  * information such as size, and flags
  * to read the file with
  */
-struct FileInfo {
+struct WdtFileInfo {
   /**
    * Name of the file to be read, generally as relative path
    */
@@ -35,15 +35,16 @@ struct FileInfo {
   /// Whether read should be done using o_direct. If fd is set, this flag will
   /// be set automatically to match the fd open mode
   bool directReads{false};
-  /// Constructor for file info with name and size
-  explicit FileInfo(const std::string& name, int64_t size = -1,
-                    bool directReads = WdtOptions::get().odirect_reads);
+  /// Constructor for file info with name, size and odirect request
+  WdtFileInfo(const std::string& name, int64_t size, bool directReads);
   /**
    * Constructor with name, size and fd
    * If this constructor is used, then whether to do direct reads is decided
-   * by fd flags
+   * by fd flags.
+   * Attempt to disambiguate the 2 constructors by having the fd first
+   * and string last in this one.
    */
-  FileInfo(const std::string& name, int64_t size, int fd);
+  WdtFileInfo(int fd, int64_t size, const std::string& name);
   /// Verify that we can align for reading in O_DIRECT and
   /// the flags make sense
   void verifyAndFixFlags();
@@ -156,7 +157,7 @@ struct WdtTransferRequest {
   std::string directory;
 
   /// Only used for the sender and when not using directory discovery
-  std::vector<FileInfo> fileInfo;
+  std::vector<WdtFileInfo> fileInfo;
 
   /// Any error associated with this transfer request upon processing
   ErrorCode errorCode{OK};

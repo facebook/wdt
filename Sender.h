@@ -51,7 +51,7 @@ class Sender : public WdtBase {
    */
   Sender(const std::string &destHost, const std::string &srcDir,
          const std::vector<int32_t> &ports,
-         const std::vector<FileInfo> &srcFileInfo);
+         const std::vector<WdtFileInfo> &srcFileInfo);
 
   /// Setup before start (@see WdtBase.h)
   const WdtTransferRequest &init() override;
@@ -103,7 +103,7 @@ class Sender : public WdtBase {
 
   /// Sets specific files to be transferred
   /// @param setFileInfo      list of (file, size) pair
-  void setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo);
+  void setSrcFileInfo(const std::vector<WdtFileInfo> &srcFileInfo);
 
   /// Sets whether to follow symlink or not
   /// @param followSymlinks   whether to follow symlinks or not

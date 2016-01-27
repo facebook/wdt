@@ -30,17 +30,16 @@ namespace wdt {
 
 using std::string;
 
-FileInfo::FileInfo(const string &name, int64_t size, bool directReads)
-    : fileName(name), fileSize(size) {
-  this->directReads = directReads;
+WdtFileInfo::WdtFileInfo(const string &name, int64_t size, bool doDirectReads)
+    : fileName(name), fileSize(size), directReads(doDirectReads) {
 }
 
-FileInfo::FileInfo(const string &name, int64_t size, int fd)
-    : FileInfo(name, size) {
+WdtFileInfo::WdtFileInfo(int fd, int64_t size, const string &name)
+    : WdtFileInfo(name, size, false) {
   this->fd = fd;
 }
 
-void FileInfo::verifyAndFixFlags() {
+void WdtFileInfo::verifyAndFixFlags() {
   if (fd >= 0) {
 #ifdef O_DIRECT
     int flags = fcntl(fd, F_GETFL, 0);
@@ -83,11 +82,12 @@ void DirectorySourceQueue::setBlockSizeMbytes(int64_t blockSizeMbytes) {
   blockSizeMbytes_ = blockSizeMbytes;
 }
 
-void DirectorySourceQueue::setFileInfo(const std::vector<FileInfo> &fileInfo) {
+void DirectorySourceQueue::setFileInfo(
+    const std::vector<WdtFileInfo> &fileInfo) {
   fileInfo_ = fileInfo;
 }
 
-const std::vector<FileInfo> &DirectorySourceQueue::getFileInfo() const {
+const std::vector<WdtFileInfo> &DirectorySourceQueue::getFileInfo() const {
   return fileInfo_;
 }
 
@@ -355,7 +355,7 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          FileInfo fileInfo(newRelativePath, fileStat.st_size);
+          WdtFileInfo fileInfo(newRelativePath, fileStat.st_size, directReads_);
           createIntoQueue(newFullPath, fileInfo);
           continue;
         }
@@ -417,7 +417,7 @@ void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
 }
 
 void DirectorySourceQueue::createIntoQueue(const string &fullPath,
-                                           FileInfo &fileInfo) {
+                                           WdtFileInfo &fileInfo) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
   // large file. This can be optimized as follows -

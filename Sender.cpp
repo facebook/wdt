@@ -61,6 +61,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
   dirQueue_->setBlockSizeMbytes(options_.block_size_mbytes);
   dirQueue_->setNumClientThreads(numSockets);
   dirQueue_->setOpenFilesDuringDiscovery(options_.open_files_during_discovery);
+  dirQueue_->setDirectReads(options_.odirect_reads);
   progressReportIntervalMillis_ = options_.progress_report_interval_millis;
 }
 
@@ -80,7 +81,7 @@ Sender::Sender(const WdtTransferRequest &transferRequest)
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir,
                const std::vector<int32_t> &ports,
-               const std::vector<FileInfo> &srcFileInfo)
+               const std::vector<WdtFileInfo> &srcFileInfo)
     : Sender(destHost, srcDir) {
   // TODO let's not copy vectors around to ourselves
   transferRequest_.ports = ports;
@@ -144,7 +145,7 @@ void Sender::setPruneDirRegex(const std::string &pruneDirRegex) {
   dirQueue_->setPruneDirPattern(pruneDirRegex);
 }
 
-void Sender::setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo) {
+void Sender::setSrcFileInfo(const std::vector<WdtFileInfo> &srcFileInfo) {
   dirQueue_->setFileInfo(srcFileInfo);
 }
 

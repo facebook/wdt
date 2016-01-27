@@ -151,9 +151,8 @@ TEST(FileByteSource, FILEINFO_ODIRECT) {
   WdtAbortChecker queueAbortChecker(shouldAbort);
   WdtOptions options;
   DirectorySourceQueue Q(options, "/tmp", &queueAbortChecker);
-  std::vector<FileInfo> files;
-  FileInfo info(file.getShortName(), sizeToRead);
-  info.directReads = true;
+  std::vector<WdtFileInfo> files;
+  WdtFileInfo info(file.getShortName(), sizeToRead, true);
   files.push_back(info);
   Q.setFileInfo(files);
   Q.buildQueueSynchronously();
@@ -178,10 +177,9 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
   std::atomic<bool> shouldAbort{false};
   WdtAbortChecker queueAbortChecker(shouldAbort);
   DirectorySourceQueue Q(options, "/tmp", &queueAbortChecker);
-  std::vector<FileInfo> files;
+  std::vector<WdtFileInfo> files;
   for (const auto& f : randFiles) {
-    FileInfo info(f.getShortName(), sizeToRead);
-    info.directReads = true;
+    WdtFileInfo info(f.getShortName(), sizeToRead, true);
     files.push_back(info);
   }
   Q.setFileInfo(files);
@@ -215,9 +213,9 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
   std::atomic<bool> shouldAbort{false};
   WdtAbortChecker queueAbortChecker(shouldAbort);
   DirectorySourceQueue Q(options, "/tmp", &queueAbortChecker);
-  std::vector<FileInfo> files;
+  std::vector<WdtFileInfo> files;
   for (const auto& f : randFiles) {
-    FileInfo info(f.getShortName(), sizeToRead);
+    WdtFileInfo info(f.getShortName(), sizeToRead, false);
     files.push_back(info);
   }
   Q.setFileInfo(files);

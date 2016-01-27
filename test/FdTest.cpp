@@ -38,7 +38,7 @@ void basicTest(bool resumption) {
   EXPECT_EQ(OK, req.errorCode);
   EXPECT_EQ(OK, r.transferAsync());
   // Not even using the actual name (which we don't know)
-  req.fileInfo.push_back(FileInfo("notexisting23r4", 0, fd));
+  req.fileInfo.push_back(WdtFileInfo(fd, 0, "notexisting23r4"));
   Sender s(req);
   // setWdtOptions not needed if change of option happens before sender cstror
   // but this indirectly tests that API (but need to manually see
@@ -76,7 +76,7 @@ TEST(DupSend, DuplicateSend) {
   EXPECT_EQ(OK, req.errorCode);
   EXPECT_EQ(OK, r.transferAsync());
   // Not even using the actual name (which we don't know)
-  req.fileInfo.push_back(FileInfo("notexisting23r4", 0, fd));
+  req.fileInfo.push_back(WdtFileInfo(fd, 0, "notexisting23r4"));
   Sender s(req);
   req = s.init();
   EXPECT_EQ(OK, req.errorCode);
