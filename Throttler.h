@@ -30,8 +30,8 @@ class Throttler {
  public:
   /**
    * Utility method that configures the avg rate, peak rate and bucket limit
-   * based on the values passed to this method and returns a shared ptr
-   * to an instance of this throttler
+   * based on the values passed to this method and returns a shared ptr to an
+   * instance of this throttler. It can return nullptr if throttling is off.
    */
   static std::shared_ptr<Throttler> makeThrottler(
       double avgRateBytesPerSec, double peakRateBytesPerSec,

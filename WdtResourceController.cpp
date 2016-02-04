@@ -302,6 +302,16 @@ WdtResourceController::~WdtResourceController() {
   shutdown();
 }
 
+ErrorCode WdtResourceController::getCounts(int32_t &numNamespaces,
+                                           int32_t &numSenders,
+                                           int32_t &numReceivers) {
+  GuardLock lock(controllerMutex_);
+  numSenders = numSenders_;
+  numReceivers = numReceivers_;
+  numNamespaces = namespaceMap_.size();
+  return OK;
+}
+
 ErrorCode WdtResourceController::createSender(
     const std::string &wdtNamespace, const std::string &identifier,
     const WdtTransferRequest &wdtOperationRequest, SenderPtr &sender) {

@@ -229,6 +229,10 @@ class WdtResourceController : public WdtControllerBase {
   /// Default global namespace
   static const char *const kGlobalNamespace;
 
+  /// Return current counts
+  ErrorCode getCounts(int32_t &numNamespaces, int32_t &numSenders,
+                      int32_t &numReceivers);
+
  protected:
   typedef std::shared_ptr<WdtNamespaceController> NamespaceControllerPtr;
   /// Get the namespace controller
