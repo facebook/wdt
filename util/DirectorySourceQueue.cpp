@@ -85,6 +85,7 @@ void DirectorySourceQueue::setBlockSizeMbytes(int64_t blockSizeMbytes) {
 void DirectorySourceQueue::setFileInfo(
     const std::vector<WdtFileInfo> &fileInfo) {
   fileInfo_ = fileInfo;
+  exploreDirectory_ = false;
 }
 
 const std::vector<WdtFileInfo> &DirectorySourceQueue::getFileInfo() const {
@@ -191,12 +192,12 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
   bool res = false;
   // either traverse directory or we already have a fixed set of candidate
   // files
-  if (!fileInfo_.empty()) {
+  if (exploreDirectory_) {
+    res = explore();
+  } else {
     LOG(INFO) << "Using list of file info. Number of files "
               << fileInfo_.size();
     res = enqueueFiles();
-  } else {
-    res = explore();
   }
   {
     std::lock_guard<std::mutex> lock(mutex_);

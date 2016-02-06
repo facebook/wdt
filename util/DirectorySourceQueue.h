@@ -386,6 +386,8 @@ class DirectorySourceQueue : public SourceQueue {
   int64_t numFilesOpenedWithDirect_{0};
   // Number of consumer threads (to tell between notify/notifyall)
   int64_t numClientThreads_{1};
+  // Should we explore or use fileInfo
+  bool exploreDirectory_{true};
 };
 }
 }

@@ -68,7 +68,8 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
 // TODO: argghhhh
 Sender::Sender(const WdtTransferRequest &transferRequest)
     : Sender(transferRequest.hostName, transferRequest.directory,
-             transferRequest.ports, transferRequest.fileInfo) {
+             transferRequest.ports, transferRequest.fileInfo,
+             transferRequest.disableDirectoryTraversal) {
   transferRequest_ = transferRequest;
   if (getTransferId().empty()) {
     LOG(WARNING) << "Sender without transferId... will likely fail to connect";
@@ -81,11 +82,14 @@ Sender::Sender(const WdtTransferRequest &transferRequest)
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir,
                const std::vector<int32_t> &ports,
-               const std::vector<WdtFileInfo> &srcFileInfo)
+               const std::vector<WdtFileInfo> &srcFileInfo,
+               bool disableDirectoryTraversal)
     : Sender(destHost, srcDir) {
   // TODO let's not copy vectors around to ourselves
   transferRequest_.ports = ports;
-  dirQueue_->setFileInfo(srcFileInfo);
+  if (!srcFileInfo.empty() || disableDirectoryTraversal) {
+    dirQueue_->setFileInfo(srcFileInfo);
+  }
   transferHistoryController_ =
       folly::make_unique<TransferHistoryController>(*dirQueue_);
 }

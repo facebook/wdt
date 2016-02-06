@@ -147,6 +147,7 @@ void readManifest(std::istream &fin, WdtTransferRequest &req, bool dfltDirect) {
     bool odirect = fields.size() > 2 ? folly::to<bool>(fields[2]) : dfltDirect;
     req.fileInfo.emplace_back(fields[0], filesize, odirect);
   }
+  req.disableDirectoryTraversal = true;
 }
 
 namespace google {

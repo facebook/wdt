@@ -159,6 +159,9 @@ struct WdtTransferRequest {
   /// Only used for the sender and when not using directory discovery
   std::vector<WdtFileInfo> fileInfo;
 
+  /// Use fileInfo even if empty (don't use the directory exploring)
+  bool disableDirectoryTraversal{false};
+
   /// Any error associated with this transfer request upon processing
   ErrorCode errorCode{OK};
 

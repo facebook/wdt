@@ -43,15 +43,18 @@ class Sender : public WdtBase {
    */
   Sender(const std::string &destHost, const std::string &srcDir);
 
+  // TODO: get rid of this constructor
   /**
    * @param destHost    destination hostname
    * @param srcDir      source directory
    * @param ports       list of destination ports
    * @param srcFileInfo list of (file, size) pair
+   * @param disableDirectoryTraversal use fileInfo even if empty
    */
   Sender(const std::string &destHost, const std::string &srcDir,
          const std::vector<int32_t> &ports,
-         const std::vector<WdtFileInfo> &srcFileInfo);
+         const std::vector<WdtFileInfo> &srcFileInfo,
+         bool disableDirectoryTraversal);
 
   /// Setup before start (@see WdtBase.h)
   const WdtTransferRequest &init() override;
