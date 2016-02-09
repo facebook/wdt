@@ -315,7 +315,7 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
 const std::string PerfStatReport::statTypeDescription_[] = {
     "Socket Read", "Socket Write", "File Open", "File Close", "File Read",
     "File Write", "Sync File Range", "fsync", "File Seek", "Throttler Sleep",
-    "Receiver Wait Sleep", "Directory creation", "Ioctl"};
+    "Receiver Wait Sleep", "Directory creation", "Ioctl", "Unlink"};
 
 PerfStatReport::PerfStatReport(const WdtOptions& options) {
   static_assert(

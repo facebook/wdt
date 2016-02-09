@@ -338,6 +338,21 @@ custom_unittest(
 )
 
 custom_unittest(
+  name = 'wdt_download_resumption_test_two_phases',
+  command = [
+      "/bin/env",
+      "TWO_PHASES=true",
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-p", "25050"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
   name = 'wdt_download_resumption_test_protcol_negotiation_1',
   command = [
       "wdt/test/wdt_download_resumption_test.sh",
@@ -420,6 +435,32 @@ custom_unittest(
   command = [
       "wdt/test/wdt_download_resumption_test.sh",
       "-r", "10", "-c", "3", "-p", "25700"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'resumption_test_flash_deletion',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-d", "-p", "25750"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'resumption_test_disk_deletion',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-d", "-c", "3", "-p", "25900"
   ],
   type = 'simple',
   deps = [

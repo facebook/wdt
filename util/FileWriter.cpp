@@ -24,6 +24,10 @@ ErrorCode FileWriter::open() {
   }
   // TODO: consider a working optimization for small files
   fd_ = fileCreator_->openForBlocks(threadCtx_, blockDetails_);
+  if (blockDetails_->allocationStatus == TO_BE_DELETED) {
+    WDT_CHECK_EQ(-1, fd_);
+    return OK;
+  }
   if (fd_ >= 0 && blockDetails_->offset > 0) {
     int64_t ret;
     {
@@ -54,6 +58,7 @@ void FileWriter::close() {
 }
 
 ErrorCode FileWriter::write(char *buf, int64_t size) {
+  WDT_CHECK_NE(TO_BE_DELETED, blockDetails_->allocationStatus);
   if (!threadCtx_.getOptions().skip_writes) {
     int64_t count = 0;
     while (count < size) {

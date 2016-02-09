@@ -340,6 +340,11 @@ class WdtOptions {
   int receive_buffer_size{0};
 
   /**
+   * If true, extra files on the receiver side is deleted during resumption
+   */
+  bool delete_extra_files{false};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;
@@ -358,7 +363,7 @@ class WdtOptions {
 
   /**
    * Initialize the fields of this object from another src one. ie makes 1 copy
-   * explictly.
+   * explicitly.
    */
   void copyInto(const WdtOptions& src);
   /**

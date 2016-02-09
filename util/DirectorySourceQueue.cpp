@@ -155,8 +155,11 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
   clearSourceQueue();
   // recreate the queue
   for (const auto metadata : sharedFileData_) {
+    // TODO: do not notify inside createIntoQueueInternal. This method still
+    // holds the lock, so no point in notifying
     createIntoQueueInternal(metadata);
   }
+  enqueueFilesToBeDeleted();
 }
 
 DirectorySourceQueue::~DirectorySourceQueue() {
@@ -202,6 +205,7 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     initFinished_ = true;
+    enqueueFilesToBeDeleted();
     // TODO: comment why
     if (sourceQueue_.empty()) {
       conditionNotEmpty_.notify_all();
@@ -595,6 +599,47 @@ int64_t DirectorySourceQueue::getTotalSize() const {
 bool DirectorySourceQueue::fileDiscoveryFinished() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return initFinished_;
+}
+
+void DirectorySourceQueue::enqueueFilesToBeDeleted() {
+  if (!deleteFiles_) {
+    return;
+  }
+  if (!initFinished_ || previouslyTransferredChunks_.empty()) {
+    // if the directory transfer has not finished yet or existing files list has
+    // not yet been received, return
+    return;
+  }
+  std::set<std::string> discoveredFiles;
+  for (const SourceMetaData *metadata : sharedFileData_) {
+    discoveredFiles.insert(metadata->relPath);
+  }
+  int64_t numFilesToBeDeleted = 0;
+  for (auto &it : previouslyTransferredChunks_) {
+    const std::string &fileName = it.first;
+    if (discoveredFiles.find(fileName) != discoveredFiles.end()) {
+      continue;
+    }
+    int64_t seqId = it.second.getSeqId();
+    // extra file on the receiver side
+    LOG(INFO) << "Extra file " << fileName << " seq-id " << seqId
+              << " on the receiver side, will be deleted";
+    SourceMetaData *metadata = new SourceMetaData();
+    metadata->relPath = fileName;
+    metadata->size = 0;
+    // we can reuse the previous seq-id
+    metadata->seqId = seqId;
+    metadata->allocationStatus = TO_BE_DELETED;
+    sharedFileData_.emplace_back(metadata);
+    // create a byte source with size and offset equal to 0
+    std::unique_ptr<ByteSource> source =
+        folly::make_unique<FileByteSource>(metadata, 0, 0);
+    sourceQueue_.push(std::move(source));
+    numFilesToBeDeleted++;
+  }
+  numEntries_ += numFilesToBeDeleted;
+  numBlocks_ += numFilesToBeDeleted;
+  smartNotify(numFilesToBeDeleted);
 }
 
 std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(

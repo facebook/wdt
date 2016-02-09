@@ -145,6 +145,11 @@ class DirectorySourceQueue : public SourceQueue {
     directReads_ = directReads;
   }
 
+  /// enable extra file deletion in the receiver side
+  void enableFileDeletion() {
+    deleteFiles_ = true;
+  }
+
   /**
    * Stat the FileInfo input files (if their size aren't already specified) and
    * insert them in the queue
@@ -271,6 +276,10 @@ class DirectorySourceQueue : public SourceQueue {
   /// Removes all elements from the source queue
   void clearSourceQueue();
 
+  /// if file deletion is enabled, extra files to be deleted are enqueued. This
+  /// method should be called while holding the lock
+  void enqueueFilesToBeDeleted();
+
   std::unique_ptr<ThreadCtx> threadCtx_{nullptr};
 
   /// root directory to recurse on if fileInfo_ is empty
@@ -306,6 +315,15 @@ class DirectorySourceQueue : public SourceQueue {
   struct SourceComparator {
     bool operator()(const std::unique_ptr<ByteSource> &source1,
                     const std::unique_ptr<ByteSource> &source2) {
+      bool toBeDeleted1 =
+          (source1->getMetaData().allocationStatus == TO_BE_DELETED);
+      bool toBeDeleted2 =
+          (source2->getMetaData().allocationStatus == TO_BE_DELETED);
+      if (toBeDeleted1 != toBeDeleted2) {
+        // always send files to be deleted first
+        return toBeDeleted2;
+      }
+
       auto retryCount1 = source1->getTransferStats().getFailedAttempts();
       auto retryCount2 = source2->getTransferStats().getFailedAttempts();
       if (retryCount1 != retryCount2) {
@@ -371,7 +389,7 @@ class DirectorySourceQueue : public SourceQueue {
 
   /**
    * Count and trigger of files to open (negative is keep opening until we run
-   * out of fd, positiveis how many files we can still open, 0 is stop opening
+   * out of fd, positive is how many files we can still open, 0 is stop opening
    * files).
    * Sender only (Receiver download resumption directory discovery should not
    * open files).
@@ -388,6 +406,8 @@ class DirectorySourceQueue : public SourceQueue {
   int64_t numClientThreads_{1};
   // Should we explore or use fileInfo
   bool exploreDirectory_{true};
+  /// delete extra files in the receiver side
+  bool deleteFiles_{false};
 };
 }
 }

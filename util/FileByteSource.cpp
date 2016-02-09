@@ -64,6 +64,9 @@ FileByteSource::FileByteSource(SourceMetaData *metadata, int64_t size,
 }
 
 ErrorCode FileByteSource::open(ThreadCtx *threadCtx) {
+  if (metadata_->allocationStatus == TO_BE_DELETED) {
+    return OK;
+  }
   bytesRead_ = 0;
   this->close();
   threadCtx_ = threadCtx;

@@ -181,6 +181,7 @@ enum FileAllocationStatus {
   EXISTS_CORRECT_SIZE,  // file exists with correct size
   EXISTS_TOO_LARGE,     // file exists, but too large
   EXISTS_TOO_SMALL,     // file exists, but too small
+  TO_BE_DELETED,        // file not needed, should be deleted
 };
 
 /// structure representing details of a block
@@ -243,6 +244,8 @@ class Protocol {
   static const int ENCRYPTION_V1_VERSION;
   /// version from which GCM tags were verified incrementally
   static const int INCREMENTAL_TAG_VERIFICATION_VERSION;
+  /// version from which file deletion was supported for resumption
+  static const int DELETE_CMD_VERSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {

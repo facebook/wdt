@@ -240,7 +240,7 @@ ErrorCode TransferLogManager::openLog() {
   WDT_CHECK(options_.enable_download_resumption);
 
   int openFlags = O_CREAT | O_RDWR;
-  const std::string logPath = getFullPath(LOG_NAME);
+  const std::string logPath = getFullPath(kWdtLogName);
   fd_ = ::open(logPath.c_str(), openFlags, 0644);
   if (fd_ < 0) {
     PLOG(ERROR) << "Could not open wdt log " << logPath;
@@ -274,7 +274,7 @@ ErrorCode TransferLogManager::checkLog() {
     LOG(WARNING) << "No log to check";
     return ERROR;
   }
-  const std::string fullLogName = getFullPath(LOG_NAME);
+  const std::string fullLogName = getFullPath(kWdtLogName);
   struct stat stat1, stat2;
   if (stat(fullLogName.c_str(), &stat1)) {
     PLOG(ERROR) << "CORRUPTION! Can't stat log file " << fullLogName
@@ -328,7 +328,7 @@ void TransferLogManager::closeLog() {
 }
 
 TransferLogManager::~TransferLogManager() {
-  WDT_CHECK_LT(fd_, 0) << "Destructor called, but transfer log not called";
+  WDT_CHECK_LT(fd_, 0) << "Destructor called, but transfer log not closed";
 }
 
 void TransferLogManager::writeEntriesToDisk() {
@@ -488,7 +488,7 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
   if (fd_ < 0) {
     return;
   }
-  VLOG(1) << "Adding invalidation entry " << seqId;
+  LOG(INFO) << "Adding invalidation entry " << seqId;
   char buf[kMaxEntryLength];
   int64_t size = encoderDecoder_.encodeFileInvalidationEntry(buf, seqId);
   std::lock_guard<std::mutex> lock(mutex_);
@@ -497,8 +497,8 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
 
 void TransferLogManager::unlink() {
   WDT_CHECK_LT(fd_, 0) << "Unlink called before closeLog!";
-  LOG(INFO) << "unlinking " << LOG_NAME;
-  std::string fullLogName = getFullPath(LOG_NAME);
+  LOG(INFO) << "unlinking " << kWdtLogName;
+  std::string fullLogName = getFullPath(kWdtLogName);
   if (::unlink(fullLogName.c_str()) != 0) {
     PLOG(ERROR) << "Could not unlink " << fullLogName;
   }
@@ -506,10 +506,11 @@ void TransferLogManager::unlink() {
 
 void TransferLogManager::renameBuggyLog() {
   WDT_CHECK_LT(fd_, 0) << "renameBuggyLog called before closeLog!";
-  LOG(INFO) << "Renaming " << LOG_NAME << " to " << BUGGY_LOG_NAME;
-  if (::rename(getFullPath(LOG_NAME).c_str(),
-               getFullPath(BUGGY_LOG_NAME).c_str()) != 0) {
-    PLOG(ERROR) << "log rename failed " << LOG_NAME << " " << BUGGY_LOG_NAME;
+  LOG(INFO) << "Renaming " << kWdtLogName << " to " << kWdtBuggyLogName;
+  if (::rename(getFullPath(kWdtLogName).c_str(),
+               getFullPath(kWdtBuggyLogName).c_str()) != 0) {
+    PLOG(ERROR) << "log rename failed " << kWdtLogName << " "
+                << kWdtBuggyLogName;
   }
   return;
 }

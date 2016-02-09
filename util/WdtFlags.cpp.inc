@@ -167,3 +167,6 @@ WDT_OPT(send_buffer_size, int32,
 WDT_OPT(receive_buffer_size, int32,
         "Receive buffer size for receiver sockets. If <= 0, buffer size is not "
         "set");
+WDT_OPT(
+    delete_extra_files, bool,
+    "If true, extra files on the receiver side is deleted during resumption");

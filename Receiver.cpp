@@ -59,6 +59,13 @@ void Receiver::traverseDestinationDir(
   dirQueue.buildQueueSynchronously();
   auto &discoveredFilesInfo = dirQueue.getDiscoveredFilesMetaData();
   for (auto &fileInfo : discoveredFilesInfo) {
+    if (fileInfo->relPath == kWdtLogName ||
+        fileInfo->relPath == kWdtBuggyLogName) {
+      // do not include wdt log files
+      VLOG(1) << "Removing " << fileInfo->relPath
+              << " from the list of existing files";
+      continue;
+    }
     FileChunksInfo chunkInfo(fileInfo->seqId, fileInfo->relPath,
                              fileInfo->size);
     chunkInfo.addChunk(Interval(0, fileInfo->size));

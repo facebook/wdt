@@ -81,7 +81,7 @@ class FileByteSource : public ByteSource {
 
   /// @return true iff there was an error reading file
   virtual bool hasError() const override {
-    return fd_ < 0;
+    return (metadata_->allocationStatus != TO_BE_DELETED) && (fd_ < 0);
   }
 
   /// @see ByteSource.h

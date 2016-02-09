@@ -33,6 +33,7 @@ const int Protocol::CHECKPOINT_OFFSET_VERSION = 16;
 const int Protocol::CHECKPOINT_SEQ_ID_VERSION = 21;
 const int Protocol::ENCRYPTION_V1_VERSION = 23;
 const int Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION = 25;
+const int Protocol::DELETE_CMD_VERSION = 26;
 
 const std::string Protocol::getFullVersion() {
   std::string fullVersion(WDT_VERSION_STR);
@@ -165,8 +166,8 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
         return false;
       }
       uint8_t flags = br.front();
-      // first 2 bytes are used to represent allocation status
-      blockDetails.allocationStatus = (FileAllocationStatus)(flags & 3);
+      // first 3 bits are used to represent allocation status
+      blockDetails.allocationStatus = (FileAllocationStatus)(flags & 7);
       br.pop_front();
       if (blockDetails.allocationStatus == EXISTS_TOO_SMALL ||
           blockDetails.allocationStatus == EXISTS_TOO_LARGE) {

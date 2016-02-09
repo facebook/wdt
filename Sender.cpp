@@ -351,8 +351,6 @@ ErrorCode Sender::start() {
   }
   checkAndUpdateBufferSize();
   const bool twoPhases = options_.two_phases;
-  WDT_CHECK(!(twoPhases && options_.enable_download_resumption))
-      << "Two phase is not supported with download resumption";
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
             << transferRequest_.ports << "]";
   startTime_ = Clock::now();
@@ -376,6 +374,14 @@ ErrorCode Sender::start() {
   // TODO: fix this ! use transferRequest! (and dup from Receiver)
   senderThreads_ = threadsController_->makeThreads<Sender, SenderThread>(
       this, transferRequest_.ports.size(), transferRequest_.ports);
+  if (downloadResumptionEnabled_ && options_.delete_extra_files) {
+    if (protocolVersion_ >= Protocol::DELETE_CMD_VERSION) {
+      dirQueue_->enableFileDeletion();
+    } else {
+      LOG(WARNING) << "Turning off extra file deletion on the receiver side "
+                      "because of protocol version " << protocolVersion_;
+    }
+  }
   dirThread_ = dirQueue_->buildQueueAsynchronously();
   if (twoPhases) {
     dirThread_.join();

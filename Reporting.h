@@ -519,6 +519,7 @@ class PerfStatReport {
                           // were not properly load balanced
     DIRECTORY_CREATE,
     IOCTL,
+    UNLINK,
     END
   };
 

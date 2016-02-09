@@ -126,6 +126,20 @@ bool FileCreator::waitForAllocationFinish(int allocatingThreadIndex,
 
 int FileCreator::openForBlocks(ThreadCtx &threadCtx,
                                BlockDetails const *blockDetails) {
+  if (blockDetails->allocationStatus == TO_BE_DELETED) {
+    const std::string path = getFullPath(blockDetails->fileName);
+    int status;
+    {
+      PerfStatCollector statCollector(threadCtx, PerfStatReport::UNLINK);
+      status = ::unlink(path.c_str());
+    }
+    if (status != 0) {
+      PLOG(ERROR) << "Failed to delete file " << path;
+    } else {
+      LOG(INFO) << "Successfully deleted file " << path;
+    }
+    return -1;
+  }
   lock_.lock();
   auto it = fileStatusMap_.find(blockDetails->seqId);
   if (blockDetails->allocationStatus == EXISTS_CORRECT_SIZE &&
@@ -165,7 +179,7 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
   WDT_CHECK(relPathStr[0] != '/');
   WDT_CHECK(relPathStr.back() != '/');
 
-  const string path = rootDir_ + relPathStr;
+  const string path = getFullPath(relPathStr);
 
   int openFlags = O_WRONLY;
   int res;
@@ -186,7 +200,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
 
-  const string path = rootDir_ + relPathStr;
+  const string path = getFullPath(relPathStr);
 
   int p = relPathStr.size();
   while (p && relPathStr[p - 1] != '/') {
@@ -284,8 +298,7 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
     }
   }
 
-  std::string fullDirPath;
-  folly::toAppend(rootDir_, dir, &fullDirPath);
+  std::string fullDirPath = getFullPath(dir);
   int code = mkdir(fullDirPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   if (code != 0 && errno != EEXIST && errno != EISDIR) {
     PLOG(ERROR) << "failed to make directory " << fullDirPath;
@@ -301,6 +314,10 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
   }
 
   return true;
+}
+
+std::string FileCreator::getFullPath(const std::string &relPath) {
+  return (rootDir_ + relPath);
 }
 
 /* static */

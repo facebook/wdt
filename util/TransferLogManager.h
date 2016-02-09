@@ -41,6 +41,8 @@ namespace wdt {
  * true.
  */
 
+constexpr char kWdtLogName[] = ".wdt.log";
+constexpr char kWdtBuggyLogName[] = ".wdt.log.bug";
 /**
  * class responsible for encoding and decoding transfer log entries
  */
@@ -233,9 +235,6 @@ class TransferLogManager {
   ~TransferLogManager();
 
  private:
-  const std::string LOG_NAME = ".wdt.log";
-  const std::string BUGGY_LOG_NAME = ".wdt.log.bug";
-
   std::string getFullPath(const std::string &relPath);
 
   /**

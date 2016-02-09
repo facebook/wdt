@@ -164,6 +164,9 @@ class FileCreator {
     return createdDirs_.find(dir) != createdDirs_.end();
   }
 
+  /// returns full path of a file
+  std::string getFullPath(const std::string &relPath);
+
   /// root directory
   std::string rootDir_;
 

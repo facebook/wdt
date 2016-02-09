@@ -413,6 +413,16 @@ ReceiverState ReceiverThread::processFileCmd() {
     threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }
+  if (blockDetails.allocationStatus == TO_BE_DELETED &&
+      (blockDetails.fileSize != 0 || blockDetails.dataSize != 0)) {
+    LOG(ERROR) << *this << " Invalid file header, file to be deleted, but "
+                           "file-size/block-size not zero "
+               << blockDetails.fileName << " file-size "
+               << blockDetails.fileSize << " block-size "
+               << blockDetails.dataSize;
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
+    return FINISH_WITH_ERROR;
+  }
 
   // received a well formed file cmd, apply the pending checkpoint update
   checkpointIndex_ = pendingCheckpointIndex_;
@@ -456,10 +466,13 @@ ReceiverState ReceiverThread::processFileCmd() {
     // on the network
     throttler->limit(*threadCtx_, toWrite + headerBytes);
   }
-  ErrorCode code = writer.write(buf_ + off_, toWrite);
-  if (code != OK) {
-    threadStats_.setLocalErrorCode(code);
-    return SEND_ABORT_CMD;
+  ErrorCode code = ERROR;
+  if (toWrite > 0) {
+    code = writer.write(buf_ + off_, toWrite);
+    if (code != OK) {
+      threadStats_.setLocalErrorCode(code);
+      return SEND_ABORT_CMD;
+    }
   }
   off_ += toWrite;
   remainingData -= toWrite;
@@ -582,15 +595,19 @@ ReceiverState ReceiverThread::processFileCmd() {
 }
 
 void ReceiverThread::markBlockVerified(const BlockDetails &blockDetails) {
-  if (options_.isLogBasedResumption()) {
-    TransferLogManager &transferLogManager =
-        wdtParent_->getTransferLogManager();
-    transferLogManager.addBlockWriteEntry(
-        blockDetails.seqId, blockDetails.offset, blockDetails.dataSize);
-  }
   threadStats_.addEffectiveBytes(0, blockDetails.dataSize);
   threadStats_.incrNumBlocks();
   checkpoint_.incrNumBlocks();
+  if (!options_.isLogBasedResumption()) {
+    return;
+  }
+  TransferLogManager &transferLogManager = wdtParent_->getTransferLogManager();
+  if (blockDetails.allocationStatus == TO_BE_DELETED) {
+    transferLogManager.addFileInvalidationEntry(blockDetails.seqId);
+    return;
+  }
+  transferLogManager.addBlockWriteEntry(blockDetails.seqId, blockDetails.offset,
+                                        blockDetails.dataSize);
 }
 
 void ReceiverThread::markReceivedBlocksVerified() {
