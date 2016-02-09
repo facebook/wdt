@@ -116,14 +116,21 @@ ErrorCode ServerSocket::listen() {
   }
   struct addrinfo sa;
   memset(&sa, 0, sizeof(sa));
-  if (threadCtx_.getOptions().ipv6) {
+  const WdtOptions &options = threadCtx_.getOptions();
+  if (options.ipv6) {
     sa.ai_family = AF_INET6;
   }
-  if (threadCtx_.getOptions().ipv4) {
+  if (options.ipv4) {
     sa.ai_family = AF_INET;
   }
   sa.ai_socktype = SOCK_STREAM;
   sa.ai_flags = AI_PASSIVE;
+  // Dynamic port is the default on receiver (and setting the start_port flag
+  // explictly automatically also sets static_ports to false)
+  if (!options.static_ports) {
+    VLOG(1) << "Not using static_ports, changing port " << port_ << " to 0";
+    port_ = 0;
+  }
   // Lookup
   addrInfoList infoList = nullptr;
   std::string portStr = folly::to<std::string>(port_);

@@ -49,6 +49,11 @@ void WdtOptions::modifyOptions(
                  << FLASH_OPTION_TYPE << ", " << DISK_OPTION_TYPE;
   }
   // options are initialized for flash. So, no need to change anything
+  if (userSpecifiedOptions.find("start_port") != userSpecifiedOptions.end() &&
+      !static_ports) {
+    LOG(INFO) << "start_port is specified, setting static_ports true";
+    static_ports = true;
+  }
 }
 
 bool WdtOptions::shouldPreallocateFiles() const {

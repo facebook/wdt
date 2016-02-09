@@ -273,6 +273,11 @@ int main(int argc, char *argv[]) {
 
   if (FLAGS_destination.empty() && connectUrl.empty()) {
     Receiver receiver(req);
+    if (FLAGS_run_as_daemon) {
+      // Backward compatible with static ports, you can still get dynamic
+      // daemon ports using -start_port 0 like before
+      options.static_ports = true;
+    }
     if (!FLAGS_recovery_id.empty()) {
       options.enable_download_resumption = true;
       receiver.setRecoveryId(FLAGS_recovery_id);

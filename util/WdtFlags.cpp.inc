@@ -19,8 +19,10 @@
  * initializeFromFlags()
  */
 #include <wdt/util/WdtFlagsMacros.h>
-WDT_OPT(start_port, int32, "Starting port number for wdt");
+WDT_OPT(start_port, int32, "Starting port number for wdt, if set, "
+                    "implies static_ports");
 WDT_OPT(num_ports, int32, "Number of sockets");
+WDT_OPT(static_ports, bool, "Use static ports (start_port) or any free port");
 WDT_OPT(ipv6, bool, "prefers ipv6");
 WDT_OPT(ipv4, bool, "use ipv4 only, takes precedence over -ipv6");
 WDT_OPT(ignore_open_errors, bool, "will continue despite open errors");

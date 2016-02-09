@@ -24,7 +24,7 @@ def test(resumption):
         print("Test with ipv6 client is disabled in this system")
         return
 
-    receiver_cmd = "_bin/wdt/wdt -start_port 0 -skip_writes -num_ports=1 -v 1"
+    receiver_cmd = "_bin/wdt/wdt -skip_writes -num_ports=1 -v 1"
     print(receiver_cmd)
     receiver_process = subprocess.Popen(receiver_cmd.split(),
                                         stdout=subprocess.PIPE)

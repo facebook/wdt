@@ -9,7 +9,7 @@ from common_utils import *
 def test():
     global test_count, src_dir, root_dir
 
-    receiver_cmd = ("_bin/wdt/wdt -directory {0}/dst{1} -start_port=0 "
+    receiver_cmd = ("_bin/wdt/wdt -directory {0}/dst{1} "
                     "-num_ports=1 "
                     "-avg_mbytes_per_sec=10").format(
                             root_dir, test_count)

@@ -96,6 +96,10 @@ class WdtOptions {
   int32_t start_port{22356};  // W (D) T = 0x5754
   int32_t num_ports{8};
   /**
+   * If true, will use start_port otherwise will use 0 / dynamic ports
+   */
+  bool static_ports{false};
+  /**
    * Maximum buffer size for the write on the sender
    * as well as while reading on receiver.
    */
