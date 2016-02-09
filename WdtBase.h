@@ -59,6 +59,14 @@ class WdtBase {
   void clearAbort();
 
   /**
+   * Returns a reference to the copy of WdtOptions held by this object.
+   * Changes should only be made before init() is called, not after.
+   */
+  WdtOptions &getWdtOptions() {
+    return options_;
+  }
+
+  /**
    * sets an extra external call back to check for abort
    * can be for instance extending IAbortChecker with
    * bool checkAbort() {return atomicBool->load();}
