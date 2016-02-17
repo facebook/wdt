@@ -200,6 +200,11 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
 
+  // Skip writes is turned on. We shouldn't be creating files
+  if (skipWrites_) {
+    return -1;
+  }
+
   const string path = getFullPath(relPathStr);
 
   int p = relPathStr.size();
@@ -281,6 +286,11 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
 }
 
 bool FileCreator::createDirRecursively(const std::string dir, bool force) {
+  // Skip writes is turned on. We shouldn't be creating files
+  if (skipWrites_) {
+    return false;
+  }
+
   if (!force && dirCreated(dir)) {
     return true;
   }

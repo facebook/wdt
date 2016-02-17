@@ -119,6 +119,7 @@ cpp_unittest(
   srcs = [ 'test/FdTest.cpp', ],
   deps = [
       ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )

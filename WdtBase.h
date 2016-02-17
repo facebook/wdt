@@ -62,7 +62,7 @@ class WdtBase {
    * Returns a reference to the copy of WdtOptions held by this object.
    * Changes should only be made before init() is called, not after.
    */
-  WdtOptions &getWdtOptions() {
+  WdtOptions& getWdtOptions() {
     return options_;
   }
 

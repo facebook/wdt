@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
+#include "TestCommon.h"
+
 #include <wdt/Sender.h>
 #include <wdt/Receiver.h>
 #include <wdt/util/WdtFlags.h>
@@ -15,6 +17,8 @@
 #include <gtest/gtest.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <folly/Range.h>
 
 using namespace std;
 
@@ -32,7 +36,9 @@ void basicTest(bool resumption) {
   int fd = fileno(tmp);
   LOG(INFO) << "tmp file fd " << fd;
   fclose(tmp);
-  WdtTransferRequest req(/* start port */ 0, /* num ports */ 3, "/tmp/wdtTest");
+  std::string recvDir;
+  folly::toAppend("/tmp/wdtTest/recv", rand32(), &recvDir);
+  WdtTransferRequest req(/* start port */ 0, /* num ports */ 3, recvDir);
   Receiver r(req);
   req = r.init();
   EXPECT_EQ(OK, req.errorCode);
@@ -49,6 +55,10 @@ void basicTest(bool resumption) {
   EXPECT_EQ(OK, req.errorCode);
   auto report = s.transfer();
   EXPECT_EQ(OK, report->getSummary().getErrorCode());
+  struct stat dirStat;
+  int sret = stat(recvDir.c_str(), &dirStat);
+  EXPECT_EQ(sret, -1);
+  EXPECT_EQ(errno, ENOENT);
 }
 
 TEST(FdTest, FdTestBasic) {

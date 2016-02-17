@@ -110,7 +110,9 @@ void Receiver::endCurGlobalSession() {
     throttler_->deRegisterTransfer();
   }
   checkpoints_.clear();
-  fileCreator_->clearAllocationMap();
+  if (fileCreator_) {
+    fileCreator_->clearAllocationMap();
+  }
   // TODO might consider moving closing the transfer log here
   hasNewTransferStarted_.store(false);
 }
@@ -130,8 +132,8 @@ const WdtTransferRequest &Receiver::init() {
   setDir(transferRequest_.directory);
   auto numThreads = transferRequest_.ports.size();
   // This creates the destination directory (which is needed for transferLogMgr)
-  fileCreator_.reset(
-      new FileCreator(destDir_, numThreads, transferLogManager_));
+  fileCreator_.reset(new FileCreator(destDir_, numThreads, transferLogManager_,
+                                     options_.skip_writes));
   // Make sure we can get the lock on the transfer log manager early
   // so if we can't we don't generate a valid but useless url and end up
   // starting a sender doomed to fail

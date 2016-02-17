@@ -36,10 +36,9 @@ namespace wdt {
  */
 class FileCreator {
  public:
-  /// rootDir is assumed to exist
   FileCreator(const std::string &rootDir, int numThreads,
-              TransferLogManager &transferLogManager)
-      : transferLogManager_(transferLogManager) {
+              TransferLogManager &transferLogManager, bool skipWrites)
+      : transferLogManager_(transferLogManager), skipWrites_(skipWrites) {
     CHECK(!rootDir.empty());
 
     // For creating root directory, we are using createDirRecursively.
@@ -192,6 +191,9 @@ class FileCreator {
   std::condition_variable *threadConditionVariables_;
   /// lock protecting fileStatusMap_
   folly::SpinLock lock_;
+
+  // Set to prevent creating files
+  bool skipWrites_;
 };
 }
 }
