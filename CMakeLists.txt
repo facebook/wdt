@@ -145,6 +145,7 @@ include(CheckCXXSourceCompiles)
 check_function_exists(posix_fallocate HAS_POSIX_FALLOCATE)
 check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
 check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
+check_function_exists(posix_fadvise HAS_POSIX_FADVISE)
 # C based check (which fail with the c++ setting thereafter...)
 check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
 set(SAVE_CMRL ${CMAKE_REQUIRED_LIBRARIES}) #globals are evil/ugly

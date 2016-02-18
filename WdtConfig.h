@@ -20,6 +20,8 @@
 #define HAS_POSIX_FALLOCATE 1
 #define HAS_SYNC_FILE_RANGE 1
 #define HAS_POSIX_MEMALIGN 1
+#define HAS_POSIX_FADVISE 1
+
 #define WDT_SUPPORTS_ODIRECT 1
 #define WDT_HAS_SOCKIOS_H 1
 // Again do not add new defines here without editing WdtConfig.h.in ...

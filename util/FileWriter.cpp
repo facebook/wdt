@@ -59,7 +59,8 @@ void FileWriter::close() {
 
 ErrorCode FileWriter::write(char *buf, int64_t size) {
   WDT_CHECK_NE(TO_BE_DELETED, blockDetails_->allocationStatus);
-  if (!threadCtx_.getOptions().skip_writes) {
+  auto &options = threadCtx_.getOptions();
+  if (!options.skip_writes) {
     int64_t count = 0;
     while (count < size) {
       int64_t written;
@@ -83,7 +84,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
     VLOG(1) << "Successfully written " << count << " bytes to fd " << fd_
             << " for file " << blockDetails_->fileName;
     bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
-    if (threadCtx_.getOptions().isLogBasedResumption() && finished) {
+    if (finished && options.isLogBasedResumption()) {
       PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC);
       if (fsync(fd_) != 0) {
         PLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
@@ -95,6 +96,17 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
     } else {
       syncFileRange(count, finished);
     }
+#ifdef HAS_POSIX_FADVISE
+    if (finished && !options.skip_fadvise) {
+      PerfStatCollector statCollector(threadCtx_, PerfStatReport::FADVISE);
+      if (posix_fadvise(fd_, blockDetails_->offset, blockDetails_->dataSize,
+                        POSIX_FADV_DONTNEED) != 0) {
+        PLOG(ERROR) << "posix_fadvise failed for " << blockDetails_->fileName
+                    << " " << blockDetails_->offset << " "
+                    << blockDetails_->dataSize;
+      }
+    }
+#endif
   }
   totalWritten_ += size;
   return OK;

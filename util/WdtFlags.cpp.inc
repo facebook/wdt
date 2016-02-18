@@ -170,3 +170,4 @@ WDT_OPT(receive_buffer_size, int32,
 WDT_OPT(
     delete_extra_files, bool,
     "If true, extra files on the receiver side is deleted during resumption");
+WDT_OPT(skip_fadvise, bool, "If true, fadvise is skipped after block write");

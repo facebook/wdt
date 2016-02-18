@@ -520,6 +520,7 @@ class PerfStatReport {
     DIRECTORY_CREATE,
     IOCTL,
     UNLINK,
+    FADVISE,
     END
   };
 

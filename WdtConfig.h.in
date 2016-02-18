@@ -21,6 +21,7 @@
 #cmakedefine HAS_POSIX_FALLOCATE 1
 #cmakedefine HAS_SYNC_FILE_RANGE 1
 #cmakedefine HAS_POSIX_MEMALIGN 1
+#cmakedefine HAS_POSIX_FADVISE 1
 
 #if (defined(HAS_POSIX_MEMALIGN) && defined(O_DIRECT)) || defined(F_NOCACHE)
 #define WDT_SUPPORTS_ODIRECT 1

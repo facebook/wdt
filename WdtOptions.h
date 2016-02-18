@@ -345,6 +345,11 @@ class WdtOptions {
   bool delete_extra_files{false};
 
   /**
+   * If true, fadvise is skipped after block write
+   */
+  bool skip_fadvise{false};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;
