@@ -17,7 +17,7 @@ namespace facebook {
 namespace wdt {
 
 int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
-                          bool isDirectReads) {
+                          const bool isDirectReads) {
   int openFlags = O_RDONLY;
   if (isDirectReads) {
 #ifdef O_DIRECT
@@ -71,7 +71,7 @@ ErrorCode FileByteSource::open(ThreadCtx *threadCtx) {
   this->close();
   threadCtx_ = threadCtx;
   ErrorCode errCode = OK;
-  bool isDirectReads = metadata_->directReads;
+  const bool isDirectReads = metadata_->directReads;
   VLOG(1) << "Reading in direct mode " << isDirectReads;
   if (isDirectReads) {
 #ifdef O_DIRECT
@@ -158,6 +158,40 @@ char *FileByteSource::read(int64_t &size) {
           << " seepPos " << seekPos << " offsetRemainder " << offsetRemainder
           << " bytesRead " << bytesRead_;
   return buffer->getData() + offsetRemainder;
+}
+
+void FileByteSource::clearPageCache() {
+#ifdef HAS_POSIX_FADVISE
+  if (metadata_->directReads) {
+    // no need to clear page cache for direct reads
+    return;
+  }
+  if (threadCtx_ == nullptr) {
+    return;
+  }
+  auto &options = threadCtx_->getOptions();
+  if (bytesRead_ > 0 && !options.skip_fadvise) {
+    PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FADVISE);
+    if (posix_fadvise(fd_, offset_, bytesRead_, POSIX_FADV_DONTNEED) != 0) {
+      PLOG(ERROR) << "posix_fadvise failed for " << getIdentifier() << " "
+                  << offset_ << " " << bytesRead_;
+    }
+  }
+#endif
+}
+
+void FileByteSource::close() {
+  clearPageCache();
+  if (metadata_->fd >= 0) {
+    // if the fd is not opened by this source, no need to close it
+    VLOG(1) << "No need to close " << getIdentifier()
+            << ", this was not opened by FileByteSource";
+  } else if (fd_ >= 0) {
+    PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FILE_CLOSE);
+    ::close(fd_);
+  }
+  fd_ = -1;
+  threadCtx_ = nullptr;
 }
 }
 }

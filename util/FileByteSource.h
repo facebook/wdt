@@ -94,18 +94,7 @@ class FileByteSource : public ByteSource {
   virtual ErrorCode open(ThreadCtx *threadCtx) override;
 
   /// close the source for reading
-  virtual void close() override {
-    if (metadata_->fd >= 0) {
-      // if the fd is not opened by this source, no need to close it
-      VLOG(1) << "No need to close " << getIdentifier()
-              << ", this was not opened by FileByteSource";
-    } else if (fd_ >= 0) {
-      PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FILE_CLOSE);
-      ::close(fd_);
-    }
-    fd_ = -1;
-    threadCtx_ = nullptr;
-  }
+  virtual void close() override;
 
   /**
    * @return transfer stats for the source. If the stats is moved by the
@@ -121,6 +110,9 @@ class FileByteSource : public ByteSource {
   }
 
  private:
+  /// clears page cache
+  void clearPageCache();
+
   ThreadCtx *threadCtx_{nullptr};
 
   /// shared file information
