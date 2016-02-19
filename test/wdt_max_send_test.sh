@@ -66,7 +66,7 @@ echo "Using $NUM_THREADS threads (on each sender, receiver) for $NUM_CPU CPUs"
 # With, still gets almost same max (21G) with throttling set high enough
 WDTBIN_OPTS="-sleep_millis 1 -max_retries 3 -num_ports $NUM_THREADS
 -transfer_id=$$ -encryption_type=none
--exit_on_bad_flags=false
+-exit_on_bad_flags=false -skip_fadvise
 --avg_mbytes_per_sec=26000 --max_mbytes_per_sec=26001 --enable_checksum=false"
 extendWdtOptions
 CLIENT_PROFILE_FORMAT="%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata \
