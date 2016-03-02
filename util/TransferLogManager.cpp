@@ -29,7 +29,8 @@ const int TransferLogManager::LOG_VERSION = 2;
 int64_t LogEncoderDecoder::timestampInMicroseconds() const {
   auto timestamp = Clock::now();
   return std::chrono::duration_cast<std::chrono::microseconds>(
-             timestamp.time_since_epoch()).count();
+             timestamp.time_since_epoch())
+      .count();
 }
 
 int64_t LogEncoderDecoder::encodeLogHeader(char *dest,
@@ -239,12 +240,31 @@ ErrorCode TransferLogManager::openLog() {
   WDT_CHECK(!rootDir_.empty()) << "Root directory not set";
   WDT_CHECK(options_.enable_download_resumption);
 
-  int openFlags = O_CREAT | O_RDWR;
   const std::string logPath = getFullPath(kWdtLogName);
-  fd_ = ::open(logPath.c_str(), openFlags, 0644);
+  fd_ = ::open(logPath.c_str(), O_RDWR);
   if (fd_ < 0) {
-    PLOG(ERROR) << "Could not open wdt log " << logPath;
-    return BYTE_SOURCE_READ_ERROR;
+    if (errno != ENOENT) {
+      PLOG(ERROR) << "Could not open wdt log " << logPath;
+      return TRANSFER_LOG_ACQUIRE_ERROR;
+    } else {
+      // creation of the log path (which can still be a race)
+      LOG(INFO) << logPath << " doesn't exist... creating...";
+      fd_ = ::open(logPath.c_str(), O_CREAT | O_EXCL, 0644);
+      if (fd_ < 0) {
+        PLOG(WARNING) << "Could not create wdt log (maybe ok if race): "
+                      << logPath;
+      } else {
+        // On windows/cygwin for instance the flock will silently succeed yet
+        // not lock on a newly created file... workaround is to close and reopen
+        ::close(fd_);
+      }
+      fd_ = ::open(logPath.c_str(), O_RDWR);
+      if (fd_ < 0) {
+        PLOG(ERROR) << "Still couldn't open wdt log after create attempt: "
+                    << logPath;
+        return TRANSFER_LOG_ACQUIRE_ERROR;
+      }
+    }
   }
   // try to acquire file lock
   if (::flock(fd_, LOCK_EX | LOCK_NB) != 0) {
@@ -380,7 +400,8 @@ bool TransferLogManager::verifySenderIp(const std::string &curSenderIp) {
                 << curSenderIp;
     } else if (senderIp_ != curSenderIp) {
       LOG(ERROR) << "Current sender ip does not match ip in the "
-                    "transfer log " << curSenderIp << " " << senderIp_
+                    "transfer log "
+                 << curSenderIp << " " << senderIp_
                  << ", ignoring transfer log";
       verifySuccessful = false;
       invalidateDirectory();
@@ -577,7 +598,8 @@ bool LogParser::writeFileInvalidationEntries(int fd,
     int written = ::write(fd, buf, size);
     if (written != size) {
       PLOG(ERROR) << "Disk write error while writing invalidation entry to "
-                     "transfer log " << written << " " << size;
+                     "transfer log "
+                  << written << " " << size;
       return false;
     }
   }
@@ -691,8 +713,8 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
   }
   if (options_.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file creation entry in directory based "
-                  "resumption mode " << fileName << " " << seqId << " "
-               << fileSize;
+                  "resumption mode "
+               << fileName << " " << seqId << " " << fileSize;
     return INVALID_LOG;
   }
   if (fileInfoMap_.find(seqId) != fileInfoMap_.end() ||
@@ -747,7 +769,8 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
   }
   if (options_.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file resize entry in directory based "
-                  "resumption mode " << seqId << " " << fileSize;
+                  "resumption mode "
+               << seqId << " " << fileSize;
     return INVALID_LOG;
   }
   auto it = fileInfoMap_.find(seqId);
@@ -796,8 +819,8 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
   }
   if (options_.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a block write entry in directory based "
-                  "resumption mode " << seqId << " " << offset << " "
-               << blockSize;
+                  "resumption mode "
+               << seqId << " " << offset << " " << blockSize;
     return INVALID_LOG;
   }
   if (invalidSeqIds_.find(seqId) != invalidSeqIds_.end()) {
@@ -842,7 +865,8 @@ ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
   }
   if (options_.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file invalidation entry in directory based "
-                  "resumption mode " << seqId;
+                  "resumption mode "
+               << seqId;
     return INVALID_LOG;
   }
   if (fileInfoMap_.find(seqId) == fileInfoMap_.end() &&

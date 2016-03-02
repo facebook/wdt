@@ -85,7 +85,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
             << " for file " << blockDetails_->fileName;
     bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
     if (finished && options.isLogBasedResumption()) {
-      PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC);
+      PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC_STATS);
       if (fsync(fd_) != 0) {
         PLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
                     << " offset " << blockDetails_->offset << " file-size "

@@ -150,7 +150,8 @@ int WdtSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
   if (supportUnencryptedPeer_ && readErrorCode_ == UNEXPECTED_CMD_ERROR) {
     LOG(WARNING)
         << "Turning off encryption since the other side does not support "
-           "encryption " << port_;
+           "encryption "
+        << port_;
     readErrorCode_ = OK;
     buf[0] = buf_[0];
     numRead = 1;
@@ -517,7 +518,7 @@ int WdtSocket::getUnackedBytes() const {
 }
 WdtSocket::~WdtSocket() {
   VLOG(1) << "~WdtSocket " << port_ << " " << fd_;
-  closeConnection();
+  closeNoCheck();
 }
 }
 }

@@ -144,8 +144,10 @@ int FileCreator::openForBlocks(ThreadCtx &threadCtx,
   auto it = fileStatusMap_.find(blockDetails->seqId);
   if (blockDetails->allocationStatus == EXISTS_CORRECT_SIZE &&
       it == fileStatusMap_.end()) {
-    it = fileStatusMap_.insert(std::make_pair(blockDetails->seqId,
-                                              FileCreator::ALLOCATED)).first;
+    it =
+        fileStatusMap_
+            .insert(std::make_pair(blockDetails->seqId, FileCreator::ALLOCATED))
+            .first;
   }
   if (it == fileStatusMap_.end()) {
     // allocation has not started for this file

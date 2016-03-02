@@ -6,4 +6,5 @@ AllowShortFunctionsOnASingleLine: false
 #IndentWidth: 4
 UseTab: Never
 Standard: Cpp11
+SortIncludes: false
 ...

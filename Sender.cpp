@@ -373,7 +373,8 @@ ErrorCode Sender::start() {
       dirQueue_->enableFileDeletion();
     } else {
       LOG(WARNING) << "Turning off extra file deletion on the receiver side "
-                      "because of protocol version " << protocolVersion_;
+                      "because of protocol version "
+                   << protocolVersion_;
     }
   }
   dirThread_ = dirQueue_->buildQueueAsynchronously();

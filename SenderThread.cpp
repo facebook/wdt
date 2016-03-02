@@ -26,12 +26,12 @@ std::ostream &operator<<(std::ostream &os, const SenderThread &senderThread) {
 }
 
 const SenderThread::StateFunction SenderThread::stateMap_[] = {
-    &SenderThread::connect, &SenderThread::readLocalCheckPoint,
-    &SenderThread::sendSettings, &SenderThread::sendBlocks,
-    &SenderThread::sendDoneCmd, &SenderThread::sendSizeCmd,
-    &SenderThread::checkForAbort, &SenderThread::readFileChunks,
+    &SenderThread::connect,         &SenderThread::readLocalCheckPoint,
+    &SenderThread::sendSettings,    &SenderThread::sendBlocks,
+    &SenderThread::sendDoneCmd,     &SenderThread::sendSizeCmd,
+    &SenderThread::checkForAbort,   &SenderThread::readFileChunks,
     &SenderThread::readReceiverCmd, &SenderThread::processDoneCmd,
-    &SenderThread::processWaitCmd, &SenderThread::processErrCmd,
+    &SenderThread::processWaitCmd,  &SenderThread::processErrCmd,
     &SenderThread::processAbortCmd, &SenderThread::processVersionMismatch};
 
 std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
@@ -500,8 +500,8 @@ SenderState SenderThread::readFileChunks() {
       // fileChunksInfoList. Number of chunks we decode should match with the
       // number mentioned in the Chunks cmd.
       LOG(ERROR) << "Number of file chunks received is more than the number "
-                    "mentioned in CHUNKS_CMD " << numFileChunks << " "
-                 << numFiles;
+                    "mentioned in CHUNKS_CMD "
+                 << numFileChunks << " " << numFiles;
       threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return END;
     }
@@ -588,8 +588,8 @@ ErrorCode SenderThread::readNextReceiverCmd() {
       return SOCKET_READ_ERROR;
     }
     LOG(INFO) << "Read receiver command failed, but number of unacked "
-                 "bytes decreased, retrying socket read " << numUnackedBytes
-              << " " << curUnackedBytes;
+                 "bytes decreased, retrying socket read "
+              << numUnackedBytes << " " << curUnackedBytes;
     numUnackedBytes = curUnackedBytes;
   }
   // we are assuming that sender and receiver tcp buffer sizes are same. So, we

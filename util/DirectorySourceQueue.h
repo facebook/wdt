@@ -348,7 +348,8 @@ class DirectorySourceQueue : public SourceQueue {
    */
   std::priority_queue<std::unique_ptr<ByteSource>,
                       std::vector<std::unique_ptr<ByteSource>>,
-                      SourceComparator> sourceQueue_;
+                      SourceComparator>
+      sourceQueue_;
 
   /// Transfer stats for sources which are not transferred
   std::vector<TransferStats> failedSourceStats_;

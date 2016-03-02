@@ -511,7 +511,7 @@ class PerfStatReport {
     FILE_READ,
     FILE_WRITE,
     SYNC_FILE_RANGE,
-    FSYNC,
+    FSYNC_STATS,  // just 'FSYNC' is defined on Windows/conflicts
     FILE_SEEK,
     THROTTLER_SLEEP,
     RECEIVER_WAIT_SLEEP,  // receiver sleep duration between sending wait cmd to

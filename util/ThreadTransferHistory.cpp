@@ -140,8 +140,8 @@ ErrorCode ThreadTransferHistory::validateCheckpoint(
   }
   if (checkpoint.numBlocks < lastCheckpoint_->numBlocks) {
     LOG(ERROR) << "Current checkpoint must be higher than previous checkpoint, "
-                  "Last checkpoint: " << *lastCheckpoint_
-               << ", Current checkpoint: " << checkpoint;
+                  "Last checkpoint: "
+               << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
     return INVALID_CHECKPOINT;
   }
   if (checkpoint.numBlocks > lastCheckpoint_->numBlocks) {

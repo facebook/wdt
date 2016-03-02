@@ -81,12 +81,18 @@ int64_t readAtMost(ServerSocket &s, char *buf, int64_t max, int64_t atMost) {
 }
 
 const ReceiverThread::StateFunction ReceiverThread::stateMap_[] = {
-    &ReceiverThread::listen, &ReceiverThread::acceptFirstConnection,
-    &ReceiverThread::acceptWithTimeout, &ReceiverThread::sendLocalCheckpoint,
-    &ReceiverThread::readNextCmd, &ReceiverThread::processFileCmd,
-    &ReceiverThread::processSettingsCmd, &ReceiverThread::processDoneCmd,
-    &ReceiverThread::processSizeCmd, &ReceiverThread::sendFileChunks,
-    &ReceiverThread::sendGlobalCheckpoint, &ReceiverThread::sendDoneCmd,
+    &ReceiverThread::listen,
+    &ReceiverThread::acceptFirstConnection,
+    &ReceiverThread::acceptWithTimeout,
+    &ReceiverThread::sendLocalCheckpoint,
+    &ReceiverThread::readNextCmd,
+    &ReceiverThread::processFileCmd,
+    &ReceiverThread::processSettingsCmd,
+    &ReceiverThread::processDoneCmd,
+    &ReceiverThread::processSizeCmd,
+    &ReceiverThread::sendFileChunks,
+    &ReceiverThread::sendGlobalCheckpoint,
+    &ReceiverThread::sendDoneCmd,
     &ReceiverThread::sendAbortCmd,
     &ReceiverThread::waitForFinishOrNewCheckpoint,
     &ReceiverThread::finishWithError};

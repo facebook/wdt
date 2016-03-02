@@ -308,15 +308,20 @@ wdt_max_send_test.sh
 (facebook only:)
 Make sure to do the following, before "arc diff":
 ```
- (cd wdt ; ./build/clangformat.sh ; ./build/version_update.tcl )
+ (cd wdt ; ./build/clangformat.sh )
+ # if you changed the minor version of the protocol (in CMakeLists.txt)
+ # run (cd wdt ; ./build/version_update.tcl ) to sync with fbcode's WdtConfig.h
 
- fbconfig  --clang --with-project-version clang:dev -r  wdt
+ fbconfig  --clang --sanitize=address -r  wdt
 
  fbmake runtests --run-disabled --extended-tests
+ # Optionally: opt build
  fbmake runtests_opt
  fbmake opt
-
+ # Sender max speed test
  wdt/test/wdt_max_send_test.sh
+ # Check buck build
+ buck build wdt/...
 ```
 
 and check the output of the last step to make sure one of the 3 runs is
