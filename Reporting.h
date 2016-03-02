@@ -552,6 +552,8 @@ class PerfStatReport {
   int64_t sumMicros_[kNumTypes_] = {0};
   /// network timeout in milliseconds
   int networkTimeoutMillis_;
+  /// mutex to support synchronized access
+  mutable folly::RWSpinLock mutex_;
 };
 }
 }

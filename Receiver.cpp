@@ -318,13 +318,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     report->setTotalTime(durationSeconds(Clock::now() - startTime_));
     progressReporter_->end(report);
   }
-  if (options_.enable_perf_stat_collection) {
-    PerfStatReport globalPerfReport(options_);
-    for (auto &receiverThread : receiverThreads_) {
-      globalPerfReport += receiverThread->getPerfReport();
-    }
-    LOG(INFO) << globalPerfReport;
-  }
+  logPerfStats();
 
   LOG(WARNING) << "WDT receiver's transfer has been finished";
   LOG(INFO) << *report;
@@ -426,8 +420,24 @@ void Receiver::progressTracker() {
       intervalsSinceLastUpdate = 0;
     }
     transferReport->setCurrentThroughput(currentThroughput);
+
     progressReporter_->progress(transferReport);
+    if (reportPerfSignal_.notified()) {
+      logPerfStats();
+    }
   }
+}
+
+void Receiver::logPerfStats() const {
+  if (!options_.enable_perf_stat_collection) {
+    return;
+  }
+
+  PerfStatReport globalPerfReport(options_);
+  for (auto &receiverThread : receiverThreads_) {
+    globalPerfReport += receiverThread->getPerfReport();
+  }
+  LOG(INFO) << globalPerfReport;
 }
 
 ErrorCode Receiver::start() {

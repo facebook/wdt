@@ -310,14 +310,8 @@ std::unique_ptr<TransferReport> Sender::finish() {
   if (progressReportEnabled) {
     progressReporter_->end(transferReport);
   }
-  if (options_.enable_perf_stat_collection) {
-    PerfStatReport report(options_);
-    for (auto &senderThread : senderThreads_) {
-      report += senderThread->getPerfReport();
-    }
-    report += dirQueue_->getPerfReport();
-    LOG(INFO) << report;
-  }
+  logPerfStats();
+
   double directoryTime;
   directoryTime = dirQueue_->getDirectoryTime();
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
@@ -483,7 +477,23 @@ void Sender::reportProgress() {
     transferReport->setCurrentThroughput(currentThroughput);
 
     progressReporter_->progress(transferReport);
+    if (reportPerfSignal_.notified()) {
+      logPerfStats();
+    }
   }
+}
+
+void Sender::logPerfStats() const {
+  if (!options_.enable_perf_stat_collection) {
+    return;
+  }
+
+  PerfStatReport report(options_);
+  for (auto &senderThread : senderThreads_) {
+    report += senderThread->getPerfReport();
+  }
+  report += dirQueue_->getPerfReport();
+  LOG(INFO) << report;
 }
 }
 }  // namespace facebook::wdt

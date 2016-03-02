@@ -161,6 +161,10 @@ void printUsage() {
   std::cerr << usage << std::endl;
 }
 
+void sigUSR1Handler(int) {
+  ReportPerfSignalSubscriber::notify();
+}
+
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
@@ -209,6 +213,7 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   signal(SIGPIPE, SIG_IGN);
+  signal(SIGUSR1, sigUSR1Handler);
 
   std::string connectUrl;
   if (argc == 2) {

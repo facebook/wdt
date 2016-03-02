@@ -141,6 +141,8 @@ class Receiver : public WdtBase {
    */
   std::unique_ptr<TransferReport> getTransferReport();
 
+  void logPerfStats() const override;
+
   /// @return     transfer config encoded as int
   int64_t getTransferConfig() const;
 

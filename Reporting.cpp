@@ -348,6 +348,8 @@ const int32_t PerfStatReport::kHistogramBuckets[] = {
     20000, 30000, 40000, 50000, 75000, 100000};
 
 void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
+  folly::RWSpinLock::WriteHolder writeLock(mutex_);
+
   int64_t timeInMillis = timeInMicros / kMicroToMilli;
   if (timeInMicros >= networkTimeoutMillis_ * 750) {
     LOG(WARNING) << statTypeDescription_[statType] << " system call took "
@@ -363,6 +365,9 @@ void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
 }
 
 PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
+  folly::RWSpinLock::WriteHolder writeLock(mutex_);
+  folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
+
   for (int i = 0; i < kNumTypes_; i++) {
     for (const auto& pair : statReport.perfStats_[i]) {
       int64_t key = pair.first;
@@ -380,6 +385,8 @@ PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
 }
 
 std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
+  folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
+
   os << "\n***** PERF STATS *****\n";
   for (int i = 0; i < PerfStatReport::kNumTypes_; i++) {
     if (statReport.count_[i] == 0) {

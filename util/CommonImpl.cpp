@@ -94,5 +94,8 @@ void ThreadCtx::setAbortChecker(IAbortChecker const* abortChecker) {
 const IAbortChecker* ThreadCtx::getAbortChecker() const {
   return abortChecker_;
 }
+
+template <>
+std::atomic<uint64_t> ReportPerfSignalSubscriber::globalEpoch_{};
 }
 }

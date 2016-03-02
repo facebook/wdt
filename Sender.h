@@ -211,6 +211,8 @@ class Sender : public WdtBase {
    */
   void reportProgress();
 
+  void logPerfStats() const override;
+
   /// Address of the destination host where the files are sent
   const std::string destHost_;
   /// Pointer to DirectorySourceQueue which reads the srcDir and the files

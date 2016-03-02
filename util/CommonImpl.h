@@ -8,6 +8,8 @@
  */
 #pragma once
 
+#include <atomic>
+
 #include <wdt/Reporting.h>
 
 namespace facebook {
@@ -111,5 +113,38 @@ class PerfStatCollector {
   const PerfStatReport::StatType statType_;
   Clock::time_point startTime_;
 };
+
+/// util class to broadcast a signal to any number of subscribers.
+template <class Tag>
+class SignalSubscriber {
+ public:
+  SignalSubscriber() : epoch_(globalEpoch_.load(std::memory_order_relaxed)) {
+  }
+
+  // This is async-signal-safe.
+  static void notify() {
+    ++globalEpoch_;
+  }
+
+  /**
+   * Returns true if notify() has been called at least once since the
+   * last invocation.
+   */
+  bool notified() {
+    auto newEpoch = globalEpoch_.load(std::memory_order_relaxed);
+    if (newEpoch != epoch_) {
+      epoch_ = newEpoch;
+      return true;
+    }
+    return false;
+  }
+
+ private:
+  static std::atomic<uint64_t> globalEpoch_;
+  uint64_t epoch_;
+};
+
+struct ReportPerfTag {};
+typedef SignalSubscriber<ReportPerfTag> ReportPerfSignalSubscriber;
 }
 }

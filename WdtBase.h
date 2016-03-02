@@ -151,6 +151,9 @@ class WdtBase {
   /// @param transferStatus   current transfer status
   void setTransferStatus(TransferStatus transferStatus);
 
+  /// Dumps performance statistics if enable_perf_stat_collection is true.
+  virtual void logPerfStats() const = 0;
+
   /// Input/output transfer request
   WdtTransferRequest transferRequest_;
 
@@ -183,6 +186,9 @@ class WdtBase {
 
   /// Controller for wdt threads shared between base and threads
   ThreadsController* threadsController_{nullptr};
+
+  /// Dump perf stats if notified
+  ReportPerfSignalSubscriber reportPerfSignal_;
 
   /// Options/config used by this object
   WdtOptions options_;
