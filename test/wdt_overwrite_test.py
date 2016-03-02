@@ -6,7 +6,7 @@ from common_utils import *
 def run_test(name, receiver_extra_flags, sender_extra_flags):
     global wdtbin, test_count, root_dir
     print("{0}. Testing {1}".format(test_count, name))
-    receiver_cmd = "{0} -start_port 0 {1}".format(wdtbin, receiver_extra_flags)
+    receiver_cmd = "{0} {1}".format(wdtbin, receiver_extra_flags)
     (receiver_process, connection_url) = start_receiver(
             receiver_cmd, root_dir, test_count)
     sender_cmd = ("{0} -connection_url \'{1}\' {2}").format(

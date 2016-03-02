@@ -5,8 +5,7 @@ import re
 import subprocess
 
 def testNegotiation(higher):
-    receiver_cmd = ("_bin/wdt/wdt -start_port 0 -skip_writes "
-    "-max_accept_retries 10")
+    receiver_cmd = ("_bin/wdt/wdt -skip_writes -max_accept_retries 10")
     print(receiver_cmd)
     receiver_process = subprocess.Popen(receiver_cmd.split(),
                                         stdout=subprocess.PIPE)

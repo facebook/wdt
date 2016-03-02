@@ -17,19 +17,20 @@ namespace facebook {
 namespace wdt {
 class ClientSocket : public WdtSocket {
  public:
-  ClientSocket(const std::string &dest, const int port,
-               IAbortChecker const *abortChecker,
+  ClientSocket(ThreadCtx &threadCtx, const std::string &dest, int port,
                const EncryptionParams &encryptionParams);
   virtual ErrorCode connect();
-  /// @return   number of unacked bytes in send buffer, returns -1 in case it
-  ///           fails to get unacked bytes for this socket
-  int getUnackedBytes() const;
   /// @return   peer-ip of the connected socket
   const std::string &getPeerIp() const;
+  /// @return   current encryptor tag
+  std::string computeCurEncryptionTag();
   /// shutdown() is now on WdtSocket as shutdownWrites()
   virtual ~ClientSocket();
 
  protected:
+  /// sets the send buffer size for this socket
+  void setSendBufferSize();
+
   const std::string dest_;
   std::string peerIp_;
   struct addrinfo sa_;

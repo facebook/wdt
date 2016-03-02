@@ -19,8 +19,6 @@
 #include <utility>
 #include <unordered_map>
 
-#include <wdt/AbortChecker.h>
-#include <wdt/WdtOptions.h>
 #include <wdt/Protocol.h>
 #include <wdt/WdtTransferRequest.h>
 #include <wdt/SourceQueue.h>
@@ -44,10 +42,11 @@ class DirectorySourceQueue : public SourceQueue {
    * Call buildQueueSynchronously() or buildQueueAsynchronously() separately
    * to actually recurse over the root directory gather files and sizes.
    *
+   * @param options               options to use
    * @param rootDir               root directory to recurse on
    * @param abortChecker          abort checker
    */
-  DirectorySourceQueue(const std::string &rootDir,
+  DirectorySourceQueue(const WdtOptions &options, const std::string &rootDir,
                        IAbortChecker const *abortChecker);
 
   /**
@@ -81,11 +80,13 @@ class DirectorySourceQueue : public SourceQueue {
   bool fileDiscoveryFinished() const;
 
   /**
-   * @param status  this variable is set to the status of the transfer
+   * @param callerThreadCtx context of the calling thread
+   * @param status          this variable is set to the status of the transfer
    *
    * @return next FileByteSource to consume or nullptr when finished
    */
-  virtual std::unique_ptr<ByteSource> getNextSource(ErrorCode &status) override;
+  virtual std::unique_ptr<ByteSource> getNextSource(ThreadCtx *callerThreadCtx,
+                                                    ErrorCode &status) override;
 
   /// @return         total number of files processed/enqueued
   virtual int64_t getCount() const override;
@@ -95,6 +96,9 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// @return         total number of blocks and status of the transfer
   std::pair<int64_t, ErrorCode> getNumBlocksAndStatus() const;
+
+  /// @return         perf report
+  const PerfStatReport &getPerfReport() const;
 
   /**
    * Sets regex representing files to include for transfer
@@ -118,11 +122,33 @@ class DirectorySourceQueue : public SourceQueue {
   void setPruneDirPattern(const std::string &pruneDirPattern);
 
   /**
-   * Sets buffer size to use during creating individual FileByteSource object
-   *
-   * @param fileSourceBufferSize  buffers size
+   * Sets the number of consumer threads for this queue. used as threshold
+   * between notify and notifyAll
    */
-  void setFileSourceBufferSize(const int64_t fileSourceBufferSize);
+  void setNumClientThreads(int64_t numClientThreads) {
+    numClientThreads_ = numClientThreads;
+  }
+
+  /**
+   * Sets the count and trigger for files to open during discovery
+   * (negative is keep opening until we run out of fd, positive is how
+   * many files we can still open, 0 is stop opening files)
+   */
+  void setOpenFilesDuringDiscovery(int64_t openFilesDuringDiscovery) {
+    openFilesDuringDiscovery_ = openFilesDuringDiscovery;
+  }
+  /**
+   * If setOpenFilesDuringDiscovery is not zero, open files using direct
+   * mode.
+   */
+  void setDirectReads(bool directReads) {
+    directReads_ = directReads;
+  }
+
+  /// enable extra file deletion in the receiver side
+  void enableFileDeletion() {
+    deleteFiles_ = true;
+  }
 
   /**
    * Stat the FileInfo input files (if their size aren't already specified) and
@@ -130,20 +156,20 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param fileInfo              files to transferred
    */
-  void setFileInfo(const std::vector<FileInfo> &fileInfo);
+  void setFileInfo(const std::vector<WdtFileInfo> &fileInfo);
 
-  /// @param blockSizeMbytes    block size in mbytes
+  /// @param blockSizeMbytes    block size in Mbytes
   void setBlockSizeMbytes(int64_t blockSizeMbytes);
 
   /// Get the file info in this directory queue
-  const std::vector<FileInfo> &getFileInfo() const;
+  const std::vector<WdtFileInfo> &getFileInfo() const;
 
   /**
    * Sets whether to follow symlink or not
    *
    * @param followSymlinks        whether to follow symlink or not
    */
-  void setFollowSymlinks(const bool followSymlinks);
+  void setFollowSymlinks(bool followSymlinks);
 
   /**
    * sets chunks which were sent in some previous transfer
@@ -228,7 +254,7 @@ class DirectorySourceQueue : public SourceQueue {
    * @param fullPath             full path of the file to be added
    * @param fileInfo             Information about file
    */
-  void createIntoQueue(const std::string &fullPath, FileInfo &fileInfo);
+  void createIntoQueue(const std::string &fullPath, WdtFileInfo &fileInfo);
 
   /**
    * initial creation from either explore or enqueue files - always increment
@@ -250,6 +276,12 @@ class DirectorySourceQueue : public SourceQueue {
   /// Removes all elements from the source queue
   void clearSourceQueue();
 
+  /// if file deletion is enabled, extra files to be deleted are enqueued. This
+  /// method should be called while holding the lock
+  void enqueueFilesToBeDeleted();
+
+  std::unique_ptr<ThreadCtx> threadCtx_{nullptr};
+
   /// root directory to recurse on if fileInfo_ is empty
   std::string rootDir_;
 
@@ -265,14 +297,8 @@ class DirectorySourceQueue : public SourceQueue {
   /// Block size in mb
   int64_t blockSizeMbytes_{0};
 
-  /**
-   * buffer size to use when creating individual FileByteSource objects
-   * (returned by getNextSource).
-   */
-  int64_t fileSourceBufferSize_;
-
   /// List of files to enqueue instead of recursing over rootDir_.
-  std::vector<FileInfo> fileInfo_;
+  std::vector<WdtFileInfo> fileInfo_;
 
   /// protects initCalled_/initFinished_/sourceQueue_
   mutable std::mutex mutex_;
@@ -289,6 +315,15 @@ class DirectorySourceQueue : public SourceQueue {
   struct SourceComparator {
     bool operator()(const std::unique_ptr<ByteSource> &source1,
                     const std::unique_ptr<ByteSource> &source2) {
+      bool toBeDeleted1 =
+          (source1->getMetaData().allocationStatus == TO_BE_DELETED);
+      bool toBeDeleted2 =
+          (source2->getMetaData().allocationStatus == TO_BE_DELETED);
+      if (toBeDeleted1 != toBeDeleted2) {
+        // always send files to be deleted first
+        return toBeDeleted2;
+      }
+
       auto retryCount1 = source1->getTransferStats().getFailedAttempts();
       auto retryCount2 = source2->getTransferStats().getFailedAttempts();
       if (retryCount1 != retryCount2) {
@@ -313,7 +348,8 @@ class DirectorySourceQueue : public SourceQueue {
    */
   std::priority_queue<std::unique_ptr<ByteSource>,
                       std::vector<std::unique_ptr<ByteSource>>,
-                      SourceComparator> sourceQueue_;
+                      SourceComparator>
+      sourceQueue_;
 
   /// Transfer stats for sources which are not transferred
   std::vector<TransferStats> failedSourceStats_;
@@ -351,15 +387,28 @@ class DirectorySourceQueue : public SourceQueue {
   /// Stores the time difference between the start and the end of the
   /// traversal of directory
   double directoryTime_{0};
-  /// abort checker
-  IAbortChecker const *abortChecker_;
+
   /**
    * Count and trigger of files to open (negative is keep opening until we run
-   * out of fd, positiveis how many files we can still open, 0 is stop opening
-   * files)
+   * out of fd, positive is how many files we can still open, 0 is stop opening
+   * files).
+   * Sender only (Receiver download resumption directory discovery should not
+   * open files).
    */
   int32_t openFilesDuringDiscovery_{0};
-  const WdtOptions &options_;
+  /// Should the WdtFileInfo created during discovery have direct read mode set
+  bool directReads_{false};
+
+  // Number of files opened
+  int64_t numFilesOpened_{0};
+  // Number of files opened with odirect
+  int64_t numFilesOpenedWithDirect_{0};
+  // Number of consumer threads (to tell between notify/notifyall)
+  int64_t numClientThreads_{1};
+  // Should we explore or use fileInfo
+  bool exploreDirectory_{true};
+  /// delete extra files in the receiver side
+  bool deleteFiles_{false};
 };
 }
 }

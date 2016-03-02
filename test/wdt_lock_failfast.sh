@@ -9,7 +9,7 @@ mkdir -p "$BASEDIR"
 DIR=$(mktemp -d "$BASEDIR/XXXXXX")
 echo "Testing in $DIR"
 
-WDTBIN_OPTS="-start_port=0 -num_ports=1 -enable_download_resumption"
+WDTBIN_OPTS="-num_ports=1 -enable_download_resumption"
 WDTBIN_OPTS+=" -directory $DIR/dst"
 WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
 

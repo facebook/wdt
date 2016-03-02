@@ -91,6 +91,12 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   wdtSetAbortSocketCreatorAndReporter(wdtNamespace, sender.get(), req,
                                       abortChecker);
 
+  auto validatedReq = sender->init();
+  if (validatedReq.errorCode != OK) {
+    LOG(ERROR) << "Couldn't init sender with request for " << wdtNamespace
+               << " " << secondKey;
+    return validatedReq.errorCode;
+  }
   auto transferReport = sender->transfer();
   ErrorCode ret = transferReport->getSummary().getErrorCode();
   wdtController->releaseSender(wdtNamespace, secondKey);

@@ -43,15 +43,18 @@ class Sender : public WdtBase {
    */
   Sender(const std::string &destHost, const std::string &srcDir);
 
+  // TODO: get rid of this constructor
   /**
    * @param destHost    destination hostname
    * @param srcDir      source directory
    * @param ports       list of destination ports
    * @param srcFileInfo list of (file, size) pair
+   * @param disableDirectoryTraversal use fileInfo even if empty
    */
   Sender(const std::string &destHost, const std::string &srcDir,
          const std::vector<int32_t> &ports,
-         const std::vector<FileInfo> &srcFileInfo);
+         const std::vector<WdtFileInfo> &srcFileInfo,
+         bool disableDirectoryTraversal);
 
   /// Setup before start (@see WdtBase.h)
   const WdtTransferRequest &init() override;
@@ -103,11 +106,11 @@ class Sender : public WdtBase {
 
   /// Sets specific files to be transferred
   /// @param setFileInfo      list of (file, size) pair
-  void setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo);
+  void setSrcFileInfo(const std::vector<WdtFileInfo> &srcFileInfo);
 
   /// Sets whether to follow symlink or not
   /// @param followSymlinks   whether to follow symlinks or not
-  void setFollowSymlinks(const bool followSymlinks);
+  void setFollowSymlinks(bool followSymlinks);
 
   /// Get the destination sender is sending to
   /// @return     destination host-name
@@ -128,29 +131,33 @@ class Sender : public WdtBase {
   /// @return    minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
 
-  typedef std::unique_ptr<ClientSocket> (*SocketCreator)(
-      const std::string &dest, const int port,
-      IAbortChecker const *abortChecker,
-      const EncryptionParams &encryptionParams);
+  /// Interface to make socket
+  class ISocketCreator {
+   public:
+    virtual std::unique_ptr<ClientSocket> makeSocket(
+        ThreadCtx &threadCtx, const std::string &dest, const int port,
+        const EncryptionParams &encryptionParams) = 0;
+
+    virtual ~ISocketCreator() {
+    }
+  };
 
   /**
    * Sets socket creator
    *
    * @param socketCreator   socket-creator to be used
    */
-  void setSocketCreator(const SocketCreator socketCreator);
+  void setSocketCreator(ISocketCreator *socketCreator);
 
  private:
   friend class SenderThread;
   friend class QueueAbortChecker;
 
+  /// Validate the transfer request
+  ErrorCode validateTransferRequest() override;
+
   /// Get the sum of all the thread transfer stats
   TransferStats getGlobalTransferStats() const;
-
-  /// Method responsible for sending one source to the destination
-  virtual TransferStats sendOneByteSource(
-      const std::unique_ptr<ClientSocket> &socket,
-      const std::unique_ptr<ByteSource> &source, ErrorCode transferStatus);
 
   /// Returns true if file chunks need to be read
   bool isSendFileChunks() const;
@@ -204,6 +211,8 @@ class Sender : public WdtBase {
    */
   void reportProgress();
 
+  void logPerfStats() const override;
+
   /// Address of the destination host where the files are sent
   const std::string destHost_;
   /// Pointer to DirectorySourceQueue which reads the srcDir and the files
@@ -215,7 +224,7 @@ class Sender : public WdtBase {
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
   /// Socket creator used to optionally create different kinds of client socket
-  SocketCreator socketCreator_{nullptr};
+  ISocketCreator *socketCreator_{nullptr};
   /// Whether download resumption is enabled or not
   bool downloadResumptionEnabled_{false};
   /// Flags representing whether file chunks have been received or not

@@ -141,6 +141,8 @@ class Receiver : public WdtBase {
    */
   std::unique_ptr<TransferReport> getTransferReport();
 
+  void logPerfStats() const override;
+
   /// @return     transfer config encoded as int
   int64_t getTransferConfig() const;
 
@@ -184,9 +186,6 @@ class Receiver : public WdtBase {
 
   /// Marks when a new transfer has started
   std::atomic<bool> hasNewTransferStarted_{false};
-
-  /// Buffer size used by this receiver
-  int64_t bufferSize_;
 
   /// Backlog used by the sockets
   int backlog_;

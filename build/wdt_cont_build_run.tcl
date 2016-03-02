@@ -109,7 +109,7 @@ if {$os == "Darwin"} {
      time fbconfig --clang -r wdt &&\
      time fbmake opt &&\
      time wdt/test/wdt_max_send_test.sh |& tail -50 &&\
-     time wdt/test/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
+     EXTRA_WDT_OPTIONS=\"-scuba_dataset=wdt_transfer_report_test\" time wdt/test/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
      time fbconfig --sanitize address -r wdt &&\
      time fbmake dbg &&\
      time $timeoutCmd $maxTestDuration fbmake runtests --extended-tests --run-disabled --record-results --return-nonzero-on-timeouts &&\

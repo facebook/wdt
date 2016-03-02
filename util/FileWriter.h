@@ -18,9 +18,9 @@ namespace wdt {
 
 class FileWriter : public Writer {
  public:
-  FileWriter(int threadIndex, BlockDetails const *blockDetails,
+  FileWriter(ThreadCtx &threadCtx, BlockDetails const *blockDetails,
              FileCreator *fileCreator)
-      : threadIndex_(threadIndex),
+      : threadCtx_(threadCtx),
         blockDetails_(blockDetails),
 #ifdef HAS_SYNC_FILE_RANGE
         nextSyncOffset_(blockDetails->offset),
@@ -55,11 +55,10 @@ class FileWriter : public Writer {
    */
   void syncFileRange(int64_t written, bool forced);
 
+  ThreadCtx &threadCtx_;
+
   /// file handler
   int fd_{-1};
-  /// index of the owner receiver thread. This is needed for co-ordination of
-  /// disk space allocation in fileCreator
-  int threadIndex_;
 
   /// details of the block
   BlockDetails const *blockDetails_;

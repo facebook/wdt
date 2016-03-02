@@ -19,8 +19,10 @@
  * initializeFromFlags()
  */
 #include <wdt/util/WdtFlagsMacros.h>
-WDT_OPT(start_port, int32, "Starting port number for wdt");
+WDT_OPT(start_port, int32, "Starting port number for wdt, if set, "
+                    "implies static_ports");
 WDT_OPT(num_ports, int32, "Number of sockets");
+WDT_OPT(static_ports, bool, "Use static ports (start_port) or any free port");
 WDT_OPT(ipv6, bool, "prefers ipv6");
 WDT_OPT(ipv4, bool, "use ipv4 only, takes precedence over -ipv6");
 WDT_OPT(ignore_open_errors, bool, "will continue despite open errors");
@@ -39,15 +41,15 @@ WDT_OPT(block_size_mbytes, double,
         "Size of the blocks that files will be divided in, specify negative "
         "to disable the file splitting mode");
 WDT_OPT(avg_mbytes_per_sec, double,
-        "Target transfer rate in mbytes/sec that should be "
+        "Target transfer rate in Mbytes/sec that should be "
         "maintained, specify negative for unlimited");
 WDT_OPT(max_mbytes_per_sec, double,
-        "Peak transfer rate in mbytes/sec that should be "
+        "Peak transfer rate in Mbytes/sec that should be "
         "maintained, specify negative for unlimited and 0 for "
         "auto configure. In auto configure mode peak rate will "
         "be 1.2 times average rate");
 WDT_OPT(throttler_bucket_limit, double,
-        "Limit of burst in mbytes to control how "
+        "Limit of burst in Mbytes to control how "
         "much data you can send at unlimited speed. Unless "
         "you specify a peak rate of -1, wdt will either use "
         "your burst limit (if not 0) or max burst possible at a time "
@@ -155,9 +157,17 @@ WDT_OPT(overwrite, bool, "Allow the receiver to overwrite existing files");
 WDT_OPT(drain_extra_ms, int32,
         "Extra time buffer to account for network when sender waits for "
         "receiver to finish processing buffered data");
+WDT_OPT(encryption_type, string,
+        "Encryption type to use. WDT currently "
+        "supports aes128ctr (fastest but no integrity check) and "
+        "aes128gcm (recommended, default). "
+        "A value of none disables encryption (fastest but insecure)");
+WDT_OPT(send_buffer_size, int32,
+        "Send buffer size for sender sockets. If <= 0, buffer size is not set");
+WDT_OPT(receive_buffer_size, int32,
+        "Receive buffer size for receiver sockets. If <= 0, buffer size is not "
+        "set");
 WDT_OPT(
-    encryption_type, string,
-    "Encryption type to use. WDT currently "
-    "supports aes128ctr (fastest but no integrity check) and "
-    "aes128gcm (recommended, default). "
-    "A value of none disables encryption (fastest but insecure)");
+    delete_extra_files, bool,
+    "If true, extra files on the receiver side is deleted during resumption");
+WDT_OPT(skip_fadvise, bool, "If true, fadvise is skipped after block write");

@@ -28,6 +28,14 @@ at any given point some threads are reading while others are writing, and data
 is buffered on both paths - keeping each subsystem busy while minimizing
 kernel to userspace switches.
 
+## Terminology
+WDT uses "Mbytes" everywhere in its output as 1024*1024 bytes = 1048576 bytes
+(technically this should be the new mebibyte (MiB) standard but it felt
+Mbytes is be more in line with what other tools are using, clearer, easier
+to read and matching what a traditional "megabyte" used to mean in historical
+memory units where the address lines are binary and thus power of two and not
+of ten)
+
 ## Example
 
 While WDT is primarily a library, we also have a small command line tool
@@ -45,7 +53,7 @@ Sender side: (discover and sends all files in a directory tree to destination)
 [=================================================] 100% 588.8 Mbytes/s
 I0720 21:48:08.446014 3245296 Sender.cpp:314] Total sender time = 2.68699
 seconds (0.00640992 dirTime). Transfer summary : Transfer status = OK. Number
-of files transferred = 1887. Data Mbytes = 1582.08. Header kBytes = 62.083
+of files transferred = 1887. Data Mbytes = 1582.08. Header Kbytes = 62.083
 (0.00383215% overhead). Total bytes = 1658999858. Wasted bytes due to
 failure = 0 (0% overhead). Total sender throughput = 588.816 Mbytes/sec
 (590.224 Mbytes/sec pure transf rate)
@@ -56,8 +64,6 @@ a linux distribution), but not much data (~1.5Gbyte), the maximum
 speed isn't as good as it would with more data (as there is still a TCP ramp
 up time even though it's faster because of parallelization) like when we use
 it in our production use cases.
-
-See "wcp.sh" (which installs as "wcp") for a more detailed example.
 
 ## Performance/Results
 
@@ -302,15 +308,20 @@ wdt_max_send_test.sh
 (facebook only:)
 Make sure to do the following, before "arc diff":
 ```
- (cd wdt ; ./build/clangformat.sh ; ./build/version_update.tcl )
+ (cd wdt ; ./build/clangformat.sh )
+ # if you changed the minor version of the protocol (in CMakeLists.txt)
+ # run (cd wdt ; ./build/version_update.tcl ) to sync with fbcode's WdtConfig.h
 
- fbconfig  --clang --with-project-version clang:dev -r  wdt
+ fbconfig  --clang --sanitize=address -r  wdt
 
  fbmake runtests --run-disabled --extended-tests
+ # Optionally: opt build
  fbmake runtests_opt
  fbmake opt
-
+ # Sender max speed test
  wdt/test/wdt_max_send_test.sh
+ # Check buck build
+ buck build wdt/...
 ```
 
 and check the output of the last step to make sure one of the 3 runs is

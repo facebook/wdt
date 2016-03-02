@@ -41,7 +41,23 @@ def get_wdt_version():
     print("Receiver " + receiver_binary + " version is " + protocol_string)
     return protocol_string.split()[4]
 
+def extend_wdt_options(cmd):
+    extra_options = get_env('EXTRA_WDT_OPTIONS')
+    if extra_options:
+        print("extra options " + extra_options)
+        cmd = cmd + " " + extra_options
+    encryption_type = get_env('ENCRYPTION_TYPE')
+    if encryption_type:
+        print("encryption_type " + encryption_type)
+        cmd = cmd + " -encryption_type=" + encryption_type
+    enable_checksum = get_env('ENABLE_CHECKSUM')
+    if enable_checksum:
+        print("enable_checksum " + enable_checksum)
+        cmd = cmd + " -enable_checksum=" + enable_checksum
+    return cmd
+
 def start_receiver(receiver_cmd, root_dir, test_count):
+    receiver_cmd = extend_wdt_options(receiver_cmd)
     print("Receiver: " + receiver_cmd)
     server_log = "{0}/server{1}.log".format(root_dir, test_count)
     receiver_process = subprocess.Popen(receiver_cmd.split(),
@@ -53,13 +69,13 @@ def start_receiver(receiver_cmd, root_dir, test_count):
     return (receiver_process, connection_url)
 
 def run_sender(sender_cmd, root_dir, test_count):
+    sender_cmd = extend_wdt_options(sender_cmd)
     # TODO: fix this to not use tee, this is python...
     sender_cmd = "bash -c \"set -o pipefail; " + sender_cmd \
                 + " 2>&1 | tee {0}/client{1}.log\"".format(root_dir, test_count)
     print("Sender: " + sender_cmd)
     # return code of system is shifted by 8 bytes
     return os.system(sender_cmd) >> 8
-
 
 def run_sender_arg(sender_arg, root_dir, test_count):
     global sender_binary

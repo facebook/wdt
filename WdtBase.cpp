@@ -14,7 +14,13 @@ using namespace std;
 namespace facebook {
 namespace wdt {
 
+// TODO: force callers to pass options in
 WdtBase::WdtBase() : abortCheckerCallback_(this) {
+  options_.copyInto(WdtOptions::get());
+}
+
+void WdtBase::setWdtOptions(const WdtOptions& src) {
+  options_.copyInto(src);
 }
 
 WdtBase::~WdtBase() {
@@ -95,9 +101,46 @@ std::string WdtBase::getTransferId() {
   return transferRequest_.transferId;
 }
 
+void WdtBase::checkAndUpdateBufferSize() {
+  int64_t bufSize = options_.buffer_size;
+  if (bufSize < Protocol::kMaxHeader) {
+    bufSize = Protocol::kMaxHeader;
+    LOG(WARNING) << "Specified buffer size " << options_.buffer_size
+                 << " less than " << Protocol::kMaxHeader << ", using "
+                 << bufSize;
+  }
+  if (bufSize % kDiskBlockSize != 0) {
+    int64_t alignedBufSize =
+        ((bufSize + kDiskBlockSize - 1) / kDiskBlockSize) * kDiskBlockSize;
+    LOG(WARNING) << "Buffer size " << bufSize
+                 << " not divisible by disk block size " << kDiskBlockSize
+                 << ", changing it to " << alignedBufSize;
+    bufSize = alignedBufSize;
+  }
+  options_.buffer_size = bufSize;
+}
+
 WdtBase::TransferStatus WdtBase::getTransferStatus() {
   std::lock_guard<std::mutex> lock(mutex_);
   return transferStatus_;
+}
+
+ErrorCode WdtBase::validateTransferRequest() {
+  ErrorCode code = transferRequest_.errorCode;
+  if (code != OK) {
+    LOG(ERROR) << "WDT object initiated with erroneous transfer request "
+               << transferRequest_.getLogSafeString();
+    return code;
+  }
+  if (transferRequest_.directory.empty() ||
+      (transferRequest_.protocolVersion < 0) ||
+      transferRequest_.ports.empty()) {
+    LOG(ERROR) << "Transfer request validation failed for wdt object "
+               << transferRequest_.getLogSafeString();
+    code = INVALID_REQUEST;
+    transferRequest_.errorCode = code;
+  }
+  return code;
 }
 
 void WdtBase::setTransferStatus(TransferStatus transferStatus) {
@@ -116,8 +159,7 @@ bool WdtBase::isStale() {
 void WdtBase::configureThrottler() {
   WDT_CHECK(!throttler_);
   VLOG(1) << "Configuring throttler options";
-  const auto& options = WdtOptions::get();
-  throttler_ = Throttler::makeThrottler(options);
+  throttler_ = Throttler::makeThrottler(options_);
   if (throttler_) {
     LOG(INFO) << "Enabling throttling " << *throttler_;
   } else {

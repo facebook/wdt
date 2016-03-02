@@ -2,9 +2,16 @@
 
 source `dirname "$0"`/common_functions.sh
 
-set -o pipefail
-
 startNewTransfer() {
+  if [ "$1" == "add" ] && [ $DELETE_EXTRA_FILES == "true" ]; then
+    echo "Adding extra files for test ${TEST_COUNT}"
+    fallocate -l 20M $SRC_DIR/extra_file${TEST_COUNT}_1
+    fallocate -l 80M $SRC_DIR/extra_file${TEST_COUNT}_2
+  fi
+  if [ "$1" == "remove" ] && [ $DELETE_EXTRA_FILES == "true" ]; then
+    echo "Removing extra files for test ${TEST_COUNT}"
+    rm $SRC_DIR/extra_file${TEST_COUNT}_1 $SRC_DIR/extra_file${TEST_COUNT}_2 
+  fi
   $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} -start_port=$STARTING_PORT \
   -transfer_id=$RECEIVER_ID -protocol_version=$RECEIVER_PROTOCOL_VERSION \
   -recovery_id=$RECOVERY_ID -disable_preallocation=$DISABLE_PREALLOCATION \
@@ -13,6 +20,7 @@ startNewTransfer() {
   $WDTBIN_CLIENT -directory $SRC_DIR -destination $HOSTNAME \
   -start_port=$STARTING_PORT -block_size_mbytes=$BLOCK_SIZE_MBYTES \
   -transfer_id=$SENDER_ID -protocol_version=$SENDER_PROTOCOL_VERSION \
+  -two_phases=$TWO_PHASES \
   |& tee -a $DIR/client${TEST_COUNT}.log &
   pidofsender=$!
 }
@@ -22,6 +30,7 @@ The possible options to this script are
 -s sender protocol version
 -r receiver protocol version
 -p start port
+-d turns on file deletion 
 -c combination of options to run. Valid values are 1, 2, 3 and 4.
    1. pre-allocation and block-mode enabled, resumption done using transfer log
    2. pre-allocation disabled, block-mode enabled, resumption done using
@@ -45,17 +54,17 @@ RECOVERY_ID="foo"
 
 STARTING_PORT=25000
 
-if [ "$1" == "-h" ]; then
-  echo "$usage"
-  wdtExit 0
-fi
-while getopts ":c:s:p:r:h:" opt; do
+DELETE_EXTRA_FILES=false
+
+while getopts ":c:s:p:r:dh" opt; do
   case $opt in
     s) SENDER_PROTOCOL_VERSION="$OPTARG"
     ;;
     r) RECEIVER_PROTOCOL_VERSION="$OPTARG"
     ;;
     p) STARTING_PORT="$OPTARG"
+    ;;
+    d) DELETE_EXTRA_FILES=true
     ;;
     c)
       case $OPTARG in
@@ -93,6 +102,10 @@ done
 
 setBinaries
 
+if [ -z "$TWO_PHASES" ]; then
+  TWO_PHASES=false
+fi
+
 echo "sender protocol version $SENDER_PROTOCOL_VERSION, receiver protocol \
 version $RECEIVER_PROTOCOL_VERSION"
 
@@ -116,7 +129,7 @@ WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -treat_fewer_port_as_error \
 -resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection \
--connect_timeout_millis 100 \
+-connect_timeout_millis 100 -delete_extra_files=$DELETE_EXTRA_FILES \
 -exit_on_bad_flags=false"
 extendWdtOptions
 WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS -buffer_size=2097152"
@@ -156,12 +169,12 @@ checkLastCmdStatusExpectingFailure
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Download resumption test(1)"
-startNewTransfer
+startNewTransfer add
 sleep 5
 killCurrentTransfer
 # rm a file to create an invalid log entry
 rm -f $DIR/dst${TEST_COUNT}/file0
-startNewTransfer
+startNewTransfer remove
 sleep 5
 killCurrentTransfer
 startNewTransfer
@@ -170,12 +183,12 @@ verifyTransferAndCleanup
 TEST_COUNT=$((TEST_COUNT + 1))
 
 echo "Download resumption test(2)"
-startNewTransfer
+startNewTransfer add
 sleep 5
 killCurrentTransfer
 # change the file size in the receiver side
 fallocate -l 70M $DIR/dst${TEST_COUNT}/file0
-startNewTransfer
+startNewTransfer remove
 sleep 5
 killCurrentTransfer
 startNewTransfer
@@ -248,10 +261,10 @@ if [ $RESUME_USING_DIR_TREE == "false" ]; then
 fi
 
 echo "Download resumption with network error test"
-startNewTransfer
+startNewTransfer add
 sleep 10
 killCurrentTransfer
-startNewTransfer
+startNewTransfer remove
 simulateNetworkGlitchesByDropping
 waitForTransferEnd
 verifyTransferAndCleanup

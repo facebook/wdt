@@ -9,7 +9,7 @@
 # make -j
 # )
 #
-#  Copyright (c) 2014, Facebook, Inc.
+#  Copyright (c) 2014-present, Facebook, Inc.
 #  All rights reserved.
 #
 #  This source code is licensed under the BSD-style license found in the
@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.24.1512180)
+project("WDT" LANGUAGES C CXX VERSION 1.26.1603020)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -50,11 +50,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "_bin/wdt")
 
 # Check that we have the Folly source tree
 set(FOLLY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../folly" CACHE path
-    "Folly source tree (folly/ThreadLocal.h should be reachable from there")
+    "Folly source tree (folly/Conv.h should be reachable from there")
 # Check for folly - TODO: this doesn't work well for relative paths
 # (because of relative to build dir vs relative to source tree for -I)
-if(NOT EXISTS "${FOLLY_SOURCE_DIR}/folly/ThreadLocal.h")
-  MESSAGE(FATAL_ERROR "${FOLLY_SOURCE_DIR}/folly/ThreadLocal.h not found
+if(NOT EXISTS "${FOLLY_SOURCE_DIR}/folly/Conv.h")
+  MESSAGE(FATAL_ERROR "${FOLLY_SOURCE_DIR}/folly/Conv.h not found
 Fix using:
 (in a sister directory of the wdt source tree - same level:)
 git clone https://github.com/facebook/folly.git
@@ -68,11 +68,10 @@ set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Checksum.cpp"
-"${FOLLY_SOURCE_DIR}/folly/detail/ThreadLocalDetail.cpp"
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
-add_library(wdtlib_min
+add_library(wdt_min
 util/WdtSocket.cpp
 util/ClientSocket.cpp
 util/EncryptionUtils.cpp
@@ -91,7 +90,6 @@ util/ThreadTransferHistory.cpp
 SenderThread.cpp
 Sender.cpp
 util/ServerSocket.cpp
-util/SocketUtils.cpp
 Throttler.cpp
 WdtOptions.cpp
 util/FileWriter.cpp
@@ -99,12 +97,13 @@ util/TransferLogManager.cpp
 util/SerializationUtil.cpp
 WdtBase.cpp
 WdtResourceController.cpp
+util/CommonImpl.cpp
 )
-add_library(wdtlib
+add_library(wdt
 util/WdtFlags.cpp
 Wdt.cpp
 )
-target_link_libraries(wdtlib wdtlib_min)
+target_link_libraries(wdt wdt_min)
 
 
 
@@ -127,7 +126,7 @@ find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
 # You can also add jemalloc to the list if you have it/want it
-target_link_libraries(wdtlib_min
+target_link_libraries(wdt_min
   folly4wdt
   ${GLOG_LIBRARY}
   ${GFLAGS_LIBRARY}
@@ -146,6 +145,7 @@ include(CheckCXXSourceCompiles)
 check_function_exists(posix_fallocate HAS_POSIX_FALLOCATE)
 check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
 check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
+check_function_exists(posix_fadvise HAS_POSIX_FADVISE)
 # C based check (which fail with the c++ setting thereafter...)
 check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
 set(SAVE_CMRL ${CMAKE_REQUIRED_LIBRARIES}) #globals are evil/ugly
@@ -201,23 +201,38 @@ include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-add_executable(wdt wdtCmdLine.cpp util/WdtFlags.cpp Wdt.cpp)
-set_target_properties(wdt PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
+add_executable(wdtbin wdtCmdLine.cpp util/WdtFlags.cpp Wdt.cpp)
+set_target_properties(wdtbin PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
 
-target_link_libraries(wdt wdtlib_min)
+target_link_libraries(wdtbin wdt_min)
 
 ### Install rules
-
-install(TARGETS wdt wdtlib wdtlib_min folly4wdt
+set_target_properties(wdtbin PROPERTIES RUNTIME_OUTPUT_NAME "wdt")
+install(TARGETS wdtbin wdt wdt_min folly4wdt
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   )
+
+### Install header files
+
+# Find the . files in the root directory
+
+file(GLOB headers "*.h")
+foreach(header ${headers})
+  install(FILES ${header} DESTINATION include/wdt)
+endforeach()
+
+# Install the .h files in the util with directory structure maintained
+
+install(DIRECTORY "${PROJECT_SOURCE_DIR}/util" DESTINATION include/wdt
+        FILES_MATCHING PATTERN "*.h")
+
 # wcp script
 install(PROGRAMS test/wcp.sh DESTINATION bin RENAME wcp)
 
 
-### Everything below is about testing (and not required to create wdt/wdtlib)
+### Everything below is about testing (and not required to create wdt/wdt)
 
 if (BUILD_TESTING)
 
@@ -225,8 +240,7 @@ if (BUILD_TESTING)
 
   # Extra code that we use in tests
   add_library(wdt4tests_min
-    "${FOLLY_SOURCE_DIR}/folly/FileUtil.cpp" # used by Random used by tests
-    "${FOLLY_SOURCE_DIR}/folly/Random.cpp" # used indirectly by tests
+    test/TestCommon.cpp
   )
 
   include(ExternalProject)
@@ -262,7 +276,7 @@ if (BUILD_TESTING)
 # so ugly weird hack generating warnings about unknown dir for now:
   target_link_libraries(wdt4tests_min
     "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
-    wdtlib_min
+    wdt_min
   )
 
   add_library(wdt4tests

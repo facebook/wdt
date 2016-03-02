@@ -1,18 +1,20 @@
 #include <wdt/util/WdtSocket.h>
-#include <wdt/util/SocketUtils.h>
 #include <wdt/Protocol.h>
 #include <folly/Bits.h>
 #include <folly/String.h>  // for humanify
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/ioctl.h>
+#ifdef WDT_HAS_SOCKIOS_H
+#include <linux/sockios.h>
+#endif
 
 namespace facebook {
 namespace wdt {
 
-WdtSocket::WdtSocket(const int port, IAbortChecker const *abortChecker,
+WdtSocket::WdtSocket(ThreadCtx &threadCtx, const int port,
                      const EncryptionParams &encryptionParams)
-    : port_(port),
-      abortChecker_(abortChecker),
-      encryptionParams_(encryptionParams),
-      options_(WdtOptions::get()) {
+    : port_(port), threadCtx_(threadCtx), encryptionParams_(encryptionParams) {
 }
 
 // TODO: consider refactoring this to return error code
@@ -34,7 +36,8 @@ void WdtSocket::readEncryptionSettingsOnce(int timeoutMs) {
     return;
   }
   int toRead = Protocol::kMaxEncryption - 1;  // already read 1 byte for cmd
-  numRead = readInternal(buf_, toRead, options_.read_timeout_millis, true);
+  numRead = readInternal(buf_, toRead,
+                         threadCtx_.getOptions().read_timeout_millis, true);
   if (numRead != toRead) {
     LOG(ERROR) << "Failed to read encryption settings " << numRead << " "
                << toRead << " " << port_;
@@ -72,7 +75,7 @@ void WdtSocket::writeEncryptionSettingsOnce() {
   }
   WDT_CHECK(!encryptionParams_.getSecret().empty());
 
-  int timeoutMs = WdtOptions::get().write_timeout_millis;
+  int timeoutMs = threadCtx_.getOptions().write_timeout_millis;
   std::string iv;
   if (!encryptor_.start(encryptionParams_, iv)) {
     writeErrorCode_ = ENCRYPTION_ERROR;
@@ -92,8 +95,7 @@ void WdtSocket::writeEncryptionSettingsOnce() {
 }
 
 int WdtSocket::readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull) {
-  int numRead = SocketUtils::readWithAbortCheck(fd_, buf, nbyte, abortChecker_,
-                                                timeoutMs, tryFull);
+  int numRead = readWithAbortCheck(buf, nbyte, timeoutMs, tryFull);
   if (numRead == 0) {
     readErrorCode_ = SOCKET_READ_ERROR;
     return 0;
@@ -116,9 +118,8 @@ int WdtSocket::writeInternal(const char *buf, int nbyte, int timeoutMs,
   int count = 0;
   int written = 0;
   while (written < nbyte) {
-    int w = SocketUtils::writeWithAbortCheck(
-        fd_, buf + written, nbyte - written, abortChecker_, timeoutMs,
-        /* always try to write everything */ true);
+    int w = writeWithAbortCheck(buf + written, nbyte - written, timeoutMs,
+                                /* always try to write everything */ true);
     if (w <= 0) {
       writeErrorCode_ = SOCKET_WRITE_ERROR;
       return (written > 0 ? written : -1);
@@ -149,7 +150,8 @@ int WdtSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
   if (supportUnencryptedPeer_ && readErrorCode_ == UNEXPECTED_CMD_ERROR) {
     LOG(WARNING)
         << "Turning off encryption since the other side does not support "
-           "encryption " << port_;
+           "encryption "
+        << port_;
     readErrorCode_ = OK;
     buf[0] = buf_[0];
     numRead = 1;
@@ -171,8 +173,23 @@ int WdtSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
   if (!encrypt) {
     return numRead;
   }
+  int numDecrypted = 0;
+  if (ctxSaveOffset_ >= 0) {
+    if (ctxSaveOffset_ <= numRead) {
+      if (!decryptor_.decrypt(buf, ctxSaveOffset_, buf)) {
+        readErrorCode_ = ENCRYPTION_ERROR;
+        return -1;
+      }
+      decryptor_.saveContext();
+      numDecrypted = ctxSaveOffset_;
+      ctxSaveOffset_ = CTX_SAVED;
+    } else {
+      ctxSaveOffset_ -= numRead;
+    }
+  }
   // have to decrypt data
-  if (!decryptor_.decrypt((uint8_t *)buf, numRead, (uint8_t *)buf)) {
+  if (!decryptor_.decrypt((buf + numDecrypted), (numRead - numDecrypted),
+                          (buf + numDecrypted))) {
     readErrorCode_ = ENCRYPTION_ERROR;
     return -1;
   }
@@ -180,7 +197,8 @@ int WdtSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
 }
 
 int WdtSocket::read(char *buf, int nbyte, bool tryFull) {
-  return readWithTimeout(buf, nbyte, options_.read_timeout_millis, tryFull);
+  return readWithTimeout(buf, nbyte,
+                         threadCtx_.getOptions().read_timeout_millis, tryFull);
 }
 
 int WdtSocket::write(char *buf, int nbyte, bool retry) {
@@ -195,16 +213,82 @@ int WdtSocket::write(char *buf, int nbyte, bool retry) {
     return -1;
   }
   bool encrypt = encryptionParams_.isSet();
-  if (encrypt && !encryptor_.encrypt((uint8_t *)buf, nbyte, (uint8_t *)buf)) {
+  if (encrypt && !encryptor_.encrypt(buf, nbyte, buf)) {
     writeErrorCode_ = ENCRYPTION_ERROR;
     return -1;
   }
-  int written = writeInternal(buf, nbyte, options_.write_timeout_millis, retry);
+  int written = writeInternal(
+      buf, nbyte, threadCtx_.getOptions().write_timeout_millis, retry);
   if (written != nbyte) {
     LOG(ERROR) << "Socket write failure " << written << " " << nbyte;
     writeErrorCode_ = SOCKET_WRITE_ERROR;
   }
   return written;
+}
+
+int64_t WdtSocket::readWithAbortCheck(char *buf, int64_t nbyte, int timeoutMs,
+                                      bool tryFull) {
+  PerfStatCollector statCollector(threadCtx_, PerfStatReport::SOCKET_READ);
+  return ioWithAbortCheck(::read, buf, nbyte, timeoutMs, tryFull);
+}
+
+int64_t WdtSocket::writeWithAbortCheck(const char *buf, int64_t nbyte,
+                                       int timeoutMs, bool tryFull) {
+  PerfStatCollector statCollector(threadCtx_, PerfStatReport::SOCKET_WRITE);
+  return ioWithAbortCheck(::write, buf, nbyte, timeoutMs, tryFull);
+}
+
+template <typename F, typename T>
+int64_t WdtSocket::ioWithAbortCheck(F readOrWrite, T tbuf, int64_t numBytes,
+                                    int timeoutMs, bool tryFull) {
+  WDT_CHECK(threadCtx_.getAbortChecker() != nullptr)
+      << "abort checker can not be null";
+  bool checkAbort = (threadCtx_.getOptions().abort_check_interval_millis > 0);
+  auto startTime = Clock::now();
+  int64_t doneBytes = 0;
+  int retries = 0;
+  while (doneBytes < numBytes) {
+    const int64_t ret =
+        readOrWrite(fd_, tbuf + doneBytes, numBytes - doneBytes);
+    if (ret < 0) {
+      // error
+      if (errno != EINTR && errno != EAGAIN) {
+        PLOG(ERROR) << "non-retryable error encountered during socket io "
+                    << fd_ << " " << doneBytes << " " << retries;
+        return (doneBytes > 0 ? doneBytes : ret);
+      }
+    } else if (ret == 0) {
+      // eof
+      VLOG(1) << "EOF received during socket io. fd : " << fd_
+              << ", finished bytes : " << doneBytes
+              << ", retries : " << retries;
+      return doneBytes;
+    } else {
+      // success
+      doneBytes += ret;
+      if (!tryFull) {
+        // do not have to read/write entire data
+        return doneBytes;
+      }
+    }
+    if (checkAbort && threadCtx_.getAbortChecker()->shouldAbort()) {
+      LOG(ERROR) << "transfer aborted during socket io " << fd_ << " "
+                 << doneBytes << " " << retries;
+      return (doneBytes > 0 ? doneBytes : -1);
+    }
+    if (timeoutMs > 0) {
+      int duration = durationMillis(Clock::now() - startTime);
+      if (duration >= timeoutMs) {
+        LOG(INFO) << "socket io timed out after " << duration << " ms, retries "
+                  << retries << " fd " << fd_ << " doneBytes " << doneBytes;
+        return (doneBytes > 0 ? doneBytes : -1);
+      }
+    }
+    retries++;
+  }
+  VLOG_IF(1, retries > 1) << "socket io for " << doneBytes << " bytes took "
+                          << retries << " retries";
+  return doneBytes;
 }
 
 ErrorCode WdtSocket::shutdownWrites() {
@@ -228,13 +312,13 @@ ErrorCode WdtSocket::expectEndOfStream() {
 
 ErrorCode WdtSocket::finalizeReads(bool doTagIOs) {
   VLOG(1) << "Finalizing reads/encryption " << port_ << " " << fd_;
-  const int toRead = decryptor_.expectsTag();
+  const int toRead = encryptionTypeToTagLen(encryptionParams_.getType());
   std::string tag;
   ErrorCode code = OK;
   if (toRead && doTagIOs) {
     tag.resize(toRead);
     int read = readInternal(&(tag.front()), tag.size(),
-                            options_.read_timeout_millis, true);
+                            threadCtx_.getOptions().read_timeout_millis, true);
     if (read != toRead) {
       LOG(ERROR) << "Unable to read tag at end of stream got " << read
                  << " needed " << toRead << " " << folly::humanify(tag);
@@ -242,10 +326,10 @@ ErrorCode WdtSocket::finalizeReads(bool doTagIOs) {
       code = ENCRYPTION_ERROR;
     }
   }
-  decryptor_.setTag(tag);
-  if (!decryptor_.finish()) {
+  if (!decryptor_.finish(tag)) {
     code = ENCRYPTION_ERROR;
   }
+  ctxSaveOffset_ = OFFSET_NOT_SET;
   readsFinalized_ = true;
   return code;
 }
@@ -253,12 +337,12 @@ ErrorCode WdtSocket::finalizeReads(bool doTagIOs) {
 ErrorCode WdtSocket::finalizeWrites(bool doTagIOs) {
   VLOG(1) << "Finalizing writes/encryption " << port_ << " " << fd_;
   ErrorCode code = OK;
-  if (!encryptor_.finish()) {
+  std::string tag;
+  if (!encryptor_.finish(tag)) {
     code = ENCRYPTION_ERROR;
   }
-  const std::string &tag = encryptor_.getTag();
   if (!tag.empty() && doTagIOs) {
-    const int timeoutMs = WdtOptions::get().write_timeout_millis;
+    const int timeoutMs = threadCtx_.getOptions().write_timeout_millis;
     const int expected = tag.size();
     if (writeInternal(tag.data(), tag.size(), timeoutMs, false) != expected) {
       PLOG(ERROR) << "Encryption Tag write error";
@@ -337,9 +421,104 @@ ErrorCode WdtSocket::getNonRetryableErrCode() const {
   return errCode;
 }
 
+void WdtSocket::saveDecryptorCtx(const int offset) {
+  WDT_CHECK_EQ(OFFSET_NOT_SET, ctxSaveOffset_);
+  ctxSaveOffset_ = offset;
+}
+
+bool WdtSocket::verifyTag(std::string &tag) {
+  WDT_CHECK_EQ(CTX_SAVED, ctxSaveOffset_);
+  bool status = decryptor_.verifyTag(tag);
+  ctxSaveOffset_ = OFFSET_NOT_SET;
+  return status;
+}
+
+int WdtSocket::getEffectiveTimeout(int networkTimeout) {
+  int abortInterval = threadCtx_.getOptions().abort_check_interval_millis;
+  if (abortInterval <= 0) {
+    return networkTimeout;
+  }
+  if (networkTimeout <= 0) {
+    return abortInterval;
+  }
+  return std::min(networkTimeout, abortInterval);
+}
+
+void WdtSocket::setSocketTimeouts() {
+  int readTimeout =
+      getEffectiveTimeout(threadCtx_.getOptions().read_timeout_millis);
+  if (readTimeout > 0) {
+    struct timeval tv;
+    tv.tv_sec = readTimeout / 1000;            // milli to sec
+    tv.tv_usec = (readTimeout % 1000) * 1000;  // milli to micro
+    if (setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,
+                   sizeof(struct timeval)) != 0) {
+      PLOG(ERROR) << "Unable to set read timeout for " << port_ << " " << fd_;
+    }
+  }
+  int writeTimeout =
+      getEffectiveTimeout(threadCtx_.getOptions().write_timeout_millis);
+  if (writeTimeout > 0) {
+    struct timeval tv;
+    tv.tv_sec = writeTimeout / 1000;            // milli to sec
+    tv.tv_usec = (writeTimeout % 1000) * 1000;  // milli to micro
+    if (setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv,
+                   sizeof(struct timeval)) != 0) {
+      PLOG(ERROR) << "Unable to set write timeout for " << port_ << " " << fd_;
+    }
+  }
+}
+
+/* static */
+bool WdtSocket::getNameInfo(const struct sockaddr *sa, socklen_t salen,
+                            std::string &host, std::string &port) {
+  char hostBuf[NI_MAXHOST], portBuf[NI_MAXSERV];
+  int res = getnameinfo(sa, salen, hostBuf, sizeof(hostBuf), portBuf,
+                        sizeof(portBuf), NI_NUMERICHOST | NI_NUMERICSERV);
+  if (res) {
+    LOG(ERROR) << "getnameinfo failed " << gai_strerror(res);
+    return false;
+  }
+  host = std::string(hostBuf);
+  port = std::string(portBuf);
+  return true;
+}
+
+int WdtSocket::getReceiveBufferSize() const {
+  int size;
+  socklen_t sizeSize = sizeof(size);
+  getsockopt(fd_, SOL_SOCKET, SO_RCVBUF, (void *)&size, &sizeSize);
+  return size;
+}
+
+int WdtSocket::getSendBufferSize() const {
+  int size;
+  socklen_t sizeSize = sizeof(size);
+  getsockopt(fd_, SOL_SOCKET, SO_SNDBUF, (void *)&size, &sizeSize);
+  return size;
+}
+
+int WdtSocket::getUnackedBytes() const {
+#ifdef WDT_HAS_SOCKIOS_H
+  int numUnackedBytes;
+  int ret;
+  {
+    PerfStatCollector statCollector(threadCtx_, PerfStatReport::IOCTL);
+    ret = ::ioctl(fd_, SIOCOUTQ, &numUnackedBytes);
+  }
+  if (ret != 0) {
+    PLOG(ERROR) << "Failed to get unacked bytes for socket " << fd_;
+    numUnackedBytes = -1;
+  }
+  return numUnackedBytes;
+#else
+  LOG(WARNING) << "Wdt has no way to determine unacked bytes for socket";
+  return -1;
+#endif
+}
 WdtSocket::~WdtSocket() {
   VLOG(1) << "~WdtSocket " << port_ << " " << fd_;
-  closeConnection();
+  closeNoCheck();
 }
 }
 }

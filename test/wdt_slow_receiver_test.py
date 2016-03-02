@@ -6,13 +6,13 @@
 
 from common_utils import *
 
-def test(encryptionType):
+def test():
     global test_count, src_dir, root_dir
 
-    receiver_cmd = ("_bin/wdt/wdt -directory {0}/dst{1} -start_port=0 "
-                    "-num_ports=1 -encryption_type {2} "
+    receiver_cmd = ("_bin/wdt/wdt -directory {0}/dst{1} "
+                    "-num_ports=1 "
                     "-avg_mbytes_per_sec=10").format(
-                            root_dir, test_count, encryptionType)
+                            root_dir, test_count)
     (receiver_process, url) = start_receiver(receiver_cmd, root_dir, test_count)
     sender_cmd = ("_bin/wdt/wdt -directory {0} -read_timeout_millis=300 "
                   "-num_ports=1 -enable_perf_stat_collection "
@@ -30,8 +30,6 @@ if __name__ == "__main__":
     root_dir = create_test_directory("/tmp")
     src_dir = "{0}/src" .format(root_dir)
     generate_random_files(src_dir, 140 * 1024 * 1024)
-    test("none")
-    test("aes128ctr")
-    test("aes128gcm")
+    test()
     status = verify_transfer_success(root_dir, range(test_count))
     exit(status)

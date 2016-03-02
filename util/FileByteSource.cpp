@@ -16,9 +16,8 @@
 namespace facebook {
 namespace wdt {
 
-folly::ThreadLocalPtr<FileByteSource::Buffer> FileByteSource::buffer_;
-
-int FileUtil::openForRead(const std::string &filename, bool isDirectReads) {
+int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
+                          const bool isDirectReads) {
   int openFlags = O_RDONLY;
   if (isDirectReads) {
 #ifdef O_DIRECT
@@ -26,9 +25,11 @@ int FileUtil::openForRead(const std::string &filename, bool isDirectReads) {
     openFlags |= O_DIRECT;
 #endif
   }
-  START_PERF_TIMER
-  int fd = ::open(filename.c_str(), openFlags);
-  RECORD_PERF_RESULT(PerfStatReport::FILE_OPEN)
+  int fd;
+  {
+    PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
+    fd = ::open(filename.c_str(), openFlags);
+  }
   if (fd >= 0) {
     if (isDirectReads) {
 #ifndef O_DIRECT
@@ -53,38 +54,37 @@ int FileUtil::openForRead(const std::string &filename, bool isDirectReads) {
 }
 
 FileByteSource::FileByteSource(SourceMetaData *metadata, int64_t size,
-                               int64_t offset, int64_t bufferSize)
+                               int64_t offset)
     : metadata_(metadata),
       size_(size),
       offset_(offset),
       bytesRead_(0),
-      bufferSize_(bufferSize),
       alignedReadNeeded_(false) {
   transferStats_.setId(getIdentifier());
 }
 
-ErrorCode FileByteSource::open() {
+ErrorCode FileByteSource::open(ThreadCtx *threadCtx) {
+  if (metadata_->allocationStatus == TO_BE_DELETED) {
+    return OK;
+  }
   bytesRead_ = 0;
   this->close();
+  threadCtx_ = threadCtx;
   ErrorCode errCode = OK;
-  bool isDirectReads = metadata_->directReads;
+  const bool isDirectReads = metadata_->directReads;
   VLOG(1) << "Reading in direct mode " << isDirectReads;
   if (isDirectReads) {
 #ifdef O_DIRECT
     alignedReadNeeded_ = true;
 #endif
   }
-  bool hasValidBuffer = (buffer_ && bufferSize_ <= buffer_->size_);
-  if (!hasValidBuffer || (alignedReadNeeded_ && !buffer_->isMemAligned_)) {
-    // TODO: if posix_memalign is present, create aligned buffer by default
-    buffer_.reset(new Buffer(bufferSize_, alignedReadNeeded_));
-  }
 
   if (metadata_->fd >= 0) {
     VLOG(1) << "metadata already has fd, no need to open " << getIdentifier();
     fd_ = metadata_->fd;
   } else {
-    fd_ = FileUtil::openForRead(metadata_->fullPath, isDirectReads);
+    fd_ =
+        FileUtil::openForRead(*threadCtx_, metadata_->fullPath, isDirectReads);
     if (fd_ < 0) {
       errCode = BYTE_SOURCE_READ_ERROR;
     }
@@ -104,44 +104,94 @@ char *FileByteSource::read(int64_t &size) {
   if (hasError() || finished()) {
     return nullptr;
   }
-  int64_t expectedRead =
-      (int64_t)std::min<int64_t>(buffer_->size_, size_ - bytesRead_);
-  int64_t toRead = expectedRead;
+  const Buffer *buffer = threadCtx_->getBuffer();
+  int64_t offsetRemainder = 0;
   if (alignedReadNeeded_) {
-    toRead =
-        ((expectedRead + kDiskBlockSize - 1) / kDiskBlockSize) * kDiskBlockSize;
+    offsetRemainder = (offset_ + bytesRead_) % kDiskBlockSize;
   }
-  // actualRead is guaranteed to be <= buffer_->size_
-  WDT_CHECK(toRead <= buffer_->size_) << "Attempting to read " << toRead
-                                      << " while buffer size is "
-                                      << buffer_->size_;
-  START_PERF_TIMER
-  int64_t numRead = ::pread(fd_, buffer_->data_, toRead, offset_ + bytesRead_);
+  int64_t logicalRead = (int64_t)std::min<int64_t>(
+      buffer->getSize() - offsetRemainder, size_ - bytesRead_);
+  int64_t physicalRead = logicalRead;
+  if (alignedReadNeeded_) {
+    physicalRead = ((logicalRead + offsetRemainder + kDiskBlockSize - 1) /
+                    kDiskBlockSize) *
+                   kDiskBlockSize;
+  }
+  const int64_t seekPos = (offset_ + bytesRead_) - offsetRemainder;
+  int numRead;
+  {
+    PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FILE_READ);
+    numRead = ::pread(fd_, buffer->getData(), physicalRead, seekPos);
+  }
   if (numRead < 0) {
-    PLOG(ERROR) << "failure while reading file " << metadata_->fullPath;
+    PLOG(ERROR) << "Failure while reading file " << metadata_->fullPath
+                << " need align " << alignedReadNeeded_ << " physicalRead "
+                << physicalRead << " offset " << offset_ << " seepPos "
+                << seekPos << " offsetRemainder " << offsetRemainder
+                << " bytesRead " << bytesRead_;
     this->close();
     transferStats_.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
     return nullptr;
   }
   if (numRead == 0) {
-    LOG(ERROR) << "Unexpected EOF on " << metadata_->fullPath
-               << " got 0 bytes instead of " << toRead;
+    LOG(ERROR) << "Unexpected EOF on " << metadata_->fullPath << " need align "
+               << alignedReadNeeded_ << " physicalRead " << physicalRead
+               << " offset " << offset_ << " seepPos " << seekPos
+               << " offsetRemainder " << offsetRemainder << " bytesRead "
+               << bytesRead_;
     this->close();
     return nullptr;
   }
-  RECORD_PERF_RESULT(PerfStatReport::FILE_READ)
   // Can only happen in case of O_DIRECT and when
   // we are trying to read the last chunk of file
   // or we are reading in multiples of disk block size
   // from a sub block of the file smaller than disk block
   // size
-  if (numRead > expectedRead) {
+  size = numRead - offsetRemainder;
+  if (size > logicalRead) {
     WDT_CHECK(alignedReadNeeded_);
-    numRead = expectedRead;
+    size = logicalRead;
   }
-  bytesRead_ += numRead;
-  size = numRead;
-  return buffer_->data_;
+  bytesRead_ += size;
+  VLOG(1) << "Size " << size << " need align " << alignedReadNeeded_
+          << " physicalRead " << physicalRead << " offset " << offset_
+          << " seepPos " << seekPos << " offsetRemainder " << offsetRemainder
+          << " bytesRead " << bytesRead_;
+  return buffer->getData() + offsetRemainder;
+}
+
+void FileByteSource::clearPageCache() {
+#ifdef HAS_POSIX_FADVISE
+  if (metadata_->directReads) {
+    // no need to clear page cache for direct reads
+    return;
+  }
+  if (threadCtx_ == nullptr) {
+    return;
+  }
+  auto &options = threadCtx_->getOptions();
+  if (bytesRead_ > 0 && !options.skip_fadvise) {
+    PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FADVISE);
+    if (posix_fadvise(fd_, offset_, bytesRead_, POSIX_FADV_DONTNEED) != 0) {
+      PLOG(ERROR) << "posix_fadvise failed for " << getIdentifier() << " "
+                  << offset_ << " " << bytesRead_;
+    }
+  }
+#endif
+}
+
+void FileByteSource::close() {
+  clearPageCache();
+  if (metadata_->fd >= 0) {
+    // if the fd is not opened by this source, no need to close it
+    VLOG(1) << "No need to close " << getIdentifier()
+            << ", this was not opened by FileByteSource";
+  } else if (fd_ >= 0) {
+    PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FILE_CLOSE);
+    ::close(fd_);
+  }
+  fd_ = -1;
+  threadCtx_ = nullptr;
 }
 }
 }

@@ -2,8 +2,6 @@
 
 source `dirname "$0"`/common_functions.sh
 
-set -o pipefail
-
 transfer() {
   $WDT_BIN -skip_writes > $DIR/server${TEST_COUNT}.log 2>&1 &
   pidofreceiver=$!

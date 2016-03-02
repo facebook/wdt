@@ -7,9 +7,6 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/util/ServerSocket.h>
-#include <wdt/util/SocketUtils.h>
-#include <wdt/Reporting.h>
-#include <wdt/WdtOptions.h>
 #include <glog/logging.h>
 #include <sys/socket.h>
 #include <poll.h>
@@ -20,10 +17,9 @@ namespace facebook {
 namespace wdt {
 using std::string;
 
-ServerSocket::ServerSocket(int port, int backlog,
-                           IAbortChecker const *abortChecker,
+ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
                            const EncryptionParams &encryptionParams)
-    : WdtSocket(port, abortChecker, encryptionParams), backlog_(backlog) {
+    : WdtSocket(threadCtx, port, encryptionParams), backlog_(backlog) {
   // for backward compatibility
   supportUnencryptedPeer_ = true;
 }
@@ -60,6 +56,7 @@ int ServerSocket::listenInternal(struct addrinfo *info,
     PLOG(WARNING) << "Error making server socket " << host << " " << port_;
     return -1;
   }
+  setReceiveBufferSize(listeningFd);
   int optval = 1;
   if (setsockopt(listeningFd, SOL_SOCKET, SO_REUSEADDR, &optval,
                  sizeof(optval)) != 0) {
@@ -119,7 +116,7 @@ ErrorCode ServerSocket::listen() {
   }
   struct addrinfo sa;
   memset(&sa, 0, sizeof(sa));
-  const auto &options = WdtOptions::get();
+  const WdtOptions &options = threadCtx_.getOptions();
   if (options.ipv6) {
     sa.ai_family = AF_INET6;
   }
@@ -128,6 +125,12 @@ ErrorCode ServerSocket::listen() {
   }
   sa.ai_socktype = SOCK_STREAM;
   sa.ai_flags = AI_PASSIVE;
+  // Dynamic port is the default on receiver (and setting the start_port flag
+  // explictly automatically also sets static_ports to false)
+  if (!options.static_ports) {
+    VLOG(1) << "Not using static_ports, changing port " << port_ << " to 0";
+    port_ = 0;
+  }
   // Lookup
   addrInfoList infoList = nullptr;
   std::string portStr = folly::to<std::string>(port_);
@@ -153,7 +156,7 @@ ErrorCode ServerSocket::listen() {
     }
 
     std::string host, port;
-    if (SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen, host, port)) {
+    if (getNameInfo(info->ai_addr, info->ai_addrlen, host, port)) {
       // even if getnameinfo fail, we can still continue. Error is logged inside
       // SocketUtils
       WDT_CHECK(port_ == folly::to<int32_t>(port));
@@ -258,18 +261,31 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
         PLOG(ERROR) << "accept error";
         return CONN_ERROR;
       }
-      SocketUtils::getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_,
-                               peerPort_);
+      getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_, peerPort_);
       VLOG(1) << "New connection, fd : " << fd_ << " from " << peerIp_ << " "
               << peerPort_;
-      SocketUtils::setReadTimeout(fd_);
-      SocketUtils::setWriteTimeout(fd_);
+      setSocketTimeouts();
       return OK;
     }
     lastCheckedPollIndex_ = (lastCheckedPollIndex_ + 1) % numFds;
   }
   LOG(ERROR) << "None of the listening fds got a POLLIN event " << port_;
   return CONN_ERROR;
+}
+
+void ServerSocket::setReceiveBufferSize(int fd) {
+  int bufSize = threadCtx_.getOptions().receive_buffer_size;
+  if (bufSize <= 0) {
+    return;
+  }
+  int status =
+      ::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bufSize, sizeof(bufSize));
+  if (status != 0) {
+    PLOG(ERROR) << "Failed to set receive buffer " << port_ << " size "
+                << bufSize << " fd " << fd;
+    return;
+  }
+  VLOG(1) << "Receive buffer size set to " << bufSize << " port " << port_;
 }
 
 std::string ServerSocket::getPeerIp() const {

@@ -46,6 +46,7 @@ WdtControllerBase::WdtControllerBase(const string &controllerName) {
   controllerName_ = controllerName;
 }
 
+// TODO: pass options in
 WdtNamespaceController::WdtNamespaceController(const string &wdtNamespace)
     : WdtControllerBase(wdtNamespace) {
   auto &options = WdtOptions::get();
@@ -267,6 +268,7 @@ WdtNamespaceController::~WdtNamespaceController() {
   // release is done by parent shutdown
 }
 
+// TODO: pass options in
 WdtResourceController::WdtResourceController()
     : WdtControllerBase("_root controller_") {
   // set global limits from options
@@ -298,6 +300,16 @@ void WdtResourceController::shutdown() {
 
 WdtResourceController::~WdtResourceController() {
   shutdown();
+}
+
+ErrorCode WdtResourceController::getCounts(int32_t &numNamespaces,
+                                           int32_t &numSenders,
+                                           int32_t &numReceivers) {
+  GuardLock lock(controllerMutex_);
+  numSenders = numSenders_;
+  numReceivers = numReceivers_;
+  numNamespaces = namespaceMap_.size();
+  return OK;
 }
 
 ErrorCode WdtResourceController::createSender(

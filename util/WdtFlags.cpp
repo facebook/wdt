@@ -50,8 +50,8 @@ std::set<std::string> getUserSpecifiedOptions() {
     if (!flag.is_default) {
       // is_default is false if the flag has been specified in the cmd line.
       // Even if the value specified is same as the default value, this boolean
-      // is still marked as false. If the flag is directly like
-      // FLAGS_num_ports=1, is_default won't change. But, if it set using
+      // is still marked as false. If the flag is set directly like
+      // FLAGS_num_ports=1, is_default won't change. But, if it is set using
       // SetCommandLineOption, this will change.
       userSpecifiedFlags.emplace(getOptionNameFromFlagName(flag.name));
     }

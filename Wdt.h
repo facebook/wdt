@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
+ * Copyright (c) 2014-present, Facebook, Inc.
  * All rights reserved.
  *
  * This source code is licensed under the BSD-style license found in the
@@ -30,7 +30,7 @@ namespace wdt {
  *
  * Example of use:
  * // During the single threaded part of your service's initialization
- * FbWdt &wdt = Wdt::initializeWdt();
+ * Wdt &wdt = Wdt::initializeWdt();
  * // Optionally: change the WdtOptions as you need, for instance:
  * wdt.getWdtOptions().overwrite = true;
  * // Will use the (possibly changed above) settings, to configure wdt,

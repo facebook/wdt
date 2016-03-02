@@ -12,6 +12,7 @@
 #include <wdt/WdtOptions.h>
 #include <wdt/util/EncryptionUtils.h>
 #include <wdt/WdtTransferRequest.h>
+#include <wdt/AbortChecker.h>
 
 #include <algorithm>
 #include <vector>
@@ -24,7 +25,6 @@
 #include <folly/RWSpinLock.h>
 #include <folly/SpinLock.h>
 #include <folly/Memory.h>
-#include <folly/ThreadLocal.h>
 
 namespace facebook {
 namespace wdt {
@@ -55,6 +55,7 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
   return os;
 }
+
 // TODO rename to ThreadResult
 /// class representing statistics related to file transfer
 class TransferStats {
@@ -333,7 +334,9 @@ class TransferStats {
 };
 
 /**
- * class representing entire client transfer report
+ * Class representing entire client transfer report.
+ * Unit are mebibyte (MiB), ie 1048576 bytes which we call "Mbytes"
+ * for familiarity
  */
 class TransferReport {
  public:
@@ -388,7 +391,7 @@ class TransferReport {
   int64_t getTotalFileSize() const {
     return totalFileSize_;
   }
-  /// @return   recent throughput in mbps
+  /// @return   recent throughput in Mbytes/sec
   double getCurrentThroughputMBps() const {
     return currentThroughput_ / kMbToB;
   }
@@ -449,7 +452,7 @@ class ProgressReporter {
   /**
    * This method gets called repeatedly with interval defined by
    * progress_report_interval. If stdout is a terminal, then it displays
-   * transfer progress in stdout. Example output [===>    ] 30% 5.00 MBytes/sec.
+   * transfer progress in stdout. Example output [===>    ] 30% 5.00 Mbytes/sec.
    * Else, it prints progress details in stdout.
    *
    * @param report                current transfer report
@@ -497,18 +500,6 @@ class ProgressReporter {
   bool isTty_;
 };
 
-#define START_PERF_TIMER                               \
-  Clock::time_point startTimePERF;                     \
-  if (WdtOptions::get().enable_perf_stat_collection) { \
-    startTimePERF = Clock::now();                      \
-  }
-
-#define RECORD_PERF_RESULT(statType)                                 \
-  if (WdtOptions::get().enable_perf_stat_collection) {               \
-    int64_t duration = durationMicros(Clock::now() - startTimePERF); \
-    wdt__perfStatReportThreadLocal->addPerfStat(statType, duration); \
-  }
-
 /// class representing perf stat collection
 class PerfStatReport {
  public:
@@ -520,7 +511,7 @@ class PerfStatReport {
     FILE_READ,
     FILE_WRITE,
     SYNC_FILE_RANGE,
-    FSYNC,
+    FSYNC_STATS,  // just 'FSYNC' is defined on Windows/conflicts
     FILE_SEEK,
     THROTTLER_SLEEP,
     RECEIVER_WAIT_SLEEP,  // receiver sleep duration between sending wait cmd to
@@ -528,10 +519,12 @@ class PerfStatReport {
                           // were not properly load balanced
     DIRECTORY_CREATE,
     IOCTL,
+    UNLINK,
+    FADVISE,
     END
   };
 
-  explicit PerfStatReport();
+  explicit PerfStatReport(const WdtOptions &options);
 
   /**
    * @param statType      stat-type
@@ -559,8 +552,8 @@ class PerfStatReport {
   int64_t sumMicros_[kNumTypes_] = {0};
   /// network timeout in milliseconds
   int networkTimeoutMillis_;
+  /// mutex to support synchronized access
+  mutable folly::RWSpinLock mutex_;
 };
-
-extern folly::ThreadLocal<PerfStatReport> wdt__perfStatReportThreadLocal;
 }
 }

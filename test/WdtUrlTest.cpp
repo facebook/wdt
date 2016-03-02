@@ -7,8 +7,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/Receiver.h>
+#include <wdt/Sender.h>
+#include <wdt/test/TestCommon.h>
 
-#include <folly/Random.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -19,7 +20,6 @@ namespace facebook {
 namespace wdt {
 
 TEST(RequestSerializationTest, UrlTests) {
-  const auto &options = WdtOptions::get();
   {
     WdtUri uri("wdt://blah.com?k1=v1&k2=v2&k3=v3.1,v3.2");
     EXPECT_EQ(uri.getErrorCode(), OK);
@@ -60,8 +60,8 @@ TEST(RequestSerializationTest, UrlTests) {
     vector<string> values;
     WdtUri wdtUri;
     for (int i = 0; i < 100; i++) {
-      keys.push_back(to_string(folly::Random::rand32()));
-      values.push_back(to_string(folly::Random::rand32()));
+      keys.push_back(to_string(rand32()));
+      values.push_back(to_string(rand32()));
     }
     for (size_t i = 0; i < keys.size(); i++) {
       wdtUri.setQueryParam(keys[i], values[i]);
@@ -123,21 +123,27 @@ TEST(RequestSerializationTest, UrlTests) {
     EXPECT_EQ(uri.getPort(), 22356);
 
     {
-      uri = "wdt://[::1]:24689";
+      uri = "wdt://[::1]:24689?num_ports=3";
       EXPECT_EQ(uri.getPort(), 24689);
       WdtTransferRequest transferRequest(uri.generateUrl());
       EXPECT_EQ(uri.getErrorCode(), OK);
       EXPECT_EQ(transferRequest.hostName, "::1");
       EXPECT_EQ(transferRequest.ports,
-                WdtTransferRequest::genPortsVector(24689, options.num_ports));
+                WdtTransferRequest::genPortsVector(24689, 3));
     }
     {
-      uri = "wdt://[::1]?num_ports=10";
+      uri = "wdt://[::1]?num_ports=10";  // missing port
       WdtTransferRequest transferRequest(uri.generateUrl());
       EXPECT_EQ(uri.getErrorCode(), OK);
+      EXPECT_EQ(transferRequest.errorCode, INVALID_REQUEST);
       EXPECT_EQ(transferRequest.hostName, "::1");
-      EXPECT_EQ(transferRequest.ports,
-                WdtTransferRequest::genPortsVector(options.start_port, 10));
+    }
+    {
+      uri = "wdt://[::1]:12345?num_ports=abc";  // bad num ports
+      WdtTransferRequest transferRequest(uri.generateUrl());
+      EXPECT_EQ(uri.getErrorCode(), OK);
+      EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
+      EXPECT_EQ(transferRequest.hostName, "::1");
     }
     {
       uri = "wdt://[::1]:24689?start_port=22356&ports=1,2,3,4";
@@ -212,25 +218,42 @@ TEST(RequestSerializationTest, UrlTests) {
     EXPECT_EQ(transferRequest.ports, expectedPorts);
   }
   {
-    string uri = "wdt://localhost?ports=123*,*,*,*&dir=test&recpv=100&id=111";
+    // missing numports/ports
+    string uri = "wdt://localhost?dir=test&recpv=100&id=111";
     WdtTransferRequest transferRequest(uri);
-    vector<int32_t> expectedPorts;
-    // transfer request will fill ports according to the
-    // default values in the wdt options
-    int32_t startPort = options.start_port;
-    int32_t numPorts = options.num_ports;
-    for (int32_t i = 0; i < numPorts; i++) {
-      expectedPorts.push_back(startPort + i);
-    }
-    EXPECT_EQ(transferRequest.ports, expectedPorts);
-    EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
-    EXPECT_EQ(transferRequest.genWdtUrlWithSecret(), "URI_PARSE_ERROR");
+    EXPECT_EQ(transferRequest.errorCode, INVALID_REQUEST);
+    EXPECT_EQ(transferRequest.genWdtUrlWithSecret(), "INVALID_REQUEST");
   }
   {
     string url = "wdt://";
     WdtTransferRequest transferRequest(url);
-    EXPECT_EQ(transferRequest.errorCode, URI_PARSE_ERROR);
-    EXPECT_EQ(transferRequest.genWdtUrlWithSecret(), "URI_PARSE_ERROR");
+    EXPECT_EQ(transferRequest.errorCode, INVALID_REQUEST);
+    EXPECT_EQ(transferRequest.genWdtUrlWithSecret(), "INVALID_REQUEST");
+  }
+  {
+    string url = "wdt://localhost:22355?num_ports=3";
+    WdtTransferRequest transferRequest(url);
+    Receiver receiver(transferRequest);
+    auto retTransferRequest = receiver.init();
+    EXPECT_EQ(retTransferRequest.errorCode, INVALID_REQUEST);
+  }
+  {
+    string url = "wdt://localhost:22355";
+    WdtTransferRequest transferRequest(url);
+    Sender sender(transferRequest);
+    auto retTransferRequest = sender.init();
+    EXPECT_EQ(retTransferRequest.errorCode, INVALID_REQUEST);
+  }
+  {
+    string url = "wdt://localhost:22355?num_ports=3";
+    WdtTransferRequest transferRequest(url);
+    EXPECT_EQ(transferRequest.errorCode, OK);
+    transferRequest.directory = "blah";
+    // Artificial error
+    transferRequest.errorCode = ERROR;
+    Receiver receiver(transferRequest);
+    auto retTransferRequest = receiver.init();
+    EXPECT_EQ(retTransferRequest.errorCode, ERROR);
   }
 }
 
@@ -247,7 +270,7 @@ TEST(TransferRequestTest, Encryption1) {
   }
   {
     WdtTransferRequest req(123, 3, "/foo/bar");
-    LOG(INFO) << "Url without enc= " << req.getLogSafeString();
+    LOG(INFO) << "Url without encr= " << req.getLogSafeString();
     WdtTransferRequest req2(123, 3, "/foo/ba2");
     EXPECT_FALSE(req2 == req);
     req2.directory = "/foo/bar";

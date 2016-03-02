@@ -20,6 +20,8 @@ namespace wdt {
  * A singleton class managing different options for WDT.
  * There will only be one instance of this class created
  * per creation of sender or receiver or both.
+ * We can now support more than 1 instance of those per process
+ * and attach a different one to sets of Sender/Receivers.
  */
 class WdtOptions {
  public:
@@ -31,10 +33,16 @@ class WdtOptions {
    * A static method that can be called to create
    * the singleton copy of WdtOptions through the lifetime
    * of wdt run.
+   * This is to be avoided, instead use the WdtOptions instance
+   * off each object.
+   * @deprecated
    */
   static const WdtOptions& get();
   /**
-   * Method to get mutable copy of the singleton
+   * Method to get mutable copy of the singleton.
+   * This is to be avoided, instead use the WdtOptions instance
+   * off each object.
+   * @deprecated
    */
   static WdtOptions& getMutable();
 
@@ -87,6 +95,10 @@ class WdtOptions {
    */
   int32_t start_port{22356};  // W (D) T = 0x5754
   int32_t num_ports{8};
+  /**
+   * If true, will use start_port otherwise will use 0 / dynamic ports
+   */
+  bool static_ports{false};
   /**
    * Maximum buffer size for the write on the sender
    * as well as while reading on receiver.
@@ -318,6 +330,26 @@ class WdtOptions {
   std::string encryption_type{encryptionTypeToStr(ENC_AES128_GCM)};
 
   /**
+   * send buffer size for Sender. If < = 0, buffer size is not set
+   */
+  int send_buffer_size{0};
+
+  /**
+   * receive buffer size for Receiver. If < = 0, buffer size is not set
+   */
+  int receive_buffer_size{0};
+
+  /**
+   * If true, extra files on the receiver side is deleted during resumption
+   */
+  bool delete_extra_files{false};
+
+  /**
+   * If true, fadvise is skipped after block write
+   */
+  bool skip_fadvise{false};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;
@@ -335,16 +367,24 @@ class WdtOptions {
   // NOTE: any option added here should also be added to util/WdtFlags.cpp.inc
 
   /**
-   * Since this is a singleton copy constructor
-   * and assignment operator are deleted
+   * Initialize the fields of this object from another src one. ie makes 1 copy
+   * explicitly.
+   */
+  void copyInto(const WdtOptions& src);
+  /**
+   * This used to be a singleton (which as always is a pretty bad idea)
+   * so copy constructor and assignment operator were deleted
+   * We still want to avoid accidental copying around of a fairly
+   * big object thus the copyInto pattern above
    */
   WdtOptions(const WdtOptions&) = delete;
-  WdtOptions& operator=(const WdtOptions&) = delete;
-
   WdtOptions() {
   }
   ~WdtOptions() {
   }
+
+ private:
+  WdtOptions& operator=(const WdtOptions&) = default;
 };
 }
 }

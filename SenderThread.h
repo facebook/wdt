@@ -57,34 +57,32 @@ class SenderThread : public WdtThread {
 
   /// abort checker passed to client sockets. This checks both global sender
   /// abort and whether global checkpoint has been received or not
-  class SocketAbortChecker : public WdtBase::AbortChecker {
+  class SocketAbortChecker : public IAbortChecker {
    public:
-    explicit SocketAbortChecker(WdtBase *wdtBase,
-                                ThreadTransferHistory &transferHistory)
-        : AbortChecker(wdtBase), transferHistory_(transferHistory) {
+    explicit SocketAbortChecker(SenderThread *threadPtr)
+        : threadPtr_(threadPtr) {
     }
 
     bool shouldAbort() const {
-      return AbortChecker::shouldAbort() ||
-             transferHistory_.isGlobalCheckpointReceived();
+      return (threadPtr_->getThreadAbortCode() != OK);
     }
 
    private:
-    ThreadTransferHistory &transferHistory_;
+    SenderThread *threadPtr_{nullptr};
   };
 
   /// Constructor for the sender thread
   SenderThread(Sender *sender, int threadIndex, int32_t port,
                ThreadsController *threadsController)
-      : WdtThread(threadIndex, port, sender->getProtocolVersion(),
-                  threadsController),
+      : WdtThread(sender->options_, threadIndex, port,
+                  sender->getProtocolVersion(), threadsController),
         wdtParent_(sender),
         dirQueue_(sender->dirQueue_.get()),
         transferHistoryController_(sender->transferHistoryController_.get()) {
     controller_->registerThread(threadIndex_);
     transferHistoryController_->addThreadHistory(port_, threadStats_);
-    socketAbortChecker_ =
-        folly::make_unique<SocketAbortChecker>(sender, getTransferHistory());
+    threadAbortChecker_ = folly::make_unique<SocketAbortChecker>(this);
+    threadCtx_->setAbortChecker(threadAbortChecker_.get());
     threadStats_.setId(folly::to<std::string>(threadIndex_));
   }
 
@@ -102,6 +100,10 @@ class SenderThread : public WdtThread {
   /// Get the port sender thread is connecting to
   int getPort() const override;
 
+  /// returns current abort code. checks for both global abort and abort due to
+  /// receive of global checkpoint
+  ErrorCode getThreadAbortCode();
+
   /// Destructor of the sender thread
   ~SenderThread() {
   }
@@ -114,8 +116,8 @@ class SenderThread : public WdtThread {
   /// Parent shared among all the threads for meta information
   Sender *wdtParent_;
 
-  /// Special abort checker for the client socket
-  std::unique_ptr<SocketAbortChecker> socketAbortChecker_{nullptr};
+  /// sets the correct footer type depending on the checksum and encryption type
+  void setFooterType();
 
   /// The main entry point of the thread
   void start() override;
@@ -268,7 +270,11 @@ class SenderThread : public WdtThread {
 
   /// General utility used by sender threads to connect to receiver
   std::unique_ptr<ClientSocket> connectToReceiver(
-      const int port, IAbortChecker const *abortChecker, ErrorCode &errCode);
+      int port, IAbortChecker const *abortChecker, ErrorCode &errCode);
+
+  /// Method responsible for sending one source to the destination
+  TransferStats sendOneByteSource(const std::unique_ptr<ByteSource> &source,
+                                  ErrorCode transferStatus);
 
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];
@@ -281,9 +287,6 @@ class SenderThread : public WdtThread {
   /// (for fbonly / btm / thrift / eventbase reasons)
   std::unique_ptr<ClientSocket> socket_;
 
-  /// Buffer used by the sender thread to read/write data
-  char buf_[Protocol::kMinBufLength];
-
   /// whether total file size has been sent to the receiver
   bool totalSizeSent_{false};
 
@@ -292,6 +295,9 @@ class SenderThread : public WdtThread {
 
   /// Point to the directory queue of parent sender
   DirectorySourceQueue *dirQueue_;
+
+  /// abort checker to use for this thread
+  std::unique_ptr<IAbortChecker> threadAbortChecker_{nullptr};
 
   /// Thread history controller shared across all threads
   TransferHistoryController *transferHistoryController_;

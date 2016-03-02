@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
+ * Copyright (c) 2014-present, Facebook, Inc.
  * All rights reserved.
  *
  * This source code is licensed under the BSD-style license found in the
@@ -39,6 +39,10 @@ std::string encryptionTypeToStr(EncryptionType encryptionType) {
     return folly::to<std::string>(encryptionType);
   }
   return kEncryptionTypeDescriptions[encryptionType];
+}
+
+size_t encryptionTypeToTagLen(EncryptionType type) {
+  return (type == ENC_AES128_GCM) ? kAESBlockSize : 0;
 }
 
 static int s_numOpensslLocks = 0;
@@ -252,6 +256,18 @@ EncryptionParams EncryptionParams::generateEncryptionParams(
   return EncryptionParams(type, std::string(key, key + kAESBlockSize));
 }
 
+bool AESBase::cloneCtx(EVP_CIPHER_CTX* ctxOut) const {
+  WDT_CHECK(encryptionTypeToTagLen(type_));
+  EVP_CIPHER_CTX_init(ctxOut);
+  int status = EVP_CIPHER_CTX_copy(ctxOut, &evpCtx_);
+  if (status != 1) {
+    LOG(ERROR) << "Cipher ctx copy failed " << status;
+    EVP_CIPHER_CTX_cleanup(ctxOut);
+    return false;
+  }
+  return true;
+}
+
 const EVP_CIPHER* AESBase::getCipher(const EncryptionType encryptionType) {
   if (encryptionType == ENC_AES128_CTR) {
     return EVP_aes_128_ctr();
@@ -316,12 +332,12 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
   return true;
 }
 
-bool AESEncryptor::encrypt(const uint8_t* in, const int inLength,
-                           uint8_t* out) {
+bool AESEncryptor::encrypt(const char* in, const int inLength, char* out) {
   WDT_CHECK(started_);
 
   int outLength;
-  if (EVP_EncryptUpdate(&evpCtx_, out, &outLength, in, inLength) != 1) {
+  if (EVP_EncryptUpdate(&evpCtx_, (uint8_t*)out, &outLength, (uint8_t*)in,
+                        inLength) != 1) {
     LOG(ERROR) << "EncryptUpdate failed";
     return false;
   }
@@ -329,39 +345,57 @@ bool AESEncryptor::encrypt(const uint8_t* in, const int inLength,
   return true;
 }
 
-bool AESEncryptor::finish() {
-  if (!started_) {
-    return true;
-  }
-
+/* static */
+bool AESEncryptor::finishInternal(EVP_CIPHER_CTX& ctx,
+                                  const EncryptionType type,
+                                  std::string& tagOut) {
   int outLength;
-  int status = EVP_EncryptFinal(&evpCtx_, nullptr, &outLength);
-  started_ = false;
+  int status = EVP_EncryptFinal(&ctx, nullptr, &outLength);
   if (status != 1) {
     LOG(ERROR) << "EncryptFinal failed";
-    EVP_CIPHER_CTX_cleanup(&evpCtx_);
+    EVP_CIPHER_CTX_cleanup(&ctx);
     return false;
   }
   WDT_CHECK_EQ(0, outLength);
-  const int tagSize = expectsTag();
+  size_t tagSize = encryptionTypeToTagLen(type);
   if (tagSize) {
-    tag_.resize(tagSize);
-    status = EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_GET_TAG, tag_.size(),
-                                 &(tag_.front()));
+    tagOut.resize(tagSize);
+    status = EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_GET_TAG, tagOut.size(),
+                                 &(tagOut.front()));
     if (status != 1) {
       LOG(ERROR) << "EncryptFinal Tag extraction error "
-                 << folly::humanify(tag_);
-      tag_.clear();
-    } else {
-      LOG(INFO) << "Encryption finish tag = " << folly::humanify(tag_);
+                 << folly::humanify(tagOut);
+      tagOut.clear();
     }
   }
-  EVP_CIPHER_CTX_cleanup(&evpCtx_);
+  EVP_CIPHER_CTX_cleanup(&ctx);
   return true;
 }
 
+bool AESEncryptor::finish(std::string& tagOut) {
+  tagOut.clear();
+  if (!started_) {
+    return true;
+  }
+  started_ = false;
+  bool status = finishInternal(evpCtx_, type_, tagOut);
+  LOG_IF(INFO, status) << "Encryption finish tag = " << folly::humanify(tagOut);
+  return status;
+}
+
+std::string AESEncryptor::computeCurrentTag() {
+  EVP_CIPHER_CTX ctx;
+  std::string tag;
+  if (!cloneCtx(&ctx)) {
+    return tag;
+  }
+  finishInternal(ctx, type_, tag);
+  return tag;
+}
+
 AESEncryptor::~AESEncryptor() {
-  finish();
+  std::string tag;
+  finish(tag);
 }
 
 bool AESDecryptor::start(const EncryptionParams& encryptionData,
@@ -413,12 +447,12 @@ bool AESDecryptor::start(const EncryptionParams& encryptionData,
   return true;
 }
 
-bool AESDecryptor::decrypt(const uint8_t* in, const int inLength,
-                           uint8_t* out) {
+bool AESDecryptor::decrypt(const char* in, const int inLength, char* out) {
   WDT_CHECK(started_);
 
   int outLength;
-  if (EVP_DecryptUpdate(&evpCtx_, out, &outLength, in, inLength) != 1) {
+  if (EVP_DecryptUpdate(&evpCtx_, (uint8_t*)out, &outLength, (uint8_t*)in,
+                        inLength) != 1) {
     LOG(ERROR) << "DecryptUpdate failed";
     return false;
   }
@@ -426,42 +460,74 @@ bool AESDecryptor::decrypt(const uint8_t* in, const int inLength,
   return true;
 }
 
-bool AESDecryptor::finish() {
-  if (!started_) {
-    return true;
+bool AESDecryptor::saveContext() {
+  WDT_CHECK(!ctxSaved_);
+  if (!cloneCtx(&savedCtx_)) {
+    return false;
   }
+  ctxSaved_ = true;
+  return true;
+}
+
+bool AESDecryptor::verifyTag(const std::string& tag) {
+  WDT_CHECK_EQ(ENC_AES128_GCM, type_);
+  WDT_CHECK(ctxSaved_);
+  bool status = finishInternal(savedCtx_, type_, tag);
+  ctxSaved_ = false;
+  return status;
+}
+
+/* static */
+bool AESDecryptor::finishInternal(EVP_CIPHER_CTX& ctx,
+                                  const EncryptionType type,
+                                  const std::string& tag) {
   int status;
-  const size_t tagSize = expectsTag();
+  size_t tagSize = encryptionTypeToTagLen(type);
   if (tagSize) {
-    if (tag_.size() != tagSize) {
-      LOG(ERROR) << "Need tag for gcm mode " << folly::humanify(tag_);
-      EVP_CIPHER_CTX_cleanup(&evpCtx_);
-      started_ = false;
+    if (tag.size() != tagSize) {
+      LOG(ERROR) << "Need tag for gcm mode " << folly::humanify(tag);
+      EVP_CIPHER_CTX_cleanup(&ctx);
       return false;
     }
-    status = EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_SET_TAG, tag_.size(),
-                                 &(tag_.front()));
+    // EVP_CIPHER_CTX_ctrl takes a non const buffer. But, for set tag the buffer
+    // will not be modified. So, it is safe to use const_cast here.
+    char* tagBuf = const_cast<char*>(tag.data());
+    status =
+        EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_TAG, tag.size(), tagBuf);
     if (status != 1) {
-      LOG(ERROR) << "Decrypt final tag set error " << folly::humanify(tag_);
+      LOG(ERROR) << "Decrypt final tag set error " << folly::humanify(tag);
     }
   }
 
   int outLength = 0;
-  status = EVP_DecryptFinal(&evpCtx_, nullptr, &outLength);
-  EVP_CIPHER_CTX_cleanup(&evpCtx_);
-  started_ = false;
+  status = EVP_DecryptFinal(&ctx, nullptr, &outLength);
+  EVP_CIPHER_CTX_cleanup(&ctx);
   if (status != 1) {
     LOG(ERROR) << "DecryptFinal failed " << outLength;
     return false;
   }
-  LOG(INFO) << "Succcesful end of decryption with tag = "
-            << folly::humanify(tag_);
   WDT_CHECK_EQ(0, outLength);
   return true;
 }
 
+bool AESDecryptor::finish(const std::string& tag) {
+  if (!started_) {
+    return true;
+  }
+  started_ = false;
+  bool status = finishInternal(evpCtx_, type_, tag);
+  LOG_IF(INFO, status) << "Successful end of decryption with tag = "
+                       << folly::humanify(tag);
+  if (ctxSaved_) {
+    EVP_CIPHER_CTX_cleanup(&savedCtx_);
+    ctxSaved_ = false;
+  }
+  return status;
+}
+
 AESDecryptor::~AESDecryptor() {
-  finish();
+  std::string tag;
+  finish(tag);
 }
 }
 }  // end of namespaces

@@ -12,7 +12,6 @@
 #include <wdt/Throttler.h>
 
 #include <wdt/util/ClientSocket.h>
-#include <wdt/util/SocketUtils.h>
 
 #include <folly/Conv.h>
 #include <folly/Memory.h>
@@ -47,26 +46,30 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
     : queueAbortChecker_(this), destHost_(destHost) {
   LOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   srcDir_ = srcDir;
-  const auto &options = WdtOptions::get();
-  int port = options.start_port;
-  int numSockets = options.num_ports;
+  int port = options_.start_port;
+  int numSockets = options_.num_ports;
   for (int i = 0; i < numSockets; i++) {
     transferRequest_.ports.push_back(port + i);
   }
-  dirQueue_.reset(new DirectorySourceQueue(srcDir_, &queueAbortChecker_));
+  dirQueue_.reset(
+      new DirectorySourceQueue(options_, srcDir_, &queueAbortChecker_));
   VLOG(3) << "Configuring the  directory queue";
-  dirQueue_->setIncludePattern(options.include_regex);
-  dirQueue_->setExcludePattern(options.exclude_regex);
-  dirQueue_->setPruneDirPattern(options.prune_dir_regex);
-  dirQueue_->setFollowSymlinks(options.follow_symlinks);
-  dirQueue_->setBlockSizeMbytes(options.block_size_mbytes);
-  progressReportIntervalMillis_ = options.progress_report_interval_millis;
+  dirQueue_->setIncludePattern(options_.include_regex);
+  dirQueue_->setExcludePattern(options_.exclude_regex);
+  dirQueue_->setPruneDirPattern(options_.prune_dir_regex);
+  dirQueue_->setFollowSymlinks(options_.follow_symlinks);
+  dirQueue_->setBlockSizeMbytes(options_.block_size_mbytes);
+  dirQueue_->setNumClientThreads(numSockets);
+  dirQueue_->setOpenFilesDuringDiscovery(options_.open_files_during_discovery);
+  dirQueue_->setDirectReads(options_.odirect_reads);
+  progressReportIntervalMillis_ = options_.progress_report_interval_millis;
 }
 
 // TODO: argghhhh
 Sender::Sender(const WdtTransferRequest &transferRequest)
     : Sender(transferRequest.hostName, transferRequest.directory,
-             transferRequest.ports, transferRequest.fileInfo) {
+             transferRequest.ports, transferRequest.fileInfo,
+             transferRequest.disableDirectoryTraversal) {
   transferRequest_ = transferRequest;
   if (getTransferId().empty()) {
     LOG(WARNING) << "Sender without transferId... will likely fail to connect";
@@ -79,18 +82,39 @@ Sender::Sender(const WdtTransferRequest &transferRequest)
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir,
                const std::vector<int32_t> &ports,
-               const std::vector<FileInfo> &srcFileInfo)
+               const std::vector<WdtFileInfo> &srcFileInfo,
+               bool disableDirectoryTraversal)
     : Sender(destHost, srcDir) {
   // TODO let's not copy vectors around to ourselves
   transferRequest_.ports = ports;
-  dirQueue_->setFileInfo(srcFileInfo);
+  if (!srcFileInfo.empty() || disableDirectoryTraversal) {
+    dirQueue_->setFileInfo(srcFileInfo);
+  }
   transferHistoryController_ =
       folly::make_unique<TransferHistoryController>(*dirQueue_);
+}
+
+ErrorCode Sender::validateTransferRequest() {
+  ErrorCode code = WdtBase::validateTransferRequest();
+  // If the request is still valid check for other
+  // sender specific validations
+  if (code == OK && transferRequest_.hostName.empty()) {
+    LOG(ERROR) << "Transfer request validation failed for wdt sender "
+               << transferRequest_.getLogSafeString();
+    code = INVALID_REQUEST;
+  }
+  transferRequest_.errorCode = code;
+  return code;
 }
 
 const WdtTransferRequest &Sender::init() {
   VLOG(1) << "Sender Init() with encryption set = "
           << transferRequest_.encryptionData.isSet();
+  if (validateTransferRequest() != OK) {
+    LOG(ERROR) << "Couldn't validate the transfer request "
+               << transferRequest_.getLogSafeString();
+    return transferRequest_;
+  }
   // TODO cleanup / most not necessary / duplicate state
   transferRequest_.protocolVersion = protocolVersion_;
   transferRequest_.directory = srcDir_;
@@ -125,7 +149,7 @@ void Sender::setPruneDirRegex(const std::string &pruneDirRegex) {
   dirQueue_->setPruneDirPattern(pruneDirRegex);
 }
 
-void Sender::setSrcFileInfo(const std::vector<FileInfo> &srcFileInfo) {
+void Sender::setSrcFileInfo(const std::vector<WdtFileInfo> &srcFileInfo) {
   dirQueue_->setFileInfo(srcFileInfo);
 }
 
@@ -225,8 +249,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
             << " existing transfer report";
     return getTransferReport();
   }
-  const auto &options = WdtOptions::get();
-  const bool twoPhases = options.two_phases;
+  const bool twoPhases = options_.two_phases;
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
   for (auto &senderThread : senderThreads_) {
@@ -265,14 +288,14 @@ std::unique_ptr<TransferReport> Sender::finish() {
     } else {
       transferHistory.returnUnackedSourcesToQueue();
     }
-    if (WdtOptions::get().full_reporting) {
+    if (options_.full_reporting) {
       std::vector<TransferStats> stats = transferHistory.popAckedSourceStats();
       transferredSourceStats.insert(transferredSourceStats.end(),
                                     std::make_move_iterator(stats.begin()),
                                     std::make_move_iterator(stats.end()));
     }
   }
-  if (WdtOptions::get().full_reporting) {
+  if (options_.full_reporting) {
     validateTransferStats(transferredSourceStats,
                           dirQueue_->getFailedSourceStats());
   }
@@ -287,13 +310,8 @@ std::unique_ptr<TransferReport> Sender::finish() {
   if (progressReportEnabled) {
     progressReporter_->end(transferReport);
   }
-  if (options.enable_perf_stat_collection) {
-    PerfStatReport report;
-    for (auto &senderThread : senderThreads_) {
-      report += senderThread->getPerfReport();
-    }
-    LOG(INFO) << report;
-  }
+  logPerfStats();
+
   double directoryTime;
   directoryTime = dirQueue_->getDirectoryTime();
   LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
@@ -325,14 +343,12 @@ ErrorCode Sender::start() {
     }
     transferStatus_ = ONGOING;
   }
-  const auto &options = WdtOptions::get();
-  const bool twoPhases = options.two_phases;
-  WDT_CHECK(!(twoPhases && options.enable_download_resumption))
-      << "Two phase is not supported with download resumption";
+  checkAndUpdateBufferSize();
+  const bool twoPhases = options_.two_phases;
   LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
             << transferRequest_.ports << "]";
   startTime_ = Clock::now();
-  downloadResumptionEnabled_ = options.enable_download_resumption;
+  downloadResumptionEnabled_ = options_.enable_download_resumption;
   if (!progressReporter_) {
     VLOG(1) << "No progress reporter provided, making a default one";
     progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
@@ -352,6 +368,15 @@ ErrorCode Sender::start() {
   // TODO: fix this ! use transferRequest! (and dup from Receiver)
   senderThreads_ = threadsController_->makeThreads<Sender, SenderThread>(
       this, transferRequest_.ports.size(), transferRequest_.ports);
+  if (downloadResumptionEnabled_ && options_.delete_extra_files) {
+    if (protocolVersion_ >= Protocol::DELETE_CMD_VERSION) {
+      dirQueue_->enableFileDeletion();
+    } else {
+      LOG(WARNING) << "Turning off extra file deletion on the receiver side "
+                      "because of protocol version "
+                   << protocolVersion_;
+    }
+  }
   dirThread_ = dirQueue_->buildQueueAsynchronously();
   if (twoPhases) {
     dirThread_.join();
@@ -406,146 +431,14 @@ void Sender::validateTransferStats(
   WDT_CHECK(sourceNumBlocks == threadNumBlocks);
 }
 
-void Sender::setSocketCreator(const SocketCreator socketCreator) {
+void Sender::setSocketCreator(Sender::ISocketCreator *socketCreator) {
   socketCreator_ = socketCreator;
-}
-
-TransferStats Sender::sendOneByteSource(
-    const std::unique_ptr<ClientSocket> &socket,
-    const std::unique_ptr<ByteSource> &source, ErrorCode transferStatus) {
-  TransferStats stats;
-  auto &options = WdtOptions::get();
-  char headerBuf[Protocol::kMaxHeader];
-  int64_t off = 0;
-  headerBuf[off++] = Protocol::FILE_CMD;
-  headerBuf[off++] = transferStatus;
-  char *headerLenPtr = headerBuf + off;
-  off += sizeof(int16_t);
-  const int64_t expectedSize = source->getSize();
-  int64_t actualSize = 0;
-  const SourceMetaData &metadata = source->getMetaData();
-  BlockDetails blockDetails;
-  blockDetails.fileName = metadata.relPath;
-  blockDetails.seqId = metadata.seqId;
-  blockDetails.fileSize = metadata.size;
-  blockDetails.offset = source->getOffset();
-  blockDetails.dataSize = expectedSize;
-  blockDetails.allocationStatus = metadata.allocationStatus;
-  blockDetails.prevSeqId = metadata.prevSeqId;
-  Protocol::encodeHeader(protocolVersion_, headerBuf, off, Protocol::kMaxHeader,
-                         blockDetails);
-  int16_t littleEndianOff = folly::Endian::little((int16_t)off);
-  folly::storeUnaligned<int16_t>(headerLenPtr, littleEndianOff);
-  int64_t written = socket->write(headerBuf, off);
-  if (written != off) {
-    PLOG(ERROR) << "Write error/mismatch " << written << " " << off
-                << ". fd = " << socket->getFd()
-                << ". file = " << metadata.relPath
-                << ". port = " << socket->getPort();
-    stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
-    stats.incrFailedAttempts();
-    return stats;
-  }
-  stats.addHeaderBytes(written);
-  int64_t byteSourceHeaderBytes = written;
-  int64_t throttlerInstanceBytes = byteSourceHeaderBytes;
-  int64_t totalThrottlerBytes = 0;
-  VLOG(3) << "Sent " << written << " on " << socket->getFd() << " : "
-          << folly::humanify(std::string(headerBuf, off));
-  int32_t checksum = 0;
-  while (!source->finished()) {
-    int64_t size;
-    char *buffer = source->read(size);
-    if (source->hasError()) {
-      LOG(ERROR) << "Failed reading file " << source->getIdentifier()
-                 << " for fd " << socket->getFd();
-      break;
-    }
-    WDT_CHECK(buffer && size > 0);
-    if (protocolVersion_ >= Protocol::CHECKSUM_VERSION &&
-        options.enable_checksum) {
-      checksum = folly::crc32c((const uint8_t *)buffer, size, checksum);
-    }
-    if (throttler_) {
-      /**
-       * If throttling is enabled we call limit(deltaBytes) which
-       * used both the methods of throttling peak and average.
-       * Always call it with bytes being written to the wire, throttler
-       * will do the rest.
-       * The first time throttle is called with the header bytes
-       * included. In the next iterations throttler is only called
-       * with the bytes being written.
-       */
-      throttlerInstanceBytes += size;
-      throttler_->limit(throttlerInstanceBytes);
-      totalThrottlerBytes += throttlerInstanceBytes;
-      throttlerInstanceBytes = 0;
-    }
-    written = socket->write(buffer, size, /* retry writes */ true);
-    if (getCurAbortCode() != OK) {
-      LOG(ERROR) << "Transfer aborted during block transfer "
-                 << socket->getPort() << " " << source->getIdentifier();
-      stats.setLocalErrorCode(ABORT);
-      stats.incrFailedAttempts();
-      return stats;
-    }
-    if (written != size) {
-      LOG(ERROR) << "Write error " << written << " (" << size << ")"
-                 << ". fd = " << socket->getFd()
-                 << ". file = " << metadata.relPath
-                 << ". port = " << socket->getPort();
-      stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
-      stats.incrFailedAttempts();
-      return stats;
-    }
-    stats.addDataBytes(written);
-    actualSize += written;
-  }
-  if (actualSize != expectedSize) {
-    // Can only happen if sender thread can not read complete source byte
-    // stream
-    LOG(ERROR) << "UGH " << source->getIdentifier() << " " << expectedSize
-               << " " << actualSize;
-    struct stat fileStat;
-    if (stat(metadata.fullPath.c_str(), &fileStat) != 0) {
-      PLOG(ERROR) << "stat failed on path " << metadata.fullPath;
-    } else {
-      LOG(WARNING) << "file " << source->getIdentifier() << " previous size "
-                   << metadata.size << " current size " << fileStat.st_size;
-    }
-    stats.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
-    stats.incrFailedAttempts();
-    return stats;
-  }
-  if (throttler_ && actualSize > 0) {
-    WDT_CHECK(totalThrottlerBytes == actualSize + byteSourceHeaderBytes)
-        << totalThrottlerBytes << " " << (actualSize + totalThrottlerBytes);
-  }
-  if (protocolVersion_ >= Protocol::CHECKSUM_VERSION &&
-      options.enable_checksum) {
-    off = 0;
-    headerBuf[off++] = Protocol::FOOTER_CMD;
-    Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum);
-    int toWrite = off;
-    written = socket->write(headerBuf, toWrite);
-    if (written != toWrite) {
-      LOG(ERROR) << "Write mismatch " << written << " " << toWrite;
-      stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
-      stats.incrFailedAttempts();
-      return stats;
-    }
-    stats.addHeaderBytes(toWrite);
-  }
-  stats.setLocalErrorCode(OK);
-  stats.incrNumBlocks();
-  stats.addEffectiveBytes(stats.getHeaderBytes(), stats.getDataBytes());
-  return stats;
 }
 
 void Sender::reportProgress() {
   WDT_CHECK(progressReportIntervalMillis_ > 0);
   int throughputUpdateIntervalMillis =
-      WdtOptions::get().throughput_update_interval_millis;
+      options_.throughput_update_interval_millis;
   WDT_CHECK(throughputUpdateIntervalMillis >= 0);
   int throughputUpdateInterval =
       throughputUpdateIntervalMillis / progressReportIntervalMillis_;
@@ -585,7 +478,23 @@ void Sender::reportProgress() {
     transferReport->setCurrentThroughput(currentThroughput);
 
     progressReporter_->progress(transferReport);
+    if (reportPerfSignal_.notified()) {
+      logPerfStats();
+    }
   }
+}
+
+void Sender::logPerfStats() const {
+  if (!options_.enable_perf_stat_collection) {
+    return;
+  }
+
+  PerfStatReport report(options_);
+  for (auto &senderThread : senderThreads_) {
+    report += senderThread->getPerfReport();
+  }
+  report += dirQueue_->getPerfReport();
+  LOG(INFO) << report;
 }
 }
 }  // namespace facebook::wdt

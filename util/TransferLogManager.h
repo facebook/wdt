@@ -9,6 +9,7 @@
 #pragma once
 
 #include <wdt/Protocol.h>
+#include <wdt/WdtOptions.h>
 
 #include <string>
 #include <set>
@@ -40,6 +41,8 @@ namespace wdt {
  * true.
  */
 
+constexpr char kWdtLogName[] = ".wdt.log";
+constexpr char kWdtBuggyLogName[] = ".wdt.log.bug";
 /**
  * class responsible for encoding and decoding transfer log entries
  */
@@ -122,12 +125,18 @@ class TransferLogManager {
   /// bytes for seq-id, 10 bytes for file-size, 10 bytes for timestamp
   static const int64_t kMaxEntryLength = 2 + 1 + 10 + PATH_MAX + 2 * 10;
 
+  explicit TransferLogManager(const WdtOptions &options) : options_(options) {
+  }
+
   /**
    * Opens the log for reading and writing. In case of log based
    * resumption, starts writer thread. If the log is not present, a new one is
    * created
    */
   ErrorCode openLog();
+
+  /// Start the log writer thread
+  ErrorCode startThread();
 
   /**
    * In case of log based resumption, signals to the writer thread to finish.
@@ -226,9 +235,6 @@ class TransferLogManager {
   ~TransferLogManager();
 
  private:
-  const std::string LOG_NAME = ".wdt.log";
-  const std::string BUGGY_LOG_NAME = ".wdt.log.bug";
-
   std::string getFullPath(const std::string &relPath);
 
   /**
@@ -268,6 +274,8 @@ class TransferLogManager {
 
   LogEncoderDecoder encoderDecoder_;
 
+  const WdtOptions &options_;
+
   /// File handler for writing
   int fd_{-1};
   /// root directory
@@ -298,8 +306,9 @@ class TransferLogManager {
 /// class responsible for parsing and fixing transfer log
 class LogParser {
  public:
-  LogParser(LogEncoderDecoder &encoderDecoder, const std::string &rootDir,
-            const std::string &recoveryId, int64_t config, bool parseOnly);
+  LogParser(const WdtOptions &options, LogEncoderDecoder &encoderDecoder,
+            const std::string &rootDir, const std::string &recoveryId,
+            int64_t config, bool parseOnly);
 
   ErrorCode parseLog(int fd, std::string &senderIp,
                      std::vector<FileChunksInfo> &fileChunksInfo);
@@ -338,6 +347,7 @@ class LogParser {
 
   ErrorCode processDirectoryInvalidationEntry(char *buf, int size);
 
+  const WdtOptions &options_;
   LogEncoderDecoder &encoderDecoder_;
   std::string rootDir_;
   std::string recoveryId_;

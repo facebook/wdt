@@ -10,16 +10,18 @@
 #include <fcntl.h>
 
 #define WDT_VERSION_MAJOR 1
-#define WDT_VERSION_MINOR 24
-#define WDT_VERSION_BUILD 1512180
+#define WDT_VERSION_MINOR 26
+#define WDT_VERSION_BUILD 1603020
 // Add -fbcode to version str
-#define WDT_VERSION_STR "1.24.1512180-fbcode"
+#define WDT_VERSION_STR "1.26.1603020-fbcode"
 // Tie minor and proto version
 #define WDT_PROTOCOL_VERSION WDT_VERSION_MINOR
 
 #define HAS_POSIX_FALLOCATE 1
 #define HAS_SYNC_FILE_RANGE 1
 #define HAS_POSIX_MEMALIGN 1
+#define HAS_POSIX_FADVISE 1
+
 #define WDT_SUPPORTS_ODIRECT 1
 #define WDT_HAS_SOCKIOS_H 1
 // Again do not add new defines here without editing WdtConfig.h.in ...

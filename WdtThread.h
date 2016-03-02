@@ -7,7 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include <wdt/Reporting.h>
+#include <wdt/util/CommonImpl.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/Protocol.h>
 #include <wdt/util/ThreadsController.h>
@@ -25,12 +25,19 @@ class ThreadsController;
 class WdtThread {
  public:
   /// Constructor for wdt thread
-  WdtThread(int threadIndex, int port, int protocolVersion,
-            ThreadsController *controller)
-      : threadIndex_(threadIndex),
+  WdtThread(const WdtOptions &options, int threadIndex, int port,
+            int protocolVersion, ThreadsController *controller)
+      : options_(options),
         port_(port),
         threadProtocolVersion_(protocolVersion) {
     controller_ = controller;
+    threadCtx_ = folly::make_unique<ThreadCtx>(
+        options, /* allocate buffer */ true, threadIndex);
+    const Buffer *buffer = threadCtx_->getBuffer();
+    WDT_CHECK(buffer);
+    buf_ = buffer->getData();
+    bufSize_ = buffer->getSize();
+    threadIndex_ = threadCtx_->getThreadIndex();
   }
   /// Starts a thread which runs the wdt functionality
   void startThread();
@@ -67,8 +74,19 @@ class WdtThread {
   /// The main entry point of the thread
   virtual void start() = 0;
 
+  std::unique_ptr<ThreadCtx> threadCtx_{nullptr};
+
+  /// buffer pointer. this points to the buffer in threadCtx_
+  char *buf_{nullptr};
+
+  /// buffer size. this is the size of buffer in threadCtx_
+  int64_t bufSize_{0};
+
+  /// reference to parent options
+  const WdtOptions &options_;
+
   /// Index of this thread with respect to other threads
-  const int threadIndex_;
+  int threadIndex_;
 
   /// port number for this thread
   const int port_;
@@ -76,11 +94,17 @@ class WdtThread {
   /// Copy of the protocol version that might be changed
   int threadProtocolVersion_;
 
+  /// possible footer types
+  enum FooterType {
+    NO_FOOTER,
+    CHECKSUM_FOOTER,
+    ENC_TAG_FOOTER,
+  };
+
+  FooterType footerType_{NO_FOOTER};
+
   /// Transfer stats for this thread
   TransferStats threadStats_{true};
-
-  /// Perf stats report for this thread
-  PerfStatReport perfReport_;
 
   /// Thread controller for all the sender threads
   ThreadsController *controller_{nullptr};

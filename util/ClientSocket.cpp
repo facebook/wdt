@@ -8,8 +8,6 @@
  */
 #include <wdt/util/ClientSocket.h>
 #include <wdt/Reporting.h>
-#include <wdt/WdtOptions.h>
-#include <wdt/util/SocketUtils.h>
 
 #include <glog/logging.h>
 #include <sys/socket.h>
@@ -21,16 +19,15 @@ namespace wdt {
 
 using std::string;
 
-ClientSocket::ClientSocket(const string &dest, const int port,
-                           IAbortChecker const *abortChecker,
+ClientSocket::ClientSocket(ThreadCtx &threadCtx, const string &dest,
+                           const int port,
                            const EncryptionParams &encryptionParams)
-    : WdtSocket(port, abortChecker, encryptionParams), dest_(dest) {
+    : WdtSocket(threadCtx, port, encryptionParams), dest_(dest) {
   memset(&sa_, 0, sizeof(sa_));
-  const auto &options = WdtOptions::get();
-  if (options.ipv6) {
+  if (threadCtx_.getOptions().ipv6) {
     sa_.ai_family = AF_INET6;
   }
-  if (options.ipv4) {
+  if (threadCtx_.getOptions().ipv4) {
     sa_.ai_family = AF_INET;
   }
   sa_.ai_socktype = SOCK_STREAM;
@@ -59,7 +56,7 @@ ErrorCode ClientSocket::connect() {
        info = info->ai_next) {
     ++count;
     std::string host, port;
-    SocketUtils::getNameInfo(info->ai_addr, info->ai_addrlen, host, port);
+    getNameInfo(info->ai_addr, info->ai_addrlen, host, port);
     VLOG(2) << "will connect to " << host << " " << port;
     fd_ = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd_ == -1) {
@@ -67,6 +64,8 @@ ErrorCode ClientSocket::connect() {
       continue;
     }
     VLOG(1) << "new socket " << fd_ << " for port " << port_;
+
+    setSendBufferSize();
 
     // make the socket non blocking
     int sockArg = fcntl(fd_, F_GETFL, nullptr);
@@ -85,11 +84,11 @@ ErrorCode ClientSocket::connect() {
         continue;
       }
       auto startTime = Clock::now();
-      int connectTimeout = WdtOptions::get().connect_timeout_millis;
+      int connectTimeout = threadCtx_.getOptions().connect_timeout_millis;
 
       while (true) {
         // check for abort
-        if (abortChecker_->shouldAbort()) {
+        if (threadCtx_.getAbortChecker()->shouldAbort()) {
           LOG(ERROR) << "Transfer aborted during connect " << port_ << " "
                      << fd_;
           closeConnection();
@@ -108,7 +107,7 @@ ErrorCode ClientSocket::connect() {
         }
         int pollTimeout =
             std::min(connectTimeout - timeElapsed,
-                     WdtOptions::get().abort_check_interval_millis);
+                     threadCtx_.getOptions().abort_check_interval_millis);
         struct pollfd pollFds[] = {{fd_, POLLOUT, 0}};
 
         int retValue;
@@ -165,17 +164,31 @@ ErrorCode ClientSocket::connect() {
     }
     return CONN_ERROR_RETRYABLE;
   }
-  SocketUtils::setReadTimeout(fd_);
-  SocketUtils::setWriteTimeout(fd_);
+  setSocketTimeouts();
   return OK;
-}
-
-int ClientSocket::getUnackedBytes() const {
-  return SocketUtils::getUnackedBytes(fd_);
 }
 
 const std::string &ClientSocket::getPeerIp() const {
   return peerIp_;
+}
+
+std::string ClientSocket::computeCurEncryptionTag() {
+  return encryptor_.computeCurrentTag();
+}
+
+void ClientSocket::setSendBufferSize() {
+  int bufSize = threadCtx_.getOptions().send_buffer_size;
+  if (bufSize <= 0) {
+    return;
+  }
+  int status =
+      ::setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &bufSize, sizeof(bufSize));
+  if (status != 0) {
+    PLOG(ERROR) << "Failed to set send buffer " << port_ << " size " << bufSize
+                << " fd " << fd_;
+    return;
+  }
+  VLOG(1) << "Send buffer size set to " << bufSize << " port " << port_;
 }
 
 ClientSocket::~ClientSocket() {

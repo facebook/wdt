@@ -8,6 +8,7 @@
  */
 #include <wdt/Reporting.h>
 #include <wdt/WdtOptions.h>
+#include <wdt/Protocol.h>
 #include <folly/String.h>
 
 #include <iostream>
@@ -49,7 +50,7 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
     localErrCode_ = ERROR;
   }
   localErrCode_ = getMoreInterestingError(localErrCode_, stats.localErrCode_);
-  VLOG(1) << "Local ErrorCode now " << localErrCode_ << " from "
+  VLOG(2) << "Local ErrorCode now " << localErrCode_ << " from "
           << stats.localErrCode_;
   remoteErrCode_ =
       getMoreInterestingError(remoteErrCode_, stats.remoteErrCode_);
@@ -87,7 +88,7 @@ std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
     os << " Number of blocks transferred = " << stats.numBlocks_ << ".";
   }
   os << " Data Mbytes = " << stats.effectiveDataBytes_ / kMbToB
-     << ". Header kBytes = " << stats.headerBytes_ / 1024. << " ("
+     << ". Header Kbytes = " << stats.headerBytes_ / 1024. << " ("
      << headerOverhead << "% overhead)"
      << ". Total bytes = " << (stats.dataBytes_ + stats.headerBytes_)
      << ". Wasted bytes due to failure = "
@@ -306,24 +307,33 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
                                    double averageThroughput,
                                    double currentThroughput) {
   LOG(INFO) << "wdt transfer progress " << (effectiveDataBytes / kMbToB)
-            << " Mb, completed " << progress << "%, Average throughput "
-            << averageThroughput << " Mbps, Recent throughput "
-            << currentThroughput << "Mbps.";
+            << " Mbytes, completed " << progress << "%, Average throughput "
+            << averageThroughput << " Mbytes/s, Recent throughput "
+            << currentThroughput << " Mbytes/s";
 }
 
-folly::ThreadLocal<PerfStatReport> wdt__perfStatReportThreadLocal;
-
 const std::string PerfStatReport::statTypeDescription_[] = {
-    "Socket Read", "Socket Write", "File Open", "File Close", "File Read",
-    "File Write", "Sync File Range", "fsync", "File Seek", "Throttler Sleep",
-    "Receiver Wait Sleep", "Directory creation", "Ioctl"};
+    "Socket Read",
+    "Socket Write",
+    "File Open",
+    "File Close",
+    "File Read",
+    "File Write",
+    "Sync File Range",
+    "fsync",
+    "File Seek",
+    "Throttler Sleep",
+    "Receiver Wait Sleep",
+    "Directory creation",
+    "Ioctl",
+    "Unlink",
+    "Fadvise"};
 
-PerfStatReport::PerfStatReport() {
+PerfStatReport::PerfStatReport(const WdtOptions& options) {
   static_assert(
       sizeof(statTypeDescription_) / sizeof(statTypeDescription_[0]) ==
           PerfStatReport::END,
       "Mismatch between number of stat types and number of descriptions");
-  const auto& options = WdtOptions::get();
   networkTimeoutMillis_ =
       std::min<int>(options.read_timeout_millis, options.write_timeout_millis);
 }
@@ -350,6 +360,8 @@ const int32_t PerfStatReport::kHistogramBuckets[] = {
     20000, 30000, 40000, 50000, 75000, 100000};
 
 void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
+  folly::RWSpinLock::WriteHolder writeLock(mutex_);
+
   int64_t timeInMillis = timeInMicros / kMicroToMilli;
   if (timeInMicros >= networkTimeoutMillis_ * 750) {
     LOG(WARNING) << statTypeDescription_[statType] << " system call took "
@@ -365,6 +377,9 @@ void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
 }
 
 PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
+  folly::RWSpinLock::WriteHolder writeLock(mutex_);
+  folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
+
   for (int i = 0; i < kNumTypes_; i++) {
     for (const auto& pair : statReport.perfStats_[i]) {
       int64_t key = pair.first;
@@ -382,7 +397,8 @@ PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
 }
 
 std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
-  const auto& options = WdtOptions::get();
+  folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
+
   os << "\n***** PERF STATS *****\n";
   for (int i = 0; i < PerfStatReport::kNumTypes_; i++) {
     if (statReport.count_[i] == 0) {
@@ -390,16 +406,14 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
     }
     double max = statReport.maxValueMicros_[i] / kMicroToMilli;
     double min = statReport.minValueMicros_[i] / kMicroToMilli;
-    double sumPerThread =
-        (statReport.sumMicros_[i] / kMicroToMilli / options.num_ports);
+    double sum = (statReport.sumMicros_[i] / kMicroToMilli);
     double avg = (((double)statReport.sumMicros_[i]) / statReport.count_[i] /
                   kMicroToMilli);
 
     os << std::fixed << std::setprecision(2);
     os << statReport.statTypeDescription_[i] << " : ";
-    os << "Ncalls " << statReport.count_[i] << " Stats in ms : SumPerThread "
-       << sumPerThread << " Min " << min << " Max " << max << " Avg " << avg
-       << " ";
+    os << "Ncalls " << statReport.count_[i] << " Stats in ms : sum " << sum
+       << " Min " << min << " Max " << max << " Avg " << avg << " ";
 
     // One extra bucket for values extending beyond last bucket
     int numBuckets = 1 +

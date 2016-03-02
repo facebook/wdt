@@ -29,7 +29,8 @@ const int TransferLogManager::LOG_VERSION = 2;
 int64_t LogEncoderDecoder::timestampInMicroseconds() const {
   auto timestamp = Clock::now();
   return std::chrono::duration_cast<std::chrono::microseconds>(
-             timestamp.time_since_epoch()).count();
+             timestamp.time_since_epoch())
+      .count();
 }
 
 int64_t LogEncoderDecoder::encodeLogHeader(char *dest,
@@ -237,15 +238,33 @@ std::string TransferLogManager::getFullPath(const std::string &relPath) {
 ErrorCode TransferLogManager::openLog() {
   WDT_CHECK(fd_ < 0);
   WDT_CHECK(!rootDir_.empty()) << "Root directory not set";
-  const auto &options = WdtOptions::get();
-  WDT_CHECK(options.enable_download_resumption);
+  WDT_CHECK(options_.enable_download_resumption);
 
-  int openFlags = O_CREAT | O_RDWR;
-  const std::string logPath = getFullPath(LOG_NAME);
-  fd_ = ::open(logPath.c_str(), openFlags, 0644);
+  const std::string logPath = getFullPath(kWdtLogName);
+  fd_ = ::open(logPath.c_str(), O_RDWR);
   if (fd_ < 0) {
-    PLOG(ERROR) << "Could not open wdt log " << logPath;
-    return BYTE_SOURCE_READ_ERROR;
+    if (errno != ENOENT) {
+      PLOG(ERROR) << "Could not open wdt log " << logPath;
+      return TRANSFER_LOG_ACQUIRE_ERROR;
+    } else {
+      // creation of the log path (which can still be a race)
+      LOG(INFO) << logPath << " doesn't exist... creating...";
+      fd_ = ::open(logPath.c_str(), O_CREAT | O_EXCL, 0644);
+      if (fd_ < 0) {
+        PLOG(WARNING) << "Could not create wdt log (maybe ok if race): "
+                      << logPath;
+      } else {
+        // On windows/cygwin for instance the flock will silently succeed yet
+        // not lock on a newly created file... workaround is to close and reopen
+        ::close(fd_);
+      }
+      fd_ = ::open(logPath.c_str(), O_RDWR);
+      if (fd_ < 0) {
+        PLOG(ERROR) << "Still couldn't open wdt log after create attempt: "
+                    << logPath;
+        return TRANSFER_LOG_ACQUIRE_ERROR;
+      }
+    }
   }
   // try to acquire file lock
   if (::flock(fd_, LOCK_EX | LOCK_NB) != 0) {
@@ -255,8 +274,15 @@ ErrorCode TransferLogManager::openLog() {
     return TRANSFER_LOG_ACQUIRE_ERROR;
   }
   LOG(INFO) << "Transfer log opened and lock acquired on " << logPath;
-  if (!options.resume_using_dir_tree) {
+  return OK;
+}
+
+ErrorCode TransferLogManager::startThread() {
+  if (!options_.resume_using_dir_tree) {
     // start writer thread
+    if (resumptionStatus_ != OK) {
+      return resumptionStatus_;
+    }
     writerThread_ = std::thread(&TransferLogManager::writeEntriesToDisk, this);
     LOG(INFO) << "Log writer thread started";
   }
@@ -268,7 +294,7 @@ ErrorCode TransferLogManager::checkLog() {
     LOG(WARNING) << "No log to check";
     return ERROR;
   }
-  const std::string fullLogName = getFullPath(LOG_NAME);
+  const std::string fullLogName = getFullPath(kWdtLogName);
   struct stat stat1, stat2;
   if (stat(fullLogName.c_str(), &stat1)) {
     PLOG(ERROR) << "CORRUPTION! Can't stat log file " << fullLogName
@@ -306,11 +332,10 @@ void TransferLogManager::close() {
 }
 
 void TransferLogManager::closeLog() {
-  const auto &options = WdtOptions::get();
   if (fd_ < 0) {
     return;
   }
-  if (!options.resume_using_dir_tree) {
+  if (!options_.resume_using_dir_tree && writerThread_.joinable()) {
     // stop writer thread
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -323,16 +348,15 @@ void TransferLogManager::closeLog() {
 }
 
 TransferLogManager::~TransferLogManager() {
-  WDT_CHECK_LT(fd_, 0) << "Destructor called, but transfer log not called";
+  WDT_CHECK_LT(fd_, 0) << "Destructor called, but transfer log not closed";
 }
 
 void TransferLogManager::writeEntriesToDisk() {
   WDT_CHECK(fd_ >= 0) << "Writer thread started before the log is opened";
   LOG(INFO) << "Transfer log writer thread started";
-  auto &options = WdtOptions::get();
-  WDT_CHECK(options.transfer_log_write_interval_ms >= 0);
+  WDT_CHECK(options_.transfer_log_write_interval_ms >= 0);
   auto waitingTime =
-      std::chrono::milliseconds(options.transfer_log_write_interval_ms);
+      std::chrono::milliseconds(options_.transfer_log_write_interval_ms);
   std::vector<std::string> entries;
   bool finished = false;
   while (!finished) {
@@ -369,15 +393,15 @@ bool TransferLogManager::verifySenderIp(const std::string &curSenderIp) {
   if (fd_ < 0) {
     return false;
   }
-  const auto &options = WdtOptions::get();
   bool verifySuccessful = true;
-  if (!options.disable_sender_verification_during_resumption) {
+  if (!options_.disable_sender_verification_during_resumption) {
     if (senderIp_.empty()) {
       LOG(INFO) << "Sender-ip empty, not verifying sender-ip, new-ip: "
                 << curSenderIp;
     } else if (senderIp_ != curSenderIp) {
       LOG(ERROR) << "Current sender ip does not match ip in the "
-                    "transfer log " << curSenderIp << " " << senderIp_
+                    "transfer log "
+                 << curSenderIp << " " << senderIp_
                  << ", ignoring transfer log";
       verifySuccessful = false;
       invalidateDirectory();
@@ -485,7 +509,7 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
   if (fd_ < 0) {
     return;
   }
-  VLOG(1) << "Adding invalidation entry " << seqId;
+  LOG(INFO) << "Adding invalidation entry " << seqId;
   char buf[kMaxEntryLength];
   int64_t size = encoderDecoder_.encodeFileInvalidationEntry(buf, seqId);
   std::lock_guard<std::mutex> lock(mutex_);
@@ -494,8 +518,8 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
 
 void TransferLogManager::unlink() {
   WDT_CHECK_LT(fd_, 0) << "Unlink called before closeLog!";
-  LOG(INFO) << "unlinking " << LOG_NAME;
-  std::string fullLogName = getFullPath(LOG_NAME);
+  LOG(INFO) << "unlinking " << kWdtLogName;
+  std::string fullLogName = getFullPath(kWdtLogName);
   if (::unlink(fullLogName.c_str()) != 0) {
     PLOG(ERROR) << "Could not unlink " << fullLogName;
   }
@@ -503,10 +527,11 @@ void TransferLogManager::unlink() {
 
 void TransferLogManager::renameBuggyLog() {
   WDT_CHECK_LT(fd_, 0) << "renameBuggyLog called before closeLog!";
-  LOG(INFO) << "Renaming " << LOG_NAME << " to " << BUGGY_LOG_NAME;
-  if (::rename(getFullPath(LOG_NAME).c_str(),
-               getFullPath(BUGGY_LOG_NAME).c_str()) != 0) {
-    PLOG(ERROR) << "log rename failed " << LOG_NAME << " " << BUGGY_LOG_NAME;
+  LOG(INFO) << "Renaming " << kWdtLogName << " to " << kWdtBuggyLogName;
+  if (::rename(getFullPath(kWdtLogName).c_str(),
+               getFullPath(kWdtBuggyLogName).c_str()) != 0) {
+    PLOG(ERROR) << "log rename failed " << kWdtLogName << " "
+                << kWdtBuggyLogName;
   }
   return;
 }
@@ -534,7 +559,8 @@ ErrorCode TransferLogManager::parseVerifyAndFix(
   if (fd_ < 0) {
     return INVALID_LOG;
   }
-  LogParser parser(encoderDecoder_, rootDir_, recoveryId, config, parseOnly);
+  LogParser parser(options_, encoderDecoder_, rootDir_, recoveryId, config,
+                   parseOnly);
   resumptionStatus_ = parser.parseLog(fd_, senderIp_, parsedInfo);
   if (resumptionStatus_ == INVALID_LOG) {
     // leave the log, but close it. Keeping the invalid log ensures that the
@@ -552,10 +578,12 @@ ErrorCode TransferLogManager::parseVerifyAndFix(
   return resumptionStatus_;
 }
 
-LogParser::LogParser(LogEncoderDecoder &encoderDecoder,
+LogParser::LogParser(const WdtOptions &options,
+                     LogEncoderDecoder &encoderDecoder,
                      const std::string &rootDir, const std::string &recoveryId,
                      int64_t config, bool parseOnly)
-    : encoderDecoder_(encoderDecoder),
+    : options_(options),
+      encoderDecoder_(encoderDecoder),
       rootDir_(rootDir),
       recoveryId_(recoveryId),
       config_(config),
@@ -570,7 +598,8 @@ bool LogParser::writeFileInvalidationEntries(int fd,
     int written = ::write(fd, buf, size);
     if (written != size) {
       PLOG(ERROR) << "Disk write error while writing invalidation entry to "
-                     "transfer log " << written << " " << size;
+                     "transfer log "
+                  << written << " " << size;
       return false;
     }
   }
@@ -670,7 +699,6 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
         << "Invalid log: File creation entry found before transfer log header";
     return INVALID_LOG;
   }
-  const auto &options = WdtOptions::get();
   int64_t timestamp, seqId, fileSize;
   std::string fileName;
   if (!encoderDecoder_.decodeFileCreationEntry(buf, size, timestamp, fileName,
@@ -683,10 +711,10 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
               << std::endl;
     return OK;
   }
-  if (options.resume_using_dir_tree) {
+  if (options_.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file creation entry in directory based "
-                  "resumption mode " << fileName << " " << seqId << " "
-               << fileSize;
+                  "resumption mode "
+               << fileName << " " << seqId << " " << fileSize;
     return INVALID_LOG;
   }
   if (fileInfoMap_.find(seqId) != fileInfoMap_.end() ||
@@ -703,7 +731,7 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
   if (stat(fullPath.c_str(), &buffer) != 0) {
     PLOG(ERROR) << "stat failed for " << fileName;
   } else {
-    if (options.shouldPreallocateFiles()) {
+    if (options_.shouldPreallocateFiles()) {
       sizeVerificationSuccess = (buffer.st_size >= fileSize);
     } else {
       sizeVerificationSuccess = true;
@@ -728,7 +756,6 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
         << "Invalid log: File resize entry found before transfer log header";
     return INVALID_LOG;
   }
-  const auto &options = WdtOptions::get();
   int64_t timestamp, seqId, fileSize;
   if (!encoderDecoder_.decodeFileResizeEntry(buf, size, timestamp, seqId,
                                              fileSize)) {
@@ -740,9 +767,10 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
               << std::endl;
     return OK;
   }
-  if (options.resume_using_dir_tree) {
+  if (options_.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file resize entry in directory based "
-                  "resumption mode " << seqId << " " << fileSize;
+                  "resumption mode "
+               << seqId << " " << fileSize;
     return INVALID_LOG;
   }
   auto it = fileInfoMap_.find(seqId);
@@ -761,7 +789,8 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
     return INVALID_LOG;
   }
 
-  if (options.shouldPreallocateFiles() && fileSize > chunksInfo.getFileSize()) {
+  if (options_.shouldPreallocateFiles() &&
+      fileSize > chunksInfo.getFileSize()) {
     LOG(ERROR) << "Size on the disk is less than the resized size for "
                << fileName << " seq-id " << seqId << " disk-size "
                << chunksInfo.getFileSize() << " resized-size " << fileSize;
@@ -777,7 +806,6 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
         << "Invalid log: Block write entry found before transfer log header";
     return INVALID_LOG;
   }
-  const auto &options = WdtOptions::get();
   int64_t timestamp, seqId, offset, blockSize;
   if (!encoderDecoder_.decodeBlockWriteEntry(buf, size, timestamp, seqId,
                                              offset, blockSize)) {
@@ -789,10 +817,10 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
               << blockSize << std::endl;
     return OK;
   }
-  if (options.resume_using_dir_tree) {
+  if (options_.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a block write entry in directory based "
-                  "resumption mode " << seqId << " " << offset << " "
-               << blockSize;
+                  "resumption mode "
+               << seqId << " " << offset << " " << blockSize;
     return INVALID_LOG;
   }
   if (invalidSeqIds_.find(seqId) != invalidSeqIds_.end()) {
@@ -825,7 +853,6 @@ ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
                   "log header";
     return INVALID_LOG;
   }
-  const auto &options = WdtOptions::get();
   int64_t timestamp, seqId;
   if (!encoderDecoder_.decodeFileInvalidationEntry(buf, size, timestamp,
                                                    seqId)) {
@@ -836,9 +863,10 @@ ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
               << " Invalidation entry for seq-id " << seqId << std::endl;
     return OK;
   }
-  if (options.resume_using_dir_tree) {
+  if (options_.resume_using_dir_tree) {
     LOG(ERROR) << "Can not have a file invalidation entry in directory based "
-                  "resumption mode " << seqId;
+                  "resumption mode "
+               << seqId;
     return INVALID_LOG;
   }
   if (fileInfoMap_.find(seqId) == fileInfoMap_.end() &&
@@ -872,7 +900,7 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
   ErrorCode status = OK;
   while (true) {
     int16_t entrySize;
-    int toRead = sizeof(entrySize);
+    int toRead = sizeof(int16_t);
     int numRead = ::read(fd, &entrySize, toRead);
     if (numRead < 0) {
       PLOG(ERROR) << "Error while reading transfer log " << numRead << " "
@@ -904,14 +932,12 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
                   << entrySize;
       return INVALID_LOG;
     }
-    if (numRead == 0) {
-      VLOG(1) << "got EOF, entrySize " << entrySize;
-      break;
-    }
     if (numRead != entrySize) {
+      // extra bytes also includes the size entry
+      int64_t extraBytes = numRead + sizeof(int16_t);
       if (parseOnly_) {
-        LOG(INFO) << "Extra " << numRead << " bytes at the end of the log";
-      } else if (!truncateExtraBytesAtEnd(fd, numRead)) {
+        LOG(INFO) << "Extra " << extraBytes << " bytes at the end of the log";
+      } else if (!truncateExtraBytesAtEnd(fd, extraBytes)) {
         return INVALID_LOG;
       }
       break;

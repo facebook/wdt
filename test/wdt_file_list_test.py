@@ -57,7 +57,7 @@ def main():
 
     wdtbin_opts = " -full_reporting --enable_perf_stat_collection "
 
-    wdt_receiver_arg = wdtbin_opts + " -start_port 0 -num_ports 2"
+    wdt_receiver_arg = wdtbin_opts + " -num_ports 2"
     wdt_sender_arg = wdtbin_opts
     test_count = 0
 

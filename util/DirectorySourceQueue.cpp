@@ -20,22 +20,26 @@
 #include <regex>
 #include <fcntl.h>
 
+// NOTE: this should remain standalone code and not use WdtOptions directly
+// also note this is used not just by the Sender but also by the receiver
+// (so code like opening files during discovery is disabled by default and
+// no reading the config directly from the options and only set by the Sender)
+
 namespace facebook {
 namespace wdt {
 
 using std::string;
 
-FileInfo::FileInfo(const string &name, int64_t size, bool directReads)
-    : fileName(name), fileSize(size) {
-  this->directReads = directReads;
+WdtFileInfo::WdtFileInfo(const string &name, int64_t size, bool doDirectReads)
+    : fileName(name), fileSize(size), directReads(doDirectReads) {
 }
 
-FileInfo::FileInfo(const string &name, int64_t size, int fd)
-    : FileInfo(name, size) {
+WdtFileInfo::WdtFileInfo(int fd, int64_t size, const string &name)
+    : WdtFileInfo(name, size, false) {
   this->fd = fd;
 }
 
-void FileInfo::verifyAndFixFlags() {
+void WdtFileInfo::verifyAndFixFlags() {
   if (fd >= 0) {
 #ifdef O_DIRECT
     int flags = fcntl(fd, F_GETFL, 0);
@@ -53,12 +57,13 @@ void FileInfo::verifyAndFixFlags() {
   }
 }
 
-DirectorySourceQueue::DirectorySourceQueue(const string &rootDir,
-                                           IAbortChecker const *abortChecker)
-    : abortChecker_(abortChecker), options_(WdtOptions::get()) {
+DirectorySourceQueue::DirectorySourceQueue(const WdtOptions &options,
+                                           const string &rootDir,
+                                           IAbortChecker const *abortChecker) {
+  threadCtx_ = folly::make_unique<ThreadCtx>(
+      options, /* do not allocate buffer */ false);
+  threadCtx_->setAbortChecker(abortChecker);
   setRootDir(rootDir);
-  fileSourceBufferSize_ = options_.buffer_size;
-  openFilesDuringDiscovery_ = options_.open_files_during_discovery;
 }
 
 void DirectorySourceQueue::setIncludePattern(const string &includePattern) {
@@ -73,21 +78,17 @@ void DirectorySourceQueue::setPruneDirPattern(const string &pruneDirPattern) {
   pruneDirPattern_ = pruneDirPattern;
 }
 
-void DirectorySourceQueue::setFileSourceBufferSize(
-    const int64_t fileSourceBufferSize) {
-  fileSourceBufferSize_ = fileSourceBufferSize;
-  CHECK(fileSourceBufferSize_ > 0);
-}
-
 void DirectorySourceQueue::setBlockSizeMbytes(int64_t blockSizeMbytes) {
   blockSizeMbytes_ = blockSizeMbytes;
 }
 
-void DirectorySourceQueue::setFileInfo(const std::vector<FileInfo> &fileInfo) {
+void DirectorySourceQueue::setFileInfo(
+    const std::vector<WdtFileInfo> &fileInfo) {
   fileInfo_ = fileInfo;
+  exploreDirectory_ = false;
 }
 
-const std::vector<FileInfo> &DirectorySourceQueue::getFileInfo() const {
+const std::vector<WdtFileInfo> &DirectorySourceQueue::getFileInfo() const {
   return fileInfo_;
 }
 
@@ -98,8 +99,8 @@ void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   }
 }
 
-std::vector<SourceMetaData *> &
-DirectorySourceQueue::getDiscoveredFilesMetaData() {
+std::vector<SourceMetaData *>
+    &DirectorySourceQueue::getDiscoveredFilesMetaData() {
   return sharedFileData_;
 }
 
@@ -154,8 +155,11 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
   clearSourceQueue();
   // recreate the queue
   for (const auto metadata : sharedFileData_) {
+    // TODO: do not notify inside createIntoQueueInternal. This method still
+    // holds the lock, so no point in notifying
     createIntoQueueInternal(metadata);
   }
+  enqueueFilesToBeDeleted();
 }
 
 DirectorySourceQueue::~DirectorySourceQueue() {
@@ -191,16 +195,17 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
   bool res = false;
   // either traverse directory or we already have a fixed set of candidate
   // files
-  if (!fileInfo_.empty()) {
+  if (exploreDirectory_) {
+    res = explore();
+  } else {
     LOG(INFO) << "Using list of file info. Number of files "
               << fileInfo_.size();
     res = enqueueFiles();
-  } else {
-    res = explore();
   }
   {
     std::lock_guard<std::mutex> lock(mutex_);
     initFinished_ = true;
+    enqueueFilesToBeDeleted();
     // TODO: comment why
     if (sourceQueue_.empty()) {
       conditionNotEmpty_.notify_all();
@@ -245,7 +250,7 @@ bool DirectorySourceQueue::explore() {
   std::deque<string> todoList;
   todoList.push_back("");
   while (!todoList.empty()) {
-    if (abortChecker_->shouldAbort()) {
+    if (threadCtx_->getAbortChecker()->shouldAbort()) {
       LOG(ERROR) << "Directory transfer thread aborted";
       hasError = true;
       break;
@@ -267,7 +272,7 @@ bool DirectorySourceQueue::explore() {
     // nastiness of calculating correctly buffer size and race conditions there)
     struct dirent *dirEntryRes = nullptr;
     while (true) {
-      if (abortChecker_->shouldAbort()) {
+      if (threadCtx_->getAbortChecker()->shouldAbort()) {
         break;
       }
       errno = 0;  // yes that's right
@@ -355,7 +360,7 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          FileInfo fileInfo(newRelativePath, fileStat.st_size);
+          WdtFileInfo fileInfo(newRelativePath, fileStat.st_size, directReads_);
           createIntoQueue(newFullPath, fileInfo);
           continue;
         }
@@ -380,13 +385,14 @@ bool DirectorySourceQueue::explore() {
     }
     closedir(dirPtr);
   }
-  LOG(INFO) << "Number of files explored: " << numEntries_
-            << ", errors: " << std::boolalpha << hasError;
+  LOG(INFO) << "Number of files explored: " << numEntries_ << " opened "
+            << numFilesOpened_ << " with direct " << numFilesOpenedWithDirect_
+            << " errors " << std::boolalpha << hasError;
   return !hasError;
 }
 
 void DirectorySourceQueue::smartNotify(int32_t addedSource) {
-  if (addedSource >= options_.num_ports) {
+  if (addedSource >= numClientThreads_) {
     conditionNotEmpty_.notify_all();
     return;
   }
@@ -416,7 +422,7 @@ void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
 }
 
 void DirectorySourceQueue::createIntoQueue(const string &fullPath,
-                                           FileInfo &fileInfo) {
+                                           WdtFileInfo &fileInfo) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
   // large file. This can be optimized as follows -
@@ -434,11 +440,16 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   metadata->directReads = fileInfo.directReads;
   metadata->size = fileInfo.fileSize;
   if ((openFilesDuringDiscovery_ != 0) && (metadata->fd < 0)) {
-    metadata->fd = FileUtil::openForRead(fullPath, metadata->directReads);
+    metadata->fd =
+        FileUtil::openForRead(*threadCtx_, fullPath, metadata->directReads);
+    ++numFilesOpened_;
+    if (metadata->directReads) {
+      ++numFilesOpenedWithDirect_;
+    }
     metadata->needToClose = (metadata->fd >= 0);
     // works for -1 up to 4B files
     if (--openFilesDuringDiscovery_ == 0) {
-      LOG(WARNING) << "Already opened " << options_.open_files_during_discovery
+      LOG(WARNING) << "Already opened " << numFilesOpened_
                    << " files, will open the reminder as they are sent";
     }
   }
@@ -507,8 +518,8 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
     int64_t remainingBytes = chunk.size();
     do {
       const int64_t size = std::min<int64_t>(remainingBytes, blockSize);
-      std::unique_ptr<ByteSource> source = folly::make_unique<FileByteSource>(
-          metadata, size, offset, fileSourceBufferSize_);
+      std::unique_ptr<ByteSource> source =
+          folly::make_unique<FileByteSource>(metadata, size, offset);
       sourceQueue_.push(std::move(source));
       remainingBytes -= size;
       offset += size;
@@ -536,7 +547,7 @@ std::vector<string> &DirectorySourceQueue::getFailedDirectories() {
 
 bool DirectorySourceQueue::enqueueFiles() {
   for (auto &info : fileInfo_) {
-    if (abortChecker_->shouldAbort()) {
+    if (threadCtx_->getAbortChecker()->shouldAbort()) {
       LOG(ERROR) << "Directory transfer thread aborted";
       return false;
     }
@@ -564,6 +575,10 @@ int64_t DirectorySourceQueue::getCount() const {
   return numEntries_;
 }
 
+const PerfStatReport &DirectorySourceQueue::getPerfReport() const {
+  return threadCtx_->getPerfReport();
+}
+
 std::pair<int64_t, ErrorCode> DirectorySourceQueue::getNumBlocksAndStatus()
     const {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -586,8 +601,49 @@ bool DirectorySourceQueue::fileDiscoveryFinished() const {
   return initFinished_;
 }
 
+void DirectorySourceQueue::enqueueFilesToBeDeleted() {
+  if (!deleteFiles_) {
+    return;
+  }
+  if (!initFinished_ || previouslyTransferredChunks_.empty()) {
+    // if the directory transfer has not finished yet or existing files list has
+    // not yet been received, return
+    return;
+  }
+  std::set<std::string> discoveredFiles;
+  for (const SourceMetaData *metadata : sharedFileData_) {
+    discoveredFiles.insert(metadata->relPath);
+  }
+  int64_t numFilesToBeDeleted = 0;
+  for (auto &it : previouslyTransferredChunks_) {
+    const std::string &fileName = it.first;
+    if (discoveredFiles.find(fileName) != discoveredFiles.end()) {
+      continue;
+    }
+    int64_t seqId = it.second.getSeqId();
+    // extra file on the receiver side
+    LOG(INFO) << "Extra file " << fileName << " seq-id " << seqId
+              << " on the receiver side, will be deleted";
+    SourceMetaData *metadata = new SourceMetaData();
+    metadata->relPath = fileName;
+    metadata->size = 0;
+    // we can reuse the previous seq-id
+    metadata->seqId = seqId;
+    metadata->allocationStatus = TO_BE_DELETED;
+    sharedFileData_.emplace_back(metadata);
+    // create a byte source with size and offset equal to 0
+    std::unique_ptr<ByteSource> source =
+        folly::make_unique<FileByteSource>(metadata, 0, 0);
+    sourceQueue_.push(std::move(source));
+    numFilesToBeDeleted++;
+  }
+  numEntries_ += numFilesToBeDeleted;
+  numBlocks_ += numFilesToBeDeleted;
+  smartNotify(numFilesToBeDeleted);
+}
+
 std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
-    ErrorCode &status) {
+    ThreadCtx *callerThreadCtx, ErrorCode &status) {
   std::unique_ptr<ByteSource> source;
   while (true) {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -613,7 +669,7 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
     VLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
             << " size " << source->getSize();
     // try to open the source
-    if (source->open() == OK) {
+    if (source->open(callerThreadCtx) == OK) {
       lock.lock();
       numBlocksDequeued_++;
       return source;

@@ -55,7 +55,7 @@ void Throttler::configureOptions(double& avgRateBytesPerSec,
         kTimeMultiplier * kBucketMultiplier * peakRateBytesPerSec;
     LOG(INFO) << "Burst limit not specified but peak "
               << "rate is configured. Auto configuring to "
-              << bucketLimitBytes / kMbToB << " mbytes";
+              << bucketLimitBytes / kMbToB << " Mbytes";
   }
 }
 
@@ -75,14 +75,14 @@ Throttler::Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
   }
   if (avgRateBytesPerSec > 0) {
     LOG(INFO) << "Average rate " << avgRateBytesPerSec_ / kMbToB
-              << " mbytes / seconds";
+              << " Mbytes/sec";
   } else {
     LOG(INFO) << "No average rate specified";
   }
   if (bucketRateBytesPerSec_ > 0) {
     LOG(INFO) << "Peak rate " << bucketRateBytesPerSec_ / kMbToB
-              << " mbytes / seconds.  Bucket limit "
-              << bytesTokenBucketLimit_ / kMbToB << " mbytes.";
+              << " Mbytes/sec.  Bucket limit "
+              << bytesTokenBucketLimit_ / kMbToB << " Mbytes.";
   } else {
     LOG(INFO) << "No peak rate specified";
   }
@@ -113,7 +113,7 @@ void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
   bytesTokenBucketLimit_ = bytesTokenBucketLimit;
 }
 
-void Throttler::limit(double deltaProgress) {
+void Throttler::limit(ThreadCtx& threadCtx, double deltaProgress) {
   // now should be before taking the lock
   std::chrono::time_point<Clock> now = Clock::now();
   double sleepTimeSeconds = calculateSleep(deltaProgress, now);
@@ -122,10 +122,9 @@ void Throttler::limit(double deltaProgress) {
   }
   if (sleepTimeSeconds > 0) {
     /* sleep override */
-    START_PERF_TIMER
+    PerfStatCollector statCollector(threadCtx, PerfStatReport::THROTTLER_SLEEP);
     std::this_thread::sleep_for(
         std::chrono::duration<double>(sleepTimeSeconds));
-    RECORD_PERF_RESULT(PerfStatReport::THROTTLER_SLEEP)
   }
 }
 
@@ -159,7 +158,7 @@ double Throttler::calculateSleep(double deltaProgress,
        */
       double peakThrottlerSleep =
           -1.0 * bytesTokenBucket_ / bucketRateBytesPerSec_;
-      VLOG(1) << "Peak throttler wants to sleep " << peakThrottlerSleep
+      VLOG(2) << "Peak throttler wants to sleep " << peakThrottlerSleep
               << " seconds";
       return peakThrottlerSleep;
     }
@@ -196,7 +195,7 @@ double Throttler::averageThrottler(const Clock::time_point& now) {
   std::chrono::duration<double> elapsedDuration = now - startTime_;
   double elapsedSeconds = elapsedDuration.count();
   if (avgRateBytesPerSec_ <= 0) {
-    VLOG(1) << "There is no rate limit";
+    VLOG(2) << "There is no avg rate limit";
     return -1;
   }
   const double allowedProgressBytes = avgRateBytesPerSec_ * elapsedSeconds;
@@ -205,12 +204,11 @@ double Throttler::averageThrottler(const Clock::time_point& now) {
     const double sleepTimeSeconds = idealTime - elapsedSeconds;
     VLOG(1) << "Throttler : Elapsed " << elapsedSeconds
             << " seconds. Made progress " << bytesProgress_ / kMbToB
-            << " mbytes in " << elapsedSeconds
+            << " Mbytes in " << elapsedSeconds
             << " seconds, maximum allowed progress for this duration is "
-            << allowedProgressBytes / kMbToB << " mbytes. Mean Rate allowed is "
-            << avgRateBytesPerSec_ / kMbToB
-            << " mbytes per seconds. Sleeping for " << sleepTimeSeconds
-            << " seconds";
+            << allowedProgressBytes / kMbToB << " Mbytes. Mean Rate allowed is "
+            << avgRateBytesPerSec_ / kMbToB << " Mbytes/sec. Sleeping for "
+            << sleepTimeSeconds << " seconds";
     return sleepTimeSeconds;
   }
   return -1;
@@ -266,10 +264,12 @@ void Throttler::setThrottlerLogTimeMillis(int64_t throttlerLogTimeMillis) {
 }
 
 std::ostream& operator<<(std::ostream& stream, const Throttler& throttler) {
-  stream << "avgRate : " << throttler.avgRateBytesPerSec_ / kMbToB << " MBps"
-         << ", peakRate : " << throttler.bucketRateBytesPerSec_ / kMbToB
-         << " MBps, bucketLimit : " << throttler.bytesTokenBucketLimit_ / kMbToB
-         << " MB, throttlerLogTimeMillis : "
+  stream << "avgRate: " << throttler.avgRateBytesPerSec_ / kMbToB
+         << " Mbytes/sec, peakRate: "
+         << throttler.bucketRateBytesPerSec_ / kMbToB
+         << " Mbytes/sec, bucketLimit: "
+         << throttler.bytesTokenBucketLimit_ / kMbToB
+         << " Mbytes, throttlerLogTimeMillis: "
          << throttler.throttlerLogTimeMillis_;
   return stream;
 }

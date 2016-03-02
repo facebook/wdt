@@ -81,7 +81,7 @@ cpp_unittest(
   name = 'filereader_test',
   srcs = [ 'test/FileReaderTest.cpp', ],
   deps = [
-      ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -91,7 +91,7 @@ cpp_unittest(
   name = 'threadscontroller_test',
   srcs = [ 'test/ThreadsControllerTest.cpp', ],
   deps = [
-      ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -109,7 +109,7 @@ cpp_unittest(
   name = 'wdt_url_test',
   srcs = [ 'test/WdtUrlTest.cpp', ],
   deps = [
-      ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -119,6 +119,7 @@ cpp_unittest(
   srcs = [ 'test/FdTest.cpp', ],
   deps = [
       ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -287,7 +288,9 @@ custom_unittest(
 custom_unittest(
   name = 'wdt_network_script_open_during_disc',
   command = [
-      "wdt/test/wdt_network_test.sh", "-x", "--open_files_during_discovery 750",
+      "/bin/env",
+      "EXTRA_WDT_OPTIONS=\"-open_files_during_discovery=750\"",
+      "wdt/test/wdt_network_test.sh",
       "-p", "25800",
   ],
   type = 'simple',
@@ -327,6 +330,21 @@ custom_unittest(
   name = 'wdt_download_resumption_test',
   command = [
       "wdt/test/wdt_download_resumption_test.sh"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'wdt_download_resumption_test_two_phases',
+  command = [
+      "/bin/env",
+      "TWO_PHASES=true",
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-p", "25050"
   ],
   type = 'simple',
   deps = [
@@ -427,6 +445,32 @@ custom_unittest(
 )
 
 custom_unittest(
+  name = 'resumption_test_flash_deletion',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-d", "-p", "25750"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
+  name = 'resumption_test_disk_deletion',
+  command = [
+      "wdt/test/wdt_download_resumption_test.sh",
+      "-d", "-c", "3", "-p", "25900"
+  ],
+  type = 'simple',
+  deps = [
+      ':wdt',
+  ],
+  tags = ['disabled'],
+)
+
+custom_unittest(
   name = 'long_running_mode_test',
   command = [
       "wdt/test/wdt_long_running_test.py"
@@ -493,7 +537,6 @@ cpp_library (
     "util/DirectorySourceQueue.cpp",
     "util/EncryptionUtils.cpp",
     "util/FileCreator.cpp",
-    "util/SocketUtils.cpp",
     "WdtThread.cpp",
     "util/ThreadsController.cpp",
     "util/ThreadTransferHistory.cpp",
@@ -511,6 +554,7 @@ cpp_library (
     "util/TransferLogManager.cpp",
     "WdtBase.cpp",
     "WdtResourceController.cpp",
+    "util/CommonImpl.cpp",
   ],
   compiler_flags = wdt_compiler_flags,
   deps = [
@@ -548,6 +592,18 @@ cpp_library (
   output_subdir = 'short_flags',
 )
 
+cpp_library (
+  name = "wdtlib4tests",
+  srcs = [
+      "test/TestCommon.cpp"
+  ],
+  deps = [
+    ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+
 cpp_binary(
     name= "wdt",
     srcs = [
@@ -569,10 +625,7 @@ cpp_binary(
       "wdtCmdLine.cpp",
     ],
     deps = [
-      ":wdtlib_short_flags",
-    ],
-    preprocessor_flags = [
-      "-DSTANDALONE_APP"
+      ":wdtlib4tests",
     ],
     output_subdir = 'test',
     compiler_flags = wdt_compiler_flags,

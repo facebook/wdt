@@ -1,10 +1,10 @@
 #pragma once
 
 #include <wdt/ErrorCodes.h>
-#include <wdt/AbortChecker.h>
 #include <wdt/Protocol.h>
-#include <wdt/WdtOptions.h>
+#include <wdt/util/CommonImpl.h>
 #include <wdt/util/EncryptionUtils.h>
+#include <sys/socket.h>
 #include <memory>
 
 namespace facebook {
@@ -13,7 +13,7 @@ namespace wdt {
 /// base socket class
 class WdtSocket {
  public:
-  WdtSocket(const int port, IAbortChecker const *abortChecker,
+  WdtSocket(ThreadCtx &threadCtx, int port,
             const EncryptionParams &encryptionParams);
 
   // making the object non-copyable and non-movable
@@ -70,6 +70,22 @@ class WdtSocket {
   /// @return     write error code
   ErrorCode getWriteErrCode() const;
 
+  /// saves decryptor ctx after offset
+  void saveDecryptorCtx(int offset);
+
+  /// verify whether the given tag matches previously saved context
+  bool verifyTag(std::string &tag);
+
+  /// @return   tcp receive buffer size
+  int getReceiveBufferSize() const;
+
+  /// @return   tcp send buffer size
+  int getSendBufferSize() const;
+
+  /// @return   number of unacked bytes in send buffer, returns -1 in case it
+  ///           fails to get unacked bytes for this socket
+  int getUnackedBytes() const;
+
   virtual ~WdtSocket();
 
  protected:
@@ -83,16 +99,33 @@ class WdtSocket {
 
   void writeEncryptionSettingsOnce();
 
-  /// If doTagIOs] is false will not try to read/write the final encryption tag
+  /// If doTagIOs is false will not try to read/write the final encryption tag
   virtual ErrorCode closeConnectionInternal(bool doTagIOs);
 
   ErrorCode finalizeWrites(bool doTagIOs);
 
   ErrorCode finalizeReads(bool doTagIOs);
 
+  /// sets read and write timeouts for the socket
+  void setSocketTimeouts();
+
+  /**
+   * Returns ip and port for a socket address
+   *
+   * @param sa      socket address
+   * @param salen   socket address length
+   * @param host    this is set to host name
+   * @param port    this is set to port
+   *
+   * @return        whether getnameinfo was successful or not
+   */
+  static bool getNameInfo(const struct sockaddr *sa, socklen_t salen,
+                          std::string &host, std::string &port);
+
   int port_{-1};
-  IAbortChecker const *abortChecker_;
   int fd_{-1};
+
+  ThreadCtx &threadCtx_;
 
   EncryptionParams encryptionParams_;
   bool encryptionSettingsWritten_{false};
@@ -111,12 +144,51 @@ class WdtSocket {
   ErrorCode readErrorCode_{OK};
   ErrorCode writeErrorCode_{OK};
 
-  /// options
-  const WdtOptions &options_;
   /// Have we already completed encryption and wrote the tag
   bool writesFinalized_{false};
   /// Have we already read the tag and completed decryption
   bool readsFinalized_{false};
+
+  const int OFFSET_NOT_SET = -1;
+  const int CTX_SAVED = -2;
+
+  /// offset after which decryptor ctx should be saved
+  int ctxSaveOffset_{OFFSET_NOT_SET};
+
+ private:
+  /// computes effective timeout depending on the network timeout and abort
+  /// check interval
+  int getEffectiveTimeout(int networkTimeout);
+
+  /// @see ioWithAbortCheck
+  int64_t readWithAbortCheck(char *buf, int64_t nbyte, int timeoutMs,
+                             bool tryFull);
+  /// @see ioWithAbortCheck
+  int64_t writeWithAbortCheck(const char *buf, int64_t nbyte, int timeoutMs,
+                              bool tryFull);
+
+  /**
+   * Tries to read/write numBytes amount of data from fd. Also, checks for abort
+   * after every read/write call. Also, retries till the input timeout.
+   * Optionally, returns after first successful read/write call.
+   *
+   * @param readOrWrite   read/write
+   * @param fd            socket file descriptor
+   * @param tbuf          buffer
+   * @param numBytes      number of bytes to read/write
+   * @param abortChecker  abort checker callback
+   * @param timeoutMs     timeout in milliseconds
+   * @param tryFull       if true, this function tries to read complete data.
+   *                      Otherwise, this function returns after the first
+   *                      successful read/write. This is set to false for
+   *                      receiver pipelining.
+   *
+   * @return              in case of success number of bytes read/written, else
+   *                      returns -1
+   */
+  template <typename F, typename T>
+  int64_t ioWithAbortCheck(F readOrWrite, T tbuf, int64_t numBytes,
+                           int timeoutMs, bool tryFull);
 };
 }
 }

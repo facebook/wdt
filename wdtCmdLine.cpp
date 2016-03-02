@@ -82,6 +82,8 @@ DEFINE_string(test_only_encryption_secret, "",
 
 DEFINE_string(app_name, "wdt", "Identifier used for reporting (scuba, at fb)");
 
+DECLARE_bool(help);
+
 using namespace facebook::wdt;
 
 // TODO: move this to some util and/or delete
@@ -93,7 +95,7 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
 
 std::mutex abortMutex;
 std::condition_variable abortCondVar;
-
+bool isAbortCancelled = false;
 std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
   int abortSeconds = FLAGS_abort_after_seconds;
   if (abortSeconds <= 0) {
@@ -105,8 +107,10 @@ std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
   auto lambda = [=] {
     LOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
     std::unique_lock<std::mutex> lk(abortMutex);
-    if (abortCondVar.wait_for(lk, std::chrono::seconds(abortSeconds)) ==
-        std::cv_status::no_timeout) {
+    bool isNotAbort =
+        abortCondVar.wait_for(lk, std::chrono::seconds(abortSeconds),
+                              [&]() -> bool { return isAbortCancelled; });
+    if (isNotAbort) {
       LOG(INFO) << "Already finished normally, no abort.";
     } else {
       LOG(INFO) << "Requesting abort.";
@@ -114,8 +118,7 @@ std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
     }
   };
   // Run this in a separate thread concurrently with sender/receiver
-  std::thread abortThread(lambda);
-  abortThread.detach();
+  static auto f = std::async(std::launch::async, lambda);
   return res;
 }
 
@@ -126,22 +129,25 @@ void setAbortChecker(WdtBase &senderOrReceiver) {
 void cancelAbort() {
   {
     std::unique_lock<std::mutex> lk(abortMutex);
+    isAbortCancelled = true;
     abortCondVar.notify_one();
   }
   std::this_thread::yield();
 }
 
-void readManifest(std::istream &fin, WdtTransferRequest &req) {
+void readManifest(std::istream &fin, WdtTransferRequest &req, bool dfltDirect) {
   std::string line;
   while (std::getline(fin, line)) {
     std::vector<std::string> fields;
     folly::split('\t', line, fields, true);
-    if (fields.empty() || fields.size() > 2) {
+    if (fields.empty() || fields.size() > 3) {
       LOG(FATAL) << "Invalid input manifest: " << line;
     }
     int64_t filesize = fields.size() > 1 ? folly::to<int64_t>(fields[1]) : -1;
-    req.fileInfo.emplace_back(fields[0], filesize);
+    bool odirect = fields.size() > 2 ? folly::to<bool>(fields[2]) : dfltDirect;
+    req.fileInfo.emplace_back(fields[0], filesize, odirect);
   }
+  req.disableDirectoryTraversal = true;
 }
 
 namespace google {
@@ -153,6 +159,10 @@ bool badGflagFound = false;
 static std::string usage;
 void printUsage() {
   std::cerr << usage << std::endl;
+}
+
+void sigUSR1Handler(int) {
+  ReportPerfSignalSubscriber::notify();
 }
 
 int main(int argc, char *argv[]) {
@@ -177,6 +187,12 @@ int main(int argc, char *argv[]) {
   usage.append("\nUse --help to see all the options.");
   google::SetUsageMessage(usage);
   google::gflags_exitfunc = [](int code) {
+    if (code == 0 || FLAGS_help) {
+      // By default gflags exit 1 with --help and 0 for --version (good)
+      // let's also exit(0) for --help to be like most gnu command line
+      exit(0);
+    }
+    // error cases:
     if (FLAGS_exit_on_bad_flags) {
       printUsage();
       exit(code);
@@ -197,6 +213,7 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   signal(SIGPIPE, SIG_IGN);
+  signal(SIGUSR1, sigUSR1Handler);
 
   std::string connectUrl;
   if (argc == 2) {
@@ -215,24 +232,24 @@ int main(int argc, char *argv[]) {
     wdt.printWdtOptions(std::cout);
     return 0;
   }
+  WdtOptions &options = wdt.getWdtOptions();
 
   ErrorCode retCode = OK;
 
   // Odd ball case of log parsing
   if (FLAGS_parse_transfer_log) {
     // Log parsing mode
-    WdtOptions::getMutable().enable_download_resumption = true;
-    TransferLogManager transferLogManager;
+    options.enable_download_resumption = true;
+    TransferLogManager transferLogManager(options);
     transferLogManager.setRootDir(FLAGS_directory);
     transferLogManager.openLog();
     bool success = transferLogManager.parseAndPrint();
-    LOG_IF(ERROR, success) << "Transfer log parsing failed";
+    LOG_IF(ERROR, !success) << "Transfer log parsing failed";
     transferLogManager.closeLog();
     return success ? OK : ERROR;
   }
 
   // General case : Sender or Receiver
-  const auto &options = WdtOptions::get();
   std::unique_ptr<WdtTransferRequest> reqPtr;
   if (connectUrl.empty()) {
     reqPtr = folly::make_unique<WdtTransferRequest>(
@@ -261,8 +278,15 @@ int main(int argc, char *argv[]) {
 
   if (FLAGS_destination.empty() && connectUrl.empty()) {
     Receiver receiver(req);
+    WdtOptions &recOptions = receiver.getWdtOptions();
+    if (FLAGS_run_as_daemon) {
+      // Backward compatible with static ports, you can still get dynamic
+      // daemon ports using -start_port 0 like before
+      recOptions.static_ports = true;
+    }
     if (!FLAGS_recovery_id.empty()) {
-      WdtOptions::getMutable().enable_download_resumption = true;
+      // TODO: add a test for this
+      recOptions.enable_download_resumption = true;
       receiver.setRecoveryId(FLAGS_recovery_id);
     }
     WdtTransferRequest augmentedReq = receiver.init();
@@ -313,10 +337,10 @@ int main(int argc, char *argv[]) {
       // Each line should have the filename and optionally
       // the filesize separated by a single space
       if (FLAGS_manifest == "-") {
-        readManifest(std::cin, req);
+        readManifest(std::cin, req, options.odirect_reads);
       } else {
         std::ifstream fin(FLAGS_manifest);
-        readManifest(fin, req);
+        readManifest(fin, req, options.odirect_reads);
         fin.close();
       }
       LOG(INFO) << "Using files lists, number of files " << req.fileInfo.size();

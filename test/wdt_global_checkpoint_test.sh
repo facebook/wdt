@@ -1,7 +1,5 @@
 #! /bin/bash
 
-set -o pipefail
-
 source `dirname "$0"`/common_functions.sh
 
 BASEDIR=/dev/shm/wdtTest_$USER
@@ -13,7 +11,7 @@ mkdir "$DIR/src"
 # create a big file
 dd if=/dev/zero of="$DIR/src/file" bs=536870912 count=1
 
-WDTBIN_OPTS="-num_ports=2 -transfer_id=wdt"
+WDTBIN_OPTS="-static_ports -num_ports=2 -transfer_id=wdt"
 extendWdtOptions
 
 TEST_COUNT=0

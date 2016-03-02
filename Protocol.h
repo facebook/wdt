@@ -181,6 +181,7 @@ enum FileAllocationStatus {
   EXISTS_CORRECT_SIZE,  // file exists with correct size
   EXISTS_TOO_LARGE,     // file exists, but too large
   EXISTS_TOO_SMALL,     // file exists, but too small
+  TO_BE_DELETED,        // file not needed, should be deleted
 };
 
 /// structure representing details of a block
@@ -241,6 +242,10 @@ class Protocol {
   static const int CHECKPOINT_SEQ_ID_VERSION;
   /// version from which wdt supports encryption
   static const int ENCRYPTION_V1_VERSION;
+  /// version from which GCM tags were verified incrementally
+  static const int INCREMENTAL_TAG_VERIFICATION_VERSION;
+  /// version from which file deletion was supported for resumption
+  static const int DELETE_CMD_VERSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
@@ -278,8 +283,9 @@ class Protocol {
   static const int64_t kMaxSize = 1 + 10;
   /// max size of settings command encoding
   static const int64_t kMaxSettings = 1 + 3 * 10 + kMaxTransferIdLength + 1;
-  /// max length of the footer cmd encoding
-  static const int64_t kMaxFooter = 1 + 10;
+  /// max length of the footer cmd encoding, 1 byte for gcm tag length, 16 byte
+  /// for tag
+  static const int64_t kMaxFooter = 1 + 1 + 16;
   /// max size of chunks cmd
   static const int64_t kChunksCmdLen = sizeof(int64_t) + sizeof(int64_t);
   /// max size of chunkInfo encoding length
@@ -401,17 +407,17 @@ class Protocol {
   static bool decodeSize(char *src, int64_t &off, int64_t max,
                          int64_t &totalNumBytes);
 
-  /// encodes checksum into dest+off
+  /// encodes checksum or tag into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
   static void encodeFooter(char *dest, int64_t &off, int64_t max,
-                           int32_t checksum);
+                           int32_t checksum, const std::string &tag);
 
   /// decodes from src+off and consumes/moves off but not past max
-  /// sets checksum
+  /// sets checksum or tag
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeFooter(char *src, int64_t &off, int64_t max,
-                           int32_t &checksum);
+                           int32_t &checksum, std::string &tag, bool isTag);
 
   /// encodes protocolVersion, errCode and checkpoint into dest+off
   /// moves the off into dest pointer

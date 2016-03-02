@@ -9,6 +9,9 @@ See also [README.md](../README.md#dependencies) Dependencies section
 Checkout the .travis.yml and travis_linux.sh and travis_osx.sh
 for build bootstrap without root/sudo requirement
 
+We don't have yet a native Windows port (please contribute!) but it does
+build and runs with Cygwin64 using the Linux instructions (and static linking)
+
 # Notes:
  On Ubuntu 14.04 - to get g++ 4.9
  ```

@@ -8,7 +8,6 @@
  */
 #include <wdt/WdtResourceController.h>
 
-#include <folly/Random.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -35,7 +34,6 @@ class WdtResourceControllerTest : public WdtResourceController {
   void AddObjectsWithLimitsTest();
   void InvalidNamespaceTest();
   void ReleaseStaleTest();
-  void RequestSerializationTest();
 
  private:
   string getTransferId(const string &wdtNamespace, int index) {

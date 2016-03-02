@@ -11,12 +11,10 @@
 #include <unistd.h>
 
 #include <wdt/ByteSource.h>
-#include <wdt/Reporting.h>
-#include <folly/ThreadLocal.h>
+#include <wdt/util/CommonImpl.h>
 
 namespace facebook {
 namespace wdt {
-const int64_t kDiskBlockSize = 4 * 1024;
 
 /// File related code
 class FileUtil {
@@ -24,21 +22,20 @@ class FileUtil {
   /**
    * Opens the file for reading.
    *
+   * @param threadCtx       thread context
    * @param filename        name of the file
    * @param isDirectReads   whether to open for direct reads
    *
    * @return    If successful, fd is returned, else -1 is returned
    */
-  static int openForRead(const std::string &filename, bool isDirectReads);
+  static int openForRead(ThreadCtx &threadCtx, const std::string &filename,
+                         bool isDirectReads);
   // TODO: create a separate file for this class and move other file related
   // code here
 };
 
 /**
- * ByteSource that reads data from a file. The buffer used is thread-local
- * for efficiency reasons so only one FileByteSource can be created/used
- * per thread. It's also unsafe to access the same FileByteSource from
- * multiple threads.
+ * ByteSource that reads data from a file.
  */
 class FileByteSource : public ByteSource {
  public:
@@ -49,11 +46,8 @@ class FileByteSource : public ByteSource {
    * @param size              size of file; if actual size is larger we'll
    *                          truncate, if it's smaller we'll fail
    * @param offset            block offset
-   * @param bufferSize        size of buffer for temporarily storing read
-   *                          bytes
    */
-  FileByteSource(SourceMetaData *metadata, int64_t size, int64_t offset,
-                 int64_t bufferSize);
+  FileByteSource(SourceMetaData *metadata, int64_t size, int64_t offset);
 
   /// close file descriptor if still open
   virtual ~FileByteSource() {
@@ -87,7 +81,7 @@ class FileByteSource : public ByteSource {
 
   /// @return true iff there was an error reading file
   virtual bool hasError() const override {
-    return fd_ < 0;
+    return (metadata_->allocationStatus != TO_BE_DELETED) && (fd_ < 0);
   }
 
   /// @see ByteSource.h
@@ -96,25 +90,11 @@ class FileByteSource : public ByteSource {
   /// @see ByteSource.h
   virtual void advanceOffset(int64_t numBytes) override;
 
-  /// open the source for reading
-  virtual ErrorCode open() override;
+  /// @see ByteSource.h
+  virtual ErrorCode open(ThreadCtx *threadCtx) override;
 
   /// close the source for reading
-  virtual void close() override {
-    if (metadata_->fd >= 0) {
-      // if the fd is not opened by this source, no need to close it
-      VLOG(1) << "No need to close " << getIdentifier()
-              << ", this was not opened by FileByteSource";
-      fd_ = -1;
-      return;
-    }
-    if (fd_ >= 0) {
-      START_PERF_TIMER
-      ::close(fd_);
-      RECORD_PERF_RESULT(PerfStatReport::FILE_CLOSE)
-      fd_ = -1;
-    }
-  }
+  virtual void close() override;
 
   /**
    * @return transfer stats for the source. If the stats is moved by the
@@ -129,57 +109,11 @@ class FileByteSource : public ByteSource {
     transferStats_ += stats;
   }
 
-  int64_t getBufferSize() const override {
-    if (!buffer_) {
-      return 0;
-    }
-    return buffer_->size_;
-  }
-
  private:
-  struct Buffer {
-    explicit Buffer(int64_t size, bool isMemAligned) : size_(size) {
-      isMemAligned_ = false;
-      if (!isMemAligned) {
-        data_ = new char[size + 1];
-        return;
-      }
-#ifdef WDT_SUPPORTS_ODIRECT
-      const int64_t remainder = size_ % kDiskBlockSize;
-      if (remainder != 0) {
-        // Making size the next multiple of disk block size
-        size_ = (size_ - remainder) + kDiskBlockSize;
-        LOG(INFO) << "Changing the buffer size to multiple "
-                  << "of " << kDiskBlockSize << ". New size " << size_
-                  << " old size " << size;
-      }
-      VLOG(1) << "Posix memaligned buffer, size = " << size_;
-      int ret = posix_memalign((void **)&data_, kDiskBlockSize, size_);
-      if (ret) {
-        LOG(ERROR) << "Memalign memory failed " << strerrorStr(ret);
-      }
-      isMemAligned_ = true;
-#endif
-    }
+  /// clears page cache
+  void clearPageCache();
 
-    ~Buffer() {
-      if (isMemAligned_) {
-        free(data_);
-        return;
-      }
-      delete[] data_;
-    }
-    bool isMemAligned_;
-    char *data_;
-    int64_t size_;
-  };
-
-  /**
-   * Buffer for temporarily holding bytes read from file. This is thread-local
-   * for efficiency reasons, so only one FileByteSource can be used at once
-   * per thread.
-   */
-  static folly::ThreadLocalPtr<Buffer> buffer_;
+  ThreadCtx *threadCtx_{nullptr};
 
   /// shared file information
   SourceMetaData *metadata_;
@@ -195,9 +129,6 @@ class FileByteSource : public ByteSource {
 
   /// number of bytes read so far from file
   int64_t bytesRead_;
-
-  /// buffer size
-  int64_t bufferSize_;
 
   /// Whether reads have to be done using aligned buffer and size
   bool alignedReadNeeded_{false};

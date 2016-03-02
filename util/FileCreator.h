@@ -11,6 +11,7 @@
 #include <wdt/WdtConfig.h>
 #include <wdt/Protocol.h>
 #include <wdt/util/TransferLogManager.h>
+#include <wdt/util/CommonImpl.h>
 
 #include <glog/logging.h>
 #include <mutex>
@@ -35,10 +36,9 @@ namespace wdt {
  */
 class FileCreator {
  public:
-  /// rootDir is assumed to exist
   FileCreator(const std::string &rootDir, int numThreads,
-              TransferLogManager &transferLogManager)
-      : transferLogManager_(transferLogManager) {
+              TransferLogManager &transferLogManager, bool skipWrites)
+      : transferLogManager_(transferLogManager), skipWrites_(skipWrites) {
     CHECK(!rootDir.empty());
 
     // For creating root directory, we are using createDirRecursively.
@@ -63,12 +63,12 @@ class FileCreator {
    * openAndSetSize function. Other threads wait for the first thread to finish
    * and opens the file without setting size.
    *
-   * @param threadIndex   index of the calling thread
+   * @param threadCtx     context of the calling thread
    * @param blockDetails  block-details
    *
    * @return              file descriptor in case of success, -1 otherwise
    */
-  int openForBlocks(int threadIndex, BlockDetails const *blockDetails);
+  int openForBlocks(ThreadCtx &threadCtx, BlockDetails const *blockDetails);
 
   /// reset internal directory cache
   void resetDirCache() {
@@ -88,11 +88,12 @@ class FileCreator {
    * required size, the file is truncated using ftruncate. Space is
    * allocated using posix_fallocate.
    *
+   * @param threadCtx     context of the calling thread
    * @param blockDetails  block-details
    *
    * @return          file descriptor in case of success, -1 otherwise
    */
-  int openAndSetSize(BlockDetails const *blockDetails);
+  int openAndSetSize(ThreadCtx &threadCtx, BlockDetails const *blockDetails);
 
   /**
    * Create a file and open for writing, recursively create subdirs.
@@ -102,38 +103,40 @@ class FileCreator {
    * failing. Will not overwrite existing files unless overwrite option
    * is set.
    *
-   * @param relPath   path relative to root dir
+   * @param threadCtx     context of the calling thread
+   * @param relPath       path relative to root dir
    *
    * @return          file descriptor or -1 on error
    */
-  int createFile(const std::string &relPath);
+  int createFile(ThreadCtx &threadCtx, const std::string &relPath);
   /**
    * Open existing file
    */
-  int openExistingFile(const std::string &relPath);
+  int openExistingFile(ThreadCtx &threadCtx, const std::string &relPath);
 
   /**
    * sets the size of the file. If the size is greater then the
    * file is truncated using ftruncate. Space is allocated using fallocate.
    *
+   * @param threadCtx context of the calling thread
    * @param fd        file descriptor
    * @param fileSize  size of the file
    *
    * @return          true for success, false otherwise
    */
-  bool setFileSize(int fd, int64_t fileSize);
+  bool setFileSize(ThreadCtx &threadCtx, int fd, int64_t fileSize);
 
   /**
    * opens the file and sets it size. Called only for the first block to request
    * opening a multi-block file. Sets the allocation status in fileStatusMap_
    * and notifies other waiting thread.
    *
-   * @param threadIndex   index of the calling thread
+   * @param threadCtx     context of the calling thread
    * @param blockDetails  block-details
    *
    * @return          file descriptor or -1 on error
    */
-  int openForFirstBlock(int threadIndex, BlockDetails const *blockDetails);
+  int openForFirstBlock(ThreadCtx &threadCtx, BlockDetails const *blockDetails);
 
   /// waits for allocation of a file to finish
   bool waitForAllocationFinish(int allocatingThreadIndex, int64_t seqId);
@@ -160,6 +163,9 @@ class FileCreator {
     return createdDirs_.find(dir) != createdDirs_.end();
   }
 
+  /// returns full path of a file
+  std::string getFullPath(const std::string &relPath);
+
   /// root directory
   std::string rootDir_;
 
@@ -185,6 +191,9 @@ class FileCreator {
   std::condition_variable *threadConditionVariables_;
   /// lock protecting fileStatusMap_
   folly::SpinLock lock_;
+
+  // Set to prevent creating files
+  bool skipWrites_;
 };
 }
 }

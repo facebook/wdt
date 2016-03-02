@@ -270,6 +270,12 @@ class ReceiverThread : public WdtThread {
    */
   ReceiverState finishWithError();
 
+  /// marks a block a verified
+  void markBlockVerified(const BlockDetails &blockDetails);
+
+  /// verifies received blocks which are not already verified
+  void markReceivedBlocksVerified();
+
   /// Mapping from receiver states to state functions
   static const StateFunction stateMap_[];
 
@@ -281,12 +287,6 @@ class ReceiverThread : public WdtThread {
    * accept, read, write on the socket
    */
   std::unique_ptr<ServerSocket> socket_{nullptr};
-
-  /// Buffer that receives reads data into from the network
-  char *buf_{nullptr};
-
-  /// Size of the buffer
-  const int64_t bufferSize_;
 
   /// Marks the number of bytes already read in the buffer
   int64_t numRead_{0};
@@ -321,23 +321,16 @@ class ReceiverThread : public WdtThread {
   /// Checkpoint local to the thread, updated regularly
   Checkpoint checkpoint_;
 
-  /// whether checksum verification is enabled or not
-  bool enableChecksum_{false};
-
   /// whether settings have been received and verified for the current
   /// connection. This is used to determine round robin order for polling in
   /// the server socket
   bool curConnectionVerified_{false};
 
-  /**
-   * Whether SEND_DONE_CMD state has already failed for this session or not.
-   * This has to be separately handled, because session barrier is
-   * implemented before sending done cmd
-   */
-  bool doneSendFailure_{false};
-
   /// Checkpoints that have not been sent back to the sender
   std::vector<Checkpoint> newCheckpoints_;
+
+  /// list of received blocks which have not yet been verified
+  std::vector<BlockDetails> blocksWaitingVerification_;
 };
 }
 }

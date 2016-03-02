@@ -7,7 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include <wdt/Reporting.h>
+#include <wdt/util/CommonImpl.h>
 #include <folly/Synchronized.h>
 #include <thread>
 #include <glog/logging.h>
@@ -30,8 +30,8 @@ class Throttler {
  public:
   /**
    * Utility method that configures the avg rate, peak rate and bucket limit
-   * based on the values passed to this method and returns a shared ptr
-   * to an instance of this throttler
+   * based on the values passed to this method and returns a shared ptr to an
+   * instance of this throttler. It can return nullptr if throttling is off.
    */
   static std::shared_ptr<Throttler> makeThrottler(
       double avgRateBytesPerSec, double peakRateBytesPerSec,
@@ -67,7 +67,7 @@ class Throttler {
    * time thread has to sleep and makes it sleep.
    * Also calls the throttler logger to log the stats
    */
-  virtual void limit(double deltaProgress);
+  virtual void limit(ThreadCtx& threadCtx, double deltaProgress);
 
   /**
    * This is thread safe implementation of token bucket

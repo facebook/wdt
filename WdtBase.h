@@ -43,6 +43,9 @@ class WdtBase {
    */
   virtual const WdtTransferRequest& init() = 0;
 
+  /// Sets other options than global/singleton ones - call this before init()
+  void setWdtOptions(const WdtOptions& src);
+
   /// Destructor
   virtual ~WdtBase();
 
@@ -50,10 +53,18 @@ class WdtBase {
   /// get aborted after this method has been called based on
   /// whether they are doing read/write on the socket and the timeout for the
   /// socket. Push mode for abort.
-  void abort(const ErrorCode abortCode);
+  void abort(ErrorCode abortCode);
 
   /// clears abort flag
   void clearAbort();
+
+  /**
+   * Returns a reference to the copy of WdtOptions held by this object.
+   * Changes should only be made before init() is called, not after.
+   */
+  WdtOptions& getWdtOptions() {
+    return options_;
+  }
 
   /**
    * sets an extra external call back to check for abort
@@ -128,11 +139,20 @@ class WdtBase {
     THREADS_JOINED,  // threads joined
   };
 
+  /// Validate the transfer request
+  virtual ErrorCode validateTransferRequest();
+
   /// @return current transfer status
   TransferStatus getTransferStatus();
 
+  /// corrects buffer size if necessary
+  void checkAndUpdateBufferSize();
+
   /// @param transferStatus   current transfer status
   void setTransferStatus(TransferStatus transferStatus);
+
+  /// Dumps performance statistics if enable_perf_stat_collection is true.
+  virtual void logPerfStats() const = 0;
 
   /// Input/output transfer request
   WdtTransferRequest transferRequest_;
@@ -166,6 +186,12 @@ class WdtBase {
 
   /// Controller for wdt threads shared between base and threads
   ThreadsController* threadsController_{nullptr};
+
+  /// Dump perf stats if notified
+  ReportPerfSignalSubscriber reportPerfSignal_;
+
+  /// Options/config used by this object
+  WdtOptions options_;
 
  private:
   folly::RWSpinLock abortCodeLock_;

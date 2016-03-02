@@ -106,7 +106,7 @@ ErrorCode WdtUri::process(const string& url) {
   if (urlPiece.empty()) {
     return status;
   }
-
+  // TODO: allow for '/' like wdt://[::1]:1234/?num_ports=3
   // parse port number
   if (urlPiece[0] == ':') {
     urlPiece.advance(1);
@@ -234,13 +234,18 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
       errorCode = getMoreInterestingError(code, errorCode);
     }
   }
-  try {
-    protocolVersion = folly::to<int64_t>(
-        wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM));
-  } catch (std::exception& e) {
-    LOG(WARNING) << "Error parsing protocol version "
+  const string recpv = wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM);
+  if (recpv.empty()) {
+    LOG(WARNING) << RECEIVER_PROTOCOL_VERSION_PARAM << " not specified in URI";
+  } else {
+    try {
+      protocolVersion = folly::to<int64_t>(recpv);
+    } catch (std::exception& e) {
+      LOG(ERROR) << "Error parsing protocol version "
                  << wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM) << " "
                  << e.what();
+      errorCode = URI_PARSE_ERROR;
+    }
   }
   string portsStr(wdtUri.getQueryParam(PORTS_PARAM));
   StringPiece portsList(portsStr);  // pointers into portsStr
@@ -264,27 +269,35 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   // Figure out ports using other params only if there was no port list
   string startPortStr = wdtUri.getQueryParam(START_PORT_PARAM);
   string numPortsStr = wdtUri.getQueryParam(NUM_PORTS_PARAM);
-  const auto& options = WdtOptions::get();
   int32_t startPort = wdtUri.getPort();
   if (startPort <= 0) {
-    startPort = options.start_port;
-    if (!startPortStr.empty()) {
+    if (startPortStr.empty()) {
+      LOG(ERROR) << "URI should have port or " << START_PORT_PARAM;
+      errorCode = INVALID_REQUEST;
+    } else {
       try {
         startPort = folly::to<int32_t>(startPortStr);
       } catch (std::exception& e) {
         LOG(ERROR) << "Couldn't convert start port " << startPortStr;
+        errorCode = URI_PARSE_ERROR;
       }
     }
   }
-  int numPorts = options.num_ports;
-  if (!numPortsStr.empty()) {
+  int32_t numPorts = 0;
+  if (numPortsStr.empty()) {
+    LOG(ERROR) << "URI should have " << NUM_PORTS_PARAM;
+    errorCode = INVALID_REQUEST;
+  } else {
     try {
       numPorts = folly::to<int32_t>(numPortsStr);
     } catch (std::exception& e) {
       LOG(ERROR) << "Couldn't convert num ports " << numPortsStr;
+      errorCode = URI_PARSE_ERROR;
     }
   }
-  ports = WdtTransferRequest::genPortsVector(startPort, numPorts);
+  if (errorCode == OK) {
+    ports = WdtTransferRequest::genPortsVector(startPort, numPorts);
+  }
   // beware of the return above, add future params processing above the return
 }
 
@@ -298,9 +311,10 @@ string WdtTransferRequest::getLogSafeString() const {
 
 string WdtTransferRequest::generateUrlInternal(bool genFull,
                                                bool forLogging) const {
-  if (errorCode == ERROR || errorCode == URI_PARSE_ERROR) {
-    LOG(ERROR) << "Transfer request has errors present ";
-    return errorCodeToStr(errorCode);
+  if (errorCode != OK) {
+    const string msg = errorCodeToStr(errorCode);
+    LOG(ERROR) << "Transfer request has " << msg;
+    return msg;
   }
   WdtUri wdtUri;
   wdtUri.setHostName(hostName);
