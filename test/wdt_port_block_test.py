@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 
-import os
 import re
-import subprocess
-from time import time
 from threading import Thread
+from common_utils import *
+
+# Todo: refactor using more of common_utils
 
 receiver_end_time = 0
 receiver_status = 0
@@ -24,7 +24,7 @@ def test(resumption):
         print("Test with ipv6 client is disabled in this system")
         return
 
-    receiver_cmd = "_bin/wdt/wdt -skip_writes -num_ports=1 -v 1"
+    receiver_cmd = get_receiver_binary() + " -skip_writes -num_ports=1 -v 1"
     print(receiver_cmd)
     receiver_process = subprocess.Popen(receiver_cmd.split(),
                                         stdout=subprocess.PIPE)
@@ -56,10 +56,11 @@ def test(resumption):
     # it works on machines which do have ipv6 but no dns entry
     sender_cmd = ("(sleep 20 | nc -4 localhost {0}) &> /dev/null & "
                   "(sleep 20 | nc -4 localhost {0}) &> /dev/null & "
-                  "sleep 1; _bin/wdt/wdt -directory wdt/ -ipv6 "
+                  "sleep 1; {3} -directory wdt/ -ipv6 "
                   "-num_ports=1 "
                   "-connection_url \"wdt://[::1]{1}{2}\"").format(
-                          port_to_block, start_port, rest_of_url)
+                      port_to_block, start_port, rest_of_url,
+                      get_sender_binary())
     if resumption:
         sender_cmd = sender_cmd + " -enable_download_resumption"
     print(sender_cmd)
@@ -84,11 +85,8 @@ def test(resumption):
     print(("Test passed - Sender and Receiver"
            " end time diff {0} ms").format(diff))
 
-def main():
-    print("Testing without download resumption")
-    test(False)
-    print("Testing with download resumption")
-    test(True)
 
-if __name__ == "__main__":
-    main()
+print("Testing without download resumption")
+test(False)
+print("Testing with download resumption")
+test(True)

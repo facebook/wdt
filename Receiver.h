@@ -8,15 +8,15 @@
  */
 #pragma once
 
-#include <wdt/WdtBase.h>
 #include <wdt/ReceiverThread.h>
+#include <wdt/WdtBase.h>
 #include <wdt/util/FileCreator.h>
 #include <wdt/util/ServerSocket.h>
 #include <wdt/util/TransferLogManager.h>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <thread>
-#include <chrono>
 
 namespace facebook {
 namespace wdt {

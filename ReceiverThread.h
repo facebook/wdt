@@ -7,9 +7,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
+#include <wdt/Receiver.h>
 #include <wdt/WdtBase.h>
 #include <wdt/WdtThread.h>
-#include <wdt/Receiver.h>
 #include <wdt/util/ServerSocket.h>
 
 namespace facebook {

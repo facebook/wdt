@@ -11,8 +11,8 @@
 #include <folly/SpinLock.h>
 #include <folly/String.h>  // for humanify
 
-#include <openssl/rand.h>
 #include <openssl/crypto.h>
+#include <openssl/rand.h>
 
 #include <string.h>  // for memset
 

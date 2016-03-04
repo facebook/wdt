@@ -8,17 +8,17 @@
  */
 #include "TestCommon.h"
 
-#include <wdt/Sender.h>
 #include <wdt/Receiver.h>
+#include <wdt/Sender.h>
 #include <wdt/util/WdtFlags.h>
 
+#include <folly/Range.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
-#include <folly/Range.h>
 
 using namespace std;
 

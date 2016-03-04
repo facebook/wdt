@@ -46,6 +46,7 @@ The possible options to this script are
 echo "Run from ~/fbcode - or fbmake runtests"
 
 source `dirname "$0"`/common_functions.sh
+setBinaries
 
 # Set DO_VERIFY:
 # to 1 : slow/expensive but checks correctness
@@ -94,7 +95,7 @@ WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
 "-num_ports=$threads -throttler_log_time_millis=200 "\
 "-transfer_id=$$"
 extendWdtOptions
-WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
+WDTBIN="$WDT_BINARY $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/wdtTest_$USER
 #BASEDIR=/data/wdt/tmpWDT

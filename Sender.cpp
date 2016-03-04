@@ -13,13 +13,13 @@
 
 #include <wdt/util/ClientSocket.h>
 
+#include <folly/Bits.h>
+#include <folly/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
-#include <folly/String.h>
-#include <folly/Bits.h>
 #include <folly/ScopeGuard.h>
+#include <folly/String.h>
 #include <sys/stat.h>
-#include <folly/Checksum.h>
 
 namespace facebook {
 namespace wdt {

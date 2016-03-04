@@ -11,9 +11,9 @@
 #include <wdt/Protocol.h>
 #include <wdt/WdtOptions.h>
 #include <map>
-#include <vector>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace facebook {
 namespace wdt {

@@ -12,9 +12,9 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <chrono>
-#include <vector>
-#include <thread>
 #include <mutex>
+#include <thread>
+#include <vector>
 using namespace std;
 namespace facebook {
 namespace wdt {

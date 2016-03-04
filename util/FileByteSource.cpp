@@ -8,11 +8,11 @@
  */
 #include <wdt/util/FileByteSource.h>
 
-#include <algorithm>
 #include <fcntl.h>
 #include <glog/logging.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <algorithm>
 namespace facebook {
 namespace wdt {
 

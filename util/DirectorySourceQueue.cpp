@@ -8,17 +8,17 @@
  */
 #include <wdt/util/DirectorySourceQueue.h>
 
-#include <wdt/Protocol.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <set>
+#include <wdt/Protocol.h>
 #include <algorithm>
+#include <set>
 #include <utility>
 
+#include <fcntl.h>
 #include <folly/Memory.h>
 #include <regex>
-#include <fcntl.h>
 
 // NOTE: this should remain standalone code and not use WdtOptions directly
 // also note this is used not just by the Sender but also by the receiver

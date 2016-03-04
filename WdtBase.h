@@ -8,21 +8,21 @@
  */
 #pragma once
 
-#include <wdt/ErrorCodes.h>
+#include <folly/RWSpinLock.h>
 #include <wdt/AbortChecker.h>
-#include <wdt/WdtOptions.h>
+#include <wdt/ErrorCodes.h>
+#include <wdt/Protocol.h>
 #include <wdt/Reporting.h>
 #include <wdt/Throttler.h>
-#include <wdt/Protocol.h>
+#include <wdt/WdtOptions.h>
 #include <wdt/WdtThread.h>
 #include <wdt/util/DirectorySourceQueue.h>
 #include <wdt/util/EncryptionUtils.h>
 #include <wdt/util/ThreadsController.h>
 #include <memory>
 #include <string>
-#include <vector>
-#include <folly/RWSpinLock.h>
 #include <unordered_map>
+#include <vector>
 
 namespace facebook {
 namespace wdt {

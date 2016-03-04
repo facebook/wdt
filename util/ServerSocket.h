@@ -8,12 +8,12 @@
  */
 #pragma once
 
-#include <wdt/util/WdtSocket.h>
 #include <wdt/ErrorCodes.h>
+#include <wdt/util/WdtSocket.h>
 
+#include <netdb.h>
 #include <string>
 #include <vector>
-#include <netdb.h>
 
 namespace facebook {
 namespace wdt {

@@ -10,14 +10,14 @@
 
 #include <wdt/util/SerializationUtil.h>
 
-#include <folly/Range.h>
-#include <wdt/Reporting.h>
-#include <folly/ScopeGuard.h>
-#include <folly/Bits.h>
-#include <folly/String.h>
 #include <fcntl.h>
-#include <sys/stat.h>
+#include <folly/Bits.h>
+#include <folly/Range.h>
+#include <folly/ScopeGuard.h>
+#include <folly/String.h>
 #include <sys/file.h>
+#include <sys/stat.h>
+#include <wdt/Reporting.h>
 #include <ctime>
 #include <iomanip>
 

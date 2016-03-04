@@ -7,15 +7,15 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/SenderThread.h>
-#include <wdt/Sender.h>
-#include <wdt/util/ClientSocket.h>
+#include <folly/Bits.h>
+#include <folly/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
-#include <folly/String.h>
-#include <folly/Bits.h>
 #include <folly/ScopeGuard.h>
+#include <folly/String.h>
 #include <sys/stat.h>
-#include <folly/Checksum.h>
+#include <wdt/Sender.h>
+#include <wdt/util/ClientSocket.h>
 
 namespace facebook {
 namespace wdt {

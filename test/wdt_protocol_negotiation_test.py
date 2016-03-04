@@ -1,11 +1,13 @@
 #! /usr/bin/env python
 
-import os
+from common_utils import *
 import re
-import subprocess
+
+# TODO: refactor more using common_utils
 
 def testNegotiation(higher):
-    receiver_cmd = ("_bin/wdt/wdt -skip_writes -max_accept_retries 10")
+    receiver_cmd = get_receiver_binary() \
+                   + " -skip_writes -max_accept_retries 10"
     print(receiver_cmd)
     receiver_process = subprocess.Popen(receiver_cmd.split(),
                                         stdout=subprocess.PIPE)
@@ -25,8 +27,8 @@ def testNegotiation(higher):
     new_str = "{0}={1}".format(protocol_key, new_protocol)
     new_connection_url = connection_url.replace(prev_str, new_str)
 
-    sender_cmd = ("_bin/wdt/wdt -directory wdt/ -connection_url "
-                  "\'{0}\'").format(new_connection_url)
+    sender_cmd = "{1} -directory wdt/ -connection_url \'{0}\'".format(
+        new_connection_url, get_sender_binary())
     print(sender_cmd)
     status = os.system(sender_cmd)
     receiver_status = receiver_process.wait()
@@ -39,10 +41,6 @@ def testNegotiation(higher):
         exit(status)
 
 
-def main():
-    testNegotiation(False)
-    testNegotiation(True)
-    print("Protocol negotiation test passed")
-
-if __name__ == "__main__":
-    main()
+testNegotiation(False)
+testNegotiation(True)
+print("Protocol negotiation test passed")

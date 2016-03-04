@@ -64,13 +64,16 @@ undoLastIpTableChange() {
 }
 
 setBinaries() {
+  if [ -z "$WDT_BINARY" ]; then
+    WDT_BINARY="_bin/wdt/wdt"
+  fi
   if [ -z "$WDT_SENDER" ]; then
-    WDT_SENDER="_bin/wdt/wdt"
+    WDT_SENDER=$WDT_BINARY
   fi
   if [ -z "$WDT_RECEIVER" ]; then
-    WDT_RECEIVER="_bin/wdt/wdt"
+    WDT_RECEIVER=$WDT_BINARY
   fi
-  echo "Sender binary : $WDT_SENDER, Receiver binary : $WDT_RECEIVER"
+  echo "Wdt binary: $WDT_BINARY, Sender: $WDT_SENDER, Receiver: $WDT_RECEIVER"
 }
 
 setDirectory() {

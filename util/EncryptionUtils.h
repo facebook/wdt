@@ -9,8 +9,8 @@
 #pragma once
 
 #include <openssl/evp.h>
-#include <string>
 #include <wdt/ErrorCodes.h>
+#include <string>
 
 namespace facebook {
 namespace wdt {

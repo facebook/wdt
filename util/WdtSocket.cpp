@@ -1,10 +1,10 @@
 #include <wdt/util/WdtSocket.h>
-#include <wdt/Protocol.h>
 #include <folly/Bits.h>
 #include <folly/String.h>  // for humanify
-#include <unistd.h>
 #include <netdb.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
+#include <wdt/Protocol.h>
 #ifdef WDT_HAS_SOCKIOS_H
 #include <linux/sockios.h>
 #endif

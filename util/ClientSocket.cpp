@@ -9,10 +9,10 @@
 #include <wdt/util/ClientSocket.h>
 #include <wdt/Reporting.h>
 
-#include <glog/logging.h>
-#include <sys/socket.h>
-#include <poll.h>
 #include <fcntl.h>
+#include <glog/logging.h>
+#include <poll.h>
+#include <sys/socket.h>
 
 namespace facebook {
 namespace wdt {

@@ -7,12 +7,12 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
+#include <unistd.h>
 #include <wdt/WdtConfig.h>
 #include <wdt/util/EncryptionUtils.h>
 #include <cstdint>
-#include <string>
-#include <unistd.h>
 #include <set>
+#include <string>
 
 namespace facebook {
 namespace wdt {

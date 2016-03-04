@@ -1,8 +1,18 @@
 #! /bin/sh
 
-transferId1=$(_bin/wdt/wdt_url_test -v=1 2>&1 | grep Generated | head -1 | \
+
+if [ "$#" -eq 0 ]; then
+  binary=_bin/wdt/wdt_url_test
+else
+  binary=$1
+fi
+
+set -e
+set -o pipefail
+
+transferId1=$($binary -v=1 2>&1 | grep Generated | head -1 | \
   awk '{print $9}')
-transferId2=$(_bin/wdt/wdt_url_test -v=1 2>&1 | grep Generated | head -1 | \
+transferId2=$($binary -v=1 2>&1 | grep Generated | head -1 | \
   awk '{print $9}')
 
 if [ "$transferId1" == "$transferId2" ]; then

@@ -1,6 +1,7 @@
 #! /bin/bash
 
 source `dirname "$0"`/common_functions.sh
+setBinaries
 
 transfer() {
   $WDT_BIN -skip_writes > $DIR/server${TEST_COUNT}.log 2>&1 &
@@ -28,7 +29,7 @@ WDTBIN_OPTS="-ipv6 -start_port=$STARTING_PORT -read_timeout_millis=100 \
 -write_timeout_millis=100 -connect_timeout_millis=100 -transfer_id=wdt \
 -max_accept_retries=10"
 extendWdtOptions
-WDT_BIN="_bin/wdt/wdt $WDTBIN_OPTS"
+WDT_BIN="$WDT_BINARY $WDTBIN_OPTS"
 
 BASEDIR=/tmp/wdtTest_$USER
 

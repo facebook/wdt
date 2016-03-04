@@ -1,6 +1,7 @@
 #! /bin/bash
 
 source `dirname "$0"`/common_functions.sh
+setBinaries
 
 BASEDIR=/tmp/wdtTest_$USER
 
@@ -8,7 +9,7 @@ mkdir -p $BASEDIR
 DIR=`mktemp -d $BASEDIR/XXXXXX`
 echo "Testing in $DIR"
 
-_bin/wdt/wdt -directory $DIR -enable_download_resumption \
+$WDT_RECEIVER -directory $DIR -enable_download_resumption \
    -abort_after_seconds 2 2>&1 | tee $DIR/server1.log &
 pidofreceiver1=$!
 
@@ -16,7 +17,7 @@ pidofreceiver1=$!
 sleep 1
 
 # start another receiver for the same directory
-_bin/wdt/wdt -directory $DIR -enable_download_resumption \
+$WDT_RECEIVER -directory $DIR -enable_download_resumption \
   2>&1 | tee $DIR/server2.log
 STATUS=$?
 

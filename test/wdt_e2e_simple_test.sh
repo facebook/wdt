@@ -5,6 +5,7 @@
 #
 
 source `dirname "$0"`/common_functions.sh
+setBinaries
 
 echo "Run from the cmake build dir (or ~/fbcode - or fbmake runtests)"
 
@@ -55,7 +56,7 @@ WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
 "-avg_mbytes_per_sec=3000 -max_mbytes_per_sec=3500 "\
 "-num_ports=4 -throttler_log_time_millis=200"
 extendWdtOptions
-WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
+WDTBIN="$WDT_BINARY $WDTBIN_OPTS"
 MD5SUM=`which md5sum`
 STATUS=$?
 if [ $STATUS -ne 0 ] ; then

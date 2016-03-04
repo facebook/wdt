@@ -11,8 +11,8 @@
 #include <wdt/WdtBase.h>
 #include <wdt/util/ClientSocket.h>
 #include <chrono>
-#include <memory>
 #include <iostream>
+#include <memory>
 
 namespace facebook {
 namespace wdt {

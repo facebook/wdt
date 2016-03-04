@@ -12,9 +12,9 @@
 #include <wdt/WdtOptions.h>
 #include <wdt/util/SerializationUtil.h>
 
+#include <folly/Bits.h>
 #include <folly/String.h>  // exceptionStr
 #include <algorithm>
-#include <folly/Bits.h>
 
 namespace facebook {
 namespace wdt {

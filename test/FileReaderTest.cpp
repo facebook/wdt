@@ -6,15 +6,15 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
+#include <fcntl.h>
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+#include <stdlib.h>
+#include <wdt/test/TestCommon.h>
 #include <wdt/util/DirectorySourceQueue.h>
 #include <wdt/util/FileByteSource.h>
 #include <wdt/util/WdtFlags.h>
-#include <wdt/test/TestCommon.h>
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 #include <fstream>
-#include <stdlib.h>
-#include <fcntl.h>
 
 namespace facebook {
 namespace wdt {
