@@ -316,7 +316,9 @@ if (BUILD_TESTING)
   add_executable(option_type_test_short_flags test/OptionTypeTest.cpp
                                               util/WdtFlags.cpp)
   set_target_properties(option_type_test_short_flags PROPERTIES
-    COMPILE_DEFINITIONS "STANDALONE_APP")
+    COMPILE_DEFINITIONS "STANDALONE_APP"
+    RUNTIME_OUTPUT_DIRECTORY "_bin/wdt/short_flags/")
+
   target_link_libraries(option_type_test_short_flags wdt4tests_min)
 
   add_test(NAME WdtRandGenTest COMMAND

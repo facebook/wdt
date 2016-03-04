@@ -77,7 +77,9 @@ setBinaries() {
 }
 
 setDirectory() {
-  BASEDIR=/dev/shm/wdtTest_$USER
+  if [ -z "$BASEDIR" ]; then
+      BASEDIR="/dev/shm/wdtTest_$USER"
+  fi
   mkdir -p "$BASEDIR"
   DIR=$(mktemp -d "$BASEDIR/XXXXX")
   SRC_DIR="$DIR/src"

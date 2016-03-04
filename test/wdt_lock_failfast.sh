@@ -2,6 +2,7 @@
 
 source `dirname "$0"`/common_functions.sh
 setBinaries
+BASEDIR=/tmp/wdtTest_$USER
 setDirectory
 
 # Simple error test for 2 receiver
