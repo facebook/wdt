@@ -29,8 +29,9 @@ using std::vector;
 namespace facebook {
 namespace wdt {
 void Receiver::addCheckpoint(Checkpoint checkpoint) {
-  LOG(INFO) << "Adding global checkpoint " << checkpoint.port << " "
-            << checkpoint.numBlocks << " " << checkpoint.lastBlockReceivedBytes;
+  WLOG(INFO) << "Adding global checkpoint " << checkpoint.port << " "
+             << checkpoint.numBlocks << " "
+             << checkpoint.lastBlockReceivedBytes;
   checkpoints_.emplace_back(checkpoint);
 }
 
@@ -45,7 +46,7 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
 
 Receiver::Receiver(const WdtTransferRequest &transferRequest)
     : transferLogManager_(options_) {
-  LOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
+  WLOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
   transferRequest_ = transferRequest;
 }
 
@@ -62,8 +63,8 @@ void Receiver::traverseDestinationDir(
     if (fileInfo->relPath == kWdtLogName ||
         fileInfo->relPath == kWdtBuggyLogName) {
       // do not include wdt log files
-      VLOG(1) << "Removing " << fileInfo->relPath
-              << " from the list of existing files";
+      WVLOG(1) << "Removing " << fileInfo->relPath
+               << " from the list of existing files";
       continue;
     }
     FileChunksInfo chunkInfo(fileInfo->seqId, fileInfo->relPath,
@@ -91,8 +92,8 @@ void Receiver::startNewGlobalSession(const std::string &peerIp) {
     }
   }
   hasNewTransferStarted_.store(true);
-  LOG(INFO) << "Starting new transfer,  peerIp " << peerIp << " , transfer id "
-            << getTransferId();
+  WLOG(INFO) << "Starting new transfer,  peerIp " << peerIp << " , transfer id "
+             << getTransferId();
 }
 
 bool Receiver::hasNewTransferStarted() const {
@@ -102,10 +103,10 @@ bool Receiver::hasNewTransferStarted() const {
 void Receiver::endCurGlobalSession() {
   setTransferStatus(FINISHED);
   if (!hasNewTransferStarted_) {
-    LOG(WARNING) << "WDT transfer did not start, no need to end session";
+    WLOG(WARNING) << "WDT transfer did not start, no need to end session";
     return;
   }
-  LOG(INFO) << "Ending the transfer " << getTransferId();
+  WLOG(INFO) << "Ending the transfer " << getTransferId();
   if (throttler_) {
     throttler_->deRegisterTransfer();
   }
@@ -119,8 +120,8 @@ void Receiver::endCurGlobalSession() {
 
 const WdtTransferRequest &Receiver::init() {
   if (validateTransferRequest() != OK) {
-    LOG(ERROR) << "Couldn't validate the transfer request "
-               << transferRequest_.getLogSafeString();
+    WLOG(ERROR) << "Couldn't validate the transfer request "
+                << transferRequest_.getLogSafeString();
     return transferRequest_;
   }
   checkAndUpdateBufferSize();
@@ -146,7 +147,7 @@ const WdtTransferRequest &Receiver::init() {
     }
     ErrorCode errCode = transferLogManager_.openLog();
     if (errCode != OK) {
-      LOG(ERROR) << "Failed to open transfer log " << errorCodeToStr(errCode);
+      WLOG(ERROR) << "Failed to open transfer log " << errorCodeToStr(errCode);
       transferRequest_.errorCode = errCode;
       return transferRequest_;
     }
@@ -163,26 +164,26 @@ const WdtTransferRequest &Receiver::init() {
   bool encrypt = (encryptionType != ENC_NONE &&
                   protocolVersion_ >= Protocol::ENCRYPTION_V1_VERSION);
   if (encrypt) {
-    LOG(INFO) << encryptionTypeToStr(encryptionType)
-              << " encryption is enabled for this transfer ";
+    WLOG(INFO) << encryptionTypeToStr(encryptionType)
+               << " encryption is enabled for this transfer ";
     if (!transferRequest_.encryptionData.isSet()) {
-      LOG(INFO) << "Receiver generating encryption key for type "
-                << encryptionTypeToStr(encryptionType);
+      WLOG(INFO) << "Receiver generating encryption key for type "
+                 << encryptionTypeToStr(encryptionType);
       transferRequest_.encryptionData =
           EncryptionParams::generateEncryptionParams(encryptionType);
     }
     if (!transferRequest_.encryptionData.isSet()) {
-      LOG(ERROR) << "Unable to generate encryption key for type "
-                 << encryptionTypeToStr(encryptionType);
+      WLOG(ERROR) << "Unable to generate encryption key for type "
+                  << encryptionTypeToStr(encryptionType);
       transferRequest_.errorCode = ENCRYPTION_ERROR;
       return transferRequest_;
     }
   } else {
     if (encryptionType != ENC_NONE) {
-      LOG(WARNING) << "Encryption is enabled, but protocol version is "
-                   << protocolVersion_
-                   << ", minimum version required for encryption is "
-                   << Protocol::ENCRYPTION_V1_VERSION;
+      WLOG(WARNING) << "Encryption is enabled, but protocol version is "
+                    << protocolVersion_
+                    << ", minimum version required for encryption is "
+                    << Protocol::ENCRYPTION_V1_VERSION;
     }
     transferRequest_.encryptionData.erase();
   }
@@ -200,8 +201,8 @@ const WdtTransferRequest &Receiver::init() {
       ++numSuccessfulInitThreads;
     }
   }
-  LOG(INFO) << "Registered " << numSuccessfulInitThreads
-            << " successful sockets";
+  WLOG(INFO) << "Registered " << numSuccessfulInitThreads
+             << " successful sockets";
   ErrorCode code = OK;
   const size_t targetSize = transferRequest_.ports.size();
   // TODO: replace with getNumPorts/thread
@@ -252,14 +253,14 @@ const std::string &Receiver::getDir() {
 
 void Receiver::setRecoveryId(const std::string &recoveryId) {
   recoveryId_ = recoveryId;
-  LOG(INFO) << "recovery id " << recoveryId_;
+  WLOG(INFO) << "recovery id " << recoveryId_;
 }
 
 Receiver::~Receiver() {
   TransferStatus status = getTransferStatus();
   if (status == ONGOING) {
-    LOG(WARNING) << "There is an ongoing transfer and the destructor"
-                 << " is being called. Trying to finish the transfer";
+    WLOG(WARNING) << "There is an ongoing transfer and the destructor"
+                  << " is being called. Trying to finish the transfer";
     abort(ABORTED_BY_APPLICATION);
   }
   finish();
@@ -284,19 +285,19 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
   TransferStatus status = getTransferStatus();
   if (status == NOT_STARTED) {
-    LOG(WARNING) << "Even though transfer has not started, finish is called";
+    WLOG(WARNING) << "Even though transfer has not started, finish is called";
     // getTransferReport will set the error code to ERROR
     return getTransferReport();
   }
   if (status == THREADS_JOINED) {
-    LOG(WARNING) << "Threads have already been joined. Returning the "
-                 << "transfer report";
+    WLOG(WARNING) << "Threads have already been joined. Returning the "
+                  << "transfer report";
     return getTransferReport();
   }
   if (!isJoinable_) {
     // TODO: don't complain about this when coming from runForever()
-    LOG(WARNING) << "The receiver is not joinable. The threads will never"
-                 << " finish and this method will never return";
+    WLOG(WARNING) << "The receiver is not joinable. The threads will never"
+                  << " finish and this method will never return";
   }
   for (auto &receiverThread : receiverThreads_) {
     receiverThread->finish();
@@ -320,8 +321,8 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   }
   logPerfStats();
 
-  LOG(WARNING) << "WDT receiver's transfer has been finished";
-  LOG(INFO) << *report;
+  WLOG(WARNING) << "WDT receiver's transfer has been finished";
+  WLOG(INFO) << *report;
   return report;
 }
 
@@ -335,10 +336,10 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
   TransferStatus status = getTransferStatus();
   ErrorCode errCode = transferReport->getSummary().getErrorCode();
   if (status == NOT_STARTED && errCode == OK) {
-    LOG(INFO) << "Transfer not started, setting the error code to ERROR";
+    WLOG(INFO) << "Transfer not started, setting the error code to ERROR";
     transferReport->setErrorCode(ERROR);
   }
-  VLOG(1) << "Summary code " << errCode;
+  WVLOG(1) << "Summary code " << errCode;
   return transferReport;
 }
 
@@ -385,8 +386,8 @@ void Receiver::progressTracker() {
   std::chrono::time_point<Clock> lastUpdateTime = Clock::now();
   int intervalsSinceLastUpdate = 0;
   double currentThroughput = 0;
-  LOG(INFO) << "Progress reporter updating every "
-            << progressReportIntervalMillis << " ms";
+  WLOG(INFO) << "Progress reporter updating every "
+             << progressReportIntervalMillis << " ms";
   auto waitingTime = std::chrono::milliseconds(progressReportIntervalMillis);
   int64_t totalSenderBytes = -1;
   while (true) {
@@ -437,20 +438,20 @@ void Receiver::logPerfStats() const {
   for (auto &receiverThread : receiverThreads_) {
     globalPerfReport += receiverThread->getPerfReport();
   }
-  LOG(INFO) << globalPerfReport;
+  WLOG(INFO) << globalPerfReport;
 }
 
 ErrorCode Receiver::start() {
   WDT_CHECK_EQ(getTransferStatus(), NOT_STARTED)
       << "There is already a transfer running on this instance of receiver";
   startTime_ = Clock::now();
-  LOG(INFO) << "Starting (receiving) server on ports [ "
-            << transferRequest_.ports << "] Target dir : " << destDir_;
+  WLOG(INFO) << "Starting (receiving) server on ports [ "
+             << transferRequest_.ports << "] Target dir : " << destDir_;
   // TODO do the init stuff here
   if (!throttler_) {
     configureThrottler();
   } else {
-    LOG(INFO) << "Throttler set externally. Throttler : " << *throttler_;
+    WLOG(INFO) << "Throttler set externally. Throttler : " << *throttler_;
   }
   setTransferStatus(ONGOING);
   while (true) {
@@ -488,11 +489,11 @@ void Receiver::addTransferLogHeader(bool isBlockMode, bool isSenderResuming) {
   }
   bool invalidationEntryNeeded = false;
   if (!isSenderResuming) {
-    LOG(INFO) << "Sender is not in resumption mode. Invalidating directory.";
+    WLOG(INFO) << "Sender is not in resumption mode. Invalidating directory.";
     invalidationEntryNeeded = true;
   } else if (options_.resume_using_dir_tree && isBlockMode) {
-    LOG(INFO) << "Sender is running in block mode, but receiver is running in "
-                 "size based resumption mode. Invalidating directory.";
+    WLOG(INFO) << "Sender is running in block mode, but receiver is running in "
+                  "size based resumption mode. Invalidating directory.";
     invalidationEntryNeeded = true;
   }
   if (invalidationEntryNeeded) {

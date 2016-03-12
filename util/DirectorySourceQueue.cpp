@@ -51,7 +51,7 @@ void WdtFileInfo::verifyAndFixFlags() {
   }
   if (directReads) {
 #ifndef WDT_SUPPORTS_ODIRECT
-    LOG(WARNING) << "Wdt can't handle O_DIRECT in this system. " << fileName;
+    WLOG(WARNING) << "Wdt can't handle O_DIRECT in this system. " << fileName;
     directReads = false;
 #endif
   }
@@ -108,7 +108,7 @@ std::vector<SourceMetaData *>
 // of logging original input vs resolved one
 bool DirectorySourceQueue::setRootDir(const string &newRootDir) {
   if (newRootDir.empty()) {
-    LOG(ERROR) << "Invalid empty root dir!";
+    WLOG(ERROR) << "Invalid empty root dir!";
     return false;
   }
   string dir(newRootDir);
@@ -118,14 +118,14 @@ bool DirectorySourceQueue::setRootDir(const string &newRootDir) {
       // error already logged
       return false;
     }
-    LOG(INFO) << "Following symlinks " << newRootDir << " -> " << dir;
+    WLOG(INFO) << "Following symlinks " << newRootDir << " -> " << dir;
   }
   if (dir.back() != '/') {
     dir.push_back('/');
   }
   if (dir != rootDir_) {
     rootDir_.assign(dir);
-    LOG(INFO) << "Root dir now " << rootDir_;
+    WLOG(INFO) << "Root dir now " << rootDir_;
   }
   return true;
 }
@@ -184,7 +184,7 @@ std::thread DirectorySourceQueue::buildQueueAsynchronously() {
 
 bool DirectorySourceQueue::buildQueueSynchronously() {
   auto startTime = Clock::now();
-  VLOG(1) << "buildQueueSynchronously() called";
+  WVLOG(1) << "buildQueueSynchronously() called";
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (initCalled_) {
@@ -198,8 +198,8 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
   if (exploreDirectory_) {
     res = explore();
   } else {
-    LOG(INFO) << "Using list of file info. Number of files "
-              << fileInfo_.size();
+    WLOG(INFO) << "Using list of file info. Number of files "
+               << fileInfo_.size();
     res = enqueueFiles();
   }
   {
@@ -212,8 +212,8 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
     }
   }
   directoryTime_ = durationSeconds(Clock::now() - startTime);
-  VLOG(1) << "finished initialization of DirectorySourceQueue in "
-          << directoryTime_;
+  WVLOG(1) << "finished initialization of DirectorySourceQueue in "
+           << directoryTime_;
   return res;
 }
 
@@ -232,15 +232,15 @@ string DirectorySourceQueue::resolvePath(const string &path) {
   }
   result.assign(resolvedPath);
   free(resolvedPath);
-  VLOG(3) << "resolvePath(\"" << path << "\") -> " << result;
+  WVLOG(3) << "resolvePath(\"" << path << "\") -> " << result;
   return result;
 }
 
 bool DirectorySourceQueue::explore() {
-  LOG(INFO) << "Exploring root dir " << rootDir_
-            << " include_pattern : " << includePattern_
-            << " exclude_pattern : " << excludePattern_
-            << " prune_dir_pattern : " << pruneDirPattern_;
+  WLOG(INFO) << "Exploring root dir " << rootDir_
+             << " include_pattern : " << includePattern_
+             << " exclude_pattern : " << excludePattern_
+             << " prune_dir_pattern : " << pruneDirPattern_;
   WDT_CHECK(!rootDir_.empty());
   bool hasError = false;
   std::set<string> visited;
@@ -251,7 +251,7 @@ bool DirectorySourceQueue::explore() {
   todoList.push_back("");
   while (!todoList.empty()) {
     if (threadCtx_->getAbortChecker()->shouldAbort()) {
-      LOG(ERROR) << "Directory transfer thread aborted";
+      WLOG(ERROR) << "Directory transfer thread aborted";
       hasError = true;
       break;
     }
@@ -259,7 +259,7 @@ bool DirectorySourceQueue::explore() {
     auto relativePath = todoList.front();
     todoList.pop_front();
     const string fullPath = rootDir_ + relativePath;
-    VLOG(1) << "Processing directory " << fullPath;
+    WVLOG(1) << "Processing directory " << fullPath;
     DIR *dirPtr = opendir(fullPath.c_str());
     if (!dirPtr) {
       PLOG(ERROR) << "Error opening dir " << fullPath;
@@ -283,18 +283,18 @@ bool DirectorySourceQueue::explore() {
           // closedir always called
           hasError = true;
         } else {
-          VLOG(2) << "Done with " << fullPath;
+          WVLOG(2) << "Done with " << fullPath;
           // finished reading dir
         }
         break;
       }
       const auto dType = dirEntryRes->d_type;
-      VLOG(2) << "Found entry " << dirEntryRes->d_name << " type "
-              << (int)dType;
+      WVLOG(2) << "Found entry " << dirEntryRes->d_name << " type "
+               << (int)dType;
       if (dirEntryRes->d_name[0] == '.') {
         if (dirEntryRes->d_name[1] == '\0' ||
             (dirEntryRes->d_name[1] == '.' && dirEntryRes->d_name[2] == '\0')) {
-          VLOG(3) << "Skipping entry : " << dirEntryRes->d_name;
+          WVLOG(3) << "Skipping entry : " << dirEntryRes->d_name;
           continue;
         }
       }
@@ -310,7 +310,7 @@ bool DirectorySourceQueue::explore() {
         keepEntry |= isLink;
       }
       if (!keepEntry) {
-        VLOG(3) << "Ignoring entry type " << (int)(dType);
+        WVLOG(3) << "Ignoring entry type " << (int)(dType);
         continue;
       }
       string newRelativePath = relativePath + string(dirEntryRes->d_name);
@@ -326,7 +326,7 @@ bool DirectorySourceQueue::explore() {
           continue;
         }
         isLink = S_ISLNK(fileStat.st_mode);
-        VLOG(2) << "lstat for " << newFullPath << " is link ? " << isLink;
+        WVLOG(2) << "lstat for " << newFullPath << " is link ? " << isLink;
         if (followSymlinks_ && isLink) {
           // Use stat to see if the pointed file is of the right type
           // (overrides previous stat call result)
@@ -341,8 +341,8 @@ bool DirectorySourceQueue::explore() {
             hasError = true;
             continue;
           }
-          VLOG(2) << "Resolved symlink " << dirEntryRes->d_name << " to "
-                  << newFullPath;
+          WVLOG(2) << "Resolved symlink " << dirEntryRes->d_name << " to "
+                   << newFullPath;
         }
 
         // could dcheck that if DT_REG we better be !isDir
@@ -350,8 +350,8 @@ bool DirectorySourceQueue::explore() {
         // if we were DT_UNKNOWN this could still be a symlink, block device
         // etc... (xfs)
         if (S_ISREG(fileStat.st_mode)) {
-          VLOG(2) << "Found file " << newFullPath << " of size "
-                  << fileStat.st_size;
+          WVLOG(2) << "Found file " << newFullPath << " of size "
+                   << fileStat.st_size;
           if (!excludePattern_.empty() &&
               std::regex_match(newRelativePath, excludeRegex)) {
             continue;
@@ -368,7 +368,8 @@ bool DirectorySourceQueue::explore() {
       if (isDir) {
         if (followSymlinks_) {
           if (visited.find(newFullPath) != visited.end()) {
-            LOG(ERROR) << "Attempted to visit directory twice: " << newFullPath;
+            WLOG(ERROR) << "Attempted to visit directory twice: "
+                        << newFullPath;
             hasError = true;
             continue;
           }
@@ -378,16 +379,16 @@ bool DirectorySourceQueue::explore() {
         newRelativePath.push_back('/');
         if (pruneDirPattern_.empty() ||
             !std::regex_match(newRelativePath, pruneDirRegex)) {
-          VLOG(2) << "Adding " << newRelativePath;
+          WVLOG(2) << "Adding " << newRelativePath;
           todoList.push_back(std::move(newRelativePath));
         }
       }
     }
     closedir(dirPtr);
   }
-  LOG(INFO) << "Number of files explored: " << numEntries_ << " opened "
-            << numFilesOpened_ << " with direct " << numFilesOpenedWithDirect_
-            << " errors " << std::boolalpha << hasError;
+  WLOG(INFO) << "Number of files explored: " << numEntries_ << " opened "
+             << numFilesOpened_ << " with direct " << numFilesOpenedWithDirect_
+             << " errors " << std::boolalpha << hasError;
   return !hasError;
 }
 
@@ -449,8 +450,8 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
     metadata->needToClose = (metadata->fd >= 0);
     // works for -1 up to 4B files
     if (--openFilesDuringDiscovery_ == 0) {
-      LOG(WARNING) << "Already opened " << numFilesOpened_
-                   << " files, will open the reminder as they are sent";
+      WLOG(WARNING) << "Already opened " << numFilesOpened_
+                    << " files, will open the reminder as they are sent";
     }
   }
   std::unique_lock<std::mutex> lock(mutex_);
@@ -473,7 +474,7 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
   int64_t blockSizeBytes = blockSizeMbytes_ * 1024 * 1024;
   bool enableBlockTransfer = blockSizeBytes > 0;
   if (!enableBlockTransfer) {
-    VLOG(2) << "Block transfer disabled for this transfer";
+    WVLOG(2) << "Block transfer disabled for this transfer";
   }
   // if block transfer is disabled, treating fileSize as block size. This
   // ensures that we create a single block
@@ -493,15 +494,15 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
     // file size is greater on the receiver side
     remainingChunks.emplace_back(0, fileSize);
     seqId = nextSeqId_++;
-    LOG(INFO) << "File size is greater in the receiver side " << relPath << " "
-              << fileSize << " " << it->second.getFileSize();
+    WLOG(INFO) << "File size is greater in the receiver side " << relPath << " "
+               << fileSize << " " << it->second.getFileSize();
     allocationStatus = EXISTS_TOO_LARGE;
     prevSeqId = it->second.getSeqId();
   } else {
     auto &fileChunksInfo = it->second;
     remainingChunks = fileChunksInfo.getRemainingChunks(fileSize);
     if (remainingChunks.empty()) {
-      LOG(INFO) << relPath << " completely sent in previous transfer";
+      WLOG(INFO) << relPath << " completely sent in previous transfer";
       return;
     }
     seqId = fileChunksInfo.getSeqId();
@@ -548,7 +549,7 @@ std::vector<string> &DirectorySourceQueue::getFailedDirectories() {
 bool DirectorySourceQueue::enqueueFiles() {
   for (auto &info : fileInfo_) {
     if (threadCtx_->getAbortChecker()->shouldAbort()) {
-      LOG(ERROR) << "Directory transfer thread aborted";
+      WLOG(ERROR) << "Directory transfer thread aborted";
       return false;
     }
     string fullPath = rootDir_ + info.fileName;
@@ -622,8 +623,8 @@ void DirectorySourceQueue::enqueueFilesToBeDeleted() {
     }
     int64_t seqId = it.second.getSeqId();
     // extra file on the receiver side
-    LOG(INFO) << "Extra file " << fileName << " seq-id " << seqId
-              << " on the receiver side, will be deleted";
+    WLOG(INFO) << "Extra file " << fileName << " seq-id " << seqId
+               << " on the receiver side, will be deleted";
     SourceMetaData *metadata = new SourceMetaData();
     metadata->relPath = fileName;
     metadata->size = 0;
@@ -666,8 +667,8 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
       conditionNotEmpty_.notify_all();
     }
     lock.unlock();
-    VLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
-            << " size " << source->getSize();
+    WVLOG(1) << "got next source " << rootDir_ + source->getIdentifier()
+             << " size " << source->getSize();
     // try to open the source
     if (source->open(callerThreadCtx) == OK) {
       lock.lock();

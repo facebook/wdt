@@ -52,7 +52,7 @@ void testHeader() {
       Protocol::HEADER_FLAG_AND_PREV_SEQ_ID_VERSION, buf, noff, off, nbd);
   EXPECT_TRUE(success);
 
-  LOG(INFO) << "error tests, expect errors";
+  WLOG(INFO) << "error tests, expect errors";
   // too short
   noff = 0;
   success = Protocol::decodeHeader(
@@ -87,7 +87,7 @@ void testHeader() {
   EXPECT_EQ(nbd.dataSize, nbd.dataSize);
   EXPECT_EQ(nbd.allocationStatus, bd.allocationStatus);
   EXPECT_EQ(nbd.prevSeqId, bd.prevSeqId);
-  LOG(INFO) << "got size of " << nbd.dataSize;
+  WLOG(INFO) << "got size of " << nbd.dataSize;
   // too short for size encoding:
   noff = 0;
   success = Protocol::decodeHeader(

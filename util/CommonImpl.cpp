@@ -19,21 +19,21 @@ Buffer::Buffer(const int64_t size) {
   // always allocate aligned buffer if possible
   int ret = posix_memalign((void**)&data_, kDiskBlockSize, size);
   if (ret || data_ == nullptr) {
-    LOG(ERROR) << "posix_memalign failed " << strerrorStr(ret) << " size "
-               << size;
+    WLOG(ERROR) << "posix_memalign failed " << strerrorStr(ret) << " size "
+                << size;
     return;
   }
-  VLOG(1) << "Allocated aligned memory " << size;
+  WVLOG(1) << "Allocated aligned memory " << size;
   isAligned_ = true;
   size_ = size;
   return;
 #else
   data_ = (char*)malloc(size);
   if (data_ == nullptr) {
-    LOG(ERROR) << "Failed to allocate memory using malloc " << size;
+    WLOG(ERROR) << "Failed to allocate memory using malloc " << size;
     return;
   }
-  VLOG(1) << "Allocated unaligned memory " << size;
+  WVLOG(1) << "Allocated unaligned memory " << size;
   size_ = size;
 #endif
 }

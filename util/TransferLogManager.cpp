@@ -24,7 +24,7 @@
 namespace facebook {
 namespace wdt {
 
-const int TransferLogManager::LOG_VERSION = 2;
+const int TransferLogManager::WLOG_VERSION = 2;
 
 int64_t LogEncoderDecoder::timestampInMicroseconds() const {
   auto timestamp = Clock::now();
@@ -42,7 +42,7 @@ int64_t LogEncoderDecoder::encodeLogHeader(char *dest,
   int64_t size = 0;
   ptr[size++] = TransferLogManager::HEADER;
   encodeInt(ptr, size, timestampInMicroseconds());
-  encodeInt(ptr, size, TransferLogManager::LOG_VERSION);
+  encodeInt(ptr, size, TransferLogManager::WLOG_VERSION);
   encodeString(ptr, size, recoveryId);
   encodeString(ptr, size, senderIp);
   encodeInt(ptr, size, config);
@@ -68,7 +68,7 @@ bool LogEncoderDecoder::decodeLogHeader(char *buf, int16_t size,
     }
     config = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   return !checkForOverflow(br.start() - (uint8_t *)buf, size);
@@ -105,7 +105,7 @@ bool LogEncoderDecoder::decodeFileCreationEntry(char *buf, int16_t size,
     seqId = decodeInt(br);
     fileSize = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   return !checkForOverflow(br.start() - (uint8_t *)buf, size);
@@ -138,7 +138,7 @@ bool LogEncoderDecoder::decodeBlockWriteEntry(char *buf, int16_t size,
     offset = decodeInt(br);
     blockSize = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   return !checkForOverflow(br.start() - (uint8_t *)buf, size);
@@ -168,7 +168,7 @@ bool LogEncoderDecoder::decodeFileResizeEntry(char *buf, int16_t size,
     seqId = decodeInt(br);
     fileSize = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   return !checkForOverflow(br.start() - (uint8_t *)buf, size);
@@ -193,7 +193,7 @@ bool LogEncoderDecoder::decodeFileInvalidationEntry(char *buf, int16_t size,
     timestamp = decodeInt(br);
     seqId = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   return !checkForOverflow(br.start() - (uint8_t *)buf, size);
@@ -215,7 +215,7 @@ bool LogEncoderDecoder::decodeDirectoryInvalidationEntry(char *buf,
   try {
     timestamp = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   return !checkForOverflow(br.start() - (uint8_t *)buf, size);
@@ -248,7 +248,7 @@ ErrorCode TransferLogManager::openLog() {
       return TRANSFER_LOG_ACQUIRE_ERROR;
     } else {
       // creation of the log path (which can still be a race)
-      LOG(INFO) << logPath << " doesn't exist... creating...";
+      WLOG(INFO) << logPath << " doesn't exist... creating...";
       fd_ = ::open(logPath.c_str(), O_CREAT | O_EXCL, 0644);
       if (fd_ < 0) {
         PLOG(WARNING) << "Could not create wdt log (maybe ok if race): "
@@ -273,7 +273,7 @@ ErrorCode TransferLogManager::openLog() {
     close();
     return TRANSFER_LOG_ACQUIRE_ERROR;
   }
-  LOG(INFO) << "Transfer log opened and lock acquired on " << logPath;
+  WLOG(INFO) << "Transfer log opened and lock acquired on " << logPath;
   return OK;
 }
 
@@ -284,14 +284,14 @@ ErrorCode TransferLogManager::startThread() {
       return resumptionStatus_;
     }
     writerThread_ = std::thread(&TransferLogManager::writeEntriesToDisk, this);
-    LOG(INFO) << "Log writer thread started";
+    WLOG(INFO) << "Log writer thread started";
   }
   return OK;
 }
 
 ErrorCode TransferLogManager::checkLog() {
   if (fd_ < 0) {
-    LOG(WARNING) << "No log to check";
+    WLOG(WARNING) << "No log to check";
     return ERROR;
   }
   const std::string fullLogName = getFullPath(kWdtLogName);
@@ -308,13 +308,13 @@ ErrorCode TransferLogManager::checkLog() {
     return ERROR;
   }
   if (stat1.st_ino != stat2.st_ino) {
-    LOG(ERROR) << "CORRUPTION! log file " << fullLogName << " changed "
-               << " old/open fd inode " << stat2.st_ino << " on fs "
-               << stat1.st_ino;
+    WLOG(ERROR) << "CORRUPTION! log file " << fullLogName << " changed "
+                << " old/open fd inode " << stat2.st_ino << " on fs "
+                << stat1.st_ino;
     exit(TRANSFER_LOG_ACQUIRE_ERROR);
     return ERROR;
   }
-  LOG(INFO) << fullLogName << " still ok with " << stat1.st_ino;
+  WLOG(INFO) << fullLogName << " still ok with " << stat1.st_ino;
   return OK;
 }
 
@@ -326,7 +326,7 @@ void TransferLogManager::close() {
   if (::close(fd_) != 0) {
     PLOG(ERROR) << "Failed to close wdt log " << fd_;
   } else {
-    LOG(INFO) << "Transfer log closed";
+    WLOG(INFO) << "Transfer log closed";
   }
   fd_ = -1;
 }
@@ -353,7 +353,7 @@ TransferLogManager::~TransferLogManager() {
 
 void TransferLogManager::writeEntriesToDisk() {
   WDT_CHECK(fd_ >= 0) << "Writer thread started before the log is opened";
-  LOG(INFO) << "Transfer log writer thread started";
+  WLOG(INFO) << "Transfer log writer thread started";
   WDT_CHECK(options_.transfer_log_write_interval_ms >= 0);
   auto waitingTime =
       std::chrono::milliseconds(options_.transfer_log_write_interval_ms);
@@ -386,7 +386,7 @@ void TransferLogManager::writeEntriesToDisk() {
       return;
     }
   }
-  LOG(INFO) << "Transfer log writer thread finished";
+  WLOG(INFO) << "Transfer log writer thread finished";
 }
 
 bool TransferLogManager::verifySenderIp(const std::string &curSenderIp) {
@@ -396,19 +396,19 @@ bool TransferLogManager::verifySenderIp(const std::string &curSenderIp) {
   bool verifySuccessful = true;
   if (!options_.disable_sender_verification_during_resumption) {
     if (senderIp_.empty()) {
-      LOG(INFO) << "Sender-ip empty, not verifying sender-ip, new-ip: "
-                << curSenderIp;
+      WLOG(INFO) << "Sender-ip empty, not verifying sender-ip, new-ip: "
+                 << curSenderIp;
     } else if (senderIp_ != curSenderIp) {
-      LOG(ERROR) << "Current sender ip does not match ip in the "
-                    "transfer log "
-                 << curSenderIp << " " << senderIp_
-                 << ", ignoring transfer log";
+      WLOG(ERROR) << "Current sender ip does not match ip in the "
+                     "transfer log "
+                  << curSenderIp << " " << senderIp_
+                  << ", ignoring transfer log";
       verifySuccessful = false;
       invalidateDirectory();
     }
   } else {
-    LOG(WARNING) << "Sender-ip verification disabled " << senderIp_ << " "
-                 << curSenderIp;
+    WLOG(WARNING) << "Sender-ip verification disabled " << senderIp_ << " "
+                  << curSenderIp;
   }
   senderIp_ = curSenderIp;
   return verifySuccessful;
@@ -425,7 +425,7 @@ void TransferLogManager::invalidateDirectory() {
   if (fd_ < 0) {
     return;
   }
-  LOG(WARNING) << "Invalidating directory " << rootDir_;
+  WLOG(WARNING) << "Invalidating directory " << rootDir_;
   resumptionStatus_ = INCONSISTENT_DIRECTORY;
   char buf[kMaxEntryLength];
   int64_t size = encoderDecoder_.encodeDirectoryInvalidationEntry(buf);
@@ -444,9 +444,9 @@ void TransferLogManager::writeLogHeader() {
   if (fd_ < 0) {
     return;
   }
-  LOG(INFO) << "Writing log header, version: " << LOG_VERSION
-            << " recovery-id: " << recoveryId_ << " config: " << config_
-            << " sender-ip: " << senderIp_;
+  WLOG(INFO) << "Writing log header, version: " << WLOG_VERSION
+             << " recovery-id: " << recoveryId_ << " config: " << config_
+             << " sender-ip: " << senderIp_;
   char buf[kMaxEntryLength];
   int64_t size =
       encoderDecoder_.encodeLogHeader(buf, recoveryId_, senderIp_, config_);
@@ -468,8 +468,8 @@ void TransferLogManager::addFileCreationEntry(const std::string &fileName,
   if (fd_ < 0 || !headerWritten_) {
     return;
   }
-  VLOG(1) << "Adding file entry to log " << fileName << " " << seqId << " "
-          << fileSize;
+  WVLOG(1) << "Adding file entry to log " << fileName << " " << seqId << " "
+           << fileSize;
   char buf[kMaxEntryLength];
   int64_t size =
       encoderDecoder_.encodeFileCreationEntry(buf, fileName, seqId, fileSize);
@@ -483,8 +483,8 @@ void TransferLogManager::addBlockWriteEntry(int64_t seqId, int64_t offset,
   if (fd_ < 0 || !headerWritten_) {
     return;
   }
-  VLOG(1) << "Adding block entry to log " << seqId << " " << offset << " "
-          << blockSize;
+  WVLOG(1) << "Adding block entry to log " << seqId << " " << offset << " "
+           << blockSize;
   char buf[kMaxEntryLength];
   int64_t size =
       encoderDecoder_.encodeBlockWriteEntry(buf, seqId, offset, blockSize);
@@ -497,7 +497,7 @@ void TransferLogManager::addFileResizeEntry(int64_t seqId, int64_t fileSize) {
   if (fd_ < 0 || !headerWritten_) {
     return;
   }
-  VLOG(1) << "Adding file resize entry to log " << seqId << " " << fileSize;
+  WVLOG(1) << "Adding file resize entry to log " << seqId << " " << fileSize;
   char buf[kMaxEntryLength];
   int64_t size = encoderDecoder_.encodeFileResizeEntry(buf, seqId, fileSize);
 
@@ -509,7 +509,7 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
   if (fd_ < 0) {
     return;
   }
-  LOG(INFO) << "Adding invalidation entry " << seqId;
+  WLOG(INFO) << "Adding invalidation entry " << seqId;
   char buf[kMaxEntryLength];
   int64_t size = encoderDecoder_.encodeFileInvalidationEntry(buf, seqId);
   std::lock_guard<std::mutex> lock(mutex_);
@@ -518,7 +518,7 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
 
 void TransferLogManager::unlink() {
   WDT_CHECK_LT(fd_, 0) << "Unlink called before closeLog!";
-  LOG(INFO) << "unlinking " << kWdtLogName;
+  WLOG(INFO) << "unlinking " << kWdtLogName;
   std::string fullLogName = getFullPath(kWdtLogName);
   if (::unlink(fullLogName.c_str()) != 0) {
     PLOG(ERROR) << "Could not unlink " << fullLogName;
@@ -527,7 +527,7 @@ void TransferLogManager::unlink() {
 
 void TransferLogManager::renameBuggyLog() {
   WDT_CHECK_LT(fd_, 0) << "renameBuggyLog called before closeLog!";
-  LOG(INFO) << "Renaming " << kWdtLogName << " to " << kWdtBuggyLogName;
+  WLOG(INFO) << "Renaming " << kWdtLogName << " to " << kWdtBuggyLogName;
   if (::rename(getFullPath(kWdtLogName).c_str(),
                getFullPath(kWdtBuggyLogName).c_str()) != 0) {
     PLOG(ERROR) << "log rename failed " << kWdtLogName << " "
@@ -573,8 +573,8 @@ ErrorCode TransferLogManager::parseVerifyAndFix(
       invalidateDirectory();
     }
   }
-  LOG(INFO) << "Transfer log parsing finished "
-            << errorCodeToStr(resumptionStatus_);
+  WLOG(INFO) << "Transfer log parsing finished "
+             << errorCodeToStr(resumptionStatus_);
   return resumptionStatus_;
 }
 
@@ -607,8 +607,8 @@ bool LogParser::writeFileInvalidationEntries(int fd,
 }
 
 bool LogParser::truncateExtraBytesAtEnd(int fd, int extraBytes) {
-  LOG(INFO) << "Removing extra " << extraBytes
-            << " bytes from the end of transfer log";
+  WLOG(INFO) << "Removing extra " << extraBytes
+             << " bytes from the end of transfer log";
   struct stat statBuffer;
   if (fstat(fd, &statBuffer) != 0) {
     PLOG(ERROR) << "fstat failed on fd " << fd;
@@ -658,16 +658,16 @@ ErrorCode LogParser::processHeaderEntry(char *buf, int size,
   int64_t logConfig;
   if (!encoderDecoder_.decodeLogHeader(buf, size, timestamp, logVersion,
                                        logRecoveryId, senderIp, logConfig)) {
-    LOG(ERROR) << "Couldn't decode the log header";
+    WLOG(ERROR) << "Couldn't decode the log header";
     return INVALID_LOG;
   }
-  if (logVersion != TransferLogManager::LOG_VERSION) {
-    LOG(ERROR) << "Can not parse log version " << logVersion
-               << ", parser version " << TransferLogManager::LOG_VERSION;
+  if (logVersion != TransferLogManager::WLOG_VERSION) {
+    WLOG(ERROR) << "Can not parse log version " << logVersion
+                << ", parser version " << TransferLogManager::WLOG_VERSION;
     return INVALID_LOG;
   }
   if (senderIp.empty()) {
-    LOG(ERROR) << "Log header has empty sender ip";
+    WLOG(ERROR) << "Log header has empty sender ip";
     return INVALID_LOG;
   }
   if (parseOnly_) {
@@ -680,13 +680,13 @@ ErrorCode LogParser::processHeaderEntry(char *buf, int size,
     return OK;
   }
   if (recoveryId_ != logRecoveryId) {
-    LOG(ERROR) << "Current recovery-id does not match with log recovery-id "
-               << recoveryId_ << " " << logRecoveryId;
+    WLOG(ERROR) << "Current recovery-id does not match with log recovery-id "
+                << recoveryId_ << " " << logRecoveryId;
     return INCONSISTENT_DIRECTORY;
   }
   if (config_ != logConfig) {
-    LOG(ERROR) << "Current config does not match with log config " << config_
-               << " " << logConfig;
+    WLOG(ERROR) << "Current config does not match with log config " << config_
+                << " " << logConfig;
     return INCONSISTENT_DIRECTORY;
   }
   headerParsed_ = true;
@@ -695,7 +695,7 @@ ErrorCode LogParser::processHeaderEntry(char *buf, int size,
 
 ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
   if (!headerParsed_) {
-    LOG(ERROR)
+    WLOG(ERROR)
         << "Invalid log: File creation entry found before transfer log header";
     return INVALID_LOG;
   }
@@ -712,15 +712,15 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
     return OK;
   }
   if (options_.resume_using_dir_tree) {
-    LOG(ERROR) << "Can not have a file creation entry in directory based "
-                  "resumption mode "
-               << fileName << " " << seqId << " " << fileSize;
+    WLOG(ERROR) << "Can not have a file creation entry in directory based "
+                   "resumption mode "
+                << fileName << " " << seqId << " " << fileSize;
     return INVALID_LOG;
   }
   if (fileInfoMap_.find(seqId) != fileInfoMap_.end() ||
       invalidSeqIds_.find(seqId) != invalidSeqIds_.end()) {
-    LOG(ERROR) << "Multiple FILE_CREATION entry for same sequence-id "
-               << fileName << " " << seqId << " " << fileSize;
+    WLOG(ERROR) << "Multiple FILE_CREATION entry for same sequence-id "
+                << fileName << " " << seqId << " " << fileSize;
     return INVALID_LOG;
   }
   // verify size
@@ -743,8 +743,8 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
                          FileChunksInfo(seqId, fileName, buffer.st_size));
     seqIdToSizeMap_.emplace(seqId, fileSize);
   } else {
-    LOG(INFO) << "Sanity check failed for " << fileName << " seq-id " << seqId
-              << " file-size " << fileSize;
+    WLOG(INFO) << "Sanity check failed for " << fileName << " seq-id " << seqId
+               << " file-size " << fileSize;
     invalidSeqIds_.insert(seqId);
   }
   return OK;
@@ -752,7 +752,7 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
 
 ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
   if (!headerParsed_) {
-    LOG(ERROR)
+    WLOG(ERROR)
         << "Invalid log: File resize entry found before transfer log header";
     return INVALID_LOG;
   }
@@ -768,15 +768,15 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
     return OK;
   }
   if (options_.resume_using_dir_tree) {
-    LOG(ERROR) << "Can not have a file resize entry in directory based "
-                  "resumption mode "
-               << seqId << " " << fileSize;
+    WLOG(ERROR) << "Can not have a file resize entry in directory based "
+                   "resumption mode "
+                << seqId << " " << fileSize;
     return INVALID_LOG;
   }
   auto it = fileInfoMap_.find(seqId);
   if (it == fileInfoMap_.end()) {
-    LOG(ERROR) << "File resize entry for unknown sequence-id " << seqId << " "
-               << fileSize;
+    WLOG(ERROR) << "File resize entry for unknown sequence-id " << seqId << " "
+                << fileSize;
     return INVALID_LOG;
   }
   FileChunksInfo &chunksInfo = it->second;
@@ -784,16 +784,16 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
   auto sizeIt = seqIdToSizeMap_.find(seqId);
   WDT_CHECK(sizeIt != seqIdToSizeMap_.end());
   if (fileSize < sizeIt->second) {
-    LOG(ERROR) << "File size can not reduce during resizing " << fileName << " "
-               << seqId << " " << fileSize << " " << sizeIt->second;
+    WLOG(ERROR) << "File size can not reduce during resizing " << fileName
+                << " " << seqId << " " << fileSize << " " << sizeIt->second;
     return INVALID_LOG;
   }
 
   if (options_.shouldPreallocateFiles() &&
       fileSize > chunksInfo.getFileSize()) {
-    LOG(ERROR) << "Size on the disk is less than the resized size for "
-               << fileName << " seq-id " << seqId << " disk-size "
-               << chunksInfo.getFileSize() << " resized-size " << fileSize;
+    WLOG(ERROR) << "Size on the disk is less than the resized size for "
+                << fileName << " seq-id " << seqId << " disk-size "
+                << chunksInfo.getFileSize() << " resized-size " << fileSize;
     return INVALID_LOG;
   }
   sizeIt->second = fileSize;
@@ -802,7 +802,7 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
 
 ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
   if (!headerParsed_) {
-    LOG(ERROR)
+    WLOG(ERROR)
         << "Invalid log: Block write entry found before transfer log header";
     return INVALID_LOG;
   }
@@ -818,29 +818,29 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
     return OK;
   }
   if (options_.resume_using_dir_tree) {
-    LOG(ERROR) << "Can not have a block write entry in directory based "
-                  "resumption mode "
-               << seqId << " " << offset << " " << blockSize;
+    WLOG(ERROR) << "Can not have a block write entry in directory based "
+                   "resumption mode "
+                << seqId << " " << offset << " " << blockSize;
     return INVALID_LOG;
   }
   if (invalidSeqIds_.find(seqId) != invalidSeqIds_.end()) {
-    LOG(INFO) << "Block entry for an invalid sequence-id " << seqId
-              << ", ignoring";
+    WLOG(INFO) << "Block entry for an invalid sequence-id " << seqId
+               << ", ignoring";
     return OK;
   }
   auto it = fileInfoMap_.find(seqId);
   if (it == fileInfoMap_.end()) {
-    LOG(ERROR) << "Block entry for unknown sequence-id " << seqId << " "
-               << offset << " " << blockSize;
+    WLOG(ERROR) << "Block entry for unknown sequence-id " << seqId << " "
+                << offset << " " << blockSize;
     return INVALID_LOG;
   }
   FileChunksInfo &chunksInfo = it->second;
   // check whether the block is within disk size
   if (offset + blockSize > chunksInfo.getFileSize()) {
-    LOG(ERROR) << "Block end point is greater than file size in disk "
-               << chunksInfo.getFileName() << " seq-id " << seqId << " offset "
-               << offset << " block-size " << blockSize << " file size in disk "
-               << chunksInfo.getFileSize();
+    WLOG(ERROR) << "Block end point is greater than file size in disk "
+                << chunksInfo.getFileName() << " seq-id " << seqId << " offset "
+                << offset << " block-size " << blockSize
+                << " file size in disk " << chunksInfo.getFileSize();
     return INVALID_LOG;
   }
   chunksInfo.addChunk(Interval(offset, offset + blockSize));
@@ -849,8 +849,8 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
 
 ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
   if (!headerParsed_) {
-    LOG(ERROR) << "Invalid log: File invalidation entry found before transfer "
-                  "log header";
+    WLOG(ERROR) << "Invalid log: File invalidation entry found before transfer "
+                   "log header";
     return INVALID_LOG;
   }
   int64_t timestamp, seqId;
@@ -864,14 +864,14 @@ ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
     return OK;
   }
   if (options_.resume_using_dir_tree) {
-    LOG(ERROR) << "Can not have a file invalidation entry in directory based "
-                  "resumption mode "
-               << seqId;
+    WLOG(ERROR) << "Can not have a file invalidation entry in directory based "
+                   "resumption mode "
+                << seqId;
     return INVALID_LOG;
   }
   if (fileInfoMap_.find(seqId) == fileInfoMap_.end() &&
       invalidSeqIds_.find(seqId) == invalidSeqIds_.end()) {
-    LOG(ERROR) << "Invalidation entry for an unknown sequence id " << seqId;
+    WLOG(ERROR) << "Invalidation entry for an unknown sequence id " << seqId;
     return INVALID_LOG;
   }
   fileInfoMap_.erase(seqId);
@@ -908,22 +908,22 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
       return INVALID_LOG;
     }
     if (numRead == 0) {
-      VLOG(1) << "got EOF, toRead " << toRead;
+      WVLOG(1) << "got EOF, toRead " << toRead;
       break;
     }
     if (numRead != toRead) {
       // extra bytes at the end, most likely part of the previous write
       // succeeded partially
       if (parseOnly_) {
-        LOG(INFO) << "Extra " << numRead << " bytes at the end of the log";
+        WLOG(INFO) << "Extra " << numRead << " bytes at the end of the log";
       } else if (!truncateExtraBytesAtEnd(fd, numRead)) {
         return INVALID_LOG;
       }
       break;
     }
     if (entrySize <= 0 || entrySize > TransferLogManager::kMaxEntryLength) {
-      LOG(ERROR) << "Transfer log parse error, invalid entry length "
-                 << entrySize;
+      WLOG(ERROR) << "Transfer log parse error, invalid entry length "
+                  << entrySize;
       return INVALID_LOG;
     }
     numRead = ::read(fd, entry, entrySize);
@@ -936,7 +936,7 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
       // extra bytes also includes the size entry
       int64_t extraBytes = numRead + sizeof(int16_t);
       if (parseOnly_) {
-        LOG(INFO) << "Extra " << extraBytes << " bytes at the end of the log";
+        WLOG(INFO) << "Extra " << extraBytes << " bytes at the end of the log";
       } else if (!truncateExtraBytesAtEnd(fd, extraBytes)) {
         return INVALID_LOG;
       }
@@ -970,11 +970,11 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
         status = processDirectoryInvalidationEntry(entry + 1, entrySize - 1);
         break;
       default:
-        LOG(ERROR) << "Invalid entry type found " << type;
+        WLOG(ERROR) << "Invalid entry type found " << type;
         return INVALID_LOG;
     }
     if (status == INVALID_LOG) {
-      LOG(ERROR) << "Invalid transfer log";
+      WLOG(ERROR) << "Invalid transfer log";
       return status;
     }
     if (status == INCONSISTENT_DIRECTORY) {

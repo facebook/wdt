@@ -34,7 +34,7 @@ void basicTest(bool resumption) {
   EXPECT_NE(tmp, nullptr);
   // We keep the fd around
   int fd = fileno(tmp);
-  LOG(INFO) << "tmp file fd " << fd;
+  WLOG(INFO) << "tmp file fd " << fd;
   fclose(tmp);
   std::string recvDir;
   folly::toAppend("/tmp/wdtTest/recv", rand32(), &recvDir);
@@ -78,7 +78,7 @@ TEST(DupSend, DuplicateSend) {
   EXPECT_NE(tmp, nullptr);
   // We keep the fd around
   int fd = fileno(tmp);
-  LOG(INFO) << "tmp file fd " << fd;
+  WLOG(INFO) << "tmp file fd " << fd;
   fclose(tmp);
   WdtTransferRequest req(/* start port */ 0, /* num ports */ 3, "/tmp/wdtTest");
   Receiver r(req);

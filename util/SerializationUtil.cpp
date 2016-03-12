@@ -31,8 +31,8 @@ bool decodeString(folly::ByteRange &br, char *src, int64_t max,
   int64_t strLen = folly::decodeVarint(br);
   int64_t off = br.start() - (uint8_t *)src;
   if (off + strLen > max) {
-    LOG(ERROR) << "Not enough room with " << max << " to decode " << strLen
-               << " at " << off;
+    WLOG(ERROR) << "Not enough room with " << max << " to decode " << strLen
+                << " at " << off;
     return false;
   }
   str.assign((const char *)(br.start()), strLen);
@@ -42,7 +42,7 @@ bool decodeString(folly::ByteRange &br, char *src, int64_t max,
 
 bool checkForOverflow(int64_t off, int64_t max) {
   if (off > max) {
-    LOG(ERROR) << "Read past the end:" << off << " " << max;
+    WLOG(ERROR) << "Read past the end:" << off << " " << max;
     return true;
   }
   return false;

@@ -160,7 +160,7 @@ TEST(RequestSerializationTest, UrlTests) {
     request.transferId = "tid1";
     request.protocolVersion = 753;
     string serialized = request.genWdtUrlWithSecret();
-    LOG(INFO) << "Serialized " << serialized;
+    WLOG(INFO) << "Serialized " << serialized;
     WdtTransferRequest deser(serialized);
     EXPECT_EQ(deser.hostName, "host1");
     EXPECT_EQ(deser.transferId, "tid1");
@@ -178,9 +178,9 @@ TEST(RequestSerializationTest, UrlTests) {
     // Lets not populate anything else
     transferRequest.hostName = "localhost";
     string serializedString = transferRequest.genWdtUrlWithSecret();
-    LOG(INFO) << serializedString;
+    WLOG(INFO) << serializedString;
     WdtTransferRequest dummy(serializedString);
-    LOG(INFO) << dummy.getLogSafeString();
+    WLOG(INFO) << dummy.getLogSafeString();
     EXPECT_EQ(transferRequest, dummy);
   }
   {
@@ -199,7 +199,7 @@ TEST(RequestSerializationTest, UrlTests) {
     for (auto port : transferRequest.ports) {
       ASSERT_TRUE(port != 0);
     }
-    LOG(INFO) << transferRequest.hostName;
+    WLOG(INFO) << transferRequest.hostName;
     ASSERT_TRUE(!transferRequest.hostName.empty());
   }
   {
@@ -270,7 +270,7 @@ TEST(TransferRequestTest, Encryption1) {
   }
   {
     WdtTransferRequest req(123, 3, "/foo/bar");
-    LOG(INFO) << "Url without encr= " << req.getLogSafeString();
+    WLOG(INFO) << "Url without encr= " << req.getLogSafeString();
     WdtTransferRequest req2(123, 3, "/foo/ba2");
     EXPECT_FALSE(req2 == req);
     req2.directory = "/foo/bar";
@@ -294,7 +294,7 @@ TEST(TransferRequestTest, Encryption1) {
     const string secret(binary);
     req.encryptionData = EncryptionParams(ENC_AES128_CTR, secret);
     string ser = req.genWdtUrlWithSecret();
-    LOG(INFO) << "Url with e= " << ser;
+    WLOG(INFO) << "Url with e= " << ser;
     EXPECT_EQ(ser,
               "wdt://host1:123?enc=1:464f4f62617235360001fffe"
               "&id=&num_ports=3&recpv=" +

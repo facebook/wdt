@@ -33,7 +33,7 @@ void simulateNetworkError() {
     if (shutdown(fd, SHUT_WR) < 0) {
       PLOG(WARNING) << "socket shutdown failed for fd " << fd;
     } else {
-      LOG(INFO) << "successfully shut down socket for fd " << fd;
+      WLOG(INFO) << "successfully shut down socket for fd " << fd;
     }
   }
 }

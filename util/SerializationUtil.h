@@ -9,6 +9,7 @@
 #pragma once
 
 #include <folly/Range.h>
+#include <wdt/ErrorCodes.h>
 #include <string>
 
 namespace facebook {

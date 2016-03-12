@@ -163,7 +163,7 @@ class Barrier {
   /// to be hit in order for the barrier to clear
   explicit Barrier(int numThreads) {
     numThreads_ = numThreads;
-    VLOG(1) << "making barrier with " << numThreads;
+    WVLOG(1) << "making barrier with " << numThreads;
   }
 
   /// Executes the main functionality of the barrier

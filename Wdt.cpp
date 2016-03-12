@@ -14,14 +14,14 @@ Wdt &Wdt::initializeWdt(const std::string &appName) {
   res.initializeWdtInternal(appName);
   WdtFlags::initializeFromFlags();
   // At fb we do this for services - that's floody for cmd line though
-  // res.printWdtOptions(LOG(INFO));
+  // res.printWdtOptions(WLOG(INFO));
   return res;
 }
 
 ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
-  LOG(INFO) << "One time initialization of WDT for " << appName;
+  WLOG(INFO) << "One time initialization of WDT for " << appName;
   if (initDone_) {
-    LOG(ERROR) << "Called initializeWdt() more than once";
+    WLOG(ERROR) << "Called initializeWdt() more than once";
     return ERROR;
   }
   appName_ = appName;
@@ -41,7 +41,7 @@ ErrorCode Wdt::applySettings() {
 Wdt &Wdt::getWdt() {
   Wdt &res = getWdtInternal();
   if (!res.initDone_) {
-    LOG(ERROR) << "Called getWdt() before/without initializeWdt()";
+    WLOG(ERROR) << "Called getWdt() before/without initializeWdt()";
     WDT_CHECK(false) << "Must call initializeWdt() once before getWdt()";
   }
   return res;
@@ -62,7 +62,7 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   }
 
   if (req.errorCode != OK) {
-    LOG(ERROR) << "Transfer request error " << errorCodeToStr(req.errorCode);
+    WLOG(ERROR) << "Transfer request error " << errorCodeToStr(req.errorCode);
     return req.errorCode;
   }
   // Protocol issues will/should be flagged as error when we call createSender
@@ -75,8 +75,8 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   ErrorCode errCode =
       wdtController->createSender(wdtNamespace, secondKey, req, sender);
   if (errCode == ALREADY_EXISTS && terminateExistingOne) {
-    LOG(WARNING) << "Found pre-existing sender for " << wdtNamespace << " "
-                 << secondKey << " aborting it and making a new one";
+    WLOG(WARNING) << "Found pre-existing sender for " << wdtNamespace << " "
+                  << secondKey << " aborting it and making a new one";
     sender->abort(ABORTED_BY_APPLICATION);
     // This may log an error too
     wdtController->releaseSender(wdtNamespace, secondKey);
@@ -84,8 +84,8 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
     errCode = wdtController->createSender(wdtNamespace, secondKey, req, sender);
   }
   if (errCode != OK) {
-    LOG(ERROR) << "Failed to create sender " << errorCodeToStr(errCode) << " "
-               << wdtNamespace << " " << secondKey;
+    WLOG(ERROR) << "Failed to create sender " << errorCodeToStr(errCode) << " "
+                << wdtNamespace << " " << secondKey;
     return errCode;
   }
   wdtSetAbortSocketCreatorAndReporter(wdtNamespace, sender.get(), req,
@@ -93,15 +93,15 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
 
   auto validatedReq = sender->init();
   if (validatedReq.errorCode != OK) {
-    LOG(ERROR) << "Couldn't init sender with request for " << wdtNamespace
-               << " " << secondKey;
+    WLOG(ERROR) << "Couldn't init sender with request for " << wdtNamespace
+                << " " << secondKey;
     return validatedReq.errorCode;
   }
   auto transferReport = sender->transfer();
   ErrorCode ret = transferReport->getSummary().getErrorCode();
   wdtController->releaseSender(wdtNamespace, secondKey);
-  LOG(INFO) << "wdtSend for " << wdtNamespace << " " << secondKey << " "
-            << " ended with " << errorCodeToStr(ret);
+  WLOG(INFO) << "wdtSend for " << wdtNamespace << " " << secondKey << " "
+             << " ended with " << errorCodeToStr(ret);
   return ret;
 }
 

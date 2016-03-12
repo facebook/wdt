@@ -20,12 +20,12 @@ namespace wdt {
  *                            "(download resumption)")
  *  }
  */
-#define CHANGE_IF_NOT_SPECIFIED(option, specifiedOptions, value, msg)        \
-  if (specifiedOptions.find(#option) == specifiedOptions.end()) {            \
-    LOG(INFO) << "Setting " << #option << " to " << value << " " << msg;     \
-    option = value;                                                          \
-  } else {                                                                   \
-    LOG(INFO) << "Not overwriting user specified " << #option << " " << msg; \
+#define CHANGE_IF_NOT_SPECIFIED(option, specifiedOptions, value, msg)         \
+  if (specifiedOptions.find(#option) == specifiedOptions.end()) {             \
+    WLOG(INFO) << "Setting " << #option << " to " << value << " " << msg;     \
+    option = value;                                                           \
+  } else {                                                                    \
+    WLOG(INFO) << "Not overwriting user specified " << #option << " " << msg; \
   }
 
 const char* WdtOptions::FLASH_OPTION_TYPE = "flash";
@@ -46,13 +46,14 @@ void WdtOptions::modifyOptions(
     return;
   }
   if (optionType != FLASH_OPTION_TYPE) {
-    LOG(WARNING) << "Invalid option type " << optionType << ". Valid types are "
-                 << FLASH_OPTION_TYPE << ", " << DISK_OPTION_TYPE;
+    WLOG(WARNING) << "Invalid option type " << optionType
+                  << ". Valid types are " << FLASH_OPTION_TYPE << ", "
+                  << DISK_OPTION_TYPE;
   }
   // options are initialized for flash. So, no need to change anything
   if (userSpecifiedOptions.find("start_port") != userSpecifiedOptions.end() &&
       !static_ports) {
-    LOG(INFO) << "start_port is specified, setting static_ports true";
+    WLOG(INFO) << "start_port is specified, setting static_ports true";
     static_ports = true;
   }
 }

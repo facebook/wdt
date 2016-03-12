@@ -60,7 +60,7 @@ std::set<std::string> getUserSpecifiedOptions() {
 }
 
 void WdtFlags::initializeFromFlags() {
-  LOG(INFO) << "Running WDT " << Protocol::getFullVersion();
+  WLOG(INFO) << "Running WDT " << Protocol::getFullVersion();
 #define ASSIGN_OPT
 #include "WdtFlags.cpp.inc"  //nolint
 #undef ASSIGN_OPT

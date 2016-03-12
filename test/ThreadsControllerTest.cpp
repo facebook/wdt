@@ -33,7 +33,7 @@ class ThreadUtil {
 
   void threadSleep(int64_t millis) {
     auto waitingTime = chrono::milliseconds(millis);
-    LOG(INFO) << "Sleeping for " << millis << " ms";
+    WLOG(INFO) << "Sleeping for " << millis << " ms";
     unique_lock<mutex> lock(mutex_);
     cv_.wait_for(lock, waitingTime);
   }

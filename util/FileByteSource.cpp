@@ -34,8 +34,8 @@ int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
     if (isDirectReads) {
 #ifndef O_DIRECT
 #ifdef F_NOCACHE
-      VLOG(1) << "O_DIRECT not found, using F_NOCACHE instead "
-              << "for " << filename;
+      WVLOG(1) << "O_DIRECT not found, using F_NOCACHE instead "
+               << "for " << filename;
       int ret = fcntl(fd, F_NOCACHE, 1);
       if (ret) {
         PLOG(ERROR) << "Not able to set F_NOCACHE";
@@ -72,7 +72,7 @@ ErrorCode FileByteSource::open(ThreadCtx *threadCtx) {
   threadCtx_ = threadCtx;
   ErrorCode errCode = OK;
   const bool isDirectReads = metadata_->directReads;
-  VLOG(1) << "Reading in direct mode " << isDirectReads;
+  WVLOG(1) << "Reading in direct mode " << isDirectReads;
   if (isDirectReads) {
 #ifdef O_DIRECT
     alignedReadNeeded_ = true;
@@ -80,7 +80,7 @@ ErrorCode FileByteSource::open(ThreadCtx *threadCtx) {
   }
 
   if (metadata_->fd >= 0) {
-    VLOG(1) << "metadata already has fd, no need to open " << getIdentifier();
+    WVLOG(1) << "metadata already has fd, no need to open " << getIdentifier();
     fd_ = metadata_->fd;
   } else {
     fd_ =
@@ -134,11 +134,11 @@ char *FileByteSource::read(int64_t &size) {
     return nullptr;
   }
   if (numRead == 0) {
-    LOG(ERROR) << "Unexpected EOF on " << metadata_->fullPath << " need align "
-               << alignedReadNeeded_ << " physicalRead " << physicalRead
-               << " offset " << offset_ << " seepPos " << seekPos
-               << " offsetRemainder " << offsetRemainder << " bytesRead "
-               << bytesRead_;
+    WLOG(ERROR) << "Unexpected EOF on " << metadata_->fullPath << " need align "
+                << alignedReadNeeded_ << " physicalRead " << physicalRead
+                << " offset " << offset_ << " seepPos " << seekPos
+                << " offsetRemainder " << offsetRemainder << " bytesRead "
+                << bytesRead_;
     this->close();
     return nullptr;
   }
@@ -153,10 +153,10 @@ char *FileByteSource::read(int64_t &size) {
     size = logicalRead;
   }
   bytesRead_ += size;
-  VLOG(1) << "Size " << size << " need align " << alignedReadNeeded_
-          << " physicalRead " << physicalRead << " offset " << offset_
-          << " seepPos " << seekPos << " offsetRemainder " << offsetRemainder
-          << " bytesRead " << bytesRead_;
+  WVLOG(1) << "Size " << size << " need align " << alignedReadNeeded_
+           << " physicalRead " << physicalRead << " offset " << offset_
+           << " seepPos " << seekPos << " offsetRemainder " << offsetRemainder
+           << " bytesRead " << bytesRead_;
   return buffer->getData() + offsetRemainder;
 }
 
@@ -184,8 +184,8 @@ void FileByteSource::close() {
   clearPageCache();
   if (metadata_->fd >= 0) {
     // if the fd is not opened by this source, no need to close it
-    VLOG(1) << "No need to close " << getIdentifier()
-            << ", this was not opened by FileByteSource";
+    WVLOG(1) << "No need to close " << getIdentifier()
+             << ", this was not opened by FileByteSource";
   } else if (fd_ >= 0) {
     PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FILE_CLOSE);
     ::close(fd_);

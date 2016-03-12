@@ -41,7 +41,7 @@ ErrorCode FileWriter::open() {
     }
   }
   if (fd_ == -1) {
-    LOG(ERROR) << "File open/seek failed for " << blockDetails_->fileName;
+    WLOG(ERROR) << "File open/seek failed for " << blockDetails_->fileName;
     return FILE_WRITE_ERROR;
   }
   return OK;
@@ -70,8 +70,8 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
       }
       if (written == -1) {
         if (errno == EINTR) {
-          VLOG(1) << "Disk write interrupted, retrying "
-                  << blockDetails_->fileName;
+          WVLOG(1) << "Disk write interrupted, retrying "
+                   << blockDetails_->fileName;
           continue;
         }
         PLOG(ERROR) << "File write failed for " << blockDetails_->fileName
@@ -81,8 +81,8 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
       }
       count += written;
     }
-    VLOG(1) << "Successfully written " << count << " bytes to fd " << fd_
-            << " for file " << blockDetails_->fileName;
+    WVLOG(1) << "Successfully written " << count << " bytes to fd " << fd_
+             << " for file " << blockDetails_->fileName;
     bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
     if (finished && options.isLogBasedResumption()) {
       PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC_STATS);
@@ -122,9 +122,9 @@ void FileWriter::syncFileRange(int64_t written, bool forced) {
   writtenSinceLastSync_ += written;
   if (writtenSinceLastSync_ == 0) {
     // no need to sync
-    VLOG(1) << "skipping syncFileRange for " << blockDetails_->fileName
-            << ". Data written " << written
-            << " sync forced = " << std::boolalpha << forced;
+    WVLOG(1) << "skipping syncFileRange for " << blockDetails_->fileName
+             << ". Data written " << written
+             << " sync forced = " << std::boolalpha << forced;
     return;
   }
   if (forced || writtenSinceLastSync_ > syncIntervalBytes) {
@@ -143,8 +143,9 @@ void FileWriter::syncFileRange(int64_t written, bool forced) {
                   << "fd " << fd_;
       return;
     }
-    VLOG(1) << "file range [" << nextSyncOffset_ << " " << writtenSinceLastSync_
-            << "] synced for file " << blockDetails_->fileName;
+    WVLOG(1) << "file range [" << nextSyncOffset_ << " "
+             << writtenSinceLastSync_ << "] synced for file "
+             << blockDetails_->fileName;
     nextSyncOffset_ += writtenSinceLastSync_;
     writtenSinceLastSync_ = 0;
   }

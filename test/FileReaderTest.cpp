@@ -25,12 +25,12 @@ class RandomFile {
     char genFileName[] = "/tmp/FILE_TEST_XXXXXX";
     int ret = mkstemp(genFileName);
     if (ret == -1) {
-      LOG(ERROR) << "Error creating temp file";
+      WLOG(ERROR) << "Error creating temp file";
       return;
     }
     close(ret);
     fileName_.assign(genFileName);
-    LOG(INFO) << "Making file " << fileName_;
+    WLOG(INFO) << "Making file " << fileName_;
     std::ofstream ofs(fileName_.c_str(), std::ios::binary | std::ios::out);
     ofs.seekp(size - 1);
     ofs.write("", 1);
@@ -114,7 +114,7 @@ void testFileRead(const WdtOptions& options, int64_t fileSize,
 
 TEST(FileByteSource, ODIRECT_NONMULTIPLE_OFFSET) {
   if (!canSupportODirect()) {
-    LOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
+    WLOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
     return;
   }
   ThreadCtx threadCtx(WdtOptions::get(), true);
@@ -145,7 +145,7 @@ TEST(FileByteSource, ODIRECT_NONMULTIPLE_OFFSET) {
 TEST(FileByteSource, FILEINFO_ODIRECT) {
   int64_t fileSize = kDiskBlockSize * 10 + 11;
   int64_t sizeToRead = fileSize / 10;
-  LOG(INFO) << "File size " << fileSize << "Size to read " << sizeToRead;
+  WLOG(INFO) << "File size " << fileSize << "Size to read " << sizeToRead;
   RandomFile file(fileSize);
   std::atomic<bool> shouldAbort{false};
   WdtAbortChecker queueAbortChecker(shouldAbort);

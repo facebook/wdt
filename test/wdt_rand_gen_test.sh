@@ -11,9 +11,9 @@ set -e
 set -o pipefail
 
 transferId1=$($binary -v=1 2>&1 | grep Generated | head -1 | \
-  awk '{print $9}')
+  awk '{print $10}')
 transferId2=$($binary -v=1 2>&1 | grep Generated | head -1 | \
-  awk '{print $9}')
+  awk '{print $10}')
 
 if [ "$transferId1" == "$transferId2" ]; then
   echo "Failed to get different transfer-id $transferId1"

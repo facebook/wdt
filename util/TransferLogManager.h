@@ -110,7 +110,7 @@ class LogEncoderDecoder {
  */
 class TransferLogManager {
  public:
-  const static int LOG_VERSION;
+  const static int WLOG_VERSION;
 
   enum EntryType {
     HEADER,                  // log header
