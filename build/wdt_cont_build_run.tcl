@@ -12,8 +12,8 @@ append ::env(USER) "_wdt_contbuild"
 set userdir $::env(USER)
 puts "Will run script with USER env = $userdir"
 
-set maxTestDuration "15m"
-set totalMaxDuration "35m"
+set maxTestDuration "20m"
+set totalMaxDuration "45m"
 
 puts "Max test duration: $maxTestDuration - Max total $totalMaxDuration"
 

@@ -7,8 +7,8 @@ else
   binary=$1
 fi
 
-set -e
 set -o pipefail
+set -e
 
 transferId1=$($binary -v=1 2>&1 | grep Generated | head -1 | \
   awk '{print $10}')
