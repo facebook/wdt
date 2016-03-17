@@ -1,6 +1,8 @@
 #! /usr/bin/env tclsh
 # run _setup once and then this will run a loop and email results
-# TODO: rewrite in python
+# TODO: rewrite in python and less if/else/state mess for autoversion+autopkg
+# (right now it will auto version successful new changes to wdt/ and then
+# auto package if the subsequent auto version change still builds and test good)
 
 # In order for /data/users/$USER to be different than default when creating
 # wdtTest for xfs test but exists and so those directory which we rm
@@ -197,10 +199,16 @@ while {1} {
                     set msg "auto fbpkg build failure"
                     sendEmail "exec error"
                 } else {
-                    set msg "new package built"
+                    catch {exec tail -1 $LOGF} pkgver
+                    catch {exec ./buck-out/gen/wdt/fbonly/wdt_fb --version} ver
+                    regexp {[0-9.]+} $ver shortver
+                    puts "Package built: $pkgver contains v$shortver"
+                    catch {exec fbpkg tag --yes $pkgver v$shortver >>& $LOGF}
+                    set msg "new package built $shortver -> $pkgver"
                     sendEmail "new package"
                 }
             }
+            set msg "GOOD"; # otherwise we get a subsequent email about ->good
         } else {
             # reset autopkgnext
             set autoPkgNext 0
