@@ -166,11 +166,12 @@ while {1} {
             puts "Previous commit is auto commit, will not auto commit!"
             set autoBump 0
         } else {
+            puts "Last commit not a version bump, resetting autoPkg"
             set autoPkgNext 0
         }
     }
     catch {exec hg log -l 1 -T "{rev}" wdt} hgout
-    puts "wdt changeset now $hgout (autoBump $autoBump, good $good) $firstLine"
+    puts "wdt changeset now $hgout (autoBump $autoBump, good $good, autoPkg $autoPkgNext) $firstLine"
     if {[string length $last]==0} {
         sendEmail "contbuild restarted"
     } elseif {[string compare $hgout $hgprev]} {
@@ -184,9 +185,11 @@ while {1} {
                     set msg "auto version update failure"
                     sendEmail "exec error"
                 } else {
+                    puts "Setting autoPkgNext for next build"
                     set autoPkgNext 1
                 }
             } elseif {$autoPkgNext} {
+                set autoPkgNext 0
                 set LOGF "$LOGF.fbpkg"
                 puts "Auto fbpkg after auto bump"
                 if {[catch {exec fbpkg build wdt >& $LOGF}]} {
@@ -198,9 +201,10 @@ while {1} {
                     sendEmail "new package"
                 }
             }
+        } else {
+            # reset autopkgnext
+            set autoPkgNext 0
         }
-        # reset autopkgnext
-        set autoPkgNext 0
     } elseif {[string compare $last $msg]} {
         # Build changed from $last to $msg
         sendEmail "was $last"
