@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 
 if [ "$#" -eq 0 ]; then
