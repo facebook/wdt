@@ -17,7 +17,7 @@ puts "Max test duration: $maxTestDuration - Max total $totalMaxDuration"
 
 # Set throughput - lower for now / there is some issue with kernel or env
 # (or our code?)
-set ::env(WDT_THROUGHPUT) 13000
+set ::env(WDT_THROUGHPUT) 12000
 
 set CDIR "/data/users/$userdir"
 
@@ -80,7 +80,7 @@ proc sendEmail {reason} {
     close $f
     # rest of the body of the email:
     # filters info and vlog and normal compilation times:
-    exec egrep -v {^([IV]| [0-9].[0-9][0-9]s )} $LOGF >> $emailFileName
+    exec egrep -v {^([IV]| [0-9].[0-9][0-9]s |BUILT)} $LOGF >> $emailFileName
     # Sending both
     exec sendmail $TO < $emailFileName
     file delete $emailFileName
@@ -116,13 +116,14 @@ if {$os == "Darwin"} {
      sudo tc qdisc add dev lo root netem delay 20ms 10ms \
      duplicate 1% corrupt 0.1% &&\
      echo rerunning tests with tc delays &&\
-     time $timeoutCmd $maxTestDuration fbmake runtests --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time $timeoutCmd $maxTestDuration buck test wdt/... -- --run-disabled --record-results --return-nonzero-on-timeouts &&\
      sudo tc qdisc del dev lo root"
     set targetDir "~/public_html/wdt_builds/"
     set sudo "sudo"
     set autoVersion 1
 }
 
+set autoPkgNext 0
 while {1} {
     # round the time to 10 minutes (in part so log files aren't growing forever)
     set now [clock seconds]
@@ -158,11 +159,14 @@ while {1} {
     if {[catch {exec hg log -l 1 -T "{desc}" wdt} prevDesc]} {
         puts "Error getting desc: $prevDesc"
         set autoBump 0
+        set autoPkgNext 0
     } else {
         set firstLine [lindex [split $prevDesc \n] 0];
         if {![string compare $firstLine "wdt version bump"]} {
             puts "Previous commit is auto commit, will not auto commit!"
             set autoBump 0
+        } else {
+            set autoPkgNext 0
         }
     }
     catch {exec hg log -l 1 -T "{rev}" wdt} hgout
@@ -171,18 +175,36 @@ while {1} {
         sendEmail "contbuild restarted"
     } elseif {[string compare $hgout $hgprev]} {
         sendEmail "hg log wdt change $firstLine"
-        if {$autoBump && $good} {
-            puts "Auto updating version after good build for $firstLine:"
-            set LOGF "$LOGF.auto_bump"
-            if {[catch {exec wdt/build/auto_version.tcl >& $LOGF}]} {
-                puts "Unable to bump - see $LOGF"
-                set msg "auto version update failure"
-                sendEmail "exec error"
+        if {$good} {
+            if {$autoBump} {
+                puts "Auto updating version after good build for $firstLine:"
+                set LOGF "$LOGF.auto_bump"
+                if {[catch {exec wdt/build/auto_version.tcl >& $LOGF}]} {
+                    puts "Unable to bump - see $LOGF"
+                    set msg "auto version update failure"
+                    sendEmail "exec error"
+                } else {
+                    set autoPkgNext 1
+                }
+            } elseif {$autoPkgNext} {
+                set LOGF "$LOGF.fbpkg"
+                puts "Auto fbpkg after auto bump"
+                if {[catch {exec fbpkg build wdt >& $LOGF}]} {
+                    puts "Unable to build fbpkg - see $LOGF"
+                    set msg "auto fbpkg build failure"
+                    sendEmail "exec error"
+                } else {
+                    set msg "new package built"
+                    sendEmail "new package"
+                }
             }
         }
+        # reset autopkgnext
+        set autoPkgNext 0
     } elseif {[string compare $last $msg]} {
         # Build changed from $last to $msg
         sendEmail "was $last"
+        set autoPkgNext 0
     } elseif {[clock seconds]>$nextEmail} {
         # periodic emails
         sendEmail "every $emailEvery email"
