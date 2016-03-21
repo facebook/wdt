@@ -6,8 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/Receiver.h>
-#include <wdt/Sender.h>
+#include <wdt/Wdt.h>
 #include <wdt/test/TestCommon.h>
 
 #include <gflags/gflags.h>
@@ -306,10 +305,20 @@ TEST(TransferRequestTest, Encryption1) {
     EXPECT_EQ(req, unser);
   }
 }
+
+TEST(Wdt, WdtInstanceTest) {
+  Wdt& wdt1 = Wdt::initializeWdt("wdt");
+  Wdt& wdt2 = Wdt::getWdt("wdt");
+  Wdt& wdt3 = Wdt::getWdt("wdt");
+  Wdt& wdt4 = Wdt::initializeWdt("wdt1");
+  EXPECT_EQ(&wdt1, &wdt2);
+  EXPECT_EQ(&wdt2, &wdt3);
+  EXPECT_NE(&wdt1, &wdt4);
+}
 }
 }  // namespace end
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);

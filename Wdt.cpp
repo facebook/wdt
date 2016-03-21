@@ -1,8 +1,6 @@
 #include <wdt/Wdt.h>
 #include <wdt/util/WdtFlags.h>
 
-#include <wdt/WdtResourceController.h>
-
 using std::string;
 
 namespace facebook {
@@ -10,8 +8,9 @@ namespace wdt {
 
 // this must be called first and exactly once:
 Wdt &Wdt::initializeWdt(const std::string &appName) {
-  Wdt &res = getWdtInternal();
+  Wdt &res = getWdtInternal(appName);
   res.initializeWdtInternal(appName);
+  // TODO this should return the options
   WdtFlags::initializeFromFlags();
   // At fb we do this for services - that's floody for cmd line though
   // res.printWdtOptions(WLOG(INFO));
@@ -26,20 +25,18 @@ ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
   }
   appName_ = appName;
   initDone_ = true;
-  // TODO this should return the options
   return OK;
 }
 
 ErrorCode Wdt::applySettings() {
-  WdtResourceController::get()->setThrottler(
-      Throttler::makeThrottler(options_));
+  resourceController_.setThrottler(Throttler::makeThrottler(options_));
   settingsApplied_ = true;
   return OK;
 }
 
 // this can be called many times after initializeWdt()
-Wdt &Wdt::getWdt() {
-  Wdt &res = getWdtInternal();
+Wdt &Wdt::getWdt(const std::string &appName) {
+  Wdt &res = getWdtInternal(appName);
   if (!res.initDone_) {
     WLOG(ERROR) << "Called getWdt() before/without initializeWdt()";
     WDT_CHECK(false) << "Must call initializeWdt() once before getWdt()";
@@ -69,19 +66,19 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
 
   // try to create sender
   SenderPtr sender;
-  auto wdtController = WdtResourceController::get();
   // TODO should be using recoverid
   const std::string secondKey = req.hostName;
   ErrorCode errCode =
-      wdtController->createSender(wdtNamespace, secondKey, req, sender);
+      resourceController_.createSender(wdtNamespace, secondKey, req, sender);
   if (errCode == ALREADY_EXISTS && terminateExistingOne) {
     WLOG(WARNING) << "Found pre-existing sender for " << wdtNamespace << " "
                   << secondKey << " aborting it and making a new one";
     sender->abort(ABORTED_BY_APPLICATION);
     // This may log an error too
-    wdtController->releaseSender(wdtNamespace, secondKey);
+    resourceController_.releaseSender(wdtNamespace, secondKey);
     // Try#2
-    errCode = wdtController->createSender(wdtNamespace, secondKey, req, sender);
+    errCode =
+        resourceController_.createSender(wdtNamespace, secondKey, req, sender);
   }
   if (errCode != OK) {
     WLOG(ERROR) << "Failed to create sender " << errorCodeToStr(errCode) << " "
@@ -99,7 +96,7 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   }
   auto transferReport = sender->transfer();
   ErrorCode ret = transferReport->getSummary().getErrorCode();
-  wdtController->releaseSender(wdtNamespace, secondKey);
+  resourceController_.releaseSender(wdtNamespace, secondKey);
   WLOG(INFO) << "wdtSend for " << wdtNamespace << " " << secondKey << " "
              << " ended with " << errorCodeToStr(ret);
   return ret;
@@ -119,9 +116,18 @@ WdtOptions &Wdt::getWdtOptions() {
 }
 
 // private version
-Wdt &Wdt::getWdtInternal() {
-  static Wdt s_wdtInstance{WdtOptions::getMutable()};
-  return s_wdtInstance;
+Wdt &Wdt::getWdtInternal(const std::string &appName) {
+  static std::unordered_map<std::string, std::unique_ptr<Wdt>> s_wdtMap;
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> lock(mutex);
+  auto it = s_wdtMap.find(appName);
+  if (it != s_wdtMap.end()) {
+    return *(it->second);
+  }
+  Wdt *wdtPtr = new Wdt(WdtOptions::getMutable());
+  std::unique_ptr<Wdt> wdt(wdtPtr);
+  s_wdtMap.emplace(appName, std::move(wdt));
+  return *wdtPtr;
 }
 }
 }  // namespaces
