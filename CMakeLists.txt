@@ -99,10 +99,13 @@ WdtBase.cpp
 WdtResourceController.cpp
 util/CommonImpl.cpp
 )
-add_library(wdt
+# Source files that depend on gflags and provide flags -> options init
+set (WDT_FLAGS_RELATED_SRC
 util/WdtFlags.cpp
 Wdt.cpp
 )
+add_library(wdt ${WDT_FLAGS_RELATED_SRC})
+
 target_link_libraries(wdt wdt_min)
 
 
@@ -201,7 +204,7 @@ include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-add_executable(wdtbin wdtCmdLine.cpp util/WdtFlags.cpp Wdt.cpp)
+add_executable(wdtbin wdtCmdLine.cpp ${WDT_FLAGS_RELATED_SRC})
 set_target_properties(wdtbin PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
 
 target_link_libraries(wdtbin wdt_min)
@@ -280,7 +283,7 @@ if (BUILD_TESTING)
   )
 
   add_library(wdt4tests
-    util/WdtFlags.cpp
+    ${WDT_FLAGS_RELATED_SRC}
   )
   target_link_libraries(wdt4tests wdt4tests_min)
 
@@ -314,7 +317,8 @@ if (BUILD_TESTING)
   target_link_libraries(option_type_test_long_flags wdt4tests)
 
   add_executable(option_type_test_short_flags test/OptionTypeTest.cpp
-                                              util/WdtFlags.cpp)
+                                              ${WDT_FLAGS_RELATED_SRC}
+                                              )
   set_target_properties(option_type_test_short_flags PROPERTIES
     COMPILE_DEFINITIONS "STANDALONE_APP"
     RUNTIME_OUTPUT_DIRECTORY "_bin/wdt/short_flags/")
