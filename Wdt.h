@@ -76,6 +76,10 @@ class Wdt {
 
   virtual ErrorCode printWdtOptions(std::ostream &out);
 
+  WdtResourceController *getWdtResourceController() {
+    return &resourceController_;
+  }
+
   /// Virtual Destructor (for class hierarchy)
   virtual ~Wdt() {
   }
