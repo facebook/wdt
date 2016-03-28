@@ -17,3 +17,4 @@
 #cmakedefine FOLLY_USE_LIBCPP 1
 #cmakedefine FOLLY_HAVE_WEAK_SYMBOLS 1
 #cmakedefine FOLLY_HAVE_BITS_FUNCTEXCEPT_H 1
+#cmakedefine FOLLY_HAVE_MEMRCHR 1
