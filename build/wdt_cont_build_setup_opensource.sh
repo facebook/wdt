@@ -1,4 +1,5 @@
 #! /bin/sh
+# Mac version of wdt_cont_build_setup.sh
 set -x
 set -e
 CDIR=/data/users/${USER}_wdt_contbuild

@@ -1,6 +1,6 @@
 #! /bin/bash
 # A lot of this is facebook specific but can give an idea of how
-# to setup custom tests for WDT
+# to setup custom tests for WDT - Very similar to travis_linux.sh
 # run this once and then _run will run a loop and email results
 set -x
 while sh -c "g++ --version | fgrep 4.4." ; do
@@ -40,9 +40,9 @@ ls -l $BINDIR/cmake
 
 # similar as travis_linux.sh
 git clone https://github.com/floitsch/double-conversion.git
-(cd double-conversion; cmake -DCMAKE_INSTALL_PREFIX=$CDIR .; make -j 16 && make install)
+(cd double-conversion; cmake -DBUILD_SHARED_LIBS=on -DCMAKE_INSTALL_PREFIX=$CDIR .; make -j 16 && make install)
 git clone https://github.com/schuhschuh/gflags.git
-(mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$CDIR -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on .. && make -j 16 && make install)
+(mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$CDIR -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on .. && make -j 16 && make install)
 svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 ( cd glog && ./configure --with-gflags=$CDIR --prefix=$CDIR && make -j 16 && make install )
 OPENSSL_VERSION=openssl-1.0.1q

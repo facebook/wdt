@@ -56,7 +56,7 @@ and avoid linking errors later or getting a wdt without flags working*
 git clone https://github.com/schuhschuh/gflags.git
 mkdir gflags/build
 cd gflags/build
-cmake -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on ..
+cmake -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on ..
 make -j && sudo make install
 ```
 
@@ -71,7 +71,8 @@ make -j && sudo make install
 *If double-conversion isn't available via apt-get:*
 ```
 git clone https://github.com/floitsch/double-conversion.git
-cd double-conversion; cmake . ; make -j && sudo make install
+cd double-conversion; cmake . -DBUILD_SHARED_LIBS=on
+make -j && sudo make install
 ```
 
 

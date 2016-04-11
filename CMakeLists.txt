@@ -118,6 +118,10 @@ include_directories(${Boost_INCLUDE_DIRS})
 # We use std:: threads
 find_package(Threads) # this will set ${CMAKE_THREAD_LIBS_INIT} (ie pthreads)
 
+
+# double-conversion
+find_path(DOUBLECONV_INCLUDE_DIR double-conversion/double-conversion.h)
+find_library(DOUBLECONV_LIBRARY double-conversion)
 # Glog
 find_path(GLOG_INCLUDE_DIR glog/logging.h)
 find_library(GLOG_LIBRARY glog)
@@ -134,6 +138,7 @@ target_link_libraries(wdt_min
   ${GLOG_LIBRARY}
   ${GFLAGS_LIBRARY}
   ${Boost_LIBRARIES}
+  ${DOUBLECONV_LIBRARY}
   ${OPENSSL_CRYPTO_LIBRARY}
   ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
 )
@@ -195,12 +200,13 @@ if (NOT FOLLY_HAVE_BITS_FUNCTEXCEPT_H)
 endif()
 
 add_library(folly4wdt ${FOLLY_CPP_SRC})
-target_link_libraries(folly4wdt ${GLOG_LIBRARY})
+target_link_libraries(folly4wdt ${GLOG_LIBRARY} ${DOUBLECONV_LIBRARY})
 
 # Order is important - inside fb we want the above
 # folly-config.h to be picked up instead of the fbcode one
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${FOLLY_SOURCE_DIR})
+include_directories(${DOUBLECONV_INCLUDE_DIR})
 include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)

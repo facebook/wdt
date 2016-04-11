@@ -1,5 +1,6 @@
 #! /bin/bash
-
+# Script to setup the travis build env - changes here are likely needed
+# in wdt_cont_build_setup*.sh too
 set -x
 set -e
 
@@ -32,9 +33,9 @@ $HOME/bin/openssl version
 ldd $HOME/bin/openssl
 export OPENSSL_ROOT_DIR=$HOME
 git clone https://github.com/floitsch/double-conversion.git
-(cd double-conversion; cmake -DCMAKE_INSTALL_PREFIX=$HOME .; make -j 4 && make install)
+(cd double-conversion; cmake -DBUILD_SHARED_LIBS=on -DCMAKE_INSTALL_PREFIX=$HOME .; make -j 4 && make install)
 git clone https://github.com/schuhschuh/gflags.git
-(mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on .. && make -j 4 && make install)
+(mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on .. && make -j 4 && make install)
 svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 ( cd glog && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
 git clone https://github.com/facebook/folly.git
