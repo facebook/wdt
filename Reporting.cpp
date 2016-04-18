@@ -213,8 +213,7 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
     if (report.summary_.getNumFiles() == 0) {
       os << " All files failed.";
     } else {
-      os << "\n" << WDT_LOG_PREFIX
-         << "Failed files :\n" << WDT_LOG_PREFIX;
+      os << "\n" << WDT_LOG_PREFIX << "Failed files :\n" << WDT_LOG_PREFIX;
       std::set<std::string> failedFilesSet;
       for (auto& stats : report.getFailedSourceStats()) {
         failedFilesSet.insert(stats.getId());
@@ -238,8 +237,7 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
     }
   }
   if (!report.failedDirectories_.empty()) {
-    os << "\n" << WDT_LOG_PREFIX
-       << "Failed directories :\n" << WDT_LOG_PREFIX;
+    os << "\n" << WDT_LOG_PREFIX << "Failed directories :\n" << WDT_LOG_PREFIX;
     int64_t numFailedDirectories = report.failedDirectories_.size();
     int64_t numOfDirToPrint =
         std::min<int64_t>(kMaxEntriesToPrint, numFailedDirectories);
@@ -466,7 +464,8 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
           (i < numBuckets - 1 ? PerfStatReport::kHistogramBuckets[i]
                               : std::numeric_limits<int64_t>::max());
       os << "[" << bucketStart << ", " << bucketEnd << ") --> " << buckets[i]
-         << '\n' << WDT_LOG_PREFIX;
+         << '\n'
+         << WDT_LOG_PREFIX;
     }
   }
   return os;

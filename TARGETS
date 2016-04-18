@@ -44,6 +44,15 @@ cpp_library(
 )
 
 cpp_unittest(
+  name = 'wdt_misc_tests',
+  srcs = [ 'test/WdtMiscTests.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_unittest(
   name = 'protocol_test',
   srcs = [ 'test/ProtocolTest.cpp', ],
   deps = [
@@ -501,6 +510,7 @@ cpp_library (
   deps = [
     ":wdtlib",
   ],
+  external_deps = [ ("gtest", None) ],
   compiler_flags = wdt_compiler_flags,
 )
 
@@ -528,6 +538,7 @@ cpp_binary(
     deps = [
       ":wdtlib4tests",
     ],
+    external_deps = [ ("gtest", None) ],
     output_subdir = 'test',
     compiler_flags = wdt_compiler_flags,
 )

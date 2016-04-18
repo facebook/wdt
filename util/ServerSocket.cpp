@@ -25,7 +25,7 @@ ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
 }
 
 void ServerSocket::closeAllNoCheck() {
-  WVLOG(1) << "Destroying server socket (port, listen fd, fd)" << port_ << ", "
+  WVLOG(1) << "Destroying server socket (port, listen fd, fd) " << port_ << ", "
            << listeningFds_ << ", " << fd_;
   closeNoCheck();
   // We don't care about listen error, the error that matters is encryption err

@@ -317,8 +317,8 @@ std::unique_ptr<TransferReport> Sender::finish() {
   directoryTime = dirQueue_->getDirectoryTime();
   WLOG(INFO) << "Total sender time = " << totalTime << " seconds ("
              << directoryTime << " dirTime)"
-             << ". Transfer summary : " << *transferReport
-             << "\n" << WDT_LOG_PREFIX << "Total sender throughput = "
+             << ". Transfer summary : " << *transferReport << "\n"
+             << WDT_LOG_PREFIX << "Total sender throughput = "
              << transferReport->getThroughputMBps() << " Mbytes/sec ("
              << transferReport->getSummary().getEffectiveTotalBytes() /
                     (totalTime - directoryTime) / kMbToB

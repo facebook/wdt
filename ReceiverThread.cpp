@@ -121,7 +121,7 @@ ReceiverState ReceiverThread::listen() {
       break;
     } else if (code == CONN_ERROR) {
       threadStats_.setLocalErrorCode(code);
-      return FAILED;
+      return FINISH_WITH_ERROR;
     }
     WLOG(INFO) << *this << " Sleeping after failed attempt " << retry;
     /* sleep override */
@@ -131,7 +131,7 @@ ReceiverState ReceiverThread::listen() {
   if (socket_->listen() != OK) {
     WLOG(ERROR) << *this << " Unable to listen/bind despite retries";
     threadStats_.setLocalErrorCode(CONN_ERROR);
-    return FAILED;
+    return FINISH_WITH_ERROR;
   }
   return ACCEPT_FIRST_CONNECTION;
 }
@@ -154,15 +154,12 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
       WLOG(ERROR) << *this << " Unable to accept after " << acceptAttempts
                   << " attempts";
       threadStats_.setLocalErrorCode(CONN_ERROR);
-      return FAILED;
+      return FINISH_WITH_ERROR;
     }
     if (wdtParent_->getCurAbortCode() != OK) {
       WLOG(ERROR) << *this << " Thread marked to abort while trying to accept "
                   << "first connection. Num attempts " << acceptAttempts;
-      // Even though there is a transition FAILED here
-      // getCurAbortCode() is going to be checked again in the receiveOne.
-      // So this is pretty much irrelevant
-      return FAILED;
+      return FINISH_WITH_ERROR;
     }
     ErrorCode code =
         socket_->acceptNextConnection(timeout, curConnectionVerified_);
@@ -488,7 +485,7 @@ ReceiverState ReceiverThread::processFileCmd() {
       WLOG(ERROR) << *this << "Thread marked for abort while processing "
                   << blockDetails.fileName << " " << blockDetails.seqId
                   << " port : " << socket_->getPort();
-      return FAILED;
+      return FINISH_WITH_ERROR;
     }
     int64_t nres = readAtMost(*socket_, buf_, bufSize_,
                               blockDetails.dataSize - writer.getTotalWritten());
@@ -848,7 +845,13 @@ ReceiverState ReceiverThread::finishWithError() {
   WDT_CHECK(threadStats_.getLocalErrorCode() != OK);
 
   // close the socket, so that sender receives an error during connect
-  socket_->closeAllNoCheck();
+  // When we are doing a single session, close the listening socket as soon
+  // as we are done
+  if (wdtParent_->isJoinable_) {
+    socket_->closeAllNoCheck();
+  } else {
+    socket_->closeNoCheck();
+  }
   auto cv = controller_->getCondition(WAIT_FOR_FINISH_OR_CHECKPOINT_CV);
   auto guard = cv->acquire();
   wdtParent_->addCheckpoint(checkpoint_);
@@ -926,7 +929,7 @@ void ReceiverThread::start() {
       threadStats_.setLocalErrorCode(ABORT);
       break;
     }
-    if (state == FAILED || state == END) {
+    if (state == END) {
       break;
     }
     state = (this->*stateMap_[state])();

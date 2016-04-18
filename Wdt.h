@@ -8,6 +8,7 @@
  */
 #pragma once
 
+#include <wdt/Receiver.h>
 #include <wdt/Sender.h>
 // For Options
 #include <wdt/WdtOptions.h>

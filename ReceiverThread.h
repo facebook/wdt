@@ -38,7 +38,6 @@ enum ReceiverState {
   SEND_ABORT_CMD,
   WAIT_FOR_FINISH_OR_NEW_CHECKPOINT,
   FINISH_WITH_ERROR,
-  FAILED,
   END
 };
 
@@ -99,7 +98,7 @@ class ReceiverThread : public WdtThread {
    * Tries to listen/bind to port. If this fails, thread is considered failed.
    * Previous states : n/a (start state)
    * Next states : ACCEPT_FIRST_CONNECTION(success),
-   *               FAILED(failure)
+   *               FINISH_WITH_ERROR(failure)
    */
   ReceiverState listen();
 

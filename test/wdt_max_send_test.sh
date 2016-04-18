@@ -107,8 +107,14 @@ echo "Done with staging src test files"
 
 #set -e
 
-/usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst -run_as_daemon=true -skip_writes=$SKIP_WRITES > \
-$DIR/server.log 2>&1 &
+# TODO: add a test that will fail if the listening socket is closed in
+# long running mode upon error (to make sure the code doesn't
+# regress/handles that case ok) by adding: but that fails for other reasons
+#             -max_accept_retries=1 -accept_timeout_millis=1 \
+
+/usr/bin/time -f "$SERVER_PROFILE_FORMAT" $WDTCMD -directory $DIR/dst \
+              -run_as_daemon=true -skip_writes=$SKIP_WRITES  \
+                       > $DIR/server.log 2>&1 &
 
 # wait for server to be up
 #while [ `/bin/true | nc $REMOTE 22356; echo $?` -eq 1 ]
