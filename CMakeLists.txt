@@ -310,6 +310,7 @@ if (BUILD_TESTING)
   add_library(wdtbenchtestslib
     bench/WdtGenTestUtils.cpp
   )
+  add_dependencies(wdtbenchtestslib gmock)
   target_link_libraries(wdtbenchtestslib
     "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
     wdtbenchlib
