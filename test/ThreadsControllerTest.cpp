@@ -6,15 +6,15 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/util/ThreadsController.h>
 #include <wdt/test/TestCommon.h>
+#include <wdt/util/ThreadsController.h>
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <chrono>
-#include <vector>
-#include <thread>
 #include <mutex>
+#include <thread>
+#include <vector>
 using namespace std;
 namespace facebook {
 namespace wdt {
@@ -33,7 +33,7 @@ class ThreadUtil {
 
   void threadSleep(int64_t millis) {
     auto waitingTime = chrono::milliseconds(millis);
-    LOG(INFO) << "Sleeping for " << millis << " ms";
+    WLOG(INFO) << "Sleeping for " << millis << " ms";
     unique_lock<mutex> lock(mutex_);
     cv_.wait_for(lock, waitingTime);
   }

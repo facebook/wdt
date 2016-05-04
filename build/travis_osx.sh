@@ -1,9 +1,9 @@
 #! /bin/bash
-
+# Sets up MacOS build environment (for travis but can be used on other mac too)
 set -x
-set -e
+#set -e
 
-date 
+date
 uname -a
 echo $HOSTNAME
 mkdir $HOME/bin || true
@@ -21,13 +21,14 @@ tar xfz $CMAKE_BASE.tar.gz
 which cmake
 cmake --version
 git clone https://github.com/floitsch/double-conversion.git
-(cd double-conversion; cmake -DCMAKE_INSTALL_PREFIX=$HOME .; make -j 4 && make install)
+mkdir double-conversion-build
+(cd double-conversion-build; cmake -DBUILD_SHARED_LIBS=on -DCMAKE_INSTALL_PREFIX=$HOME ../double-conversion; make -j 4 && make install)
 git clone https://github.com/schuhschuh/gflags.git
-(mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -D GFLAGS_NAMESPACE=google -D BUILD_SHARED_LIBS=on .. && make -j 4 && make install)
+(mkdir gflags-build; cd gflags-build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on ../gflags && make -j 4 && make install)
 svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
 ( cd glog && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
-git clone https://github.com/facebook/folly.git 
-pwd ; ls -l  
+git clone https://github.com/facebook/folly.git
+pwd ; ls -l
 cd wdt
 # to avoid svn clone errors of gmock later:
 ( echo p | svn list https://googlemock.googlecode.com ) || true

@@ -16,7 +16,7 @@ ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue &queue,
                                              TransferStats &threadStats,
                                              int32_t port)
     : queue_(queue), threadStats_(threadStats), port_(port) {
-  VLOG(1) << "Making thread history for port " << port_;
+  WVLOG(1) << "Making thread history for port " << port_;
 }
 
 std::string ThreadTransferHistory::getSourceId(int64_t index) {
@@ -26,8 +26,8 @@ std::string ThreadTransferHistory::getSourceId(int64_t index) {
   if (index >= 0 && index < historySize) {
     sourceId = history_[index]->getIdentifier();
   } else {
-    LOG(WARNING) << "Trying to read out of bounds data " << index << " "
-                 << history_.size();
+    WLOG(WARNING) << "Trying to read out of bounds data " << index << " "
+                  << history_.size();
   }
   return sourceId;
 }
@@ -36,8 +36,8 @@ bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (globalCheckpoint_) {
     // already received an error for this thread
-    VLOG(1) << "adding source after global checkpoint is received. returning "
-               "the source to the queue";
+    WVLOG(1) << "adding source after global checkpoint is received. returning "
+                "the source to the queue";
     markSourceAsFailed(source, lastCheckpoint_.get());
     lastCheckpoint_.reset();
     queue_.returnToQueue(source);
@@ -59,8 +59,8 @@ ErrorCode ThreadTransferHistory::setGlobalCheckpoint(
   ErrorCode status = setCheckpointAndReturnToQueue(checkpoint, true);
   while (inUse_) {
     // have to wait, error thread signalled through globalCheckpoint_ flag
-    LOG(INFO) << "Transfer history still in use, waiting, checkpoint "
-              << checkpoint;
+    WLOG(INFO) << "Transfer history still in use, waiting, checkpoint "
+               << checkpoint;
     conditionInUse_.wait(lock);
   }
   return status;
@@ -71,7 +71,7 @@ ErrorCode ThreadTransferHistory::setCheckpointAndReturnToQueue(
   int64_t numReceivedSources = checkpoint.numBlocks;
   int64_t lastBlockReceivedBytes = checkpoint.lastBlockReceivedBytes;
   if (numReceivedSources > historySize) {
-    LOG(ERROR)
+    WLOG(ERROR)
         << "checkpoint is greater than total number of sources transferred "
         << history_.size() << " " << numReceivedSources;
     return INVALID_CHECKPOINT;
@@ -87,8 +87,9 @@ ErrorCode ThreadTransferHistory::setCheckpointAndReturnToQueue(
     if (!globalCheckpoint) {
       // no block to apply checkpoint offset. This can happen if we receive same
       // local checkpoint without adding anything to the history
-      LOG(WARNING) << "Local checkpoint has received bytes for last block, but "
-                      "there are no unacked blocks in the history. Ignoring.";
+      WLOG(WARNING)
+          << "Local checkpoint has received bytes for last block, but "
+             "there are no unacked blocks in the history. Ignoring.";
     }
   }
   numAcknowledged_ = numReceivedSources;
@@ -102,9 +103,9 @@ ErrorCode ThreadTransferHistory::setCheckpointAndReturnToQueue(
     sourcesToReturn.emplace_back(std::move(source));
   }
   queue_.returnToQueue(sourcesToReturn);
-  LOG(INFO) << numFailedSources
-            << " number of sources returned to queue, checkpoint: "
-            << checkpoint;
+  WLOG(INFO) << numFailedSources
+             << " number of sources returned to queue, checkpoint: "
+             << checkpoint;
   return errCode;
 }
 
@@ -139,9 +140,10 @@ ErrorCode ThreadTransferHistory::validateCheckpoint(
     return OK;
   }
   if (checkpoint.numBlocks < lastCheckpoint_->numBlocks) {
-    LOG(ERROR) << "Current checkpoint must be higher than previous checkpoint, "
-                  "Last checkpoint: "
-               << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+    WLOG(ERROR)
+        << "Current checkpoint must be higher than previous checkpoint, "
+           "Last checkpoint: "
+        << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
     return INVALID_CHECKPOINT;
   }
   if (checkpoint.numBlocks > lastCheckpoint_->numBlocks) {
@@ -154,9 +156,9 @@ ErrorCode ThreadTransferHistory::validateCheckpoint(
     // same block
     if (checkpoint.lastBlockReceivedBytes !=
         lastCheckpoint_->lastBlockReceivedBytes) {
-      LOG(ERROR) << "Current checkpoint has different received bytes, but all "
-                    "other fields are same, Last checkpoint "
-                 << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+      WLOG(ERROR) << "Current checkpoint has different received bytes, but all "
+                     "other fields are same, Last checkpoint "
+                  << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
       return INVALID_CHECKPOINT;
     }
     noProgress = true;
@@ -170,8 +172,8 @@ ErrorCode ThreadTransferHistory::validateCheckpoint(
   if (noProgress && !globalCheckpoint) {
     // we can get same global checkpoint multiple times, so no need to check for
     // progress
-    LOG(WARNING) << "No progress since last checkpoint, Last checkpoint: "
-                 << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
+    WLOG(WARNING) << "No progress since last checkpoint, Last checkpoint: "
+                  << *lastCheckpoint_ << ", Current checkpoint: " << checkpoint;
     return NO_PROGRESS;
   }
   return OK;
@@ -187,7 +189,7 @@ void ThreadTransferHistory::markSourceAsFailed(
           (checkpoint->lastBlockOffset == source->getOffset())) {
         validCheckpoint = true;
       } else {
-        LOG(WARNING)
+        WLOG(WARNING)
             << "Checkpoint block does not match history block. Checkpoint: "
             << checkpoint->lastBlockSeqId << ", " << checkpoint->lastBlockOffset
             << " History: " << metadata.seqId << ", " << source->getOffset();
@@ -249,7 +251,7 @@ ThreadTransferHistory &TransferHistoryController::getTransferHistory(
 
 void TransferHistoryController::addThreadHistory(int32_t port,
                                                  TransferStats &threadStats) {
-  VLOG(1) << "Adding the history for " << port;
+  WVLOG(1) << "Adding the history for " << port;
   threadHistoriesMap_.emplace(port, folly::make_unique<ThreadTransferHistory>(
                                         dirQueue_, threadStats, port));
 }
@@ -258,9 +260,10 @@ ErrorCode TransferHistoryController::handleVersionMismatch() {
   for (auto &historyPair : threadHistoriesMap_) {
     auto &history = historyPair.second;
     if (history->getNumAcked() > 0) {
-      LOG(ERROR) << "Even though the transfer aborted due to VERSION_MISMATCH, "
-                    "some blocks got acked by the receiver, port "
-                 << historyPair.first << " numAcked " << history->getNumAcked();
+      WLOG(ERROR)
+          << "Even though the transfer aborted due to VERSION_MISMATCH, "
+             "some blocks got acked by the receiver, port "
+          << historyPair.first << " numAcked " << history->getNumAcked();
       return ERROR;
     }
     history->returnUnackedSourcesToQueue();
@@ -273,11 +276,11 @@ void TransferHistoryController::handleGlobalCheckpoint(
   auto errPort = checkpoint.port;
   auto it = threadHistoriesMap_.find(errPort);
   if (it == threadHistoriesMap_.end()) {
-    LOG(ERROR) << "Invalid checkpoint " << checkpoint
-               << ". No sender thread running on port " << errPort;
+    WLOG(ERROR) << "Invalid checkpoint " << checkpoint
+                << ". No sender thread running on port " << errPort;
     return;
   }
-  VLOG(1) << "received global checkpoint " << checkpoint;
+  WVLOG(1) << "received global checkpoint " << checkpoint;
   it->second->setGlobalCheckpoint(checkpoint);
 }
 }

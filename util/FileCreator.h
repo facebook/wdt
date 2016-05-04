@@ -8,18 +8,18 @@
  */
 #pragma once
 
-#include <wdt/WdtConfig.h>
 #include <wdt/Protocol.h>
-#include <wdt/util/TransferLogManager.h>
+#include <wdt/WdtConfig.h>
 #include <wdt/util/CommonImpl.h>
+#include <wdt/util/TransferLogManager.h>
 
+#include <folly/SpinLock.h>
 #include <glog/logging.h>
+#include <condition_variable>
+#include <map>
 #include <mutex>
 #include <string>
 #include <unordered_set>
-#include <folly/SpinLock.h>
-#include <map>
-#include <condition_variable>
 
 namespace facebook {
 namespace wdt {

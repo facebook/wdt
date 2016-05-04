@@ -13,21 +13,22 @@
 
 #include <wdt/util/ClientSocket.h>
 
+#include <folly/Bits.h>
+#include <folly/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
-#include <folly/String.h>
-#include <folly/Bits.h>
 #include <folly/ScopeGuard.h>
+#include <folly/String.h>
 #include <sys/stat.h>
-#include <folly/Checksum.h>
 
 namespace facebook {
 namespace wdt {
 
 void Sender::endCurTransfer() {
   endTime_ = Clock::now();
-  LOG(INFO) << "Last thread finished " << durationSeconds(endTime_ - startTime_)
-            << " for transfer id " << getTransferId();
+  WLOG(INFO) << "Last thread finished "
+             << durationSeconds(endTime_ - startTime_) << " for transfer id "
+             << getTransferId();
   setTransferStatus(FINISHED);
   if (throttler_) {
     throttler_->deRegisterTransfer();
@@ -38,13 +39,13 @@ void Sender::startNewTransfer() {
   if (throttler_) {
     throttler_->registerTransfer();
   }
-  LOG(INFO) << "Starting a new transfer " << getTransferId() << " to "
-            << destHost_;
+  WLOG(INFO) << "Starting a new transfer " << getTransferId() << " to "
+             << destHost_;
 }
 
 Sender::Sender(const std::string &destHost, const std::string &srcDir)
     : queueAbortChecker_(this), destHost_(destHost) {
-  LOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
+  WLOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   srcDir_ = srcDir;
   int port = options_.start_port;
   int numSockets = options_.num_ports;
@@ -53,7 +54,7 @@ Sender::Sender(const std::string &destHost, const std::string &srcDir)
   }
   dirQueue_.reset(
       new DirectorySourceQueue(options_, srcDir_, &queueAbortChecker_));
-  VLOG(3) << "Configuring the  directory queue";
+  WVLOG(3) << "Configuring the  directory queue";
   dirQueue_->setIncludePattern(options_.include_regex);
   dirQueue_->setExcludePattern(options_.exclude_regex);
   dirQueue_->setPruneDirPattern(options_.prune_dir_regex);
@@ -72,7 +73,7 @@ Sender::Sender(const WdtTransferRequest &transferRequest)
              transferRequest.disableDirectoryTraversal) {
   transferRequest_ = transferRequest;
   if (getTransferId().empty()) {
-    LOG(WARNING) << "Sender without transferId... will likely fail to connect";
+    WLOG(WARNING) << "Sender without transferId... will likely fail to connect";
   }
   // TODO: use transferRequest_
   setProtocolVersion(transferRequest.protocolVersion);
@@ -99,8 +100,8 @@ ErrorCode Sender::validateTransferRequest() {
   // If the request is still valid check for other
   // sender specific validations
   if (code == OK && transferRequest_.hostName.empty()) {
-    LOG(ERROR) << "Transfer request validation failed for wdt sender "
-               << transferRequest_.getLogSafeString();
+    WLOG(ERROR) << "Transfer request validation failed for wdt sender "
+                << transferRequest_.getLogSafeString();
     code = INVALID_REQUEST;
   }
   transferRequest_.errorCode = code;
@@ -108,11 +109,11 @@ ErrorCode Sender::validateTransferRequest() {
 }
 
 const WdtTransferRequest &Sender::init() {
-  VLOG(1) << "Sender Init() with encryption set = "
-          << transferRequest_.encryptionData.isSet();
+  WVLOG(1) << "Sender Init() with encryption set = "
+           << transferRequest_.encryptionData.isSet();
   if (validateTransferRequest() != OK) {
-    LOG(ERROR) << "Couldn't validate the transfer request "
-               << transferRequest_.getLogSafeString();
+    WLOG(ERROR) << "Couldn't validate the transfer request "
+                << transferRequest_.getLogSafeString();
     return transferRequest_;
   }
   // TODO cleanup / most not necessary / duplicate state
@@ -124,14 +125,14 @@ const WdtTransferRequest &Sender::init() {
   transferRequest_.errorCode = OK;
 
   bool encrypt = transferRequest_.encryptionData.isSet();
-  LOG_IF(INFO, encrypt) << "Encryption is enabled for this transfer";
+  WLOG_IF(INFO, encrypt) << "Encryption is enabled for this transfer";
   return transferRequest_;
 }
 
 Sender::~Sender() {
   TransferStatus status = getTransferStatus();
   if (status == ONGOING) {
-    LOG(WARNING) << "Sender being deleted. Forcefully aborting the transfer";
+    WLOG(WARNING) << "Sender being deleted. Forcefully aborting the transfer";
     abort(ABORTED_BY_APPLICATION);
   }
   finish();
@@ -196,7 +197,7 @@ void Sender::setFileChunksInfo(
     std::vector<FileChunksInfo> &fileChunksInfoList) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (fileChunksReceived_) {
-    LOG(WARNING) << "File chunks list received multiple times";
+    WLOG(WARNING) << "File chunks list received multiple times";
     return;
   }
   dirQueue_->setPreviouslyReceivedChunks(fileChunksInfoList);
@@ -217,7 +218,7 @@ std::unique_ptr<TransferReport> Sender::getTransferReport() {
   TransferStatus status = getTransferStatus();
   ErrorCode errCode = transferReport->getSummary().getErrorCode();
   if (status == NOT_STARTED && errCode == OK) {
-    LOG(INFO) << "Transfer not started, setting the error code to ERROR";
+    WLOG(INFO) << "Transfer not started, setting the error code to ERROR";
     transferReport->setErrorCode(ERROR);
   }
   return transferReport;
@@ -237,16 +238,16 @@ TransferStats Sender::getGlobalTransferStats() const {
 
 std::unique_ptr<TransferReport> Sender::finish() {
   std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
-  VLOG(1) << "Sender::finish()";
+  WVLOG(1) << "Sender::finish()";
   TransferStatus status = getTransferStatus();
   if (status == NOT_STARTED) {
-    LOG(WARNING) << "Even though transfer has not started, finish is called";
+    WLOG(WARNING) << "Even though transfer has not started, finish is called";
     // getTransferReport will set the error code to ERROR
     return getTransferReport();
   }
   if (status == THREADS_JOINED) {
-    VLOG(1) << "Threads have already been joined. Returning the"
-            << " existing transfer report";
+    WVLOG(1) << "Threads have already been joined. Returning the"
+             << " existing transfer report";
     return getTransferReport();
   }
   const bool twoPhases = options_.two_phases;
@@ -314,14 +315,14 @@ std::unique_ptr<TransferReport> Sender::finish() {
 
   double directoryTime;
   directoryTime = dirQueue_->getDirectoryTime();
-  LOG(INFO) << "Total sender time = " << totalTime << " seconds ("
-            << directoryTime << " dirTime)"
-            << ". Transfer summary : " << *transferReport
-            << "\nTotal sender throughput = "
-            << transferReport->getThroughputMBps() << " Mbytes/sec ("
-            << transferReport->getSummary().getEffectiveTotalBytes() /
-                   (totalTime - directoryTime) / kMbToB
-            << " Mbytes/sec pure transfer rate)";
+  WLOG(INFO) << "Total sender time = " << totalTime << " seconds ("
+             << directoryTime << " dirTime)"
+             << ". Transfer summary : " << *transferReport << "\n"
+             << WDT_LOG_PREFIX << "Total sender throughput = "
+             << transferReport->getThroughputMBps() << " Mbytes/sec ("
+             << transferReport->getSummary().getEffectiveTotalBytes() /
+                    (totalTime - directoryTime) / kMbToB
+             << " Mbytes/sec pure transfer rate)";
   return transferReport;
 }
 
@@ -338,26 +339,26 @@ ErrorCode Sender::start() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (transferStatus_ != NOT_STARTED) {
-      LOG(ERROR) << "duplicate start() call detected " << transferStatus_;
+      WLOG(ERROR) << "duplicate start() call detected " << transferStatus_;
       return ALREADY_EXISTS;
     }
     transferStatus_ = ONGOING;
   }
   checkAndUpdateBufferSize();
   const bool twoPhases = options_.two_phases;
-  LOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
-            << transferRequest_.ports << "]";
+  WLOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
+             << transferRequest_.ports << "]";
   startTime_ = Clock::now();
   downloadResumptionEnabled_ = options_.enable_download_resumption;
   if (!progressReporter_) {
-    VLOG(1) << "No progress reporter provided, making a default one";
+    WVLOG(1) << "No progress reporter provided, making a default one";
     progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
   }
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
   if (throttler_) {
-    LOG(INFO) << "Skipping throttler setup. External throttler set."
-              << "Throttler details : " << *throttler_;
+    WLOG(INFO) << "Skipping throttler setup. External throttler set."
+               << "Throttler details : " << *throttler_;
   } else {
     configureThrottler();
   }
@@ -372,9 +373,9 @@ ErrorCode Sender::start() {
     if (protocolVersion_ >= Protocol::DELETE_CMD_VERSION) {
       dirQueue_->enableFileDeletion();
     } else {
-      LOG(WARNING) << "Turning off extra file deletion on the receiver side "
-                      "because of protocol version "
-                   << protocolVersion_;
+      WLOG(WARNING) << "Turning off extra file deletion on the receiver side "
+                       "because of protocol version "
+                    << protocolVersion_;
     }
   }
   dirThread_ = dirQueue_->buildQueueAsynchronously();
@@ -449,8 +450,8 @@ void Sender::reportProgress() {
   double currentThroughput = 0;
 
   auto waitingTime = std::chrono::milliseconds(progressReportIntervalMillis_);
-  LOG(INFO) << "Progress reporter tracking every "
-            << progressReportIntervalMillis_ << " ms";
+  WLOG(INFO) << "Progress reporter tracking every "
+             << progressReportIntervalMillis_ << " ms";
   while (true) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
@@ -494,7 +495,7 @@ void Sender::logPerfStats() const {
     report += senderThread->getPerfReport();
   }
   report += dirQueue_->getPerfReport();
-  LOG(INFO) << report;
+  WLOG(INFO) << report;
 }
 }
 }  // namespace facebook::wdt

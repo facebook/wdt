@@ -59,18 +59,18 @@ string WdtUri::generateUrl() const {
 
 ErrorCode WdtUri::process(const string& url) {
   if (url.size() < WDT_URL_PREFIX.size()) {
-    LOG(ERROR) << "Url doesn't specify wdt protocol";
+    WLOG(ERROR) << "Url doesn't specify wdt protocol";
     return URI_PARSE_ERROR;
   }
   StringPiece urlPiece(url, 0, WDT_URL_PREFIX.size());
   StringPiece wdtPrefix(WDT_URL_PREFIX);
   if (urlPiece != wdtPrefix) {
-    LOG(ERROR) << "Url does not specify wdt protocol " << url;
+    WLOG(ERROR) << "Url does not specify wdt protocol " << url;
     return URI_PARSE_ERROR;
   }
   urlPiece = StringPiece(url, WDT_URL_PREFIX.size());
   if (urlPiece.empty()) {
-    LOG(ERROR) << "Empty host name " << url;
+    WLOG(ERROR) << "Empty host name " << url;
     return URI_PARSE_ERROR;
   }
   ErrorCode status = OK;
@@ -79,7 +79,7 @@ ErrorCode WdtUri::process(const string& url) {
     urlPiece.advance(1);
     size_t hostNameEnd = urlPiece.find(']');
     if (hostNameEnd == string::npos) {
-      LOG(ERROR) << "Didn't find ] for ipv6 address " << url;
+      WLOG(ERROR) << "Didn't find ] for ipv6 address " << url;
       return URI_PARSE_ERROR;
     }
     hostName_.assign(urlPiece.data(), 0, hostNameEnd);
@@ -100,7 +100,7 @@ ErrorCode WdtUri::process(const string& url) {
 
   if (hostName_.empty()) {
     status = URI_PARSE_ERROR;
-    LOG(ERROR) << "Empty hostname " << url;
+    WLOG(ERROR) << "Empty hostname " << url;
   }
 
   if (urlPiece.empty()) {
@@ -119,7 +119,7 @@ ErrorCode WdtUri::process(const string& url) {
       portStr.assign(urlPiece.data(), 0, paramsIndex);
       port_ = folly::to<int32_t>(portStr);
     } catch (std::exception& e) {
-      LOG(ERROR) << "Invalid port, can't be parsed " << url;
+      WLOG(ERROR) << "Invalid port, can't be parsed " << url;
       status = URI_PARSE_ERROR;
     }
     urlPiece.advance(paramsIndex);
@@ -130,7 +130,7 @@ ErrorCode WdtUri::process(const string& url) {
   }
 
   if (urlPiece[0] != '?') {
-    LOG(ERROR) << "Unexpected delimiter for params " << urlPiece[0];
+    WLOG(ERROR) << "Unexpected delimiter for params " << urlPiece[0];
     return URI_PARSE_ERROR;
   }
   urlPiece.advance(1);
@@ -146,7 +146,7 @@ ErrorCode WdtUri::process(const string& url) {
     StringPiece value = keyValuePair;
     if (key.empty()) {
       // Value can be empty but key can't be empty
-      LOG(ERROR) << "Errors parsing params, url = " << url;
+      WLOG(ERROR) << "Errors parsing params, url = " << url;
       status = URI_PARSE_ERROR;
       break;
     }
@@ -166,7 +166,7 @@ int32_t WdtUri::getPort() const {
 string WdtUri::getQueryParam(const string& key) const {
   auto it = queryParams_.find(key);
   if (it == queryParams_.end()) {
-    VLOG(1) << "Couldn't find query param " << key;
+    WVLOG(1) << "Couldn't find query param " << key;
     return "";
   }
   return it->second;
@@ -229,21 +229,21 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   if (!encStr.empty()) {
     ErrorCode code = EncryptionParams::unserialize(encStr, encryptionData);
     if (code != OK) {
-      LOG(ERROR) << "Unable to parse encryption data from \"" << encStr << "\" "
-                 << errorCodeToStr(code);
+      WLOG(ERROR) << "Unable to parse encryption data from \"" << encStr
+                  << "\" " << errorCodeToStr(code);
       errorCode = getMoreInterestingError(code, errorCode);
     }
   }
   const string recpv = wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM);
   if (recpv.empty()) {
-    LOG(WARNING) << RECEIVER_PROTOCOL_VERSION_PARAM << " not specified in URI";
+    WLOG(WARNING) << RECEIVER_PROTOCOL_VERSION_PARAM << " not specified in URI";
   } else {
     try {
       protocolVersion = folly::to<int64_t>(recpv);
     } catch (std::exception& e) {
-      LOG(ERROR) << "Error parsing protocol version "
-                 << wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM) << " "
-                 << e.what();
+      WLOG(ERROR) << "Error parsing protocol version "
+                  << wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM)
+                  << " " << e.what();
       errorCode = URI_PARSE_ERROR;
     }
   }
@@ -257,7 +257,8 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
         port = folly::to<int32_t>(portNum);
         ports.push_back(port);
       } catch (std::exception& e) {
-        LOG(ERROR) << "Couldn't convert " << portNum << " to valid port number";
+        WLOG(ERROR) << "Couldn't convert " << portNum
+                    << " to valid port number";
         errorCode = URI_PARSE_ERROR;
       }
     }
@@ -272,26 +273,26 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   int32_t startPort = wdtUri.getPort();
   if (startPort <= 0) {
     if (startPortStr.empty()) {
-      LOG(ERROR) << "URI should have port or " << START_PORT_PARAM;
+      WLOG(ERROR) << "URI should have port or " << START_PORT_PARAM;
       errorCode = INVALID_REQUEST;
     } else {
       try {
         startPort = folly::to<int32_t>(startPortStr);
       } catch (std::exception& e) {
-        LOG(ERROR) << "Couldn't convert start port " << startPortStr;
+        WLOG(ERROR) << "Couldn't convert start port " << startPortStr;
         errorCode = URI_PARSE_ERROR;
       }
     }
   }
   int32_t numPorts = 0;
   if (numPortsStr.empty()) {
-    LOG(ERROR) << "URI should have " << NUM_PORTS_PARAM;
+    WLOG(ERROR) << "URI should have " << NUM_PORTS_PARAM;
     errorCode = INVALID_REQUEST;
   } else {
     try {
       numPorts = folly::to<int32_t>(numPortsStr);
     } catch (std::exception& e) {
-      LOG(ERROR) << "Couldn't convert num ports " << numPortsStr;
+      WLOG(ERROR) << "Couldn't convert num ports " << numPortsStr;
       errorCode = URI_PARSE_ERROR;
     }
   }
@@ -313,7 +314,7 @@ string WdtTransferRequest::generateUrlInternal(bool genFull,
                                                bool forLogging) const {
   if (errorCode != OK) {
     const string msg = errorCodeToStr(errorCode);
-    LOG(ERROR) << "Transfer request has " << msg;
+    WLOG(ERROR) << "Transfer request has " << msg;
     return msg;
   }
   WdtUri wdtUri;
@@ -326,7 +327,7 @@ string WdtTransferRequest::generateUrlInternal(bool genFull,
     wdtUri.setQueryParam(DIRECTORY_PARAM, directory);
   }
   if (encryptionData.isSet()) {
-    VLOG(1) << "Encryption data is set " << encryptionData.getLogSafeString();
+    WVLOG(1) << "Encryption data is set " << encryptionData.getLogSafeString();
     wdtUri.setQueryParam(ENCRYPTION_PARAM,
                          forLogging ? encryptionData.getLogSafeString()
                                     : encryptionData.getUrlSafeString());

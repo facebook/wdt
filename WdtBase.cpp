@@ -35,7 +35,7 @@ void WdtBase::abort(const ErrorCode abortCode) {
     // anything other than OK, we should not override it
     return;
   }
-  LOG(WARNING) << "Setting the abort code " << abortCode;
+  WLOG(WARNING) << "Setting the abort code " << abortCode;
   abortCode_ = abortCode;
 }
 
@@ -45,7 +45,7 @@ void WdtBase::clearAbort() {
     // We do no clear abort code unless it is VERSION_MISMATCH
     return;
   }
-  LOG(WARNING) << "Clearing the abort code";
+  WLOG(WARNING) << "Clearing the abort code";
   abortCode_ = OK;
 }
 
@@ -69,7 +69,7 @@ void WdtBase::setProgressReporter(
 }
 
 void WdtBase::setThrottler(std::shared_ptr<Throttler> throttler) {
-  VLOG(2) << "Setting an external throttler";
+  WVLOG(2) << "Setting an external throttler";
   throttler_ = throttler;
 }
 
@@ -79,18 +79,18 @@ std::shared_ptr<Throttler> WdtBase::getThrottler() const {
 
 void WdtBase::setTransferId(const std::string& transferId) {
   transferRequest_.transferId = transferId;
-  LOG(INFO) << "Setting transfer id " << transferId;
+  WLOG(INFO) << "Setting transfer id " << transferId;
 }
 
 void WdtBase::setProtocolVersion(int64_t protocol) {
   WDT_CHECK(protocol > 0) << "Protocol version can't be <= 0 " << protocol;
   int negotiatedPv = Protocol::negotiateProtocol(protocol);
   if (negotiatedPv != protocol) {
-    LOG(WARNING) << "Negotiated protocol version " << protocol << " -> "
-                 << negotiatedPv;
+    WLOG(WARNING) << "Negotiated protocol version " << protocol << " -> "
+                  << negotiatedPv;
   }
   protocolVersion_ = negotiatedPv;
-  LOG(INFO) << "using wdt protocol version " << protocolVersion_;
+  WLOG(INFO) << "using wdt protocol version " << protocolVersion_;
 }
 
 int WdtBase::getProtocolVersion() const {
@@ -105,16 +105,16 @@ void WdtBase::checkAndUpdateBufferSize() {
   int64_t bufSize = options_.buffer_size;
   if (bufSize < Protocol::kMaxHeader) {
     bufSize = Protocol::kMaxHeader;
-    LOG(WARNING) << "Specified buffer size " << options_.buffer_size
-                 << " less than " << Protocol::kMaxHeader << ", using "
-                 << bufSize;
+    WLOG(WARNING) << "Specified buffer size " << options_.buffer_size
+                  << " less than " << Protocol::kMaxHeader << ", using "
+                  << bufSize;
   }
   if (bufSize % kDiskBlockSize != 0) {
     int64_t alignedBufSize =
         ((bufSize + kDiskBlockSize - 1) / kDiskBlockSize) * kDiskBlockSize;
-    LOG(WARNING) << "Buffer size " << bufSize
-                 << " not divisible by disk block size " << kDiskBlockSize
-                 << ", changing it to " << alignedBufSize;
+    WLOG(WARNING) << "Buffer size " << bufSize
+                  << " not divisible by disk block size " << kDiskBlockSize
+                  << ", changing it to " << alignedBufSize;
     bufSize = alignedBufSize;
   }
   options_.buffer_size = bufSize;
@@ -128,15 +128,15 @@ WdtBase::TransferStatus WdtBase::getTransferStatus() {
 ErrorCode WdtBase::validateTransferRequest() {
   ErrorCode code = transferRequest_.errorCode;
   if (code != OK) {
-    LOG(ERROR) << "WDT object initiated with erroneous transfer request "
-               << transferRequest_.getLogSafeString();
+    WLOG(ERROR) << "WDT object initiated with erroneous transfer request "
+                << transferRequest_.getLogSafeString();
     return code;
   }
   if (transferRequest_.directory.empty() ||
       (transferRequest_.protocolVersion < 0) ||
       transferRequest_.ports.empty()) {
-    LOG(ERROR) << "Transfer request validation failed for wdt object "
-               << transferRequest_.getLogSafeString();
+    WLOG(ERROR) << "Transfer request validation failed for wdt object "
+                << transferRequest_.getLogSafeString();
     code = INVALID_REQUEST;
     transferRequest_.errorCode = code;
   }
@@ -158,12 +158,12 @@ bool WdtBase::isStale() {
 
 void WdtBase::configureThrottler() {
   WDT_CHECK(!throttler_);
-  VLOG(1) << "Configuring throttler options";
+  WVLOG(1) << "Configuring throttler options";
   throttler_ = Throttler::makeThrottler(options_);
   if (throttler_) {
-    LOG(INFO) << "Enabling throttling " << *throttler_;
+    WLOG(INFO) << "Enabling throttling " << *throttler_;
   } else {
-    LOG(INFO) << "Throttling not enabled";
+    WLOG(INFO) << "Throttling not enabled";
   }
 }
 
@@ -175,7 +175,7 @@ string WdtBase::generateTransferId() {
     std::lock_guard<std::mutex> lock(mutex);
     transferId = to_string(randomEngine());
   }
-  VLOG(1) << "Generated a transfer id " << transferId;
+  WVLOG(1) << "Generated a transfer id " << transferId;
   return transferId;
 }
 }

@@ -12,10 +12,10 @@
 #include <wdt/util/EncryptionUtils.h>
 
 #include <folly/Range.h>
+#include <limits.h>
 #include <stddef.h>
 #include <string>
 #include <vector>
-#include <limits.h>
 
 namespace facebook {
 namespace wdt {

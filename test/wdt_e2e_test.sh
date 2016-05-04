@@ -46,6 +46,7 @@ The possible options to this script are
 echo "Run from ~/fbcode - or fbmake runtests"
 
 source `dirname "$0"`/common_functions.sh
+setBinaries
 
 # Set DO_VERIFY:
 # to 1 : slow/expensive but checks correctness
@@ -94,7 +95,7 @@ WDTBIN_OPTS="-minloglevel=0 -sleep_millis 1 -max_retries 999 -full_reporting "\
 "-num_ports=$threads -throttler_log_time_millis=200 "\
 "-transfer_id=$$"
 extendWdtOptions
-WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
+WDTBIN="$WDT_BINARY $WDTBIN_OPTS"
 
 BASEDIR=/dev/shm/wdtTest_$USER
 #BASEDIR=/data/wdt/tmpWDT
@@ -126,15 +127,14 @@ done
 
 #for size in 1k 64K 512K 1M 16M 256M 512M 1G
 #for size in 512K 1M 16M 256M 512M 1G
-for size in 1k 64K 512K 1M 16M 256M
+# In Mbytes
+for size in .0009765625 .0625 0.5 1 16 256
 do
     base=inp$size
-    echo dd if=/dev/... of=$DIR/src/$base.1 bs=$size count=1
-#    dd if=/dev/urandom of=$DIR/src/$base.1 bs=$size count=1
-    dd if=/dev/zero of=$DIR/src/$base.1 bs=$size count=1
-    for i in {2..8}
+    for i in {1..8}
     do
-        cp $DIR/src/$base.1 $DIR/src/$base.$i
+      $WDT_GEN_FILES -stats_source="$WDT_GEN_BIGRAMS" \
+        -directory="$DIR/src" -filename="$base.$i" -gen_size_mb="$size"
     done
 done
 fallocate -l 3G $DIR/src/file_big

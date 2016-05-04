@@ -20,9 +20,9 @@
 cmake_minimum_required(VERSION 3.2)
 
 # There is no C per se in WDT but if you use CXX only here many checks fail
-# Version is Major.Minor.YYMMDDX for up to 10 releases per day
+# Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.26.1603020)
+project("WDT" LANGUAGES C CXX VERSION 1.26.1605030)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -99,10 +99,13 @@ WdtBase.cpp
 WdtResourceController.cpp
 util/CommonImpl.cpp
 )
-add_library(wdt
+# Source files that depend on gflags and provide flags -> options init
+set (WDT_FLAGS_RELATED_SRC
 util/WdtFlags.cpp
 Wdt.cpp
 )
+add_library(wdt ${WDT_FLAGS_RELATED_SRC})
+
 target_link_libraries(wdt wdt_min)
 
 
@@ -115,6 +118,10 @@ include_directories(${Boost_INCLUDE_DIRS})
 # We use std:: threads
 find_package(Threads) # this will set ${CMAKE_THREAD_LIBS_INIT} (ie pthreads)
 
+
+# double-conversion
+find_path(DOUBLECONV_INCLUDE_DIR double-conversion/double-conversion.h)
+find_library(DOUBLECONV_LIBRARY double-conversion)
 # Glog
 find_path(GLOG_INCLUDE_DIR glog/logging.h)
 find_library(GLOG_LIBRARY glog)
@@ -131,6 +138,7 @@ target_link_libraries(wdt_min
   ${GLOG_LIBRARY}
   ${GFLAGS_LIBRARY}
   ${Boost_LIBRARIES}
+  ${DOUBLECONV_LIBRARY}
   ${OPENSSL_CRYPTO_LIBRARY}
   ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
 )
@@ -148,6 +156,7 @@ check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
 check_function_exists(posix_fadvise HAS_POSIX_FADVISE)
 # C based check (which fail with the c++ setting thereafter...)
 check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
+check_function_exists(memrchr FOLLY_HAVE_MEMRCHR)
 set(SAVE_CMRL ${CMAKE_REQUIRED_LIBRARIES}) #globals are evil/ugly
 set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 check_function_exists(pthread_atfork FOLLY_HAVE_PTHREAD_ATFORK)
@@ -160,7 +169,7 @@ set(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
 check_include_file_cxx(malloc.h FOLLY_HAVE_MALLOC_H)
 check_include_file_cxx(features.h FOLLY_HAVE_FEATURES_H)
 check_include_file_cxx(bits/c++config.h FOLLY_HAVE_BITS_CXXCONFIG_H)
-check_include_file_cxx(bits/functexcept.h FOLLY_HAVE_BITS_FUNCTEXCEPT)
+check_include_file_cxx(bits/functexcept.h FOLLY_HAVE_BITS_FUNCTEXCEPT_H)
 check_include_file_cxx(linux/sockios.h WDT_HAS_SOCKIOS_H)
 #check_function_exists(clock_gettime FOLLY_HAVE_CLOCK_GETTIME)
 check_cxx_source_compiles("#include <type_traits>
@@ -185,23 +194,24 @@ if (NOT FOLLY_HAVE_WEAK_SYMBOLS)
   message(STATUS "no weak symbols, adding MallocImpl to folly src")
 endif()
 # For missing __throw_logic_error:
-if (NOT FOLLY_HAVE_BITS_FUNCTEXCEPT)
+if (NOT FOLLY_HAVE_BITS_FUNCTEXCEPT_H)
   list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/detail/FunctionalExcept.cpp")
   message(STATUS "no bits/functexcept.h, adding FunctionalExcept to folly src")
 endif()
 
 add_library(folly4wdt ${FOLLY_CPP_SRC})
-target_link_libraries(folly4wdt ${GLOG_LIBRARY})
+target_link_libraries(folly4wdt ${GLOG_LIBRARY} ${DOUBLECONV_LIBRARY})
 
 # Order is important - inside fb we want the above
 # folly-config.h to be picked up instead of the fbcode one
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${FOLLY_SOURCE_DIR})
+include_directories(${DOUBLECONV_INCLUDE_DIR})
 include_directories(${GLOG_INCLUDE_DIR})
 include_directories(${GFLAGS_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-add_executable(wdtbin wdtCmdLine.cpp util/WdtFlags.cpp Wdt.cpp)
+add_executable(wdtbin wdtCmdLine.cpp ${WDT_FLAGS_RELATED_SRC})
 set_target_properties(wdtbin PROPERTIES COMPILE_DEFINITIONS "STANDALONE_APP")
 
 target_link_libraries(wdtbin wdt_min)
@@ -280,11 +290,48 @@ if (BUILD_TESTING)
   )
 
   add_library(wdt4tests
-    util/WdtFlags.cpp
+    ${WDT_FLAGS_RELATED_SRC}
   )
   target_link_libraries(wdt4tests wdt4tests_min)
 
   # TODO: make a macro/function to add tests in 1 line instead of 3
+
+
+  # WDT testing/benchmarking code
+  add_library(wdtbenchlib
+    bench/Bigram.cpp
+  )
+
+  target_link_libraries(wdtbenchlib
+    ${GLOG_LIBRARY}
+    ${GFLAGS_LIBRARY}
+  )
+
+  add_library(wdtbenchtestslib
+    bench/WdtGenTestUtils.cpp
+  )
+  add_dependencies(wdtbenchtestslib gmock)
+  target_link_libraries(wdtbenchtestslib
+    "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
+    wdtbenchlib
+    ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
+  )
+
+  add_executable(wdt_gen_files bench/wdtGenFiles.cpp)
+  target_link_libraries(wdt_gen_files wdtbenchlib
+    ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
+  )
+  set_target_properties(wdt_gen_files PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "_bin/wdt/bench/")
+
+  add_executable(wdt_gen_stats bench/wdtStats.cpp)
+  target_link_libraries(wdt_gen_stats wdtbenchlib)
+
+  add_executable(wdt_gen_test bench/wdtGenTest.cpp)
+  target_link_libraries(wdt_gen_test wdtbenchtestslib)
+  add_test(NAME AllTestsInGenTest COMMAND wdt_gen_test)
+
+  # Regular tests
 
   add_executable(protocol_test test/ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
@@ -314,9 +361,12 @@ if (BUILD_TESTING)
   target_link_libraries(option_type_test_long_flags wdt4tests)
 
   add_executable(option_type_test_short_flags test/OptionTypeTest.cpp
-                                              util/WdtFlags.cpp)
+                                              ${WDT_FLAGS_RELATED_SRC}
+                                              )
   set_target_properties(option_type_test_short_flags PROPERTIES
-    COMPILE_DEFINITIONS "STANDALONE_APP")
+    COMPILE_DEFINITIONS "STANDALONE_APP"
+    RUNTIME_OUTPUT_DIRECTORY "_bin/wdt/short_flags/")
+
   target_link_libraries(option_type_test_short_flags wdt4tests_min)
 
   add_test(NAME WdtRandGenTest COMMAND

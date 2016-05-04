@@ -6,12 +6,12 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <stdlib.h>
 #include <glog/logging.h>
+#include <stdlib.h>
 #include <sys/socket.h>
-#include <thread>
 #include <wdt/WdtOptions.h>
 #include <wdt/test/TestCommon.h>
+#include <thread>
 
 namespace facebook {
 namespace wdt {
@@ -33,7 +33,7 @@ void simulateNetworkError() {
     if (shutdown(fd, SHUT_WR) < 0) {
       PLOG(WARNING) << "socket shutdown failed for fd " << fd;
     } else {
-      LOG(INFO) << "successfully shut down socket for fd " << fd;
+      WLOG(INFO) << "successfully shut down socket for fd " << fd;
     }
   }
 }

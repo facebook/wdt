@@ -11,13 +11,13 @@
 #include <wdt/Protocol.h>
 #include <wdt/WdtOptions.h>
 
-#include <string>
-#include <set>
 #include <condition_variable>
-#include <mutex>
-#include <thread>
 #include <iostream>
 #include <map>
+#include <mutex>
+#include <set>
+#include <string>
+#include <thread>
 
 namespace facebook {
 namespace wdt {
@@ -110,7 +110,7 @@ class LogEncoderDecoder {
  */
 class TransferLogManager {
  public:
-  const static int LOG_VERSION;
+  const static int WLOG_VERSION;
 
   enum EntryType {
     HEADER,                  // log header

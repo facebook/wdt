@@ -6,18 +6,18 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/Wdt.h>
 #include <wdt/Receiver.h>
+#include <wdt/Wdt.h>
 #include <wdt/WdtResourceController.h>
 
-#include <chrono>
-#include <future>
 #include <folly/String.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <iostream>
-#include <fstream>
 #include <signal.h>
+#include <chrono>
+#include <fstream>
+#include <future>
+#include <iostream>
 #include <thread>
 
 // Used in fbonly to add socket creator setup
@@ -101,19 +101,19 @@ std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
   if (abortSeconds <= 0) {
     return nullptr;
   }
-  LOG(INFO) << "Setting up abort " << abortSeconds << " seconds.";
+  WLOG(INFO) << "Setting up abort " << abortSeconds << " seconds.";
   static std::atomic<bool> abortTrigger{false};
   auto res = std::make_shared<WdtAbortChecker>(abortTrigger);
   auto lambda = [=] {
-    LOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
+    WLOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
     std::unique_lock<std::mutex> lk(abortMutex);
     bool isNotAbort =
         abortCondVar.wait_for(lk, std::chrono::seconds(abortSeconds),
                               [&]() -> bool { return isAbortCancelled; });
     if (isNotAbort) {
-      LOG(INFO) << "Already finished normally, no abort.";
+      WLOG(INFO) << "Already finished normally, no abort.";
     } else {
-      LOG(INFO) << "Requesting abort.";
+      WLOG(INFO) << "Requesting abort.";
       abortTrigger.store(true);
     }
   };
@@ -141,7 +141,7 @@ void readManifest(std::istream &fin, WdtTransferRequest &req, bool dfltDirect) {
     std::vector<std::string> fields;
     folly::split('\t', line, fields, true);
     if (fields.empty() || fields.size() > 3) {
-      LOG(FATAL) << "Invalid input manifest: " << line;
+      WLOG(FATAL) << "Invalid input manifest: " << line;
     }
     int64_t filesize = fields.size() > 1 ? folly::to<int64_t>(fields[1]) : -1;
     bool odirect = fields.size() > 2 ? folly::to<bool>(fields[2]) : dfltDirect;
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   if (badGflagFound) {
-    LOG(ERROR) << "Continuing despite bad flags";
+    WLOG(ERROR) << "Continuing despite bad flags";
   }
   // Only non -flag argument allowed so far is "-" meaning
   // Read url from stdin and start a sender
@@ -219,7 +219,8 @@ int main(int argc, char *argv[]) {
   if (argc == 2) {
     std::getline(std::cin, connectUrl);
     if (connectUrl.empty()) {
-      LOG(ERROR) << "Sender unable to read connection url from stdin - exiting";
+      WLOG(ERROR)
+          << "Sender unable to read connection url from stdin - exiting";
       return URI_PARSE_ERROR;
     }
   } else {
@@ -244,7 +245,7 @@ int main(int argc, char *argv[]) {
     transferLogManager.setRootDir(FLAGS_directory);
     transferLogManager.openLog();
     bool success = transferLogManager.parseAndPrint();
-    LOG_IF(ERROR, !success) << "Transfer log parsing failed";
+    WLOG_IF(ERROR, !success) << "Transfer log parsing failed";
     transferLogManager.closeLog();
     return success ? OK : ERROR;
   }
@@ -264,12 +265,12 @@ int main(int argc, char *argv[]) {
   } else {
     reqPtr = folly::make_unique<WdtTransferRequest>(connectUrl);
     if (reqPtr->errorCode != OK) {
-      LOG(ERROR) << "Invalid url \"" << connectUrl
-                 << "\" : " << errorCodeToStr(reqPtr->errorCode);
+      WLOG(ERROR) << "Invalid url \"" << connectUrl
+                  << "\" : " << errorCodeToStr(reqPtr->errorCode);
       return ERROR;
     }
     reqPtr->directory = FLAGS_directory;
-    LOG(INFO) << "Parsed url as " << reqPtr->getLogSafeString();
+    WLOG(INFO) << "Parsed url as " << reqPtr->getLogSafeString();
   }
   WdtTransferRequest &req = *reqPtr;
   if (FLAGS_protocol_version > 0) {
@@ -293,17 +294,17 @@ int main(int argc, char *argv[]) {
     retCode = augmentedReq.errorCode;
     if (retCode == FEWER_PORTS) {
       if (FLAGS_treat_fewer_port_as_error) {
-        LOG(ERROR) << "Receiver could not bind to all the ports";
+        WLOG(ERROR) << "Receiver could not bind to all the ports";
         return FEWER_PORTS;
       }
       retCode = OK;
     } else if (augmentedReq.errorCode != OK) {
-      LOG(ERROR) << "Error setting up receiver " << errorCodeToStr(retCode);
+      WLOG(ERROR) << "Error setting up receiver " << errorCodeToStr(retCode);
       return retCode;
     }
     // In the log:
-    LOG(INFO) << "Starting receiver with connection url "
-              << augmentedReq.getLogSafeString();  // The url without secret
+    WLOG(INFO) << "Starting receiver with connection url "
+               << augmentedReq.getLogSafeString();  // The url without secret
     // on stdout: the one with secret:
     std::cout << augmentedReq.genWdtUrlWithSecret() << std::endl;
     std::cout.flush();
@@ -314,7 +315,7 @@ int main(int argc, char *argv[]) {
         exit(1);
       }
       if (cpid > 0) {
-        LOG(INFO) << "Detaching receiver";
+        WLOG(INFO) << "Detaching receiver";
         exit(0);
       }
       close(0);
@@ -343,10 +344,11 @@ int main(int argc, char *argv[]) {
         readManifest(fin, req, options.odirect_reads);
         fin.close();
       }
-      LOG(INFO) << "Using files lists, number of files " << req.fileInfo.size();
+      WLOG(INFO) << "Using files lists, number of files "
+                 << req.fileInfo.size();
     }
-    LOG(INFO) << "Making Sender with encryption set = "
-              << req.encryptionData.isSet();
+    WLOG(INFO) << "Making Sender with encryption set = "
+               << req.encryptionData.isSet();
 
     // TODO: find something more useful for namespace (userid ? directory?)
     // (shardid at fb)
@@ -355,10 +357,10 @@ int main(int argc, char *argv[]) {
   }
   cancelAbort();
   if (retCode == OK) {
-    LOG(INFO) << "Returning with OK exit code";
+    WLOG(INFO) << "Returning with OK exit code";
   } else {
-    LOG(ERROR) << "Returning with code " << retCode << " "
-               << errorCodeToStr(retCode);
+    WLOG(ERROR) << "Returning with code " << retCode << " "
+                << errorCodeToStr(retCode);
   }
   return retCode;
 }

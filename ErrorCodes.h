@@ -8,12 +8,19 @@
  */
 #pragma once
 
-#include <wdt/WdtConfig.h>
 #include <glog/logging.h>
+#include <wdt/WdtConfig.h>
 #include <string>
 
 namespace facebook {
 namespace wdt {
+
+// Call regular google log but prefix with wdt for easier extraction later
+#define WDT_LOG_PREFIX "wdt>\t"
+#define WLOG(X) LOG(X) << WDT_LOG_PREFIX
+#define WVLOG(X) VLOG(X) << WDT_LOG_PREFIX
+#define WLOG_IF(X, Y) LOG_IF(X, Y) << WDT_LOG_PREFIX
+#define WVLOG_IF(X, Y) VLOG_IF(X, Y) << WDT_LOG_PREFIX
 
 // For now just does regular check, for some library embedding may consider
 // skipping or being DCHECK

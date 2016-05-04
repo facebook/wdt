@@ -7,13 +7,13 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include <mutex>
-#include <memory>
-#include <vector>
-#include <unordered_map>
-#include <condition_variable>
-#include <wdt/WdtThread.h>
 #include <wdt/ErrorCodes.h>
+#include <wdt/WdtThread.h>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace facebook {
 namespace wdt {
@@ -163,7 +163,7 @@ class Barrier {
   /// to be hit in order for the barrier to clear
   explicit Barrier(int numThreads) {
     numThreads_ = numThreads;
-    VLOG(1) << "making barrier with " << numThreads;
+    WVLOG(1) << "making barrier with " << numThreads;
   }
 
   /// Executes the main functionality of the barrier

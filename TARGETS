@@ -10,6 +10,41 @@ wdt_compiler_flags = [
     #"-Iwdt",
 ]
 
+wdt_env = {
+    'WDT_BINARY' : '$(location :wdt)',
+    'WDT_GEN_FILES' : '$(location @/wdt/bench:wdt_gen_files)',
+    'WDT_GEN_BIGRAMS' : '$(location @/wdt/bench:book1.bigrams)',
+}
+
+def wdt_test(test_name, ext, tags):
+    custom_unittest(
+        name = test_name,
+        command = [
+            "wdt/test/" + test_name + ext
+        ],
+        type = 'simple',
+        env = wdt_env,
+        deps = [
+            ':wdt',
+            '@/wdt/bench:wdt_gen_files'
+        ],
+        tags = tags
+    )
+
+def wdt_sh_test(test_name, tags = []):
+    wdt_test(test_name, ".sh", tags)
+
+def wdt_py_test(test_name, tags = []):
+    wdt_test(test_name, ".py", tags)
+
+
+
+cpp_library(
+  name = 'version',
+  headers = [
+      "WdtConfig.h",
+  ],
+)
 
 cpp_library(
   name = 'inc',
@@ -17,6 +52,15 @@ cpp_library(
       "util/WdtFlags.cpp.inc",
       "wdtCmdLine.cpp",
   ],
+)
+
+cpp_unittest(
+  name = 'wdt_misc_tests',
+  srcs = [ 'test/WdtMiscTests.cpp', ],
+  deps = [
+      ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
 )
 
 cpp_unittest(
@@ -68,7 +112,9 @@ cpp_binary(
 custom_unittest(
   name = 'option_type_test',
   command = [
-      "wdt/test/wdt_option_type_test.sh"
+      "wdt/test/wdt_option_type_test.sh",
+      '$(location :option_type_test_long_flags)',
+      '$(location :option_type_test_short_flags)',
   ],
   type = 'simple',
   deps = [
@@ -127,59 +173,23 @@ cpp_unittest(
 custom_unittest(
   name = 'wdt_rand_gen_test',
   command = [
-      "wdt/test/wdt_rand_gen_test.sh"
+      "wdt/test/wdt_rand_gen_test.sh",
+      '$(location :wdt_url_test)',
   ],
   type = 'simple',
   deps = [
-      ':wdt',
+      ':wdt_url_test',
   ],
 )
 
-custom_unittest(
-  name = 'receiver_throttler_ref_count_test',
-  command = [
-      "wdt/test/receiver_throttler_ref_count_test.sh"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_sh_test('receiver_throttler_ref_count_test')
 
-custom_unittest(
-    name='transfer_log_lock_test',
-    command=[
-        "wdt/test/transfer_log_lock_test.sh"
-    ],
-    type='simple',
-    deps=[
-        ':wdt',
-    ],
-)
+wdt_sh_test('transfer_log_lock_test')
 
-custom_unittest(
-    name='error_codes_test',
-    command=[
-        "wdt/test/wdt_error_codes_test.sh"
-    ],
-    type='simple',
-    deps=[
-        ':wdt',
-    ],
-    tags=['serialize'],
-)
+wdt_sh_test('wdt_error_codes_test', tags=['serialize'])
 
-custom_unittest(
-    name='wdte2e',
-    command=[
-        "wdt/test/wdt_e2e_test.sh"
-    ],
-    type='simple',
-    deps=[
-        ':wdt',
-    ],
-    tags=['serialize'],
-)
+wdt_sh_test('wdt_e2e_test', tags=['serialize'])
+
 
 custom_unittest(
   name = 'wdte2e_simple',
@@ -188,6 +198,7 @@ custom_unittest(
       "-d", "/dev/shm/wdtTest_" + os.environ['USER']
   ],
   type = 'simple',
+  env = wdt_env,
   deps = [
       ':wdt',
   ],
@@ -200,96 +211,36 @@ custom_unittest(
       "-o", "true"
   ],
   type = 'simple',
+  env = wdt_env,
   deps = [
       ':wdt',
   ],
   tags = ['serialize'],
 )
 
-custom_unittest(
-  name = 'wdt_stdin_test',
-  command = [
-      "wdt/test/wdt_stdin_test.sh",
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_sh_test('wdt_stdin_test')
 
-custom_unittest(
-  name = 'wdt_lock_failfast_test',
-  command = [
-      "wdt/test/wdt_lock_failfast.sh",
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_sh_test('wdt_lock_failfast')
 
-custom_unittest(
-  name = 'wdte2e_simple_xfs',
-  command = [
-      "wdt/test/wdt_e2e_xfs_test.sh",
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_sh_test('wdt_e2e_xfs_test')
 
-custom_unittest(
-  name = 'wdt_file_list_test',
-  command = [
-      "wdt/test/wdt_file_list_test.py",
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_py_test('wdt_file_list_test')
 
-custom_unittest(
-  name = 'wdt_overwrite_test',
-  command = [
-      "wdt/test/wdt_overwrite_test.py",
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_py_test('wdt_overwrite_test')
 
-custom_unittest(
-  name = 'slow_receiver_test',
-  command = [
-      "wdt/test/wdt_slow_receiver_test.py",
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  tags = ['extended'],
-)
+wdt_py_test('wdt_slow_receiver_test', tags = ['extended'])
 
-custom_unittest(
-  name = 'wdt_network_script',
-  command = [
-      "wdt/test/wdt_network_test.sh",
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  tags = ['disabled'],
-)
+# only disabled for sandcastle - this test is critical/important
+wdt_sh_test('wdt_network_test', tags  = ['disabled'])
+
+def merge_dicts(x, y):
+    z = x.copy()
+    z.update(y)
+    return z
 
 custom_unittest(
   name = 'wdt_network_script_open_during_disc',
   command = [
-      "/bin/env",
-      "EXTRA_WDT_OPTIONS=\"-open_files_during_discovery=750\"",
       "wdt/test/wdt_network_test.sh",
       "-p", "25800",
   ],
@@ -298,6 +249,8 @@ custom_unittest(
       ':wdt',
   ],
   tags = ['disabled'],
+  env = merge_dicts(wdt_env,
+                    {"EXTRA_WDT_OPTIONS" : "-open_files_during_discovery=750"}),
 )
 
 custom_unittest(
@@ -310,6 +263,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -323,6 +277,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -335,6 +290,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -350,6 +306,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -363,6 +320,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -376,6 +334,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -389,6 +348,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -402,6 +362,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -415,6 +376,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -428,6 +390,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -441,6 +404,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -454,6 +418,7 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
@@ -467,64 +432,20 @@ custom_unittest(
   deps = [
       ':wdt',
   ],
+  env = wdt_env,
   tags = ['disabled'],
 )
 
-custom_unittest(
-  name = 'long_running_mode_test',
-  command = [
-      "wdt/test/wdt_long_running_test.py"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_py_test("wdt_long_running_test")
 
-custom_unittest(
-  name = 'port_block_test',
-  command = [
-      "wdt/test/wdt_port_block_test.py"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_py_test("wdt_port_block_test")
 
-custom_unittest(
-  name = 'protocol_negotiation_test',
-  command = [
-      "wdt/test/wdt_protocol_negotiation_test.py"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_py_test("wdt_protocol_negotiation_test")
 
-custom_unittest(
-  name = 'bad_server_test',
-  command = [
-      "wdt/test/wdt_bad_server_test.py"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-)
+wdt_py_test("wdt_bad_server_test")
 
-custom_unittest(
-  name = 'global_checkpoint_test',
-  command = [
-      "wdt/test/wdt_global_checkpoint_test.sh"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  tags = ['serialize', 'disabled'],
-)
+wdt_sh_test("wdt_global_checkpoint_test",  tags = ['serialize', 'disabled'])
+
 
 cpp_library (
   name = "wdtlib_min",
@@ -600,6 +521,7 @@ cpp_library (
   deps = [
     ":wdtlib",
   ],
+  external_deps = [ ("gtest", None) ],
   compiler_flags = wdt_compiler_flags,
 )
 
@@ -619,7 +541,7 @@ cpp_binary(
 )
 
 cpp_binary(
-    name= "wdt_network_test",
+    name= "wdt_random_close",
     srcs = [
       "test/NetworkErrorSimulator.cpp",
       "wdtCmdLine.cpp",
@@ -627,6 +549,7 @@ cpp_binary(
     deps = [
       ":wdtlib4tests",
     ],
+    external_deps = [ ("gtest", None) ],
     output_subdir = 'test',
     compiler_flags = wdt_compiler_flags,
 )

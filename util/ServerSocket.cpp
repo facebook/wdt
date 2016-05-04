@@ -7,11 +7,11 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/util/ServerSocket.h>
-#include <glog/logging.h>
-#include <sys/socket.h>
-#include <poll.h>
-#include <folly/Conv.h>
 #include <fcntl.h>
+#include <folly/Conv.h>
+#include <glog/logging.h>
+#include <poll.h>
+#include <sys/socket.h>
 #include <algorithm>
 namespace facebook {
 namespace wdt {
@@ -25,8 +25,8 @@ ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
 }
 
 void ServerSocket::closeAllNoCheck() {
-  VLOG(1) << "Destroying server socket (port, listen fd, fd)" << port_ << ", "
-          << listeningFds_ << ", " << fd_;
+  WVLOG(1) << "Destroying server socket (port, listen fd, fd) " << port_ << ", "
+           << listeningFds_ << ", " << fd_;
   closeNoCheck();
   // We don't care about listen error, the error that matters is encryption err
   for (auto listeningFd : listeningFds_) {
@@ -48,8 +48,8 @@ ServerSocket::~ServerSocket() {
 
 int ServerSocket::listenInternal(struct addrinfo *info,
                                  const std::string &host) {
-  VLOG(1) << "Will listen on " << host << " " << port_ << " "
-          << info->ai_family;
+  WVLOG(1) << "Will listen on " << host << " " << port_ << " "
+           << info->ai_family;
   int listeningFd =
       socket(info->ai_family, info->ai_socktype, info->ai_protocol);
   if (listeningFd == -1) {
@@ -94,17 +94,17 @@ int ServerSocket::getSelectedPortAndNewAddress(int listeningFd,
     return -1;
   }
   port = ntohs(sin.sin_port);
-  VLOG(1) << "auto configuring port to " << port;
+  WVLOG(1) << "auto configuring port to " << port;
   std::string portStr = folly::to<std::string>(port);
   int res = getaddrinfo(nullptr, portStr.c_str(), &sa, &infoList);
   if (res) {
-    LOG(ERROR) << "getaddrinfo failed " << host << " " << port << " : "
-               << gai_strerror(res);
+    WLOG(ERROR) << "getaddrinfo failed " << host << " " << port << " : "
+                << gai_strerror(res);
     return -1;
   }
   if (infoList == nullptr) {
-    LOG(ERROR) << "getaddrinfo unexpectedly returned nullptr " << host << " "
-               << port;
+    WLOG(ERROR) << "getaddrinfo unexpectedly returned nullptr " << host << " "
+                << port;
     return -1;
   }
   return port;
@@ -128,7 +128,7 @@ ErrorCode ServerSocket::listen() {
   // Dynamic port is the default on receiver (and setting the start_port flag
   // explictly automatically also sets static_ports to false)
   if (!options.static_ports) {
-    VLOG(1) << "Not using static_ports, changing port " << port_ << " to 0";
+    WVLOG(1) << "Not using static_ports, changing port " << port_ << " to 0";
     port_ = 0;
   }
   // Lookup
@@ -137,8 +137,8 @@ ErrorCode ServerSocket::listen() {
   int res = getaddrinfo(nullptr, portStr.c_str(), &sa, &infoList);
   if (res) {
     // not errno, can't use PLOG (perror)
-    LOG(ERROR) << "Failed getaddrinfo ai_passive on " << port_ << " : " << res
-               << " : " << gai_strerror(res);
+    WLOG(ERROR) << "Failed getaddrinfo ai_passive on " << port_ << " : " << res
+                << " : " << gai_strerror(res);
     return CONN_ERROR;
   }
   // if the port specified is 0, then a random port is selected for the first
@@ -149,8 +149,8 @@ ErrorCode ServerSocket::listen() {
   for (struct addrinfo *info = infoList; info != nullptr;) {
     if (info->ai_family == addressTypeAlreadyBound) {
       // we are already listening for this address type
-      VLOG(2) << "Ignoring address family " << info->ai_family
-              << " since we are already listing on it " << port_;
+      WVLOG(2) << "Ignoring address family " << info->ai_family
+               << " since we are already listing on it " << port_;
       info = info->ai_next;
       continue;
     }
@@ -186,13 +186,13 @@ ErrorCode ServerSocket::listen() {
       info = info->ai_next;
     }
 
-    VLOG(1) << "Successful listen on " << listeningFd << " host " << host
-            << " port " << port_ << " ai_family " << addressFamily;
+    WVLOG(1) << "Successful listen on " << listeningFd << " host " << host
+             << " port " << port_ << " ai_family " << addressFamily;
     listeningFds_.emplace_back(listeningFd);
   }
   freeaddrinfo(infoList);
   if (listeningFds_.empty()) {
-    LOG(ERROR) << "Unable to listen port " << port_;
+    WLOG(ERROR) << "Unable to listen port " << port_;
     return CONN_ERROR_RETRYABLE;
   }
   return OK;
@@ -217,7 +217,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
     // reduced timeout
     int timeElapsed = durationMillis(Clock::now() - startTime);
     if (timeElapsed >= timeoutMillis) {
-      VLOG(1) << "accept() timed out";
+      WVLOG(1) << "accept() timed out";
       return CONN_ERROR;
     }
     int pollTimeout = timeoutMillis - timeElapsed;
@@ -228,12 +228,12 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
     int retValue;
     if ((retValue = poll(pollFds, numFds, pollTimeout)) <= 0) {
       if (errno == EINTR) {
-        VLOG(1) << "poll() call interrupted. retrying...";
+        WVLOG(1) << "poll() call interrupted. retrying...";
         continue;
       }
       if (retValue == 0) {
-        VLOG(3) << "poll() timed out on port : " << port_
-                << ", listening fds : " << listeningFds_;
+        WVLOG(3) << "poll() timed out on port : " << port_
+                 << ", listening fds : " << listeningFds_;
       } else {
         PLOG(ERROR) << "poll() failed on port : " << port_
                     << ", listening fds : " << listeningFds_;
@@ -262,14 +262,14 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
         return CONN_ERROR;
       }
       getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_, peerPort_);
-      VLOG(1) << "New connection, fd : " << fd_ << " from " << peerIp_ << " "
-              << peerPort_;
+      WVLOG(1) << "New connection, fd : " << fd_ << " from " << peerIp_ << " "
+               << peerPort_;
       setSocketTimeouts();
       return OK;
     }
     lastCheckedPollIndex_ = (lastCheckedPollIndex_ + 1) % numFds;
   }
-  LOG(ERROR) << "None of the listening fds got a POLLIN event " << port_;
+  WLOG(ERROR) << "None of the listening fds got a POLLIN event " << port_;
   return CONN_ERROR;
 }
 
@@ -285,7 +285,7 @@ void ServerSocket::setReceiveBufferSize(int fd) {
                 << bufSize << " fd " << fd;
     return;
   }
-  VLOG(1) << "Receive buffer size set to " << bufSize << " port " << port_;
+  WVLOG(1) << "Receive buffer size set to " << bufSize << " port " << port_;
 }
 
 std::string ServerSocket::getPeerIp() const {

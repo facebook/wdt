@@ -11,8 +11,8 @@
 #include <folly/SpinLock.h>
 #include <folly/String.h>  // for humanify
 
-#include <openssl/rand.h>
 #include <openssl/crypto.h>
+#include <openssl/rand.h>
 
 #include <string.h>  // for memset
 
@@ -35,7 +35,7 @@ static_assert(NUM_ENC_TYPES ==
 
 std::string encryptionTypeToStr(EncryptionType encryptionType) {
   if (encryptionType < 0 || encryptionType >= NUM_ENC_TYPES) {
-    LOG(ERROR) << "Unknown encryption type " << encryptionType;
+    WLOG(ERROR) << "Unknown encryption type " << encryptionType;
     return folly::to<std::string>(encryptionType);
   }
   return kEncryptionTypeDescriptions[encryptionType];
@@ -51,10 +51,10 @@ static void opensslLock(int mode, int type, const char* file, int line) {
   WDT_CHECK_LT(type, s_numOpensslLocks);
   if (mode & CRYPTO_LOCK) {
     s_opensslLocks[type].lock();
-    VLOG(3) << "Lock requested for " << type << " " << file << " " << line;
+    WVLOG(3) << "Lock requested for " << type << " " << file << " " << line;
     return;
   }
-  VLOG(3) << "unlock requested for " << type << " " << file << " " << line;
+  WVLOG(3) << "unlock requested for " << type << " " << file << " " << line;
   s_opensslLocks[type].unlock();
 }
 
@@ -64,28 +64,28 @@ static void opensslThreadId(CRYPTO_THREADID* id) {
 
 WdtCryptoIntializer::WdtCryptoIntializer() {
   if (CRYPTO_get_locking_callback()) {
-    LOG(WARNING) << "Openssl crypto library already initialized";
+    WLOG(WARNING) << "Openssl crypto library already initialized";
     return;
   }
   s_numOpensslLocks = CRYPTO_num_locks();
   s_opensslLocks = new folly::SpinLock[s_numOpensslLocks];
   if (!s_opensslLocks) {
-    LOG(ERROR) << "Unable to allocate openssl locks " << s_numOpensslLocks;
+    WLOG(ERROR) << "Unable to allocate openssl locks " << s_numOpensslLocks;
     return;
   }
   CRYPTO_set_locking_callback(opensslLock);
   if (!CRYPTO_THREADID_get_callback()) {
     CRYPTO_THREADID_set_callback(opensslThreadId);
   } else {
-    LOG(INFO) << "Openssl id callback already set";
+    WLOG(INFO) << "Openssl id callback already set";
   }
-  LOG(INFO) << "Openssl library initialized";
+  WLOG(INFO) << "Openssl library initialized";
 }
 
 WdtCryptoIntializer::~WdtCryptoIntializer() {
-  VLOG(1) << "Cleaning up openssl";
+  WVLOG(1) << "Cleaning up openssl";
   if (CRYPTO_get_locking_callback() != opensslLock) {
-    LOG(WARNING) << "Openssl not initialized by wdt";
+    WLOG(WARNING) << "Openssl not initialized by wdt";
     return;
   }
   CRYPTO_set_locking_callback(nullptr);
@@ -105,15 +105,15 @@ EncryptionType parseEncryptionType(const std::string& str) {
   if (str == kEncryptionTypeDescriptions[ENC_NONE]) {
     return ENC_NONE;
   }
-  LOG(WARNING) << "Unknown encryption type" << str << ", defaulting to none";
+  WLOG(WARNING) << "Unknown encryption type" << str << ", defaulting to none";
   return ENC_NONE;
 }
 
 EncryptionParams::EncryptionParams(EncryptionType type, const string& data)
     : type_(type), data_(data) {
-  LOG(INFO) << "New encryption params " << this << " " << getLogSafeString();
+  WLOG(INFO) << "New encryption params " << this << " " << getLogSafeString();
   if (type_ < 0 || type_ >= NUM_ENC_TYPES) {
-    LOG(ERROR) << "Unsupported type " << type;
+    WLOG(ERROR) << "Unsupported type " << type;
     erase();
   }
 }
@@ -123,7 +123,7 @@ bool EncryptionParams::operator==(const EncryptionParams& that) const {
 }
 
 void EncryptionParams::erase() {
-  VLOG(1) << " Erasing EncryptionParams " << this << " " << type_;
+  WVLOG(1) << " Erasing EncryptionParams " << this << " " << type_;
   // Erase the key (once for now...)
   if (!data_.empty()) {
     // Can't use .data() here (copy on write fbstring)
@@ -195,7 +195,7 @@ ErrorCode EncryptionParams::unserialize(const string& input,
       // In type section (before ':')
       if (c == ':') {
         if (type == 0) {
-          LOG(ERROR) << "Enc type still none when ':' reached " << input;
+          WLOG(ERROR) << "Enc type still none when ':' reached " << input;
           return ERROR;
         }
         state = FIRST_HEX;
@@ -204,7 +204,7 @@ ErrorCode EncryptionParams::unserialize(const string& input,
     }
     int v = fromHex(c);
     if (v < 0) {
-      LOG(ERROR) << "Not hex found " << (int)c << " in " << input;
+      WLOG(ERROR) << "Not hex found " << (int)c << " in " << input;
       return ERROR;
     }
     if (state == IN_TYPE) {
@@ -224,20 +224,20 @@ ErrorCode EncryptionParams::unserialize(const string& input,
     byte = 0;  // not needed but safer
   }
   if (state == IN_TYPE) {
-    LOG(ERROR) << "Missing ':' in encryption data " << input;
+    WLOG(ERROR) << "Missing ':' in encryption data " << input;
     return ERROR;
   }
   if (state != LEFT_HEX) {
-    LOG(ERROR) << "Odd number of hex in encryption data " << input
-               << " decoded up to: " << out.data_;
+    WLOG(ERROR) << "Odd number of hex in encryption data " << input
+                << " decoded up to: " << out.data_;
     return ERROR;
   }
   if (type <= ENC_NONE || type >= NUM_ENC_TYPES) {
-    LOG(ERROR) << "Encryption type out of range " << type;
+    WLOG(ERROR) << "Encryption type out of range " << type;
     return ERROR;
   }
   out.type_ = static_cast<EncryptionType>(type);
-  VLOG(1) << "Deserialized Encryption Params " << out.getLogSafeString();
+  WVLOG(1) << "Deserialized Encryption Params " << out.getLogSafeString();
   return OK;
 }
 
@@ -250,7 +250,7 @@ EncryptionParams EncryptionParams::generateEncryptionParams(
   WDT_CHECK(type > ENC_NONE && type < NUM_ENC_TYPES);
   uint8_t key[kAESBlockSize];
   if (RAND_bytes(key, kAESBlockSize) != 1) {
-    LOG(ERROR) << "RAND_bytes failed, unable to generate symmetric key";
+    WLOG(ERROR) << "RAND_bytes failed, unable to generate symmetric key";
     return EncryptionParams();
   }
   return EncryptionParams(type, std::string(key, key + kAESBlockSize));
@@ -261,7 +261,7 @@ bool AESBase::cloneCtx(EVP_CIPHER_CTX* ctxOut) const {
   EVP_CIPHER_CTX_init(ctxOut);
   int status = EVP_CIPHER_CTX_copy(ctxOut, &evpCtx_);
   if (status != 1) {
-    LOG(ERROR) << "Cipher ctx copy failed " << status;
+    WLOG(ERROR) << "Cipher ctx copy failed " << status;
     EVP_CIPHER_CTX_cleanup(ctxOut);
     return false;
   }
@@ -275,7 +275,7 @@ const EVP_CIPHER* AESBase::getCipher(const EncryptionType encryptionType) {
   if (encryptionType == ENC_AES128_GCM) {
     return EVP_aes_128_gcm();
   }
-  LOG(ERROR) << "Unknown encryption type " << encryptionType;
+  WLOG(ERROR) << "Unknown encryption type " << encryptionType;
   return nullptr;
 }
 
@@ -287,8 +287,8 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
 
   const std::string& key = encryptionData.getSecret();
   if (key.length() != kAESBlockSize) {
-    LOG(ERROR) << "Encryption key size must be " << kAESBlockSize
-               << ", but input size length " << key.length();
+    WLOG(ERROR) << "Encryption key size must be " << kAESBlockSize
+                << ", but input size length " << key.length();
     return false;
   }
 
@@ -297,7 +297,8 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
   uint8_t* ivPtr = (uint8_t*)(&ivOut.front());
   uint8_t* keyPtr = (uint8_t*)(&key.front());
   if (RAND_bytes(ivPtr, kAESBlockSize) != 1) {
-    LOG(ERROR) << "RAND_bytes failed, unable to generate initialization vector";
+    WLOG(ERROR)
+        << "RAND_bytes failed, unable to generate initialization vector";
     return false;
   }
 
@@ -315,16 +316,16 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
   // reduce chances of attacks on large data transfers.
   if (type_ == ENC_AES128_GCM) {
     if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, nullptr, nullptr) != 1) {
-      LOG(ERROR) << "GCM First init error";
+      WLOG(ERROR) << "GCM First init error";
     }
     if (EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_SET_IVLEN, ivOut.size(),
                             nullptr) != 1) {
-      LOG(ERROR) << "Encrypt Init ivlen set failed";
+      WLOG(ERROR) << "Encrypt Init ivlen set failed";
     }
   }
 
   if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, keyPtr, ivPtr) != 1) {
-    LOG(ERROR) << "Encrypt Init failed";
+    WLOG(ERROR) << "Encrypt Init failed";
     EVP_CIPHER_CTX_cleanup(&evpCtx_);
     return false;
   }
@@ -338,7 +339,7 @@ bool AESEncryptor::encrypt(const char* in, const int inLength, char* out) {
   int outLength;
   if (EVP_EncryptUpdate(&evpCtx_, (uint8_t*)out, &outLength, (uint8_t*)in,
                         inLength) != 1) {
-    LOG(ERROR) << "EncryptUpdate failed";
+    WLOG(ERROR) << "EncryptUpdate failed";
     return false;
   }
   WDT_CHECK_EQ(inLength, outLength);
@@ -352,7 +353,7 @@ bool AESEncryptor::finishInternal(EVP_CIPHER_CTX& ctx,
   int outLength;
   int status = EVP_EncryptFinal(&ctx, nullptr, &outLength);
   if (status != 1) {
-    LOG(ERROR) << "EncryptFinal failed";
+    WLOG(ERROR) << "EncryptFinal failed";
     EVP_CIPHER_CTX_cleanup(&ctx);
     return false;
   }
@@ -363,8 +364,8 @@ bool AESEncryptor::finishInternal(EVP_CIPHER_CTX& ctx,
     status = EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_GET_TAG, tagOut.size(),
                                  &(tagOut.front()));
     if (status != 1) {
-      LOG(ERROR) << "EncryptFinal Tag extraction error "
-                 << folly::humanify(tagOut);
+      WLOG(ERROR) << "EncryptFinal Tag extraction error "
+                  << folly::humanify(tagOut);
       tagOut.clear();
     }
   }
@@ -379,7 +380,8 @@ bool AESEncryptor::finish(std::string& tagOut) {
   }
   started_ = false;
   bool status = finishInternal(evpCtx_, type_, tagOut);
-  LOG_IF(INFO, status) << "Encryption finish tag = " << folly::humanify(tagOut);
+  WLOG_IF(INFO, status) << "Encryption finish tag = "
+                        << folly::humanify(tagOut);
   return status;
 }
 
@@ -406,13 +408,13 @@ bool AESDecryptor::start(const EncryptionParams& encryptionData,
 
   const std::string& key = encryptionData.getSecret();
   if (key.length() != kAESBlockSize) {
-    LOG(ERROR) << "Encryption key size must be " << kAESBlockSize
-               << ", but input size length " << key.length();
+    WLOG(ERROR) << "Encryption key size must be " << kAESBlockSize
+                << ", but input size length " << key.length();
     return false;
   }
   if (iv.length() != kAESBlockSize) {
-    LOG(ERROR) << "Initialization size must be " << kAESBlockSize
-               << ", but input size length " << iv.length();
+    WLOG(ERROR) << "Initialization size must be " << kAESBlockSize
+                << ", but input size length " << iv.length();
     return false;
   }
 
@@ -430,16 +432,16 @@ bool AESDecryptor::start(const EncryptionParams& encryptionData,
 
   if (type_ == ENC_AES128_GCM) {
     if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, nullptr, nullptr) != 1) {
-      LOG(ERROR) << "GCM Decryptor First init error";
+      WLOG(ERROR) << "GCM Decryptor First init error";
     }
     if (EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_SET_IVLEN, iv.size(),
                             nullptr) != 1) {
-      LOG(ERROR) << "Encrypt Init ivlen set failed";
+      WLOG(ERROR) << "Encrypt Init ivlen set failed";
     }
   }
 
   if (EVP_DecryptInit_ex(&evpCtx_, cipher, nullptr, keyPtr, ivPtr) != 1) {
-    LOG(ERROR) << "Decrypt Init failed";
+    WLOG(ERROR) << "Decrypt Init failed";
     EVP_CIPHER_CTX_cleanup(&evpCtx_);
     return false;
   }
@@ -453,7 +455,7 @@ bool AESDecryptor::decrypt(const char* in, const int inLength, char* out) {
   int outLength;
   if (EVP_DecryptUpdate(&evpCtx_, (uint8_t*)out, &outLength, (uint8_t*)in,
                         inLength) != 1) {
-    LOG(ERROR) << "DecryptUpdate failed";
+    WLOG(ERROR) << "DecryptUpdate failed";
     return false;
   }
   WDT_CHECK_EQ(inLength, outLength);
@@ -485,7 +487,7 @@ bool AESDecryptor::finishInternal(EVP_CIPHER_CTX& ctx,
   size_t tagSize = encryptionTypeToTagLen(type);
   if (tagSize) {
     if (tag.size() != tagSize) {
-      LOG(ERROR) << "Need tag for gcm mode " << folly::humanify(tag);
+      WLOG(ERROR) << "Need tag for gcm mode " << folly::humanify(tag);
       EVP_CIPHER_CTX_cleanup(&ctx);
       return false;
     }
@@ -495,7 +497,7 @@ bool AESDecryptor::finishInternal(EVP_CIPHER_CTX& ctx,
     status =
         EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_TAG, tag.size(), tagBuf);
     if (status != 1) {
-      LOG(ERROR) << "Decrypt final tag set error " << folly::humanify(tag);
+      WLOG(ERROR) << "Decrypt final tag set error " << folly::humanify(tag);
     }
   }
 
@@ -503,7 +505,7 @@ bool AESDecryptor::finishInternal(EVP_CIPHER_CTX& ctx,
   status = EVP_DecryptFinal(&ctx, nullptr, &outLength);
   EVP_CIPHER_CTX_cleanup(&ctx);
   if (status != 1) {
-    LOG(ERROR) << "DecryptFinal failed " << outLength;
+    WLOG(ERROR) << "DecryptFinal failed " << outLength;
     return false;
   }
   WDT_CHECK_EQ(0, outLength);
@@ -516,8 +518,8 @@ bool AESDecryptor::finish(const std::string& tag) {
   }
   started_ = false;
   bool status = finishInternal(evpCtx_, type_, tag);
-  LOG_IF(INFO, status) << "Successful end of decryption with tag = "
-                       << folly::humanify(tag);
+  WLOG_IF(INFO, status) << "Successful end of decryption with tag = "
+                        << folly::humanify(tag);
   if (ctxSaved_) {
     EVP_CIPHER_CTX_cleanup(&savedCtx_);
     ctxSaved_ = false;

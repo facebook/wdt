@@ -8,6 +8,7 @@
  */
 #pragma once
 
+#include <wdt/Receiver.h>
 #include <wdt/Sender.h>
 // For Options
 #include <wdt/WdtOptions.h>
@@ -15,6 +16,7 @@
 #include <wdt/ErrorCodes.h>
 // For IAbortChecker and WdtTransferRequest - TODO: split out ?
 #include <wdt/WdtBase.h>
+#include <wdt/WdtResourceController.h>
 #include <wdt/util/EncryptionUtils.h>
 #include <ostream>
 
@@ -30,7 +32,7 @@ namespace wdt {
  *
  * Example of use:
  * // During the single threaded part of your service's initialization
- * Wdt &wdt = Wdt::initializeWdt();
+ * Wdt &wdt = Wdt::initializeWdt("app-name");
  * // Optionally: change the WdtOptions as you need, for instance:
  * wdt.getWdtOptions().overwrite = true;
  * // Will use the (possibly changed above) settings, to configure wdt,
@@ -57,7 +59,7 @@ class Wdt {
    * This is only needed if the caller code doesn't want to pass the Wdt
    * instance around.
    */
-  static Wdt &getWdt();
+  static Wdt &getWdt(const std::string &appName);
 
   /// High level APIs:
 
@@ -74,6 +76,14 @@ class Wdt {
       bool terminateExistingOne = false);
 
   virtual ErrorCode printWdtOptions(std::ostream &out);
+
+  WdtResourceController *getWdtResourceController() {
+    return &resourceController_;
+  }
+
+  /// Virtual Destructor (for class hierarchy)
+  virtual ~Wdt() {
+  }
 
  protected:
   /// Set to true when the single instance is initialized
@@ -94,6 +104,10 @@ class Wdt {
   /// responsible for initializing openssl
   WdtCryptoIntializer cryptoInitializer_;
 
+  // TODO: share resource controller across apps
+  /// wdt resource controller
+  WdtResourceController resourceController_;
+
   // Internal initialization so sub classes can share the code
   virtual ErrorCode initializeWdtInternal(const std::string &appName);
 
@@ -103,8 +117,8 @@ class Wdt {
       const WdtTransferRequest &req,
       std::shared_ptr<IAbortChecker> abortChecker);
 
-  // Internal singleton creator/holder
-  static Wdt &getWdtInternal();
+  // Internal wdt object creator/holder
+  static Wdt &getWdtInternal(const std::string &appName);
 
   /**
    * Apply the possibly changed settings, eg throttler.
@@ -121,10 +135,6 @@ class Wdt {
   /// Not copyable
   Wdt(const Wdt &) = delete;
   Wdt &operator=(const Wdt &) = delete;
-
-  /// Virtual Destructor (for class hierarchy)
-  virtual ~Wdt() {
-  }
 };
 }
 }  // namespaces

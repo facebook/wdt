@@ -1,9 +1,19 @@
-#! /bin/sh
+#! /bin/bash
 
-transferId1=$(_bin/wdt/wdt_url_test -v=1 2>&1 | grep Generated | head -1 | \
-  awk '{print $9}')
-transferId2=$(_bin/wdt/wdt_url_test -v=1 2>&1 | grep Generated | head -1 | \
-  awk '{print $9}')
+
+if [ "$#" -eq 0 ]; then
+  binary=_bin/wdt/wdt_url_test
+else
+  binary=$1
+fi
+
+set -o pipefail
+set -e
+
+transferId1=$($binary -v=1 2>&1 | grep Generated | head -1 | \
+  awk '{print $10}')
+transferId2=$($binary -v=1 2>&1 | grep Generated | head -1 | \
+  awk '{print $10}')
 
 if [ "$transferId1" == "$transferId2" ]; then
   echo "Failed to get different transfer-id $transferId1"

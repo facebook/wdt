@@ -7,18 +7,19 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/SenderThread.h>
-#include <wdt/Sender.h>
-#include <wdt/util/ClientSocket.h>
+#include <folly/Bits.h>
+#include <folly/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
-#include <folly/String.h>
-#include <folly/Bits.h>
 #include <folly/ScopeGuard.h>
+#include <folly/String.h>
 #include <sys/stat.h>
-#include <folly/Checksum.h>
+#include <wdt/Sender.h>
+#include <wdt/util/ClientSocket.h>
 
 namespace facebook {
 namespace wdt {
+
 std::ostream &operator<<(std::ostream &os, const SenderThread &senderThread) {
   os << "Thread[" << senderThread.threadIndex_
      << ", port: " << senderThread.port_ << "] ";
@@ -52,7 +53,7 @@ std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
   double retryInterval = options_.sleep_millis;
   int maxRetries = options_.max_retries;
   if (maxRetries < 1) {
-    LOG(ERROR) << "Invalid max_retries " << maxRetries << " using 1 instead";
+    WLOG(ERROR) << "Invalid max_retries " << maxRetries << " using 1 instead";
     maxRetries = 1;
   }
   for (int i = 1; i <= maxRetries; ++i) {
@@ -69,40 +70,40 @@ std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
     }
     if (i != maxRetries) {
       // sleep between attempts but not after the last
-      VLOG(1) << "Sleeping after failed attempt " << i;
+      WVLOG(1) << "Sleeping after failed attempt " << i;
       usleep(retryInterval * 1000);
     }
   }
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
   if (errCode != OK) {
-    LOG(ERROR) << "Unable to connect to " << wdtParent_->destHost_ << " "
-               << port << " despite " << connectAttempts << " retries in "
-               << elapsedSecsConn << " seconds.";
+    WLOG(ERROR) << "Unable to connect to " << wdtParent_->destHost_ << " "
+                << port << " despite " << connectAttempts << " retries in "
+                << elapsedSecsConn << " seconds.";
     errCode = CONN_ERROR;
     return nullptr;
   }
-  ((connectAttempts > 1) ? LOG(WARNING) : LOG(INFO))
+  ((connectAttempts > 1) ? WLOG(WARNING) : WLOG(INFO))
       << "Connection took " << connectAttempts << " attempt(s) and "
       << elapsedSecsConn << " seconds. port " << port;
   return socket;
 }
 
 SenderState SenderThread::connect() {
-  VLOG(1) << *this << " entered CONNECT state";
+  WVLOG(1) << *this << " entered CONNECT state";
   if (socket_) {
     ErrorCode socketErrCode = socket_->getNonRetryableErrCode();
     if (socketErrCode != OK) {
-      LOG(ERROR) << *this << "Socket has non-retryable error "
-                 << errorCodeToStr(socketErrCode);
+      WLOG(ERROR) << *this << "Socket has non-retryable error "
+                  << errorCodeToStr(socketErrCode);
       threadStats_.setLocalErrorCode(socketErrCode);
       return END;
     }
     socket_->closeNoCheck();
   }
   if (numReconnectWithoutProgress_ >= options_.max_transfer_retries) {
-    LOG(ERROR) << "Sender thread reconnected " << numReconnectWithoutProgress_
-               << " times without making any progress, giving up. port: "
-               << socket_->getPort();
+    WLOG(ERROR) << "Sender thread reconnected " << numReconnectWithoutProgress_
+                << " times without making any progress, giving up. port: "
+                << socket_->getPort();
     threadStats_.setLocalErrorCode(NO_PROGRESS);
     return END;
   }
@@ -131,7 +132,7 @@ SenderState SenderThread::connect() {
 }
 
 SenderState SenderThread::readLocalCheckPoint() {
-  LOG(INFO) << *this << " entered READ_LOCAL_CHECKPOINT state";
+  WLOG(INFO) << *this << " entered READ_LOCAL_CHECKPOINT state";
   ThreadTransferHistory &transferHistory = getTransferHistory();
   std::vector<Checkpoint> checkpoints;
   int64_t decodeOffset = 0;
@@ -139,8 +140,8 @@ SenderState SenderThread::readLocalCheckPoint() {
       Protocol::getMaxLocalCheckpointLength(threadProtocolVersion_);
   int64_t numRead = socket_->read(buf_, checkpointLen);
   if (numRead != checkpointLen) {
-    LOG(ERROR) << "read mismatch during reading local checkpoint "
-               << checkpointLen << " " << numRead << " port " << port_;
+    WLOG(ERROR) << "read mismatch during reading local checkpoint "
+                << checkpointLen << " " << numRead << " port " << port_;
     threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     numReconnectWithoutProgress_++;
     return CONNECT;
@@ -148,17 +149,17 @@ SenderState SenderThread::readLocalCheckPoint() {
   bool isValidCheckpoint = true;
   if (!Protocol::decodeCheckpoints(threadProtocolVersion_, buf_, decodeOffset,
                                    checkpointLen, checkpoints)) {
-    LOG(ERROR) << "checkpoint decode failure "
-               << folly::humanify(std::string(buf_, numRead));
+    WLOG(ERROR) << "checkpoint decode failure "
+                << folly::humanify(std::string(buf_, numRead));
     isValidCheckpoint = false;
   } else if (checkpoints.size() != 1) {
-    LOG(ERROR) << "Illegal local checkpoint, unexpected num checkpoints "
-               << checkpoints.size() << " "
-               << folly::humanify(std::string(buf_, numRead));
+    WLOG(ERROR) << "Illegal local checkpoint, unexpected num checkpoints "
+                << checkpoints.size() << " "
+                << folly::humanify(std::string(buf_, numRead));
     isValidCheckpoint = false;
   } else if (checkpoints[0].port != port_) {
-    LOG(ERROR) << "illegal checkpoint, checkpoint " << checkpoints[0]
-               << " doesn't match the port " << port_;
+    WLOG(ERROR) << "illegal checkpoint, checkpoint " << checkpoints[0]
+                << " doesn't match the port " << port_;
     isValidCheckpoint = false;
   }
   if (!isValidCheckpoint) {
@@ -167,7 +168,7 @@ SenderState SenderThread::readLocalCheckPoint() {
   }
   const Checkpoint &checkpoint = checkpoints[0];
   auto numBlocks = checkpoint.numBlocks;
-  VLOG(1) << "received local checkpoint " << checkpoint;
+  WVLOG(1) << "received local checkpoint " << checkpoint;
 
   if (numBlocks == -1) {
     // Receiver failed while sending DONE cmd
@@ -188,7 +189,7 @@ SenderState SenderThread::readLocalCheckPoint() {
 }
 
 SenderState SenderThread::sendSettings() {
-  VLOG(1) << *this << " entered SEND_SETTINGS state";
+  WVLOG(1) << *this << " entered SEND_SETTINGS state";
   int64_t readTimeoutMillis = options_.read_timeout_millis;
   int64_t writeTimeoutMillis = options_.write_timeout_millis;
   int64_t off = 0;
@@ -206,7 +207,7 @@ SenderState SenderThread::sendSettings() {
   int64_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
   int64_t written = socket_->write(buf_, toWrite);
   if (written != toWrite) {
-    LOG(ERROR) << "Socket write failure " << written << " " << toWrite;
+    WLOG(ERROR) << "Socket write failure " << written << " " << toWrite;
     threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return CONNECT;
   }
@@ -215,7 +216,7 @@ SenderState SenderThread::sendSettings() {
 }
 
 SenderState SenderThread::sendBlocks() {
-  VLOG(1) << *this << " entered SEND_BLOCKS state";
+  WVLOG(1) << *this << " entered SEND_BLOCKS state";
   ThreadTransferHistory &transferHistory = getTransferHistory();
   if (threadProtocolVersion_ >= Protocol::RECEIVER_PROGRESS_REPORT_VERSION &&
       !totalSizeSent_ && dirQueue_->fileDiscoveryFinished()) {
@@ -235,7 +236,7 @@ SenderState SenderThread::sendBlocks() {
   if (!transferHistory.addSource(source)) {
     // global checkpoint received for this thread. no point in
     // continuing
-    LOG(ERROR) << *this << " global checkpoint received. Stopping";
+    WLOG(ERROR) << *this << " global checkpoint received. Stopping";
     threadStats_.setLocalErrorCode(CONN_ERROR);
     return END;
   }
@@ -283,15 +284,15 @@ TransferStats SenderThread::sendOneByteSource(
   int64_t byteSourceHeaderBytes = written;
   int64_t throttlerInstanceBytes = byteSourceHeaderBytes;
   int64_t totalThrottlerBytes = 0;
-  VLOG(3) << "Sent " << written << " on " << socket_->getFd() << " : "
-          << folly::humanify(std::string(headerBuf, off));
+  WVLOG(3) << "Sent " << written << " on " << socket_->getFd() << " : "
+           << folly::humanify(std::string(headerBuf, off));
   int32_t checksum = 0;
   while (!source->finished()) {
     int64_t size;
     char *buffer = source->read(size);
     if (source->hasError()) {
-      LOG(ERROR) << "Failed reading file " << source->getIdentifier()
-                 << " for fd " << socket_->getFd();
+      WLOG(ERROR) << "Failed reading file " << source->getIdentifier()
+                  << " for fd " << socket_->getFd();
       break;
     }
     WDT_CHECK(buffer && size > 0);
@@ -315,17 +316,17 @@ TransferStats SenderThread::sendOneByteSource(
     }
     written = socket_->write(buffer, size, /* retry writes */ true);
     if (getThreadAbortCode() != OK) {
-      LOG(ERROR) << "Transfer aborted during block transfer "
-                 << socket_->getPort() << " " << source->getIdentifier();
+      WLOG(ERROR) << "Transfer aborted during block transfer "
+                  << socket_->getPort() << " " << source->getIdentifier();
       stats.setLocalErrorCode(ABORT);
       stats.incrFailedAttempts();
       return stats;
     }
     if (written != size) {
-      LOG(ERROR) << "Write error " << written << " (" << size << ")"
-                 << ". fd = " << socket_->getFd()
-                 << ". file = " << metadata.relPath
-                 << ". port = " << socket_->getPort();
+      WLOG(ERROR) << "Write error " << written << " (" << size << ")"
+                  << ". fd = " << socket_->getFd()
+                  << ". file = " << metadata.relPath
+                  << ". port = " << socket_->getPort();
       stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
       stats.incrFailedAttempts();
       return stats;
@@ -336,14 +337,14 @@ TransferStats SenderThread::sendOneByteSource(
   if (actualSize != expectedSize) {
     // Can only happen if sender thread can not read complete source byte
     // stream
-    LOG(ERROR) << "UGH " << source->getIdentifier() << " " << expectedSize
-               << " " << actualSize;
+    WLOG(ERROR) << "UGH " << source->getIdentifier() << " " << expectedSize
+                << " " << actualSize;
     struct stat fileStat;
     if (stat(metadata.fullPath.c_str(), &fileStat) != 0) {
       PLOG(ERROR) << "stat failed on path " << metadata.fullPath;
     } else {
-      LOG(WARNING) << "file " << source->getIdentifier() << " previous size "
-                   << metadata.size << " current size " << fileStat.st_size;
+      WLOG(WARNING) << "file " << source->getIdentifier() << " previous size "
+                    << metadata.size << " current size " << fileStat.st_size;
     }
     stats.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
     stats.incrFailedAttempts();
@@ -364,7 +365,7 @@ TransferStats SenderThread::sendOneByteSource(
     int toWrite = off;
     written = socket_->write(headerBuf, toWrite);
     if (written != toWrite) {
-      LOG(ERROR) << "Write mismatch " << written << " " << toWrite;
+      WLOG(ERROR) << "Write mismatch " << written << " " << toWrite;
       stats.setLocalErrorCode(SOCKET_WRITE_ERROR);
       stats.incrFailedAttempts();
       return stats;
@@ -378,7 +379,7 @@ TransferStats SenderThread::sendOneByteSource(
 }
 
 SenderState SenderThread::sendSizeCmd() {
-  VLOG(1) << *this << " entered SEND_SIZE_CMD state";
+  WVLOG(1) << *this << " entered SEND_SIZE_CMD state";
   int64_t off = 0;
   buf_[off++] = Protocol::SIZE_CMD;
 
@@ -386,7 +387,7 @@ SenderState SenderThread::sendSizeCmd() {
                        dirQueue_->getTotalSize());
   int64_t written = socket_->write(buf_, off);
   if (written != off) {
-    LOG(ERROR) << "Socket write error " << off << " " << written;
+    WLOG(ERROR) << "Socket write error " << off << " " << written;
     threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return CHECK_FOR_ABORT;
   }
@@ -396,7 +397,7 @@ SenderState SenderThread::sendSizeCmd() {
 }
 
 SenderState SenderThread::sendDoneCmd() {
-  VLOG(1) << *this << " entered SEND_DONE_CMD state";
+  WVLOG(1) << *this << " entered SEND_DONE_CMD state";
 
   int64_t off = 0;
   buf_[off++] = Protocol::DONE_CMD;
@@ -409,26 +410,26 @@ SenderState SenderThread::sendDoneCmd() {
   int toWrite = Protocol::kMinBufLength;
   int64_t written = socket_->write(buf_, toWrite);
   if (written != toWrite) {
-    LOG(ERROR) << "Socket write failure " << written << " " << toWrite;
+    WLOG(ERROR) << "Socket write failure " << written << " " << toWrite;
     threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return CHECK_FOR_ABORT;
   }
   threadStats_.addHeaderBytes(toWrite);
-  VLOG(1) << "Wrote done cmd on " << socket_->getFd()
-          << " waiting for reply...";
+  WVLOG(1) << "Wrote done cmd on " << socket_->getFd()
+           << " waiting for reply...";
   return READ_RECEIVER_CMD;
 }
 
 SenderState SenderThread::checkForAbort() {
-  LOG(INFO) << *this << " entered CHECK_FOR_ABORT state";
+  WLOG(INFO) << *this << " entered CHECK_FOR_ABORT state";
   auto numRead = socket_->read(buf_, 1);
   if (numRead != 1) {
-    VLOG(1) << "No abort cmd found";
+    WVLOG(1) << "No abort cmd found";
     return CONNECT;
   }
   Protocol::CMD_MAGIC cmd = (Protocol::CMD_MAGIC)buf_[0];
   if (cmd != Protocol::ABORT_CMD) {
-    VLOG(1) << "Unexpected result found while reading for abort " << buf_[0];
+    WVLOG(1) << "Unexpected result found while reading for abort " << buf_[0];
     return CONNECT;
   }
   threadStats_.addHeaderBytes(1);
@@ -436,10 +437,10 @@ SenderState SenderThread::checkForAbort() {
 }
 
 SenderState SenderThread::readFileChunks() {
-  LOG(INFO) << *this << " entered READ_FILE_CHUNKS state ";
+  WLOG(INFO) << *this << " entered READ_FILE_CHUNKS state ";
   int64_t numRead = socket_->read(buf_, 1);
   if (numRead != 1) {
-    LOG(ERROR) << "Socket read error 1 " << numRead;
+    WLOG(ERROR) << "Socket read error 1 " << numRead;
     threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return CHECK_FOR_ABORT;
   }
@@ -453,8 +454,8 @@ SenderState SenderThread::readFileChunks() {
   }
   if (cmd == Protocol::ACK_CMD) {
     if (!wdtParent_->isFileChunksReceived()) {
-      LOG(ERROR) << "Sender has not yet received file chunks, but receiver "
-                 << "thinks it has already sent it";
+      WLOG(ERROR) << "Sender has not yet received file chunks, but receiver "
+                  << "thinks it has already sent it";
       threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return END;
     }
@@ -472,14 +473,14 @@ SenderState SenderThread::readFileChunks() {
     return READ_FILE_CHUNKS;
   }
   if (cmd != Protocol::CHUNKS_CMD) {
-    LOG(ERROR) << "Unexpected cmd " << cmd;
+    WLOG(ERROR) << "Unexpected cmd " << cmd;
     threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return END;
   }
   int64_t toRead = Protocol::kChunksCmdLen;
   numRead = socket_->read(buf_, toRead);
   if (numRead != toRead) {
-    LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
+    WLOG(ERROR) << "Socket read error " << toRead << " " << numRead;
     threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return CHECK_FOR_ABORT;
   }
@@ -487,8 +488,8 @@ SenderState SenderThread::readFileChunks() {
   int64_t off = 0;
   int64_t bufSize, numFiles;
   Protocol::decodeChunksCmd(buf_, off, bufSize, numFiles);
-  LOG(INFO) << "File chunk list has " << numFiles
-            << " entries and is broken in buffers of length " << bufSize;
+  WLOG(INFO) << "File chunk list has " << numFiles
+             << " entries and is broken in buffers of length " << bufSize;
   std::unique_ptr<char[]> chunkBuffer(new char[bufSize]);
   std::vector<FileChunksInfo> fileChunksInfoList;
   while (true) {
@@ -499,9 +500,9 @@ SenderState SenderThread::readFileChunks() {
       // number of chunks. This chunks are read and parsed and added to
       // fileChunksInfoList. Number of chunks we decode should match with the
       // number mentioned in the Chunks cmd.
-      LOG(ERROR) << "Number of file chunks received is more than the number "
-                    "mentioned in CHUNKS_CMD "
-                 << numFileChunks << " " << numFiles;
+      WLOG(ERROR) << "Number of file chunks received is more than the number "
+                     "mentioned in CHUNKS_CMD "
+                  << numFileChunks << " " << numFiles;
       threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return END;
     }
@@ -511,7 +512,7 @@ SenderState SenderThread::readFileChunks() {
     toRead = sizeof(int32_t);
     numRead = socket_->read(buf_, toRead);
     if (numRead != toRead) {
-      LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
+      WLOG(ERROR) << "Socket read error " << toRead << " " << numRead;
       threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
       return CHECK_FOR_ABORT;
     }
@@ -519,7 +520,7 @@ SenderState SenderThread::readFileChunks() {
     toRead = folly::Endian::little(toRead);
     numRead = socket_->read(chunkBuffer.get(), toRead);
     if (numRead != toRead) {
-      LOG(ERROR) << "Socket read error " << toRead << " " << numRead;
+      WLOG(ERROR) << "Socket read error " << toRead << " " << numRead;
       threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
       return CHECK_FOR_ABORT;
     }
@@ -529,7 +530,7 @@ SenderState SenderThread::readFileChunks() {
     bool success = Protocol::decodeFileChunksInfoList(
         chunkBuffer.get(), off, toRead, fileChunksInfoList);
     if (!success) {
-      LOG(ERROR) << "Unable to decode file chunks list";
+      WLOG(ERROR) << "Unable to decode file chunks list";
       threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return END;
     }
@@ -540,7 +541,7 @@ SenderState SenderThread::readFileChunks() {
   int64_t toWrite = 1;
   int64_t written = socket_->write(buf_, toWrite);
   if (toWrite != written) {
-    LOG(ERROR) << "Socket write error " << toWrite << " " << written;
+    WLOG(ERROR) << "Socket write error " << toWrite << " " << written;
     threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return CHECK_FOR_ABORT;
   }
@@ -566,15 +567,15 @@ ErrorCode SenderThread::readNextReceiverCmd() {
     }
     WDT_CHECK_LT(numRead, 0);
     ErrorCode errCode = socket_->getReadErrCode();
-    LOG(ERROR) << "Failed to read receiver cmd " << numRead << " "
-               << errorCodeToStr(errCode);
+    WLOG(ERROR) << "Failed to read receiver cmd " << numRead << " "
+                << errorCodeToStr(errCode);
     if (errCode != WDT_TIMEOUT) {
       // not timed out
       return SOCKET_READ_ERROR;
     }
     int curUnackedBytes = socket_->getUnackedBytes();
     if (numUnackedBytes < 0 || curUnackedBytes < 0) {
-      LOG(ERROR) << "Failed to read number of unacked bytes, reconnecting";
+      WLOG(ERROR) << "Failed to read number of unacked bytes, reconnecting";
       return SOCKET_READ_ERROR;
     }
     WDT_CHECK_GE(numUnackedBytes, curUnackedBytes);
@@ -583,33 +584,33 @@ ErrorCode SenderThread::readNextReceiverCmd() {
       break;
     }
     if (curUnackedBytes == numUnackedBytes) {
-      LOG(ERROR) << "Number of unacked bytes did not change, reconnecting "
-                 << curUnackedBytes;
+      WLOG(ERROR) << "Number of unacked bytes did not change, reconnecting "
+                  << curUnackedBytes;
       return SOCKET_READ_ERROR;
     }
-    LOG(INFO) << "Read receiver command failed, but number of unacked "
-                 "bytes decreased, retrying socket read "
-              << numUnackedBytes << " " << curUnackedBytes;
+    WLOG(INFO) << "Read receiver command failed, but number of unacked "
+                  "bytes decreased, retrying socket read "
+               << numUnackedBytes << " " << curUnackedBytes;
     numUnackedBytes = curUnackedBytes;
   }
   // we are assuming that sender and receiver tcp buffer sizes are same. So, we
   // expect another timeToClearSendBuffer milliseconds for receiver to clear its
   // buffer
   int readTimeout = timeToClearSendBuffer + options_.drain_extra_ms;
-  LOG(INFO) << "Send buffer cleared in " << timeToClearSendBuffer
-            << "ms, waiting for " << readTimeout
-            << "ms for receiver buffer to clear";
+  WLOG(INFO) << "Send buffer cleared in " << timeToClearSendBuffer
+             << "ms, waiting for " << readTimeout
+             << "ms for receiver buffer to clear";
   // readWithTimeout internally checks for abort periodically
   int numRead = socket_->readWithTimeout(buf_, 1, readTimeout);
   if (numRead != 1) {
-    LOG(ERROR) << "Failed to read receiver cmd " << numRead;
+    WLOG(ERROR) << "Failed to read receiver cmd " << numRead;
     return SOCKET_READ_ERROR;
   }
   return OK;
 }
 
 SenderState SenderThread::readReceiverCmd() {
-  VLOG(1) << *this << " entered READ_RECEIVER_CMD state";
+  WVLOG(1) << *this << " entered READ_RECEIVER_CMD state";
 
   ErrorCode errCode = readNextReceiverCmd();
   if (errCode != OK) {
@@ -640,7 +641,7 @@ SenderState SenderThread::readReceiverCmd() {
     WDT_CHECK_EQ(OK, errCode);
     return READ_RECEIVER_CMD;
   }
-  LOG(ERROR) << "Read unexpected receiver cmd " << cmd << " port " << port_;
+  WLOG(ERROR) << "Read unexpected receiver cmd " << cmd << " port " << port_;
   threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
   return END;
 }
@@ -651,8 +652,8 @@ ErrorCode SenderThread::readAndVerifySpuriousCheckpoint() {
   int64_t toRead = checkpointLen - 1;
   int numRead = socket_->read(buf_ + 1, toRead);
   if (numRead != toRead) {
-    LOG(ERROR) << "Could not read possible local checkpoint " << toRead << " "
-               << numRead << " " << port_;
+    WLOG(ERROR) << "Could not read possible local checkpoint " << toRead << " "
+                << numRead << " " << port_;
     threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return SOCKET_READ_ERROR;
   }
@@ -666,19 +667,19 @@ ErrorCode SenderThread::readAndVerifySpuriousCheckpoint() {
       // In a spurious local checkpoint, number of blocks and offset must both
       // be zero
       // Ignore the checkpoint
-      LOG(WARNING)
+      WLOG(WARNING)
           << "Received valid but unexpected local checkpoint, ignoring "
           << port_ << " checkpoint " << checkpoints[0];
       return OK;
     }
   }
-  LOG(ERROR) << "Failed to verify spurious local checkpoint, port " << port_;
+  WLOG(ERROR) << "Failed to verify spurious local checkpoint, port " << port_;
   threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
   return PROTOCOL_ERROR;
 }
 
 SenderState SenderThread::processDoneCmd() {
-  VLOG(1) << *this << " entered PROCESS_DONE_CMD state";
+  WVLOG(1) << *this << " entered PROCESS_DONE_CMD state";
   // DONE cmd implies that all the blocks sent till now is acked
   ThreadTransferHistory &transferHistory = getTransferHistory();
   transferHistory.markAllAcknowledged();
@@ -690,33 +691,33 @@ SenderState SenderThread::processDoneCmd() {
   socket_->shutdownWrites();
   ErrorCode retCode = socket_->expectEndOfStream();
   if (retCode != OK) {
-    LOG(WARNING) << "Logical EOF not found when expected "
-                 << errorCodeToStr(retCode);
+    WLOG(WARNING) << "Logical EOF not found when expected "
+                  << errorCodeToStr(retCode);
     threadStats_.setLocalErrorCode(retCode);
     return CONNECT;
   }
-  VLOG(1) << "done with transfer, port " << port_;
+  WVLOG(1) << "done with transfer, port " << port_;
   return END;
 }
 
 SenderState SenderThread::processWaitCmd() {
-  LOG(INFO) << *this << " entered PROCESS_WAIT_CMD state ";
+  WLOG(INFO) << *this << " entered PROCESS_WAIT_CMD state ";
   // similar to DONE, WAIT also verifies all the blocks
   ThreadTransferHistory &transferHistory = getTransferHistory();
   transferHistory.markAllAcknowledged();
-  VLOG(1) << "received WAIT_CMD, port " << port_;
+  WVLOG(1) << "received WAIT_CMD, port " << port_;
   return READ_RECEIVER_CMD;
 }
 
 SenderState SenderThread::processErrCmd() {
-  LOG(INFO) << *this << " entered PROCESS_ERR_CMD state";
+  WLOG(INFO) << *this << " entered PROCESS_ERR_CMD state";
   // similar to DONE, global checkpoint cmd also verifies all the blocks
   ThreadTransferHistory &transferHistory = getTransferHistory();
   transferHistory.markAllAcknowledged();
   int64_t toRead = sizeof(int16_t);
   int64_t numRead = socket_->read(buf_, toRead);
   if (numRead != toRead) {
-    LOG(ERROR) << "read unexpected " << toRead << " " << numRead;
+    WLOG(ERROR) << "read unexpected " << toRead << " " << numRead;
     threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return CONNECT;
   }
@@ -726,7 +727,7 @@ SenderState SenderThread::processErrCmd() {
   char checkpointBuf[checkpointsLen];
   numRead = socket_->read(checkpointBuf, checkpointsLen);
   if (numRead != checkpointsLen) {
-    LOG(ERROR) << "read unexpected " << checkpointsLen << " " << numRead;
+    WLOG(ERROR) << "read unexpected " << checkpointsLen << " " << numRead;
     threadStats_.setLocalErrorCode(SOCKET_READ_ERROR);
     return CONNECT;
   }
@@ -735,28 +736,28 @@ SenderState SenderThread::processErrCmd() {
   int64_t decodeOffset = 0;
   if (!Protocol::decodeCheckpoints(threadProtocolVersion_, checkpointBuf,
                                    decodeOffset, checkpointsLen, checkpoints)) {
-    LOG(ERROR) << "checkpoint decode failure "
-               << folly::humanify(std::string(checkpointBuf, checkpointsLen));
+    WLOG(ERROR) << "checkpoint decode failure "
+                << folly::humanify(std::string(checkpointBuf, checkpointsLen));
     threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return END;
   }
   for (auto &checkpoint : checkpoints) {
-    LOG(INFO) << *this << " Received global checkpoint " << checkpoint;
+    WLOG(INFO) << *this << " Received global checkpoint " << checkpoint;
     transferHistoryController_->handleGlobalCheckpoint(checkpoint);
   }
   return SEND_BLOCKS;
 }
 
 SenderState SenderThread::processAbortCmd() {
-  LOG(INFO) << *this << " entered PROCESS_ABORT_CMD state ";
+  WLOG(INFO) << *this << " entered PROCESS_ABORT_CMD state ";
   ThreadTransferHistory &transferHistory = getTransferHistory();
   threadStats_.setLocalErrorCode(ABORT);
   int toRead = Protocol::kAbortLength;
   auto numRead = socket_->read(buf_, toRead);
   if (numRead != toRead) {
     // can not read checkpoint, but still must exit because of ABORT
-    LOG(ERROR) << "Error while trying to read ABORT cmd " << numRead << " "
-               << toRead;
+    WLOG(ERROR) << "Error while trying to read ABORT cmd " << numRead << " "
+                << toRead;
     return END;
   }
   int64_t offset = 0;
@@ -767,10 +768,10 @@ SenderState SenderThread::processAbortCmd() {
                         checkpoint);
   threadStats_.setRemoteErrorCode(remoteError);
   std::string failedFileName = transferHistory.getSourceId(checkpoint);
-  LOG(WARNING) << *this << "Received abort on "
-               << " remote protocol version " << negotiatedProtocol
-               << " remote error code " << errorCodeToStr(remoteError)
-               << " file " << failedFileName << " checkpoint " << checkpoint;
+  WLOG(WARNING) << *this << "Received abort on "
+                << " remote protocol version " << negotiatedProtocol
+                << " remote error code " << errorCodeToStr(remoteError)
+                << " file " << failedFileName << " checkpoint " << checkpoint;
   wdtParent_->abort(remoteError);
   if (remoteError == VERSION_MISMATCH) {
     if (Protocol::negotiateProtocol(
@@ -779,8 +780,8 @@ SenderState SenderThread::processAbortCmd() {
       negotiatedProtocol_ = negotiatedProtocol;
       return PROCESS_VERSION_MISMATCH;
     } else {
-      LOG(ERROR) << "Sender can not support receiver version "
-                 << negotiatedProtocol;
+      WLOG(ERROR) << "Sender can not support receiver version "
+                  << negotiatedProtocol;
       threadStats_.setRemoteErrorCode(VERSION_INCOMPATIBLE);
     }
   }
@@ -788,14 +789,14 @@ SenderState SenderThread::processAbortCmd() {
 }
 
 SenderState SenderThread::processVersionMismatch() {
-  LOG(INFO) << *this << " entered PROCESS_VERSION_MISMATCH state ";
+  WLOG(INFO) << *this << " entered PROCESS_VERSION_MISMATCH state ";
   WDT_CHECK(threadStats_.getLocalErrorCode() == ABORT);
   auto negotiationStatus = wdtParent_->getNegotiationStatus();
   WDT_CHECK_NE(negotiationStatus, V_MISMATCH_FAILED)
       << "Thread should have ended in case of version mismatch";
   if (negotiationStatus == V_MISMATCH_RESOLVED) {
-    LOG(WARNING) << *this << " Protocol version already negotiated, but "
-                             "transfer still aborted due to version mismatch";
+    WLOG(WARNING) << *this << " Protocol version already negotiated, but "
+                              "transfer still aborted due to version mismatch";
     return END;
   }
   WDT_CHECK_EQ(negotiationStatus, V_MISMATCH_WAIT);
@@ -803,13 +804,13 @@ SenderState SenderThread::processVersionMismatch() {
   // have been collected
   auto barrier = controller_->getBarrier(VERSION_MISMATCH_BARRIER);
   barrier->execute();
-  VLOG(1) << *this << " cleared the protocol version barrier";
+  WVLOG(1) << *this << " cleared the protocol version barrier";
   auto execFunnel = controller_->getFunnel(VERSION_MISMATCH_FUNNEL);
   while (true) {
     auto status = execFunnel->getStatus();
     switch (status) {
       case FUNNEL_START: {
-        LOG(INFO) << *this << " started the funnel for version mismatch";
+        WLOG(INFO) << *this << " started the funnel for version mismatch";
         wdtParent_->setProtoNegotiationStatus(V_MISMATCH_FAILED);
         if (transferHistoryController_->handleVersionMismatch() != OK) {
           execFunnel->notifySuccess();
@@ -821,8 +822,9 @@ SenderState SenderThread::processVersionMismatch() {
           if (threadProtocolVersion_ > 0) {
             if (negotiatedProtocol > 0 &&
                 negotiatedProtocol != threadProtocolVersion_) {
-              LOG(ERROR) << "Different threads negotiated different protocols "
-                         << negotiatedProtocol << " " << threadProtocolVersion_;
+              WLOG(ERROR) << "Different threads negotiated different protocols "
+                          << negotiatedProtocol << " "
+                          << threadProtocolVersion_;
               execFunnel->notifySuccess();
               return END;
             }
@@ -830,7 +832,7 @@ SenderState SenderThread::processVersionMismatch() {
           }
         }
         WDT_CHECK_GT(negotiatedProtocol, 0);
-        LOG_IF(INFO, negotiatedProtocol != threadProtocolVersion_)
+        WLOG_IF(INFO, negotiatedProtocol != threadProtocolVersion_)
             << *this << "Changing protocol version to " << negotiatedProtocol
             << ", previous version " << threadProtocolVersion_;
         wdtParent_->setProtocolVersion(negotiatedProtocol);
@@ -882,7 +884,7 @@ void SenderThread::start() {
   Clock::time_point startTime = Clock::now();
 
   if (buf_ == nullptr) {
-    LOG(ERROR) << "Unable to allocate buffer";
+    WLOG(ERROR) << "Unable to allocate buffer";
     threadStats_.setLocalErrorCode(MEMORY_ALLOCATION_ERROR);
     return;
   }
@@ -895,7 +897,7 @@ void SenderThread::start() {
   while (state != END) {
     ErrorCode abortCode = getThreadAbortCode();
     if (abortCode != OK) {
-      LOG(ERROR) << *this << "Transfer aborted " << errorCodeToStr(abortCode);
+      WLOG(ERROR) << *this << "Transfer aborted " << errorCodeToStr(abortCode);
       threadStats_.setLocalErrorCode(ABORT);
       if (abortCode == VERSION_MISMATCH) {
         state = PROCESS_VERSION_MISMATCH;
@@ -910,10 +912,10 @@ void SenderThread::start() {
       (socket_ ? socket_->getEncryptionType() : ENC_NONE);
   threadStats_.setEncryptionType(encryptionType);
   double totalTime = durationSeconds(Clock::now() - startTime);
-  LOG(INFO) << "Port " << port_ << " done. " << threadStats_
-            << " Total throughput = "
-            << threadStats_.getEffectiveTotalBytes() / totalTime / kMbToB
-            << " Mbytes/sec";
+  WLOG(INFO) << "Port " << port_ << " done. " << threadStats_
+             << " Total throughput = "
+             << threadStats_.getEffectiveTotalBytes() / totalTime / kMbToB
+             << " Mbytes/sec";
 
   ThreadTransferHistory &transferHistory = getTransferHistory();
   transferHistory.markNotInUse();

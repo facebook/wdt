@@ -7,12 +7,12 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
-#include <unordered_map>
-#include <vector>
 #include <folly/Memory.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/Receiver.h>
 #include <wdt/Sender.h>
+#include <unordered_map>
+#include <vector>
 
 namespace facebook {
 namespace wdt {

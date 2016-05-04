@@ -9,11 +9,11 @@
 #include <wdt/util/FileCreator.h>
 #include <wdt/ErrorCodes.h>
 
+#include <fcntl.h>
+#include <folly/Conv.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <fcntl.h>
-#include <folly/Conv.h>
 
 namespace facebook {
 namespace wdt {
@@ -43,7 +43,7 @@ bool FileCreator::setFileSize(ThreadCtx &threadCtx, int fd, int64_t fileSize) {
 #ifdef HAS_POSIX_FALLOCATE
   int status = posix_fallocate(fd, 0, fileSize);
   if (status != 0) {
-    LOG(ERROR) << "fallocate() failed " << strerrorStr(status);
+    WLOG(ERROR) << "fallocate() failed " << strerrorStr(status);
     return false;
   }
   return true;
@@ -74,9 +74,9 @@ int FileCreator::openAndSetSize(ThreadCtx &threadCtx,
   }
   if (threadCtx.getOptions().isLogBasedResumption()) {
     if (isTooLarge) {
-      LOG(WARNING) << "File size smaller in the sender side "
-                   << blockDetails->fileName
-                   << ", marking previous transferred chunks as invalid";
+      WLOG(WARNING) << "File size smaller in the sender side "
+                    << blockDetails->fileName
+                    << ", marking previous transferred chunks as invalid";
       transferLogManager_.addFileInvalidationEntry(blockDetails->prevSeqId);
     }
     if (isTooLarge || doCreate) {
@@ -136,7 +136,7 @@ int FileCreator::openForBlocks(ThreadCtx &threadCtx,
     if (status != 0) {
       PLOG(ERROR) << "Failed to delete file " << path;
     } else {
-      LOG(INFO) << "Successfully deleted file " << path;
+      WLOG(INFO) << "Successfully deleted file " << path;
     }
     return -1;
   }
@@ -193,7 +193,7 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
     PLOG(ERROR) << "failed opening file " << path;
     return -1;
   }
-  VLOG(1) << "successfully opened file " << path;
+  WVLOG(1) << "successfully opened file " << path;
   return res;
 }
 
@@ -224,8 +224,8 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
     }
     if (!dirSuccess1) {
       // retry with force
-      LOG(ERROR) << "failed to create dir " << dir << " recursively, "
-                 << "trying to force directory creation";
+      WLOG(ERROR) << "failed to create dir " << dir << " recursively, "
+                  << "trying to force directory creation";
       bool dirSuccess2;
       {
         PerfStatCollector statCollector(threadCtx,
@@ -233,7 +233,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
         dirSuccess2 = createDirRecursively(dir, true /* force */);
       }
       if (!dirSuccess2) {
-        LOG(ERROR) << "failed to create dir " << dir << " recursively";
+        WLOG(ERROR) << "failed to create dir " << dir << " recursively";
         return -1;
       }
     }
@@ -271,7 +271,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
       dirSuccess = createDirRecursively(dir, true /* force */);
     }
     if (!dirSuccess) {
-      LOG(ERROR) << "failed to create dir " << dir << " recursively";
+      WLOG(ERROR) << "failed to create dir " << dir << " recursively";
       return -1;
     }
     {
@@ -283,7 +283,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
       return -1;
     }
   }
-  VLOG(1) << "successfully created file " << path;
+  WVLOG(1) << "successfully created file " << path;
   return res;
 }
 
@@ -316,9 +316,9 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
     PLOG(ERROR) << "failed to make directory " << fullDirPath;
     return false;
   } else if (code != 0) {
-    LOG(INFO) << "dir already exists " << fullDirPath;
+    WLOG(INFO) << "dir already exists " << fullDirPath;
   } else {
-    LOG(INFO) << "made dir " << fullDirPath;
+    WLOG(INFO) << "made dir " << fullDirPath;
   }
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -336,7 +336,7 @@ std::string FileCreator::getFullPath(const std::string &relPath) {
 void FileCreator::addTrailingSlash(string &path) {
   if (path.back() != '/') {
     path.push_back('/');
-    VLOG(1) << "Added missing trailing / to " << path;
+    WVLOG(1) << "Added missing trailing / to " << path;
   }
 }
 }

@@ -9,10 +9,10 @@
 #include <wdt/util/ClientSocket.h>
 #include <wdt/Reporting.h>
 
-#include <glog/logging.h>
-#include <sys/socket.h>
-#include <poll.h>
 #include <fcntl.h>
+#include <glog/logging.h>
+#include <poll.h>
+#include <sys/socket.h>
 
 namespace facebook {
 namespace wdt {
@@ -47,8 +47,8 @@ ErrorCode ClientSocket::connect() {
   int res = getaddrinfo(dest_.c_str(), portStr.c_str(), &sa_, &infoList);
   if (res) {
     // not errno, can't use PLOG (perror)
-    LOG(ERROR) << "Failed getaddrinfo " << dest_ << " , " << port_ << " : "
-               << res << " : " << gai_strerror(res);
+    WLOG(ERROR) << "Failed getaddrinfo " << dest_ << " , " << port_ << " : "
+                << res << " : " << gai_strerror(res);
     return CONN_ERROR;
   }
   int count = 0;
@@ -57,13 +57,13 @@ ErrorCode ClientSocket::connect() {
     ++count;
     std::string host, port;
     getNameInfo(info->ai_addr, info->ai_addrlen, host, port);
-    VLOG(2) << "will connect to " << host << " " << port;
+    WVLOG(2) << "will connect to " << host << " " << port;
     fd_ = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd_ == -1) {
       PLOG(WARNING) << "Error making socket for port " << port_;
       continue;
     }
-    VLOG(1) << "new socket " << fd_ << " for port " << port_;
+    WVLOG(1) << "new socket " << fd_ << " for port " << port_;
 
     setSendBufferSize();
 
@@ -89,8 +89,8 @@ ErrorCode ClientSocket::connect() {
       while (true) {
         // check for abort
         if (threadCtx_.getAbortChecker()->shouldAbort()) {
-          LOG(ERROR) << "Transfer aborted during connect " << port_ << " "
-                     << fd_;
+          WLOG(ERROR) << "Transfer aborted during connect " << port_ << " "
+                      << fd_;
           closeConnection();
           return ABORT;
         }
@@ -101,7 +101,7 @@ ErrorCode ClientSocket::connect() {
         // abort check interval. This allows us to check for abort regularly.
         int timeElapsed = durationMillis(Clock::now() - startTime);
         if (timeElapsed >= connectTimeout) {
-          VLOG(1) << "connect() timed out" << host << " " << port;
+          WVLOG(1) << "connect() timed out" << host << " " << port;
           closeConnection();
           return CONN_ERROR_RETRYABLE;
         }
@@ -113,11 +113,11 @@ ErrorCode ClientSocket::connect() {
         int retValue;
         if ((retValue = poll(pollFds, 1, pollTimeout)) <= 0) {
           if (errno == EINTR) {
-            VLOG(1) << "poll() call interrupted. retrying... " << port_;
+            WVLOG(1) << "poll() call interrupted. retrying... " << port_;
             continue;
           }
           if (retValue == 0) {
-            VLOG(1) << "poll() timed out " << host << " " << port;
+            WVLOG(1) << "poll() timed out " << host << " " << port;
             continue;
           }
           PLOG(ERROR) << "poll() failed " << host << " " << port << " " << fd_;
@@ -136,8 +136,8 @@ ErrorCode ClientSocket::connect() {
         continue;
       }
       if (connectResult != 0) {
-        LOG(WARNING) << "connect did not succeed on " << host << " " << port
-                     << " : " << strerrorStr(connectResult);
+        WLOG(WARNING) << "connect did not succeed on " << host << " " << port
+                      << " : " << strerrorStr(connectResult);
         closeConnection();
         continue;
       }
@@ -152,7 +152,7 @@ ErrorCode ClientSocket::connect() {
       closeConnection();
       continue;
     }
-    VLOG(1) << "Successful connect on " << fd_;
+    WVLOG(1) << "Successful connect on " << fd_;
     peerIp_ = host;
     sa_ = *info;
     break;
@@ -160,7 +160,7 @@ ErrorCode ClientSocket::connect() {
   if (fd_ < 0) {
     if (count > 1) {
       // Only log this if not redundant with log above (ie --ipv6=false)
-      LOG(INFO) << "Unable to connect to either of the " << count << " addrs";
+      WLOG(INFO) << "Unable to connect to either of the " << count << " addrs";
     }
     return CONN_ERROR_RETRYABLE;
   }
@@ -188,7 +188,7 @@ void ClientSocket::setSendBufferSize() {
                 << " fd " << fd_;
     return;
   }
-  VLOG(1) << "Send buffer size set to " << bufSize << " port " << port_;
+  WVLOG(1) << "Send buffer size set to " << bufSize << " port " << port_;
 }
 
 ClientSocket::~ClientSocket() {

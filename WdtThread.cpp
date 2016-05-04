@@ -38,8 +38,8 @@ void WdtThread::startThread() {
 
 ErrorCode WdtThread::finish() {
   if (!threadPtr_) {
-    LOG(ERROR) << "Finish called on an instance while no thread has been "
-               << " created to do any work";
+    WLOG(ERROR) << "Finish called on an instance while no thread has been "
+                << " created to do any work";
     return ERROR;
   }
   threadPtr_->join();
@@ -49,9 +49,9 @@ ErrorCode WdtThread::finish() {
 
 WdtThread::~WdtThread() {
   if (threadPtr_) {
-    LOG(INFO) << threadIndex_
-              << " has an alive thread while the instance is being "
-              << "destructed";
+    WLOG(INFO) << threadIndex_
+               << " has an alive thread while the instance is being "
+               << "destructed";
     finish();
   }
 }

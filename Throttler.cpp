@@ -45,17 +45,17 @@ void Throttler::configureOptions(double& avgRateBytesPerSec,
                                  double& peakRateBytesPerSec,
                                  double& bucketLimitBytes) {
   if (peakRateBytesPerSec < avgRateBytesPerSec && peakRateBytesPerSec >= 0) {
-    LOG(WARNING) << "Per thread peak rate should be greater "
-                 << "than per thread average rate. "
-                 << "Making peak rate 1.2 times the average rate";
+    WLOG(WARNING) << "Per thread peak rate should be greater "
+                  << "than per thread average rate. "
+                  << "Making peak rate 1.2 times the average rate";
     peakRateBytesPerSec = kPeakMultiplier * (double)avgRateBytesPerSec;
   }
   if (bucketLimitBytes <= 0 && peakRateBytesPerSec > 0) {
     bucketLimitBytes =
         kTimeMultiplier * kBucketMultiplier * peakRateBytesPerSec;
-    LOG(INFO) << "Burst limit not specified but peak "
-              << "rate is configured. Auto configuring to "
-              << bucketLimitBytes / kMbToB << " Mbytes";
+    WLOG(INFO) << "Burst limit not specified but peak "
+               << "rate is configured. Auto configuring to "
+               << bucketLimitBytes / kMbToB << " Mbytes";
   }
 }
 
@@ -74,17 +74,17 @@ Throttler::Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
     bytesTokenBucketLimit_ = bucketLimitBytes;
   }
   if (avgRateBytesPerSec > 0) {
-    LOG(INFO) << "Average rate " << avgRateBytesPerSec_ / kMbToB
-              << " Mbytes/sec";
+    WLOG(INFO) << "Average rate " << avgRateBytesPerSec_ / kMbToB
+               << " Mbytes/sec";
   } else {
-    LOG(INFO) << "No average rate specified";
+    WLOG(INFO) << "No average rate specified";
   }
   if (bucketRateBytesPerSec_ > 0) {
-    LOG(INFO) << "Peak rate " << bucketRateBytesPerSec_ / kMbToB
-              << " Mbytes/sec.  Bucket limit "
-              << bytesTokenBucketLimit_ / kMbToB << " Mbytes.";
+    WLOG(INFO) << "Peak rate " << bucketRateBytesPerSec_ / kMbToB
+               << " Mbytes/sec.  Bucket limit "
+               << bytesTokenBucketLimit_ / kMbToB << " Mbytes.";
   } else {
-    LOG(INFO) << "No peak rate specified";
+    WLOG(INFO) << "No peak rate specified";
   }
   throttlerLogTimeMillis_ = throttlerLogTimeMillis;
 }
@@ -98,16 +98,16 @@ void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
                    bytesTokenBucketLimit);
   folly::SpinLockGuard lock(throttlerMutex_);
   if (refCount_ > 0 && avgRateBytesPerSec < avgRateBytesPerSec_) {
-    LOG(INFO) << "new avg rate : " << avgRateBytesPerSec
-              << " cur avg rate : " << avgRateBytesPerSec_
-              << " Average throttler rate can't be "
-              << "lowered mid transfer. Ignoring the new value";
+    WLOG(INFO) << "new avg rate : " << avgRateBytesPerSec
+               << " cur avg rate : " << avgRateBytesPerSec_
+               << " Average throttler rate can't be "
+               << "lowered mid transfer. Ignoring the new value";
     avgRateBytesPerSec = avgRateBytesPerSec_;
   }
 
-  LOG(INFO) << "Updating the rates avgRateBytesPerSec : " << avgRateBytesPerSec
-            << " bucketRateBytesPerSec : " << bucketRateBytesPerSec
-            << " bytesTokenBucketLimit : " << bytesTokenBucketLimit;
+  WLOG(INFO) << "Updating the rates avgRateBytesPerSec : " << avgRateBytesPerSec
+             << " bucketRateBytesPerSec : " << bucketRateBytesPerSec
+             << " bytesTokenBucketLimit : " << bytesTokenBucketLimit;
   avgRateBytesPerSec_ = avgRateBytesPerSec;
   bucketRateBytesPerSec_ = bucketRateBytesPerSec;
   bytesTokenBucketLimit_ = bytesTokenBucketLimit;
@@ -132,7 +132,7 @@ double Throttler::calculateSleep(double deltaProgress,
                                  const Clock::time_point& now) {
   folly::SpinLockGuard lock(throttlerMutex_);
   if (refCount_ <= 0) {
-    LOG(ERROR) << "Using the throttler without registering the transfer";
+    WLOG(ERROR) << "Using the throttler without registering the transfer";
     return -1;
   }
   bytesProgress_ += deltaProgress;
@@ -158,8 +158,8 @@ double Throttler::calculateSleep(double deltaProgress,
        */
       double peakThrottlerSleep =
           -1.0 * bytesTokenBucket_ / bucketRateBytesPerSec_;
-      VLOG(2) << "Peak throttler wants to sleep " << peakThrottlerSleep
-              << " seconds";
+      WVLOG(2) << "Peak throttler wants to sleep " << peakThrottlerSleep
+               << " seconds";
       return peakThrottlerSleep;
     }
   }
@@ -185,9 +185,9 @@ void Throttler::printPeriodicLogs(const Clock::time_point& now,
     std::chrono::duration<double> elapsedAvgDuration = now - startTime_;
     double elapsedAvgSeconds = elapsedAvgDuration.count();
     double avgBytesPerSec = bytesProgress_ / elapsedAvgSeconds;
-    LOG(INFO) << "Throttler:Transfer_Rates::"
-              << " " << elapsedAvgSeconds << " " << avgBytesPerSec / kMbToB
-              << " " << instantBytesPerSec / kMbToB << " " << deltaProgress;
+    WLOG(INFO) << "Throttler:Transfer_Rates::"
+               << " " << elapsedAvgSeconds << " " << avgBytesPerSec / kMbToB
+               << " " << instantBytesPerSec / kMbToB << " " << deltaProgress;
   }
 }
 
@@ -195,20 +195,20 @@ double Throttler::averageThrottler(const Clock::time_point& now) {
   std::chrono::duration<double> elapsedDuration = now - startTime_;
   double elapsedSeconds = elapsedDuration.count();
   if (avgRateBytesPerSec_ <= 0) {
-    VLOG(2) << "There is no avg rate limit";
+    WVLOG(2) << "There is no avg rate limit";
     return -1;
   }
   const double allowedProgressBytes = avgRateBytesPerSec_ * elapsedSeconds;
   if (bytesProgress_ > allowedProgressBytes) {
     double idealTime = bytesProgress_ / avgRateBytesPerSec_;
     const double sleepTimeSeconds = idealTime - elapsedSeconds;
-    VLOG(1) << "Throttler : Elapsed " << elapsedSeconds
-            << " seconds. Made progress " << bytesProgress_ / kMbToB
-            << " Mbytes in " << elapsedSeconds
-            << " seconds, maximum allowed progress for this duration is "
-            << allowedProgressBytes / kMbToB << " Mbytes. Mean Rate allowed is "
-            << avgRateBytesPerSec_ / kMbToB << " Mbytes/sec. Sleeping for "
-            << sleepTimeSeconds << " seconds";
+    WVLOG(1) << "Throttler : Elapsed " << elapsedSeconds
+             << " seconds. Made progress " << bytesProgress_ / kMbToB
+             << " Mbytes in " << elapsedSeconds
+             << " seconds, maximum allowed progress for this duration is "
+             << allowedProgressBytes / kMbToB
+             << " Mbytes. Mean Rate allowed is " << avgRateBytesPerSec_ / kMbToB
+             << " Mbytes/sec. Sleeping for " << sleepTimeSeconds << " seconds";
     return sleepTimeSeconds;
   }
   return -1;

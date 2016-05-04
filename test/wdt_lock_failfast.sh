@@ -1,17 +1,15 @@
 #! /bin/bash
 
+source `dirname "$0"`/common_functions.sh
+setBinaries
+BASEDIR=/tmp/wdtTest_$USER
+setDirectory
 
 # Simple error test for 2 receiver
 
-BASEDIR="/tmp/wdtTest_$USER"
-
-mkdir -p "$BASEDIR"
-DIR=$(mktemp -d "$BASEDIR/XXXXXX")
-echo "Testing in $DIR"
-
 WDTBIN_OPTS="-num_ports=1 -enable_download_resumption"
 WDTBIN_OPTS+=" -directory $DIR/dst"
-WDTBIN="_bin/wdt/wdt $WDTBIN_OPTS"
+WDTBIN="$WDT_BINARY $WDTBIN_OPTS"
 
 # Use -fork so this blocks until url is generated/receiver started
 $WDTBIN -fork -abort_after_seconds=3 > "$DIR/url1"

@@ -10,7 +10,7 @@ startNewTransfer() {
   fi
   if [ "$1" == "remove" ] && [ $DELETE_EXTRA_FILES == "true" ]; then
     echo "Removing extra files for test ${TEST_COUNT}"
-    rm $SRC_DIR/extra_file${TEST_COUNT}_1 $SRC_DIR/extra_file${TEST_COUNT}_2 
+    rm $SRC_DIR/extra_file${TEST_COUNT}_1 $SRC_DIR/extra_file${TEST_COUNT}_2
   fi
   $WDTBIN_SERVER -directory $DIR/dst${TEST_COUNT} -start_port=$STARTING_PORT \
   -transfer_id=$RECEIVER_ID -protocol_version=$RECEIVER_PROTOCOL_VERSION \
@@ -30,7 +30,7 @@ The possible options to this script are
 -s sender protocol version
 -r receiver protocol version
 -p start port
--d turns on file deletion 
+-d turns on file deletion
 -c combination of options to run. Valid values are 1, 2, 3 and 4.
    1. pre-allocation and block-mode enabled, resumption done using transfer log
    2. pre-allocation disabled, block-mode enabled, resumption done using
@@ -145,7 +145,7 @@ echo "Testing in $DIR"
 
 SRC_DIR=$DIR/src
 
-generateRandomFiles $SRC_DIR 16777216
+generateRandomFiles "$SRC_DIR" 16 # 16 Mb for smallest file
 
 TEST_COUNT=0
 

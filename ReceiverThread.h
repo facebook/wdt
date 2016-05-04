@@ -7,9 +7,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
+#include <wdt/Receiver.h>
 #include <wdt/WdtBase.h>
 #include <wdt/WdtThread.h>
-#include <wdt/Receiver.h>
 #include <wdt/util/ServerSocket.h>
 
 namespace facebook {
@@ -38,7 +38,6 @@ enum ReceiverState {
   SEND_ABORT_CMD,
   WAIT_FOR_FINISH_OR_NEW_CHECKPOINT,
   FINISH_WITH_ERROR,
-  FAILED,
   END
 };
 
@@ -99,7 +98,7 @@ class ReceiverThread : public WdtThread {
    * Tries to listen/bind to port. If this fails, thread is considered failed.
    * Previous states : n/a (start state)
    * Next states : ACCEPT_FIRST_CONNECTION(success),
-   *               FAILED(failure)
+   *               FINISH_WITH_ERROR(failure)
    */
   ReceiverState listen();
 

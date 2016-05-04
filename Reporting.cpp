@@ -7,14 +7,14 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/Reporting.h>
-#include <wdt/WdtOptions.h>
-#include <wdt/Protocol.h>
 #include <folly/String.h>
+#include <wdt/Protocol.h>
+#include <wdt/WdtOptions.h>
 
-#include <iostream>
-#include <iomanip>
-#include <set>
 #include <algorithm>
+#include <iomanip>
+#include <iostream>
+#include <set>
 
 namespace facebook {
 namespace wdt {
@@ -35,23 +35,23 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
     numBlocksSend_ = stats.numBlocksSend_;
   } else if (stats.numBlocksSend_ != -1 &&
              numBlocksSend_ != stats.numBlocksSend_) {
-    LOG_IF(ERROR, localErrCode_ == OK) << "Mismatch in the numBlocksSend "
-                                       << numBlocksSend_ << " "
-                                       << stats.numBlocksSend_;
+    WLOG_IF(ERROR, localErrCode_ == OK) << "Mismatch in the numBlocksSend "
+                                        << numBlocksSend_ << " "
+                                        << stats.numBlocksSend_;
     localErrCode_ = ERROR;
   }
   if (totalSenderBytes_ == -1) {
     totalSenderBytes_ = stats.totalSenderBytes_;
   } else if (stats.totalSenderBytes_ != -1 &&
              totalSenderBytes_ != stats.totalSenderBytes_) {
-    LOG_IF(ERROR, localErrCode_ == OK) << "Mismatch in the total sender bytes "
-                                       << totalSenderBytes_ << " "
-                                       << stats.totalSenderBytes_;
+    WLOG_IF(ERROR, localErrCode_ == OK) << "Mismatch in the total sender bytes "
+                                        << totalSenderBytes_ << " "
+                                        << stats.totalSenderBytes_;
     localErrCode_ = ERROR;
   }
   localErrCode_ = getMoreInterestingError(localErrCode_, stats.localErrCode_);
-  VLOG(2) << "Local ErrorCode now " << localErrCode_ << " from "
-          << stats.localErrCode_;
+  WVLOG(2) << "Local ErrorCode now " << localErrCode_ << " from "
+           << stats.localErrCode_;
   remoteErrCode_ =
       getMoreInterestingError(remoteErrCode_, stats.remoteErrCode_);
   if (stats.localErrCode_ == OK && stats.remoteErrCode_ == OK) {
@@ -122,7 +122,7 @@ TransferReport::TransferReport(
       break;
     }
   }
-  LOG(INFO) << "Error code summary " << errorCodeToStr(summaryErrorCode);
+  WLOG(INFO) << "Error code summary " << errorCodeToStr(summaryErrorCode);
   // none of the files or directories failed
   bool possiblyOk = true;
   if (!failedDirectories_.empty()) {
@@ -137,8 +137,8 @@ TransferReport::TransferReport(
   }
   if (possiblyOk && atLeastOneOk) {
     if (summaryErrorCode != OK) {
-      LOG(WARNING) << "WDT successfully recovered from error "
-                   << errorCodeToStr(summaryErrorCode);
+      WLOG(WARNING) << "WDT successfully recovered from error "
+                    << errorCodeToStr(summaryErrorCode);
     }
     summaryErrorCode = OK;
   }
@@ -146,8 +146,8 @@ TransferReport::TransferReport(
 
   if (summary_.getEffectiveDataBytes() != totalFileSize_) {
     // sender did not send all the bytes
-    LOG(INFO) << "Could not send all the bytes " << totalFileSize_ << " "
-              << summary_.getEffectiveDataBytes();
+    WLOG(INFO) << "Could not send all the bytes " << totalFileSize_ << " "
+               << summary_.getEffectiveDataBytes();
     WDT_CHECK(summaryErrorCode != OK)
         << "BUG: All threads OK yet sized based error detected";
   }
@@ -181,23 +181,23 @@ TransferReport::TransferReport(TransferStats&& globalStats)
   const int64_t numBytesSend = summary_.getTotalSenderBytes();
   const int64_t numBytesReceived = summary_.getEffectiveDataBytes();
   ErrorCode summaryErrorCode = summary_.getLocalErrorCode();
-  VLOG(1) << "Summary Error Code " << summaryErrorCode;
+  WVLOG(1) << "Summary Error Code " << summaryErrorCode;
   // TODO this is messy and error (ah!) prone
   if (numBlocksSend == -1 || numBlocksSend != numBlocksReceived) {
-    LOG(ERROR) << "Did not receive all the blocks sent by the sender "
-               << numBlocksSend << " " << numBlocksReceived;
+    WLOG(ERROR) << "Did not receive all the blocks sent by the sender "
+                << numBlocksSend << " " << numBlocksReceived;
     summaryErrorCode = getMoreInterestingError(summaryErrorCode, ERROR);
   } else if (numBytesSend != -1 && numBytesSend != numBytesReceived) {
     // did not receive all the bytes
-    LOG(ERROR) << "Number of bytes sent and received do not match "
-               << numBytesSend << " " << numBytesReceived;
+    WLOG(ERROR) << "Number of bytes sent and received do not match "
+                << numBytesSend << " " << numBytesReceived;
     summaryErrorCode = getMoreInterestingError(summaryErrorCode, ERROR);
   } else {
     // We got all the bytes... but if we have an encryption error we should
     // make it stick (unlike the connection error on a single port...)
     if (summaryErrorCode != OK && summaryErrorCode != ENCRYPTION_ERROR) {
-      LOG(WARNING) << "All bytes received, turning "
-                   << errorCodeToStr(summaryErrorCode) << " into local OK";
+      WLOG(WARNING) << "All bytes received, turning "
+                    << errorCodeToStr(summaryErrorCode) << " into local OK";
       summaryErrorCode = OK;
     }
   }
@@ -213,8 +213,7 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
     if (report.summary_.getNumFiles() == 0) {
       os << " All files failed.";
     } else {
-      os << "\n"
-         << "Failed files :\n";
+      os << "\n" << WDT_LOG_PREFIX << "Failed files :\n" << WDT_LOG_PREFIX;
       std::set<std::string> failedFilesSet;
       for (auto& stats : report.getFailedSourceStats()) {
         failedFilesSet.insert(stats.getId());
@@ -228,7 +227,7 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
         if (displayCount >= numOfFilesToPrint) {
           break;
         }
-        os << fileName << "\n";
+        os << fileName << "\n" << WDT_LOG_PREFIX;
         displayCount++;
       }
 
@@ -238,13 +237,12 @@ std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
     }
   }
   if (!report.failedDirectories_.empty()) {
-    os << "\n"
-       << "Failed directories :\n";
+    os << "\n" << WDT_LOG_PREFIX << "Failed directories :\n" << WDT_LOG_PREFIX;
     int64_t numFailedDirectories = report.failedDirectories_.size();
     int64_t numOfDirToPrint =
         std::min<int64_t>(kMaxEntriesToPrint, numFailedDirectories);
     for (int64_t i = 0; i < numOfDirToPrint; i++) {
-      os << report.failedDirectories_[i] << "\n";
+      os << report.failedDirectories_[i] << "\n" << WDT_LOG_PREFIX;
     }
     if (numOfDirToPrint < numFailedDirectories) {
       os << "more...(" << numFailedDirectories - numOfDirToPrint
@@ -306,10 +304,10 @@ void ProgressReporter::displayProgress(int progress, double averageThroughput,
 void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
                                    double averageThroughput,
                                    double currentThroughput) {
-  LOG(INFO) << "wdt transfer progress " << (effectiveDataBytes / kMbToB)
-            << " Mbytes, completed " << progress << "%, Average throughput "
-            << averageThroughput << " Mbytes/s, Recent throughput "
-            << currentThroughput << " Mbytes/s";
+  WLOG(INFO) << "wdt transfer progress " << (effectiveDataBytes / kMbToB)
+             << " Mbytes, completed " << progress << "%, Average throughput "
+             << averageThroughput << " Mbytes/s, Recent throughput "
+             << currentThroughput << " Mbytes/s";
 }
 
 const std::string PerfStatReport::statTypeDescription_[] = {
@@ -364,8 +362,8 @@ void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
 
   int64_t timeInMillis = timeInMicros / kMicroToMilli;
   if (timeInMicros >= networkTimeoutMillis_ * 750) {
-    LOG(WARNING) << statTypeDescription_[statType] << " system call took "
-                 << timeInMillis << " ms";
+    WLOG(WARNING) << statTypeDescription_[statType] << " system call took "
+                  << timeInMillis << " ms";
   }
   perfStats_[statType][timeInMillis]++;
   maxValueMicros_[statType] =
@@ -399,7 +397,7 @@ PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
 std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
   folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
 
-  os << "\n***** PERF STATS *****\n";
+  os << "***** PERF STATS *****\n" << WDT_LOG_PREFIX;
   for (int i = 0; i < PerfStatReport::kNumTypes_; i++) {
     if (statReport.count_[i] == 0) {
       continue;
@@ -455,7 +453,7 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
       }
       buckets[currentBucketIndex] += count;
     }
-    os << '\n';
+    os << '\n' << WDT_LOG_PREFIX;
     for (int i = 0; i < numBuckets; i++) {
       if (buckets[i] == 0) {
         continue;
@@ -466,7 +464,8 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
           (i < numBuckets - 1 ? PerfStatReport::kHistogramBuckets[i]
                               : std::numeric_limits<int64_t>::max());
       os << "[" << bucketStart << ", " << bucketEnd << ") --> " << buckets[i]
-         << '\n';
+         << '\n'
+         << WDT_LOG_PREFIX;
     }
   }
   return os;

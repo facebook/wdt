@@ -8,8 +8,8 @@
  */
 #pragma once
 
-#include <wdt/util/CommonImpl.h>
 #include <wdt/Protocol.h>
+#include <wdt/util/CommonImpl.h>
 
 #include <string>
 

@@ -8,20 +8,20 @@
  */
 #pragma once
 
-#include <algorithm>
-#include <condition_variable>
 #include <dirent.h>
 #include <glog/logging.h>
+#include <algorithm>
+#include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <thread>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 
 #include <wdt/Protocol.h>
-#include <wdt/WdtTransferRequest.h>
 #include <wdt/SourceQueue.h>
+#include <wdt/WdtTransferRequest.h>
 #include <wdt/util/FileByteSource.h>
 
 namespace facebook {

@@ -27,28 +27,28 @@ releaseIptableLock() {
 }
 
 blockSportByDropping() {
-  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --sport "$1" -j DROP"
+  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --sport $1 -j DROP"
   acquireIptableLock
   sudo ip6tables -A INPUT -p tcp --sport "$1" -j DROP
   releaseIptableLock
 }
 
 blockDportByDropping() {
-  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --dport "$1" -j DROP"
+  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --dport $1 -j DROP"
   acquireIptableLock
   sudo ip6tables -A INPUT -p tcp --dport "$1" -j DROP
   releaseIptableLock
 }
 
 blockSportByRejecting() {
-  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --sport "$1" -j REJECT"
+  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --sport $1 -j REJECT"
   acquireIptableLock
   sudo ip6tables -A INPUT -p tcp --sport "$1" -j REJECT
   releaseIptableLock
 }
 
 blockDportByRejecting() {
-  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --dport "$1" -j REJECT"
+  UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --dport $1 -j REJECT"
   acquireIptableLock
   sudo ip6tables -A INPUT -p tcp --dport "$1" -j REJECT
   releaseIptableLock
@@ -64,17 +64,29 @@ undoLastIpTableChange() {
 }
 
 setBinaries() {
+  if [ -z "$WDT_BINARY" ]; then
+    WDT_BINARY="./_bin/wdt/wdt"
+  fi
   if [ -z "$WDT_SENDER" ]; then
-    WDT_SENDER="_bin/wdt/wdt"
+    WDT_SENDER=$WDT_BINARY
   fi
   if [ -z "$WDT_RECEIVER" ]; then
-    WDT_RECEIVER="_bin/wdt/wdt"
+    WDT_RECEIVER=$WDT_BINARY
   fi
-  echo "Sender binary : $WDT_SENDER, Receiver binary : $WDT_RECEIVER"
+  if [ -z "$WDT_GEN_FILES" ]; then
+    WDT_GEN_FILES="./_bin/wdt/bench/wdt_gen_files"
+  fi
+  if [ -z "$WDT_GEN_BIGRAMS" ]; then
+    WDT_GEN_BIGRAMS="$(dirname "$0")/../bench/book1.bigrams"
+  fi
+  echo "Wdt binary: $WDT_BINARY, Sender: $WDT_SENDER, Receiver: $WDT_RECEIVER"
+  echo "wdt_gen_files: $WDT_GEN_FILES - bigram data $WDT_GEN_BIGRAMS"
 }
 
 setDirectory() {
-  BASEDIR=/dev/shm/wdtTest_$USER
+  if [ -z "$BASEDIR" ]; then
+      BASEDIR="/dev/shm/wdtTest_$USER"
+  fi
   mkdir -p "$BASEDIR"
   DIR=$(mktemp -d "$BASEDIR/XXXXX")
   SRC_DIR="$DIR/src"
@@ -158,29 +170,29 @@ checkLastCmdStatusExpectingFailure() {
 }
 
 waitForTransferEnd() {
-  wait $pidofreceiver
+  wait "$pidofreceiver"
   checkLastCmdStatus
-  wait $pidofsender
+  wait "$pidofsender"
   checkLastCmdStatus
 }
 
 waitForTransferEndWithoutCheckingStatus() {
-  wait $pidofreceiver
-  wait $pidofsender
+  wait "$pidofreceiver"
+  wait "$pidofsender"
 }
 
 waitForTransferEndExpectingFailure() {
-  wait $pidofreceiver
+  wait "$pidofreceiver"
   checkLastCmdStatusExpectingFailure
-  wait $pidofsender
+  wait "$pidofsender"
   checkLastCmdStatusExpectingFailure
 }
 
 killCurrentTransfer() {
-  kill -9 $pidofsender
-  kill -9 $pidofreceiver
-  wait $pidofsender
-  wait $pidofreceiver
+  kill -9 "$pidofsender"
+  kill -9 "$pidofreceiver"
+  wait "$pidofsender"
+  wait "$pidofreceiver"
 }
 
 generateRandomFiles() {
@@ -194,23 +206,20 @@ generateRandomFiles() {
       argument"
     wdtExit 1
   fi
-  mkdir -p $1
-  cd $1
+  mkdir -p "$1"
+  fourx=$(echo "$2* 4" | bc -l)
+  echo "Generating 4 files of $2 MBytes and 16 of $fourx Mbytes"
   for ((i = 0; i < 4; i++))
   do
-    dd if=/dev/urandom of=sample${i} bs=$2 count=1
+    $WDT_GEN_FILES -stats_source="$WDT_GEN_BIGRAMS" \
+        -directory="$1" -filename="sample${i}" -gen_size_mb="$2"
   done
   # we will generate 1G of random data. 16 files each of size 64mb.
   for ((i = 0; i < 16; i++))
   do
-    touch file${i}
-    for ((j = 0; j < 4; j++))
-    do
-      sample=$((RANDOM % 4))
-      cat sample${sample} >> file${i}
-    done
+    $WDT_GEN_FILES -stats_source="$WDT_GEN_BIGRAMS" \
+        -directory="$1" -filename="file${i}" -gen_size_mb="$fourx"
   done
-  cd -
 }
 
 removeDestination() {
@@ -309,4 +318,3 @@ trap signalHandler SIGINT SIGTERM
 # which generates a crypto. Add _secret for _secr in case of single digit pid.
 TEST_ONLY_ENCRYPTION_KEY=$(echo not_a_key_$$_secret | fold -b -w 16 | head -n 1)
 EXTRA_ENCRYPTION_CMD="-test_only_encryption_secret $TEST_ONLY_ENCRYPTION_KEY"
-ENCRYPTION_ENABLED=0

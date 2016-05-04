@@ -52,7 +52,7 @@
 #ifdef PRINT_OPT
 // print options
 #define WDT_OPT(A, type, description) \
-  out << WDT_TOSTR(A) << " " << WDT_READ_OPT(A) << std::endl
+  out << WDT_LOG_PREFIX << WDT_TOSTR(A) << " " << WDT_READ_OPT(A) << std::endl
 #else
 // google flag define or declare:
 #define WDT_FLAG_DECLARATION(type, argument) DECLARE_##type(argument);

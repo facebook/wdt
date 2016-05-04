@@ -1,10 +1,10 @@
 #pragma once
 
+#include <sys/socket.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/Protocol.h>
 #include <wdt/util/CommonImpl.h>
 #include <wdt/util/EncryptionUtils.h>
-#include <sys/socket.h>
 #include <memory>
 
 namespace facebook {

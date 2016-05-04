@@ -21,7 +21,7 @@ void testEncryption(const EncryptionType encryptionType,
       EncryptionParams::generateEncryptionParams(encryptionType);
   EXPECT_EQ(encryptionType, encryptionData.getType());
 
-  LOG(INFO) << "Generated encryption key for type " << encryptionType;
+  WLOG(INFO) << "Generated encryption key for type " << encryptionType;
 
   const int length = plaintext.size();
   char encryptedText[length];

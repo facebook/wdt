@@ -12,9 +12,9 @@
 #include <wdt/WdtOptions.h>
 #include <wdt/util/SerializationUtil.h>
 
+#include <folly/Bits.h>
 #include <folly/String.h>  // exceptionStr
 #include <algorithm>
-#include <folly/Bits.h>
 
 namespace facebook {
 namespace wdt {
@@ -45,7 +45,7 @@ const std::string Protocol::getFullVersion() {
 int Protocol::negotiateProtocol(int requestedProtocolVersion,
                                 int curProtocolVersion) {
   if (requestedProtocolVersion < 10) {
-    LOG(WARNING) << "Can not handle protocol " << requestedProtocolVersion;
+    WLOG(WARNING) << "Can not handle protocol " << requestedProtocolVersion;
     return 0;
   }
   return std::min<int>(curProtocolVersion, requestedProtocolVersion);
@@ -162,7 +162,7 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
     blockDetails.fileSize = decodeInt(br);
     if (receiverProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
       if (!(br.size() >= 1)) {
-        LOG(ERROR) << "Invalid (too short) input " << string(src + off, max);
+        WLOG(ERROR) << "Invalid (too short) input " << string(src + off, max);
         return false;
       }
       uint8_t flags = br.front();
@@ -175,7 +175,7 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
       }
     }
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
@@ -226,7 +226,7 @@ bool Protocol::decodeCheckpoints(int protocolVersion, char *src, int64_t &off,
       checkpoints.emplace_back(checkpoint);
     }
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   return true;
@@ -250,7 +250,7 @@ bool Protocol::decodeDone(int protocolVersion, char *src, int64_t &off,
       bytesSent = decodeInt(br);
     }
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
@@ -269,7 +269,7 @@ bool Protocol::decodeSize(char *src, int64_t &off, int64_t max,
   try {
     totalNumBytes = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
@@ -328,7 +328,7 @@ bool Protocol::decodeChunkInfo(folly::ByteRange &br, char *src, int64_t max,
     chunk.start_ = decodeInt(br);
     chunk.end_ = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   int64_t off = br.start() - (uint8_t *)src;
@@ -371,7 +371,7 @@ bool Protocol::decodeFileChunksInfo(folly::ByteRange &br, char *src,
       fileChunksInfo.addChunk(chunk);
     }
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   int64_t off = br.start() - (uint8_t *)src;
@@ -393,9 +393,9 @@ int64_t Protocol::encodeFileChunksInfoList(
     const FileChunksInfo &fileChunksInfo = fileChunksInfoList[i];
     int64_t maxLength = maxEncodeLen(fileChunksInfo);
     if (maxLength + oldOffset > bufSize) {
-      LOG(WARNING) << "Chunk info for " << fileChunksInfo.getFileName()
-                   << " can not be encoded in a buffer of size " << bufSize
-                   << ", Ignoring.";
+      WLOG(WARNING) << "Chunk info for " << fileChunksInfo.getFileName()
+                    << " can not be encoded in a buffer of size " << bufSize
+                    << ", Ignoring.";
       continue;
     }
     if (maxLength + off >= bufSize) {
@@ -451,7 +451,7 @@ bool Protocol::decodeVersion(char *src, int64_t &off, int64_t max,
   try {
     senderProtocolVersion = decodeInt(br);
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return ERROR;
   }
   off = br.start() - (uint8_t *)src;
@@ -476,7 +476,7 @@ bool Protocol::decodeSettings(int protocolVersion, char *src, int64_t &off,
       br.pop_front();
     }
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
@@ -503,7 +503,7 @@ bool Protocol::decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
       return false;
     }
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
@@ -532,7 +532,7 @@ bool Protocol::decodeFooter(char *src, int64_t &off, int64_t max,
       checksum = decodeInt(br);
     }
   } catch (const std::exception &ex) {
-    LOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
     return false;
   }
   off = br.start() - (uint8_t *)src;
