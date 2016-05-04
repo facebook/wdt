@@ -12,6 +12,8 @@ wdt_compiler_flags = [
 
 wdt_env = {
     'WDT_BINARY' : '$(location :wdt)',
+    'WDT_GEN_FILES' : '$(location @/wdt/bench:wdt_gen_files)',
+    'WDT_GEN_BIGRAMS' : '$(location @/wdt/bench:book1.bigrams)',
 }
 
 def wdt_test(test_name, ext, tags):
@@ -24,6 +26,7 @@ def wdt_test(test_name, ext, tags):
         env = wdt_env,
         deps = [
             ':wdt',
+            '@/wdt/bench:wdt_gen_files'
         ],
         tags = tags
     )
@@ -34,6 +37,14 @@ def wdt_sh_test(test_name, tags = []):
 def wdt_py_test(test_name, tags = []):
     wdt_test(test_name, ".py", tags)
 
+
+
+cpp_library(
+  name = 'version',
+  headers = [
+      "WdtConfig.h",
+  ],
+)
 
 cpp_library(
   name = 'inc',

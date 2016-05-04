@@ -25,9 +25,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <thread>
-using std::vector;
+
 namespace facebook {
 namespace wdt {
+
 void Receiver::addCheckpoint(Checkpoint checkpoint) {
   WLOG(INFO) << "Adding global checkpoint " << checkpoint.port << " "
              << checkpoint.numBlocks << " "

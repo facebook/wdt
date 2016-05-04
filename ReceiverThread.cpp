@@ -20,6 +20,7 @@ namespace wdt {
 
 const static int kTimeoutBufferMillis = 1000;
 const static int kWaitTimeoutFactor = 5;
+
 std::ostream &operator<<(std::ostream &os,
                          const ReceiverThread &receiverThread) {
   os << "Thread[" << receiverThread.threadIndex_

@@ -1,0 +1,7 @@
+book1.bigrams is generated using :
+
+  wdt_gen_stats -binary -wrap < book1.txt > book1.bigrams1
+
+Where book1.txt is "Pride and Prejudice By Jane Austen"
+Most downloaded book on Project Guthenberg
+https://www.gutenberg.org/browse/scores/top#books-last30

@@ -2,6 +2,7 @@
 
 from common_utils import *
 
+
 def run_test(name, receiver_extra_flags, sender_extra_flags, expect_fail=False):
     start_test(name)
     start_receiver(receiver_extra_flags)
@@ -31,8 +32,9 @@ if newmtime != mtime:
 
 mtime = newmtime
 
-run_test("with -overwrite should succeed", receiver_args + " -overwrite",
-         sender_args)
+run_test(
+    "with -overwrite should succeed", receiver_args + " -overwrite", sender_args
+)
 
 newmtime = os.stat(fname).st_mtime
 if newmtime == mtime:

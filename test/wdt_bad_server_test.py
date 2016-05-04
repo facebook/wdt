@@ -10,6 +10,7 @@ import threading
 import time
 from common_utils import *
 
+
 def start_server():
     global bad_socket
     bad_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
@@ -17,11 +18,11 @@ def start_server():
     bad_socket.bind(("", 0))
     bad_socket.listen(5)
 
+
 def start_server_thread():
     print("Before accept")
     (conn, addr) = bad_socket.accept()
-    print("Connected with {0}:{1}".format(
-        addr[0], addr[1]))
+    print("Connected with {0}:{1}".format(addr[0], addr[1]))
     while True:
         if stop:
             break
@@ -49,13 +50,17 @@ server_thread.start()
 
 read_timeout = 500
 # start a wdt sender
-sender_status = run_sender("-read_timeout_millis={0}".format(read_timeout),
-                           "wdt://[::1]:{0}?num_ports=1".format(port))
+sender_status = run_sender(
+    "-read_timeout_millis={0}".format(read_timeout),
+    "wdt://[::1]:{0}?num_ports=1".format(port)
+)
 stop = True
 server_thread.join()
 if sender_status != 24:
-    print("Sender should exit with code NO_PROGRESS(24), but it exited "
-          "with {0}. Logs at {1}".format(sender_status, root_dir))
+    print(
+        "Sender should exit with code NO_PROGRESS(24), but it exited "
+        "with {0}. Logs at {1}".format(sender_status, root_dir)
+    )
     exit(1)
 else:
     good_run()

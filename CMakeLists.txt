@@ -296,6 +296,42 @@ if (BUILD_TESTING)
 
   # TODO: make a macro/function to add tests in 1 line instead of 3
 
+
+  # WDT testing/benchmarking code
+  add_library(wdtbenchlib
+    bench/Bigram.cpp
+  )
+
+  target_link_libraries(wdtbenchlib
+    ${GLOG_LIBRARY}
+    ${GFLAGS_LIBRARY}
+  )
+
+  add_library(wdtbenchtestslib
+    bench/WdtGenTestUtils.cpp
+  )
+  target_link_libraries(wdtbenchtestslib
+    "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
+    wdtbenchlib
+    ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
+  )
+
+  add_executable(wdt_gen_files bench/wdtGenFiles.cpp)
+  target_link_libraries(wdt_gen_files wdtbenchlib
+    ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
+  )
+  set_target_properties(wdt_gen_files PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "_bin/wdt/bench/")
+
+  add_executable(wdt_gen_stats bench/wdtStats.cpp)
+  target_link_libraries(wdt_gen_stats wdtbenchlib)
+
+  add_executable(wdt_gen_test bench/wdtGenTest.cpp)
+  target_link_libraries(wdt_gen_test wdtbenchtestslib)
+  add_test(NAME AllTestsInGenTest COMMAND wdt_gen_test)
+
+  # Regular tests
+
   add_executable(protocol_test test/ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
   add_test(NAME AllTestsInProtocolTest COMMAND protocol_test)

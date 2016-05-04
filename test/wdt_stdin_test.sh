@@ -4,7 +4,7 @@ source `dirname "$0"`/common_functions.sh
 
 setBinaries
 setDirectory
-generateRandomFiles $SRC_DIR 16384
+generateRandomFiles "$SRC_DIR" .015625 # in Mbytes: 16k smallest file
 
 WDTBIN_OPTS="-fork -abort_after_seconds 3"
 extendWdtOptions

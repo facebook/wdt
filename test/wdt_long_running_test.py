@@ -2,12 +2,14 @@
 
 from common_utils import *
 
+
 def run_test(test_name, connection_url):
     start_test(test_name)
     run_sender("", connection_url)
     check_transfer_status(False,  # not expected to fail
-                          False   # don't check/wait on receiver
-                          )
+                          False  # don't check/wait on receiver
+                         )
+
 
 wdt_version = get_wdt_version()
 print("wdt protocol version " + wdt_version)

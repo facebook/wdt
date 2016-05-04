@@ -6,7 +6,6 @@
 
 from common_utils import *
 
-
 # 1 time setup
 create_test_directory("/tmp")
 generate_random_files(140 * 1024 * 1024)

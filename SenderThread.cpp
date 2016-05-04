@@ -19,6 +19,7 @@
 
 namespace facebook {
 namespace wdt {
+
 std::ostream &operator<<(std::ostream &os, const SenderThread &senderThread) {
   os << "Thread[" << senderThread.threadIndex_
      << ", port: " << senderThread.port_ << "] ";

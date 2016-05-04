@@ -86,16 +86,14 @@ mkdir $DIR/extsrc
 
 #for size in 1k 64K 512K 1M 16M 256M 512M 1G
 #for size in 512K 1M 16M 256M 512M 1G
-# Mac's dd doesn't understand K,M,G...
-for size in 1024 65536 524288 1232896 19726336
+# In megabytes
+for size in .0009765625 .0625 0.5 1 20
 do
     base=inp$size
-    echo dd if=/dev/... of=$DIR/src/$base.1 bs=$size count=1
-    dd if=/dev/urandom of=$DIR/src/$base.1 bs=$size count=1
-#    dd if=/dev/zero of=$DIR/src/$base.1 bs=$size count=1
-    for i in {2..8}
+    for i in {1..8}
     do
-        cp $DIR/src/$base.1 $DIR/src/$base.$i
+        $WDT_GEN_FILES -stats_source="$WDT_GEN_BIGRAMS" \
+                 -directory="$DIR/src" -filename="$base.$i" -gen_size_mb="$size"
     done
 done
 echo "done with setup"
