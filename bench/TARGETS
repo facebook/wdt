@@ -24,6 +24,7 @@ cpp_library (
 
 cpp_library (
   name = "wdtbenchlibopt",
+  output_subdir = 'wblopt',
   srcs = [
     "Bigram.cpp",
   ],
@@ -49,6 +50,7 @@ cpp_binary(
 
 cpp_binary(
     name= "wdt_gen_files_prof",
+    output_subdir = 'wbprof',
     srcs = [
       "wdtGenFiles.cpp",
     ],
