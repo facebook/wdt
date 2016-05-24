@@ -210,11 +210,14 @@ const std::string &Sender::getDestination() const {
 
 std::unique_ptr<TransferReport> Sender::getTransferReport() {
   int64_t totalFileSize = dirQueue_->getTotalSize();
+  int64_t fileCount = dirQueue_->getCount();
+  bool fileDiscoveryFinished = dirQueue_->fileDiscoveryFinished();
   double totalTime = durationSeconds(Clock::now() - startTime_);
   auto globalStats = getGlobalTransferStats();
   std::unique_ptr<TransferReport> transferReport =
       folly::make_unique<TransferReport>(std::move(globalStats), totalTime,
-                                         totalFileSize);
+                                         totalFileSize, fileCount,
+                                         fileDiscoveryFinished);
   TransferStatus status = getTransferStatus();
   ErrorCode errCode = transferReport->getSummary().getErrorCode();
   if (status == NOT_STARTED && errCode == OK) {
@@ -306,7 +309,8 @@ std::unique_ptr<TransferReport> Sender::finish() {
       folly::make_unique<TransferReport>(
           transferredSourceStats, dirQueue_->getFailedSourceStats(),
           threadStats, dirQueue_->getFailedDirectories(), totalTime,
-          totalFileSize, dirQueue_->getCount());
+          totalFileSize, dirQueue_->getCount(),
+          dirQueue_->fileDiscoveryFinished());
 
   if (progressReportEnabled) {
     progressReporter_->end(transferReport);
@@ -459,9 +463,6 @@ void Sender::reportProgress() {
       if (transferStatus_ == THREADS_JOINED) {
         break;
       }
-    }
-    if (!dirQueue_->fileDiscoveryFinished()) {
-      continue;
     }
 
     std::unique_ptr<TransferReport> transferReport = getTransferReport();
