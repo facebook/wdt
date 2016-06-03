@@ -61,7 +61,7 @@ make -j && sudo make install
 ```
 
 ```
-svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
+git clone https://github.com/google/glog.git
 cd glog
 ./configure # add --with-gflags=whereyouinstalledgflags
 # to avoid ERROR: unknown command line flag 'minloglevel' later
