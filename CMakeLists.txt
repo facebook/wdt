@@ -255,37 +255,38 @@ if (BUILD_TESTING)
 
   include(ExternalProject)
 
-  # GMock
-  set(GMOCK_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/gmock")
+  # GTest
+  set(GTEST_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/gtest")
   externalproject_add(
-    gmock
-    SVN_REPOSITORY https://googlemock.googlecode.com/svn/trunk/
+    gtest
+    GIT_REPOSITORY https://github.com/google/googletest.git
     INSTALL_COMMAND "" # Disable install step
     UPDATE_COMMAND "" # Doesn't change often
-    PREFIX "${GMOCK_PREFIX}"
+    PREFIX "${GTEST_PREFIX}"
     #CONFIGURE_COMMAND "" # skip
     #BUILD_COMMAND "" # skip
     LOG_DOWNLOAD ON
     LOG_CONFIGURE ON
     LOG_BUILD ON
   )
-  # Specify include dir for both gmock and gtest
-  externalproject_get_property(gmock SOURCE_DIR)
-  include_directories("${SOURCE_DIR}/include" "${SOURCE_DIR}/gtest/include")
+  # Specify include dir for gtest
+  externalproject_get_property(gtest SOURCE_DIR)
+  include_directories("${SOURCE_DIR}/googletest/include")
 
-  externalproject_get_property(gmock BINARY_DIR)
+  externalproject_get_property(gtest BINARY_DIR)
 
   #  add_library(gmock_all STATIC EXCLUDE_FROM_ALL
   #   ${GMOCK_PREFIX}/src/gmock/gtest/src/gtest-all.cc
   #   ${GMOCK_PREFIX}/src/gmock/gmock-all.cc
   #   ${GMOCK_PREFIX}/src/gmock/gmock_main.cc)
 
-  add_dependencies(wdt4tests_min gmock)
+  add_dependencies(wdt4tests_min gtest)
 
-  # ${BINARY_DIR}/libgmock.a works everywhere except xcode...
+  # ${BINARY_DIR}/libgtest.a works everywhere except xcode...
 # so ugly weird hack generating warnings about unknown dir for now:
   target_link_libraries(wdt4tests_min
-    "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
+    #"-L ${BINARY_DIR}/googlemock/gtest -L ${BINARY_DIR}/Debug -lgtest"
+    "-L ${BINARY_DIR}/googlemock/gtest -lgtest"
     wdt_min
   )
 
@@ -310,9 +311,9 @@ if (BUILD_TESTING)
   add_library(wdtbenchtestslib
     bench/WdtGenTestUtils.cpp
   )
-  add_dependencies(wdtbenchtestslib gmock)
+  add_dependencies(wdtbenchtestslib gtest)
   target_link_libraries(wdtbenchtestslib
-    "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
+    "-L ${BINARY_DIR}/googlemock/gtest -lgtest"
     wdtbenchlib
     ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
   )

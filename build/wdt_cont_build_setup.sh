@@ -43,7 +43,7 @@ git clone https://github.com/floitsch/double-conversion.git
 (cd double-conversion; cmake -DBUILD_SHARED_LIBS=on -DCMAKE_INSTALL_PREFIX=$CDIR .; make -j 16 && make install)
 git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$CDIR -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on .. && make -j 16 && make install)
-svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
+git clone https://github.com/google/glog.git
 ( cd glog && ./configure --with-gflags=$CDIR --prefix=$CDIR && make -j 16 && make install )
 OPENSSL_VERSION=openssl-1.0.1q
 wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
