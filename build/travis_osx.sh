@@ -30,7 +30,5 @@ git clone https://github.com/google/glog.git
 git clone https://github.com/facebook/folly.git
 pwd ; ls -l
 cd wdt
-# to avoid svn clone errors of gmock later:
-( echo p | svn list https://googlemock.googlecode.com ) || true
 #set +e
 set +x
