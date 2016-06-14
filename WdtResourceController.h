@@ -39,7 +39,7 @@ class WdtControllerBase {
   virtual void updateMaxSendersLimit(int64_t maxNumSenders);
 
  protected:
-  using GuardLock = std::unique_lock<std::mutex>;
+  using GuardLock = std::unique_lock<std::recursive_mutex>;
   /// Number of active receivers
   int64_t numReceivers_{0};
 
@@ -53,7 +53,7 @@ class WdtControllerBase {
   int64_t maxNumReceivers_{0};
 
   /// Mutex that protects all the private members of this class
-  mutable std::mutex controllerMutex_;
+  mutable std::recursive_mutex controllerMutex_;
 
   /// Name of the resource controller
   std::string controllerName_;
@@ -71,10 +71,16 @@ class WdtNamespaceController : public WdtControllerBase {
   WdtNamespaceController(const std::string &wdtNamespace,
                          const WdtResourceController *const parent);
 
+  /// Is free to create sender.
+  bool hasSenderQuota() const;
+
   /// Add a receiver for this namespace with identifier
   ErrorCode createReceiver(const WdtTransferRequest &request,
                            const std::string &identifier,
                            ReceiverPtr &receiver);
+
+  /// Is free to create receiver.
+  bool hasReceiverQuota() const;
 
   /// Add a sender for this namespace with identifier
   ErrorCode createSender(const WdtTransferRequest &request,
@@ -140,6 +146,9 @@ class WdtResourceController : public WdtControllerBase {
   explicit WdtResourceController(const WdtOptions &options);
   WdtResourceController();
 
+  /// Is free to create sender specified by namespace.
+  bool hasSenderQuota(const std::string &wdtNamespace) const;
+
   /**
    * Add a sender specified by namespace and a identifier.
    * You can get this sender back by using the same identifier
@@ -147,6 +156,9 @@ class WdtResourceController : public WdtControllerBase {
   ErrorCode createSender(const std::string &wdtNamespace,
                          const std::string &identifier,
                          const WdtTransferRequest &request, SenderPtr &sender);
+
+  /// Is free to create receiver specified by namespace.
+  bool hasReceiverQuota(const std::string &wdtNamespace) const;
 
   /// Add a receiver specified with namespace and identifier
   ErrorCode createReceiver(const std::string &wdtNamespace,
@@ -243,8 +255,8 @@ class WdtResourceController : public WdtControllerBase {
  protected:
   typedef std::shared_ptr<WdtNamespaceController> NamespaceControllerPtr;
   /// Get the namespace controller
-  NamespaceControllerPtr getNamespaceController(const std::string &wdtNamespace,
-                                                bool isLock = false) const;
+  NamespaceControllerPtr getNamespaceController(
+      const std::string &wdtNamespace) const;
 
  private:
   NamespaceControllerPtr createNamespaceController(const std::string &name);
@@ -255,6 +267,11 @@ class WdtResourceController : public WdtControllerBase {
   /// Throttler for all the namespaces
   std::shared_ptr<Throttler> throttler_{nullptr};
   const WdtOptions &options_;
+  /// Internal method for checking hasSenderQuota & hasReceiverQuota
+  bool hasSenderQuotaInternal(const std::shared_ptr<WdtNamespaceController>
+                                  &controller = nullptr) const;
+  bool hasReceiverQuotaInternal(const std::shared_ptr<WdtNamespaceController>
+                                    &controller = nullptr) const;
 };
 }
 }

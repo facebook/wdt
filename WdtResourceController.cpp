@@ -42,6 +42,16 @@ WdtNamespaceController::WdtNamespaceController(
   updateMaxReceiversLimit(options.namespace_receiver_limit);
 }
 
+bool WdtNamespaceController::hasReceiverQuota() const {
+  GuardLock lock(controllerMutex_);
+  if (numReceivers_ >= maxNumReceivers_ && maxNumReceivers_ > 0) {
+    WLOG(WARNING) << "Exceeded number of receivers for " << controllerName_
+                  << " Max number of receivers " << maxNumReceivers_;
+    return false;
+  }
+  return true;
+}
+
 ErrorCode WdtNamespaceController::createReceiver(
     const WdtTransferRequest &request, const string &identifier,
     ReceiverPtr &receiver) {
@@ -57,9 +67,7 @@ ErrorCode WdtNamespaceController::createReceiver(
       return ALREADY_EXISTS;
     }
     // Check for quotas
-    if (numReceivers_ >= maxNumReceivers_ && maxNumReceivers_ > 0) {
-      WLOG(ERROR) << "Exceeded number of receivers for " << controllerName_
-                  << " Number of max receivers " << maxNumReceivers_;
+    if (!hasReceiverQuota()) {
       return QUOTA_EXCEEDED;
     }
     receiver = make_shared<Receiver>(request);
@@ -68,6 +76,16 @@ ErrorCode WdtNamespaceController::createReceiver(
     ++numReceivers_;
   }
   return OK;
+}
+
+bool WdtNamespaceController::hasSenderQuota() const {
+  GuardLock lock(controllerMutex_);
+  if (numSenders_ >= maxNumSenders_ && maxNumSenders_ > 0) {
+    WLOG(WARNING) << "Exceeded number of senders for " << controllerName_
+                  << " Max number of senders " << maxNumSenders_;
+    return false;
+  }
+  return true;
 }
 
 ErrorCode WdtNamespaceController::createSender(
@@ -85,9 +103,7 @@ ErrorCode WdtNamespaceController::createSender(
       return ALREADY_EXISTS;
     }
     /// Check for quotas
-    if (numSenders_ >= maxNumSenders_ && maxNumSenders_ > 0) {
-      WLOG(ERROR) << "Exceeded number of senders for " << controllerName_
-                  << " Number of max receivers " << maxNumSenders_;
+    if (!hasSenderQuota()) {
       return QUOTA_EXCEEDED;
     }
     sender = make_shared<Sender>(request);
@@ -302,6 +318,29 @@ ErrorCode WdtResourceController::getCounts(int32_t &numNamespaces,
   return OK;
 }
 
+bool WdtResourceController::hasSenderQuota(
+    const std::string &wdtNamespace) const {
+  const auto &controller = getNamespaceController(wdtNamespace);
+  return hasSenderQuotaInternal(controller);
+}
+
+bool WdtResourceController::hasSenderQuotaInternal(
+    const std::shared_ptr<WdtNamespaceController> &controller) const {
+  GuardLock lock(controllerMutex_);
+  bool namespaceHasSenderQuota =
+      controller ? controller->hasSenderQuota() : true;
+  if ((numSenders_ >= maxNumSenders_ && maxNumSenders_ > 0) ||
+      !namespaceHasSenderQuota) {
+    WLOG(WARNING) << "Exceeded quota on max senders. "
+                  << "Max num senders " << maxNumSenders_ << " and we have "
+                  << numSenders_ << " existing senders";
+    return false;
+  } else if (controller && !controller->hasSenderQuota()) {
+    return false;
+  }
+  return true;
+}
+
 ErrorCode WdtResourceController::createSender(
     const std::string &wdtNamespace, const std::string &identifier,
     const WdtTransferRequest &wdtOperationRequest, SenderPtr &sender) {
@@ -319,9 +358,8 @@ ErrorCode WdtResourceController::createSender(
         controller = createNamespaceController(wdtNamespace);
       }
     }
-    if (numSenders_ >= maxNumSenders_ && maxNumSenders_ > 0) {
-      WLOG(ERROR) << "Exceeded quota on max senders. "
-                  << "Max num senders " << maxNumSenders_;
+    if (!hasSenderQuotaInternal(controller)) {
+      WLOG(ERROR) << "No quota for more sender.";
       return QUOTA_EXCEEDED;
     }
     ++numSenders_;
@@ -341,6 +379,29 @@ ErrorCode WdtResourceController::createSender(
   return code;
 }
 
+bool WdtResourceController::hasReceiverQuota(
+    const std::string &wdtNamespace) const {
+  const auto &controller = getNamespaceController(wdtNamespace);
+  return hasReceiverQuotaInternal(controller);
+}
+
+bool WdtResourceController::hasReceiverQuotaInternal(
+    const std::shared_ptr<WdtNamespaceController> &controller) const {
+  GuardLock lock(controllerMutex_);
+  bool namespaceHasReceiverQuota =
+      controller ? controller->hasReceiverQuota() : true;
+  if ((numReceivers_ >= maxNumReceivers_ && maxNumReceivers_ > 0) ||
+      !namespaceHasReceiverQuota) {
+    WLOG(WARNING) << "Exceeded quota on max receivers. "
+                  << "Max num receivers " << maxNumReceivers_ << " and we have "
+                  << numReceivers_ << " existing receivers";
+    return false;
+  } else if (controller && !controller->hasReceiverQuota()) {
+    return false;
+  }
+  return true;
+}
+
 ErrorCode WdtResourceController::createReceiver(
     const std::string &wdtNamespace, const string &identifier,
     const WdtTransferRequest &wdtOperationRequest, ReceiverPtr &receiver) {
@@ -358,9 +419,8 @@ ErrorCode WdtResourceController::createReceiver(
         controller = createNamespaceController(wdtNamespace);
       }
     }
-    if (numReceivers_ >= maxNumReceivers_ && maxNumReceivers_ > 0) {
-      WLOG(ERROR) << "Exceeded quota on max receivers. "
-                  << "Max num senders " << maxNumReceivers_;
+    if (!hasReceiverQuotaInternal(controller)) {
+      WLOG(ERROR) << "No quota for more receiver.";
       return QUOTA_EXCEEDED;
     }
     ++numReceivers_;
@@ -384,7 +444,7 @@ ErrorCode WdtResourceController::releaseSender(const std::string &wdtNamespace,
                                                const std::string &identifier) {
   NamespaceControllerPtr controller = nullptr;
   {
-    controller = getNamespaceController(wdtNamespace, true);
+    controller = getNamespaceController(wdtNamespace);
     if (!controller) {
       WLOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
       return ERROR;
@@ -404,7 +464,7 @@ ErrorCode WdtResourceController::releaseAllSenders(
     const std::string &wdtNamespace) {
   NamespaceControllerPtr controller = nullptr;
   {
-    controller = getNamespaceController(wdtNamespace, true);
+    controller = getNamespaceController(wdtNamespace);
     if (!controller) {
       WLOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
       return ERROR;
@@ -422,7 +482,7 @@ ErrorCode WdtResourceController::releaseReceiver(
     const std::string &wdtNamespace, const std::string &identifier) {
   NamespaceControllerPtr controller = nullptr;
   {
-    controller = getNamespaceController(wdtNamespace, true);
+    controller = getNamespaceController(wdtNamespace);
     if (!controller) {
       WLOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
       return ERROR;
@@ -443,7 +503,7 @@ ErrorCode WdtResourceController::releaseAllReceivers(
     const std::string &wdtNamespace) {
   NamespaceControllerPtr controller = nullptr;
   {
-    controller = getNamespaceController(wdtNamespace, true);
+    controller = getNamespaceController(wdtNamespace);
     if (!controller) {
       WLOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
       return ERROR;
@@ -460,7 +520,7 @@ ErrorCode WdtResourceController::releaseAllReceivers(
 SenderPtr WdtResourceController::getSender(const string &wdtNamespace,
                                            const string &identifier) const {
   NamespaceControllerPtr controller = nullptr;
-  controller = getNamespaceController(wdtNamespace, true);
+  controller = getNamespaceController(wdtNamespace);
   if (!controller) {
     WLOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
     return nullptr;
@@ -471,7 +531,7 @@ SenderPtr WdtResourceController::getSender(const string &wdtNamespace,
 vector<SenderPtr> WdtResourceController::getAllSenders(
     const string &wdtNamespace) const {
   NamespaceControllerPtr controller = nullptr;
-  controller = getNamespaceController(wdtNamespace, true);
+  controller = getNamespaceController(wdtNamespace);
   if (!controller) {
     WLOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
     return vector<SenderPtr>();
@@ -482,7 +542,7 @@ vector<SenderPtr> WdtResourceController::getAllSenders(
 ErrorCode WdtResourceController::releaseStaleSenders(
     const string &wdtNamespace, vector<string> &erasedIds) {
   NamespaceControllerPtr controller = nullptr;
-  controller = getNamespaceController(wdtNamespace, true);
+  controller = getNamespaceController(wdtNamespace);
   if (!controller) {
     WLOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
     return NOT_FOUND;
@@ -498,7 +558,7 @@ ErrorCode WdtResourceController::releaseStaleSenders(
 ReceiverPtr WdtResourceController::getReceiver(const string &wdtNamespace,
                                                const string &identifier) const {
   NamespaceControllerPtr controller = nullptr;
-  controller = getNamespaceController(wdtNamespace, true);
+  controller = getNamespaceController(wdtNamespace);
   if (!controller) {
     WLOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
     return nullptr;
@@ -509,7 +569,7 @@ ReceiverPtr WdtResourceController::getReceiver(const string &wdtNamespace,
 vector<ReceiverPtr> WdtResourceController::getAllReceivers(
     const string &wdtNamespace) const {
   NamespaceControllerPtr controller = nullptr;
-  controller = getNamespaceController(wdtNamespace, true);
+  controller = getNamespaceController(wdtNamespace);
   if (!controller) {
     WLOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
     return vector<ReceiverPtr>();
@@ -520,7 +580,7 @@ vector<ReceiverPtr> WdtResourceController::getAllReceivers(
 ErrorCode WdtResourceController::releaseStaleReceivers(
     const string &wdtNamespace, vector<string> &erasedIds) {
   NamespaceControllerPtr controller = nullptr;
-  controller = getNamespaceController(wdtNamespace, true);
+  controller = getNamespaceController(wdtNamespace);
   if (!controller) {
     WLOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
     return NOT_FOUND;
@@ -587,7 +647,7 @@ ErrorCode WdtResourceController::deRegisterWdtNamespace(
 
 void WdtResourceController::updateMaxReceiversLimit(
     const std::string &wdtNamespace, int64_t maxNumReceivers) {
-  auto controller = getNamespaceController(wdtNamespace, true);
+  auto controller = getNamespaceController(wdtNamespace);
   if (controller) {
     controller->updateMaxReceiversLimit(maxNumReceivers);
   }
@@ -595,7 +655,7 @@ void WdtResourceController::updateMaxReceiversLimit(
 
 void WdtResourceController::updateMaxSendersLimit(
     const std::string &wdtNamespace, int64_t maxNumSenders) {
-  auto controller = getNamespaceController(wdtNamespace, true);
+  auto controller = getNamespaceController(wdtNamespace);
   if (controller) {
     controller->updateMaxSendersLimit(maxNumSenders);
   }
@@ -611,12 +671,9 @@ const WdtOptions &WdtResourceController::getOptions() const {
 
 // TODO: consider putting strict/not strict handling logic here...
 shared_ptr<WdtNamespaceController>
-WdtResourceController::getNamespaceController(const string &wdtNamespace,
-                                              bool isLock) const {
-  GuardLock lock(controllerMutex_, std::defer_lock);
-  if (isLock) {
-    lock.lock();
-  }
+WdtResourceController::getNamespaceController(
+    const string &wdtNamespace) const {
+  GuardLock lock(controllerMutex_);
   auto it = namespaceMap_.find(wdtNamespace);
   if (it != namespaceMap_.end()) {
     return it->second;
