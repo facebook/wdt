@@ -9,9 +9,9 @@ namespace wdt {
 // this must be called first and exactly once:
 Wdt &Wdt::initializeWdt(const std::string &appName) {
   Wdt &res = getWdtInternal(appName);
-  res.initializeWdtInternal(appName);
   // TODO this should return the options
   WdtFlags::initializeFromFlags();
+  res.initializeWdtInternal(appName);
   // At fb we do this for services - that's floody for cmd line though
   // res.printWdtOptions(WLOG(INFO));
   return res;
@@ -25,12 +25,7 @@ ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
   }
   appName_ = appName;
   initDone_ = true;
-  return OK;
-}
-
-ErrorCode Wdt::applySettings() {
-  resourceController_.setThrottler(Throttler::makeThrottler(options_));
-  settingsApplied_ = true;
+  resourceController_.getThrottler()->setThrottlerRates(options_);
   return OK;
 }
 
@@ -54,10 +49,6 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
                        const WdtTransferRequest &req,
                        std::shared_ptr<IAbortChecker> abortChecker,
                        bool terminateExistingOne) {
-  if (!settingsApplied_) {
-    applySettings();
-  }
-
   if (req.errorCode != OK) {
     WLOG(ERROR) << "Transfer request error " << errorCodeToStr(req.errorCode);
     return req.errorCode;

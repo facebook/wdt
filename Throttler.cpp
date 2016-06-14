@@ -33,12 +33,8 @@ std::shared_ptr<Throttler> Throttler::makeThrottler(
     double avgRateBytesPerSec, double peakRateBytesPerSec,
     double bucketLimitBytes, int64_t throttlerLogTimeMillis) {
   configureOptions(avgRateBytesPerSec, peakRateBytesPerSec, bucketLimitBytes);
-  if (avgRateBytesPerSec > 0 || peakRateBytesPerSec > 0) {
-    return std::make_shared<Throttler>(avgRateBytesPerSec, peakRateBytesPerSec,
-                                       bucketLimitBytes,
-                                       throttlerLogTimeMillis);
-  }
-  return nullptr;
+  return std::make_shared<Throttler>(avgRateBytesPerSec, peakRateBytesPerSec,
+                                     bucketLimitBytes, throttlerLogTimeMillis);
 }
 
 void Throttler::configureOptions(double& avgRateBytesPerSec,
@@ -63,7 +59,8 @@ Throttler::Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
                      double bucketLimitBytes, int64_t throttlerLogTimeMillis)
     : avgRateBytesPerSec_(avgRateBytesPerSec) {
   bucketRateBytesPerSec_ = peakRateBytesPerSec;
-  bytesTokenBucketLimit_ = 2 * bucketRateBytesPerSec_ * 0.25;
+  bytesTokenBucketLimit_ =
+      kTimeMultiplier * kBucketMultiplier * bucketRateBytesPerSec_;
   /* We keep the number of tokens generated as zero initially
    * It could be argued that we keep this filled when we created the
    * bucket. However the startTime is passed in this case and the hope is
@@ -92,7 +89,7 @@ Throttler::Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
 void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
                                   double& bucketRateBytesPerSec,
                                   double& bytesTokenBucketLimit) {
-  // configureThrottlerOptions will change the rates in case they don't make
+  // configureOptions will change the rates in case they don't make
   // sense
   configureOptions(avgRateBytesPerSec, bucketRateBytesPerSec,
                    bytesTokenBucketLimit);
@@ -111,6 +108,13 @@ void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
   avgRateBytesPerSec_ = avgRateBytesPerSec;
   bucketRateBytesPerSec_ = bucketRateBytesPerSec;
   bytesTokenBucketLimit_ = bytesTokenBucketLimit;
+}
+
+void Throttler::setThrottlerRates(const WdtOptions& options) {
+  double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
+  double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
+  double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
+  setThrottlerRates(avgRateBytesPerSec, peakRateBytesPerSec, bucketLimitBytes);
 }
 
 void Throttler::limit(ThreadCtx& threadCtx, double deltaProgress) {

@@ -87,6 +87,9 @@ class Throttler {
                                  double& bucketRateBytesPerSec,
                                  double& bytesTokenBucketLimit);
 
+  /// Utility method that set throttler rate using the wdt options
+  void setThrottlerRates(const WdtOptions& options);
+
   virtual ~Throttler() {
   }
 

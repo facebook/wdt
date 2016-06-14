@@ -30,26 +30,14 @@ void WdtControllerBase::updateMaxSendersLimit(int64_t maxNumSenders) {
              << " to " << maxNumSenders_;
 }
 
-void WdtControllerBase::setThrottler(shared_ptr<Throttler> throttler) {
-  throttler_ = throttler;
-  if (throttler) {
-    WLOG(INFO) << "Set the throttler for " << controllerName_ << " "
-               << *throttler;
-  }
-}
-
-shared_ptr<Throttler> WdtControllerBase::getThrottler() const {
-  return throttler_;
-}
-
 WdtControllerBase::WdtControllerBase(const string &controllerName) {
   controllerName_ = controllerName;
 }
 
-// TODO: pass options in
-WdtNamespaceController::WdtNamespaceController(const string &wdtNamespace)
-    : WdtControllerBase(wdtNamespace) {
-  auto &options = WdtOptions::get();
+WdtNamespaceController::WdtNamespaceController(
+    const string &wdtNamespace, const WdtResourceController *const parent)
+    : WdtControllerBase(wdtNamespace), parent_(parent) {
+  auto &options = parent_->getOptions();
   updateMaxSendersLimit(options.namespace_sender_limit);
   updateMaxReceiversLimit(options.namespace_receiver_limit);
 }
@@ -75,7 +63,7 @@ ErrorCode WdtNamespaceController::createReceiver(
       return QUOTA_EXCEEDED;
     }
     receiver = make_shared<Receiver>(request);
-    receiver->setThrottler(throttler_);
+    receiver->setThrottler(parent_->getThrottler());
     receiversMap_[identifier] = receiver;
     ++numReceivers_;
   }
@@ -103,7 +91,7 @@ ErrorCode WdtNamespaceController::createSender(
       return QUOTA_EXCEEDED;
     }
     sender = make_shared<Sender>(request);
-    sender->setThrottler(throttler_);
+    sender->setThrottler(parent_->getThrottler());
     sendersMap_[identifier] = sender;
     ++numSenders_;
   }
@@ -268,17 +256,19 @@ WdtNamespaceController::~WdtNamespaceController() {
   // release is done by parent shutdown
 }
 
-// TODO: pass options in
-WdtResourceController::WdtResourceController()
-    : WdtControllerBase("_root controller_") {
-  // set global limits from options
-  auto &options = WdtOptions::get();
+WdtResourceController::WdtResourceController(const WdtOptions &options)
+    : WdtControllerBase("_root controller_"), options_(options) {
   updateMaxSendersLimit(options.global_sender_limit);
   updateMaxReceiversLimit(options.global_receiver_limit);
+  throttler_ = Throttler::makeThrottler(options);
+}
+
+WdtResourceController::WdtResourceController()
+    : WdtResourceController(WdtOptions::get()) {
 }
 
 WdtResourceController *WdtResourceController::get() {
-  static WdtResourceController wdtController;
+  static WdtResourceController wdtController(WdtOptions::get());
   return &wdtController;
 }
 
@@ -336,6 +326,8 @@ ErrorCode WdtResourceController::createSender(
     }
     ++numSenders_;
   }
+  // TODO: not thread safe reading from options_
+  throttler_->setThrottlerRates(options_);
   ErrorCode code =
       controller->createSender(wdtOperationRequest, identifier, sender);
   if (code != OK) {
@@ -373,6 +365,8 @@ ErrorCode WdtResourceController::createReceiver(
     }
     ++numReceivers_;
   }
+  // TODO: not thread safe reading from options_
+  throttler_->setThrottlerRates(options_);
   ErrorCode code =
       controller->createReceiver(wdtOperationRequest, identifier, receiver);
   if (code != OK) {
@@ -542,7 +536,8 @@ ErrorCode WdtResourceController::releaseStaleReceivers(
 WdtResourceController::NamespaceControllerPtr
 WdtResourceController::createNamespaceController(
     const std::string &wdtNamespace) {
-  auto namespaceController = make_shared<WdtNamespaceController>(wdtNamespace);
+  auto namespaceController =
+      make_shared<WdtNamespaceController>(wdtNamespace, this);
   namespaceMap_[wdtNamespace] = namespaceController;
   return namespaceController;
 }
@@ -604,6 +599,14 @@ void WdtResourceController::updateMaxSendersLimit(
   if (controller) {
     controller->updateMaxSendersLimit(maxNumSenders);
   }
+}
+
+std::shared_ptr<Throttler> WdtResourceController::getThrottler() const {
+  return throttler_;
+}
+
+const WdtOptions &WdtResourceController::getOptions() const {
+  return options_;
 }
 
 // TODO: consider putting strict/not strict handling logic here...
