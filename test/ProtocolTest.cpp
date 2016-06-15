@@ -6,8 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/Protocol.h>
-#include <wdt/util/WdtFlags.h>
+#include <wdt/Wdt.h>
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -167,7 +166,7 @@ int main(int argc, char *argv[]) {
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
-  facebook::wdt::WdtFlags::initializeFromFlags();
+  facebook::wdt::Wdt::initializeWdt("wdt");
   int ret = RUN_ALL_TESTS();
   return ret;
 }

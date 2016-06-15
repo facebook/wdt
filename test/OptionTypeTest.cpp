@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
+#include <wdt/Wdt.h>
 #include <wdt/WdtOptions.h>
 #include <wdt/util/WdtFlags.h>
 #include <wdt/util/WdtFlagsMacros.h>
@@ -31,29 +32,29 @@ const std::string BLOCK_SIZE_FLAG = WDT_FLAG_STR(block_size_mbytes);
 const std::string OPTION_TYPE_FLAG = WDT_FLAG_STR(option_type);
 
 void overrideTest1(const std::string &optionType) {
-  const auto &options = WdtOptions::get();
+  WdtOptions options;
   google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), optionType.c_str());
   google::SetCommandLineOption(NUM_PORTS_FLAG.c_str(), "4");
   google::SetCommandLineOption(BLOCK_SIZE_FLAG.c_str(), "8");
-  WdtFlags::initializeFromFlags();
+  WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(4, options.num_ports);
   EXPECT_EQ(8, options.block_size_mbytes);
 }
 
 void overrideTest2(const std::string &optionType) {
-  const auto &options = WdtOptions::get();
+  WdtOptions options;
   google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), optionType.c_str());
   google::SetCommandLineOption(NUM_PORTS_FLAG.c_str(), "8");
   google::SetCommandLineOption(BLOCK_SIZE_FLAG.c_str(), "16");
-  WdtFlags::initializeFromFlags();
+  WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(8, options.num_ports);
   EXPECT_EQ(16, options.block_size_mbytes);
 }
 
 TEST(OptionType, FlashOptionTypeTest1) {
-  const auto &options = WdtOptions::get();
+  WdtOptions options;
   google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "flash");
-  WdtFlags::initializeFromFlags();
+  WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(8, options.num_ports);
   EXPECT_EQ(16, options.block_size_mbytes);
 }
@@ -67,18 +68,26 @@ TEST(OptionType, FlashOptionTypeTest3) {
 }
 
 TEST(OptionType, DiskOptionTypeTest1) {
-  const auto &options = WdtOptions::get();
+  auto &options = WdtOptions::getMutable();
   google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
-  WdtFlags::initializeFromFlags();
+  WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(3, options.num_ports);
   EXPECT_EQ(-1, options.block_size_mbytes);
 }
 
 TEST(OptionType, DiskOptionTypeTest2) {
-  overrideTest1("disk");
+  auto &options = WdtOptions::getMutable();
+  google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
+  Wdt::initializeWdt("wdt");
+  EXPECT_EQ(3, options.num_ports);
+  EXPECT_EQ(-1, options.block_size_mbytes);
 }
 
 TEST(OptionType, DiskOptionTypeTest3) {
+  overrideTest1("disk");
+}
+
+TEST(OptionType, DiskOptionTypeTest4) {
   overrideTest2("disk");
 }
 }

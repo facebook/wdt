@@ -8,9 +8,13 @@ namespace wdt {
 
 // this must be called first and exactly once:
 Wdt &Wdt::initializeWdt(const std::string &appName) {
+  static bool doGlobalFlagsInit = true;
   Wdt &res = getWdtInternal(appName);
-  // TODO this should return the options
-  WdtFlags::initializeFromFlags();
+  WdtFlags::initializeFromFlags(res.options_);
+  if (doGlobalFlagsInit) {
+    WdtFlags::initializeFromFlags(WdtOptions::getMutable());
+    doGlobalFlagsInit = false;
+  }
   res.initializeWdtInternal(appName);
   // At fb we do this for services - that's floody for cmd line though
   // res.printWdtOptions(WLOG(INFO));
@@ -40,8 +44,7 @@ Wdt &Wdt::getWdt(const std::string &appName) {
 }
 
 ErrorCode Wdt::printWdtOptions(std::ostream &out) {
-  // TODO: should print this object's options instead
-  WdtFlags::printOptions(out);
+  WdtFlags::printOptions(out, options_);
   return OK;
 }
 
@@ -115,7 +118,7 @@ Wdt &Wdt::getWdtInternal(const std::string &appName) {
   if (it != s_wdtMap.end()) {
     return *(it->second);
   }
-  Wdt *wdtPtr = new Wdt(WdtOptions::getMutable());
+  Wdt *wdtPtr = new Wdt();
   std::unique_ptr<Wdt> wdt(wdtPtr);
   s_wdtMap.emplace(appName, std::move(wdt));
   return *wdtPtr;

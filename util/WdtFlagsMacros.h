@@ -12,7 +12,7 @@
 // prefixed by wdt_ so we play nice with others when making a
 // library (long flag)
 #define WDT_READ_OPT(A) facebook::wdt::OPTIONS::get().A
-#define WDT_WRITE_OPT(A) facebook::wdt::OPTIONS::getMutable().A
+#define WDT_OPT_VARIABLE(A) options.A
 
 // Generic macros to concat and stringify:
 // Turns wdt_ and foo into wdt_foo
@@ -47,12 +47,13 @@
 /// on the mode/context. Trailing semi colon is expected to be in the .inc
 #ifdef ASSIGN_OPT
 // Assign option from flags
-#define WDT_OPT(A, type, description) WDT_WRITE_OPT(A) = WDT_FLAG_VAR(A)
+#define WDT_OPT(A, type, description) WDT_OPT_VARIABLE(A) = WDT_FLAG_VAR(A)
 #else
 #ifdef PRINT_OPT
 // print options
-#define WDT_OPT(A, type, description) \
-  out << WDT_LOG_PREFIX << WDT_TOSTR(A) << " " << WDT_READ_OPT(A) << std::endl
+#define WDT_OPT(A, type, description)                                 \
+  out << WDT_LOG_PREFIX << WDT_TOSTR(A) << " " << WDT_OPT_VARIABLE(A) \
+      << std::endl
 #else
 // google flag define or declare:
 #define WDT_FLAG_DECLARATION(type, argument) DECLARE_##type(argument);

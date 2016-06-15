@@ -59,17 +59,16 @@ std::set<std::string> getUserSpecifiedOptions() {
   return userSpecifiedFlags;
 }
 
-void WdtFlags::initializeFromFlags() {
+void WdtFlags::initializeFromFlags(WdtOptions &options) {
   WLOG(INFO) << "Running WDT " << Protocol::getFullVersion();
 #define ASSIGN_OPT
 #include "WdtFlags.cpp.inc"  //nolint
 #undef ASSIGN_OPT
   std::set<std::string> userSpecifiedFlags = getUserSpecifiedOptions();
-  WdtOptions::getMutable().modifyOptions(WDT_FLAG_VAR(option_type),
-                                         userSpecifiedFlags);
+  options.modifyOptions(WDT_FLAG_VAR(option_type), userSpecifiedFlags);
 }
 
-void WdtFlags::printOptions(std::ostream &out) {
+void WdtFlags::printOptions(std::ostream &out, const WdtOptions &options) {
   out << "Options current value:" << std::endl;
 #define PRINT_OPT
 #include "WdtFlags.cpp.inc"  //nolint

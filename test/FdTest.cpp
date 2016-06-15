@@ -8,9 +8,7 @@
  */
 #include "TestCommon.h"
 
-#include <wdt/Receiver.h>
-#include <wdt/Sender.h>
-#include <wdt/util/WdtFlags.h>
+#include <wdt/Wdt.h>
 
 #include <folly/Range.h>
 #include <gflags/gflags.h>
@@ -105,7 +103,7 @@ int main(int argc, char *argv[]) {
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
-  facebook::wdt::WdtFlags::initializeFromFlags();
+  facebook::wdt::Wdt::initializeWdt("wdt");
   int ret = RUN_ALL_TESTS();
   return ret;
 }

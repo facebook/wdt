@@ -143,6 +143,8 @@ class WdtNamespaceController : public WdtControllerBase {
  */
 class WdtResourceController : public WdtControllerBase {
  public:
+  /// resource controller should take the option as reference so that it can be
+  /// changed later from the parent object
   explicit WdtResourceController(const WdtOptions &options);
   WdtResourceController();
 

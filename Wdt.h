@@ -92,7 +92,7 @@ class Wdt {
   /// App name which is used in scuba reporting
   std::string appName_;
 
-  WdtOptions &options_;
+  WdtOptions options_;
 
   /// responsible for initializing openssl
   WdtCryptoIntializer cryptoInitializer_;
@@ -113,11 +113,9 @@ class Wdt {
   // Internal wdt object creator/holder
   static Wdt &getWdtInternal(const std::string &appName);
 
-  /// Private constructor (TODO options to be returned by initializeFromFlags)
-  explicit Wdt(WdtOptions &opts) : options_(opts), resourceController_(opts) {
+  /// Private constructor
+  explicit Wdt() : resourceController_(options_) {
   }
-
-  Wdt() = delete;
 
   /// Not copyable
   Wdt(const Wdt &) = delete;

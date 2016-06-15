@@ -10,10 +10,8 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <stdlib.h>
+#include <wdt/Wdt.h>
 #include <wdt/test/TestCommon.h>
-#include <wdt/util/DirectorySourceQueue.h>
-#include <wdt/util/FileByteSource.h>
-#include <wdt/util/WdtFlags.h>
 #include <fstream>
 
 namespace facebook {
@@ -238,7 +236,7 @@ int main(int argc, char* argv[]) {
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
-  facebook::wdt::WdtFlags::initializeFromFlags();
+  facebook::wdt::Wdt::initializeWdt("wdt");
   int ret = RUN_ALL_TESTS();
   return ret;
 }

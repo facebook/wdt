@@ -72,6 +72,7 @@ ErrorCode WdtNamespaceController::createReceiver(
     }
     receiver = make_shared<Receiver>(request);
     receiver->setThrottler(parent_->getThrottler());
+    receiver->setWdtOptions(parent_->getOptions());
     receiversMap_[identifier] = receiver;
     ++numReceivers_;
   }
@@ -108,6 +109,7 @@ ErrorCode WdtNamespaceController::createSender(
     }
     sender = make_shared<Sender>(request);
     sender->setThrottler(parent_->getThrottler());
+    sender->setWdtOptions(parent_->getOptions());
     sendersMap_[identifier] = sender;
     ++numSenders_;
   }
