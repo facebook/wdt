@@ -195,6 +195,10 @@ struct WdtTransferRequest {
   /// Operator for finding if two request objects are equal
   bool operator==(const WdtTransferRequest& that) const;
 
+  /// Overloaded operator for printing request info
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const WdtTransferRequest& req);
+
   const static int LEGACY_PROTCOL_VERSION;
 
   /// Names of the get parameters for different fields

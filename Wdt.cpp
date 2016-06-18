@@ -67,6 +67,11 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   if (errCode == ALREADY_EXISTS && terminateExistingOne) {
     WLOG(WARNING) << "Found pre-existing sender for " << wdtNamespace << " "
                   << secondKey << " aborting it and making a new one";
+    if (sender->getTransferRequest() == req) {
+      WLOG(WARNING) << "No need to recreate same sender with key: " << secondKey
+                    << " TransferRequest: " << req;
+      return errCode;
+    }
     sender->abort(ABORTED_BY_APPLICATION);
     // This may log an error too
     resourceController_.releaseSender(wdtNamespace, secondKey);

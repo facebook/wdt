@@ -97,6 +97,9 @@ class WdtBase {
   /// Get the transfer id of the object
   std::string getTransferId();
 
+  /// Get the transfer request
+  const WdtTransferRequest& getTransferRequest();
+
   /// Finishes the wdt object and returns a report
   virtual std::unique_ptr<TransferReport> finish() = 0;
 
