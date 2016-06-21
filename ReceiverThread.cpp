@@ -158,6 +158,7 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
     if (wdtParent_->getCurAbortCode() != OK) {
       WTLOG(ERROR) << "Thread marked to abort while trying to accept "
                    << "first connection. Num attempts " << acceptAttempts;
+      threadStats_.setLocalErrorCode(ABORT);
       return FINISH_WITH_ERROR;
     }
     ErrorCode code =
@@ -199,7 +200,8 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
       socket_->acceptNextConnection(timeout, curConnectionVerified_);
   curConnectionVerified_ = false;
   if (code != OK) {
-    WTLOG(ERROR) << "accept() failed with timeout " << timeout;
+    WTLOG(ERROR) << "accept() failed with error " << errorCodeToStr(code)
+                 << " timeout " << timeout;
     threadStats_.setLocalErrorCode(code);
     return FINISH_WITH_ERROR;
   }
@@ -484,6 +486,7 @@ ReceiverState ReceiverThread::processFileCmd() {
       WTLOG(ERROR) << "Thread marked for abort while processing "
                    << blockDetails.fileName << " " << blockDetails.seqId
                    << " port : " << socket_->getPort();
+      threadStats_.setLocalErrorCode(ABORT);
       return FINISH_WITH_ERROR;
     }
     int64_t nres = readAtMost(*socket_, buf_, bufSize_,

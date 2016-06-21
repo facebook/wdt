@@ -207,6 +207,9 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
   WDT_CHECK(!listeningFds_.empty());
   WDT_CHECK(timeoutMillis > 0);
 
+  const WdtOptions& options = threadCtx_.getOptions();
+  const bool checkAbort = (options.abort_check_interval_millis > 0);
+
   const int numFds = listeningFds_.size();
   struct pollfd pollFds[numFds];
   auto startTime = Clock::now();
@@ -221,26 +224,33 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
       return CONN_ERROR;
     }
     int pollTimeout = timeoutMillis - timeElapsed;
+    if (checkAbort) {
+      if (threadCtx_.getAbortChecker()->shouldAbort()) {
+        WLOG(ERROR) << "Transfer aborted during accept " << port_ << " " << fd_;
+        return ABORT;
+      }
+      pollTimeout = std::min(pollTimeout, options.abort_check_interval_millis);
+    }
     for (int i = 0; i < numFds; i++) {
       pollFds[i] = {listeningFds_[i], POLLIN, 0};
     }
 
-    int retValue;
-    if ((retValue = poll(pollFds, numFds, pollTimeout)) <= 0) {
-      if (errno == EINTR) {
-        WVLOG(1) << "poll() call interrupted. retrying...";
-        continue;
-      }
-      if (retValue == 0) {
-        WVLOG(3) << "poll() timed out on port : " << port_
-                 << ", listening fds : " << listeningFds_;
-      } else {
-        PLOG(ERROR) << "poll() failed on port : " << port_
-                    << ", listening fds : " << listeningFds_;
-      }
-      return CONN_ERROR;
+    int retValue = poll(pollFds, numFds, pollTimeout);
+    if (retValue > 0) {
+      break;
     }
-    break;
+    if (errno == EINTR) {
+      WVLOG(1) << "poll() call interrupted. retrying...";
+      continue;
+    }
+    if (retValue == 0) {
+      WVLOG(3) << "poll() timed out on port : " << port_
+               << ", listening fds : " << listeningFds_;
+      continue;
+    }
+    PLOG(ERROR) << "poll() failed on port : " << port_
+                << ", listening fds : " << listeningFds_;
+    return CONN_ERROR;
   }
 
   if (lastCheckedPollIndex_ >= numFds) {

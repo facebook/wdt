@@ -112,13 +112,13 @@ if {$os == "Darwin"} {
      time wdt/test/wdt_max_send_test.sh ./buck-out/gen/wdt/wdt |& tail -50 &&\
      EXTRA_WDT_OPTIONS=\"-scuba_dataset=wdt_transfer_report_test\" time wdt/test/wdt_max_send_test.sh ./buck-out/gen/wdt/fbonly/wdt_fb |& tail -50 &&\
      time buck build @mode/dbg-asan wdt/... &&\
-     time $timeoutCmd $maxTestDuration buck test @mode/dbg-asan wdt/... -- --extended-tests --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time $timeoutCmd $maxTestDuration buck test @mode/dbg-asan wdt/... -- --extended-tests --run-disabled --record-results --return-nonzero-on-timeouts --print-long-results &&\
      sudo tc qdisc add dev lo root netem delay 20ms 10ms \
      duplicate 1% corrupt 0.1% &&\
      echo rerunning tests with tc delays &&\
-     time $timeoutCmd $maxTestDuration buck test wdt/... -- --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time $timeoutCmd $maxTestDuration buck test wdt/... -- --run-disabled --record-results --return-nonzero-on-timeouts --print-long-results &&\
      sudo tc qdisc del dev lo root &&\
-     time $timeoutCmd $maxTestDuration buck test stargate/..."
+     time $timeoutCmd $maxTestDuration buck test stargate/... -- --print-long-results --return-nonzero-on-timeouts"
     set targetDir "~/public_html/wdt_builds/"
     set sudo "sudo"
     set autoVersion 1
