@@ -698,7 +698,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
           return ACCEPT_WITH_TIMEOUT;
         }
         threadStats_.addHeaderBytes(toWrite);
-        execFunnel->wait(waitingTimeMillis);
+        execFunnel->wait(waitingTimeMillis, *threadCtx_);
         break;
       }
       case FUNNEL_START: {
@@ -893,7 +893,7 @@ ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
       {
         PerfStatCollector statCollector(*threadCtx_,
                                         PerfStatReport::RECEIVER_WAIT_SLEEP);
-        guard.wait(timeoutMillis);
+        guard.wait(timeoutMillis, *threadCtx_);
       }
       state = checkForFinishOrNewCheckpoints();
       if (state != WAIT_FOR_FINISH_OR_NEW_CHECKPOINT) {

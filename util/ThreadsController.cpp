@@ -14,13 +14,29 @@ using namespace std;
 namespace facebook {
 namespace wdt {
 
-void ConditionGuardImpl::wait(int timeoutMillis) {
-  if (timeoutMillis <= 0) {
-    cv_.wait(*lock_);
-    return;
+void ConditionGuardImpl::wait(int timeoutMillis, const ThreadCtx &threadCtx) {
+  const WdtOptions &options = threadCtx.getOptions();
+  const bool checkAbort = (options.abort_check_interval_millis > 0);
+  int remainingTime = timeoutMillis;
+
+  while (remainingTime > 0) {
+    int waitTime = remainingTime;
+    if (checkAbort) {
+      waitTime = std::min(waitTime, options.abort_check_interval_millis);
+    }
+    auto waitingTime = chrono::milliseconds(waitTime);
+    auto status = cv_.wait_for(*lock_, waitingTime);
+    if (status == std::cv_status::no_timeout) {
+      return;
+    }
+    // check for abort
+    if (threadCtx.getAbortChecker()->shouldAbort()) {
+      LOG(ERROR) << "Transfer aborted during condition guard wait "
+                 << threadCtx.getThreadIndex();
+      return;
+    }
+    remainingTime -= waitTime;
   }
-  auto waitingTime = chrono::milliseconds(timeoutMillis);
-  cv_.wait_for(*lock_, waitingTime);
 }
 
 void ConditionGuardImpl::notifyAll() {
@@ -69,13 +85,12 @@ void Funnel::wait() {
   cv_.wait(lock);
 }
 
-void Funnel::wait(int32_t waitingTime) {
-  auto waitMillis = chrono::milliseconds(waitingTime);
-  unique_lock<mutex> lock(mutex_);
+void Funnel::wait(int32_t waitingTime, const ThreadCtx &threadCtx) {
+  ConditionGuardImpl guard(mutex_, cv_);
   if (status_ != FUNNEL_PROGRESS) {
     return;
   }
-  cv_.wait_for(lock, waitMillis);
+  guard.wait(waitingTime, threadCtx);
 }
 
 void Funnel::notifySuccess() {

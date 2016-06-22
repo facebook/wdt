@@ -87,7 +87,7 @@ class ConditionGuardImpl {
  public:
   /// Release the lock and wait for the timeout
   /// After the wait is over, lock is reacquired
-  void wait(int timeoutMillis = -1);
+  void wait(int timeoutMillis, const ThreadCtx &threadCtx);
   /// Notify all the threads waiting on the lock
   void notifyAll();
   /// Notify one thread waiting on the lock
@@ -106,6 +106,7 @@ class ConditionGuardImpl {
 
  protected:
   friend class ConditionGuard;
+  friend class Funnel;
   /// Constructor that takes the shared mutex and condition
   /// variable
   ConditionGuardImpl(std::mutex &mutex, std::condition_variable &cv);
@@ -234,7 +235,7 @@ class Funnel {
   void wait();
 
   /// Threads that get status as progress execute this function
-  void wait(int32_t waitingTime);
+  void wait(int32_t waitingTime, const ThreadCtx &threadCtx);
 
   /**
    * The first thread that was able to start the funnel
