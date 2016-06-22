@@ -44,6 +44,9 @@ DEFINE_string(manifest, "",
 DEFINE_string(
     destination, "",
     "empty is server (destination) mode, non empty is destination host");
+
+DEFINE_string(hostname, "", "override hostname in transfe request");
+
 DEFINE_bool(parse_transfer_log, false,
             "If true, transfer log is parsed and fixed");
 
@@ -202,21 +205,23 @@ int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   if (badGflagFound) {
+    // will only work for receivers
     WLOG(ERROR) << "Continuing despite bad flags";
-  }
-  // Only non -flag argument allowed so far is "-" meaning
-  // Read url from stdin and start a sender
-  if (argc > 2 || (argc == 2 && (argv[1][0] != '-' || argv[1][1] != '\0'))) {
-    printUsage();
-    std::cerr << "Error: argument should be - (to read url from stdin) "
-              << "or no arguments" << std::endl;
-    exit(1);
+  } else {
+    // Only non -flag argument allowed so far is "-" meaning
+    // Read url from stdin and start a sender
+    if (argc > 2 || (argc == 2 && (argv[1][0] != '-' || argv[1][1] != '\0'))) {
+      printUsage();
+      std::cerr << "Error: argument should be - (to read url from stdin) "
+                << "or no arguments" << std::endl;
+      exit(1);
+    }
   }
   signal(SIGPIPE, SIG_IGN);
   signal(SIGUSR1, sigUSR1Handler);
 
   std::string connectUrl;
-  if (argc == 2) {
+  if (!badGflagFound && argc == 2) {
     std::getline(std::cin, connectUrl);
     if (connectUrl.empty()) {
       WLOG(ERROR)
@@ -276,7 +281,9 @@ int main(int argc, char *argv[]) {
   if (FLAGS_protocol_version > 0) {
     req.protocolVersion = FLAGS_protocol_version;
   }
-
+  if (FLAGS_hostname.size()) {
+    reqPtr->hostName = FLAGS_hostname;
+  }
   if (FLAGS_destination.empty() && connectUrl.empty()) {
     Receiver receiver(req);
     WdtOptions &recOptions = receiver.getWdtOptions();

@@ -225,6 +225,8 @@ wdt_sh_test('wdt_lock_failfast')
 
 wdt_sh_test('wdt_e2e_xfs_test')
 
+wdt_py_test('hostname_override_test')
+
 wdt_py_test('wdt_file_list_test')
 
 wdt_py_test('wdt_overwrite_test')

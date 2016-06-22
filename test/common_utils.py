@@ -11,7 +11,7 @@ import tempfile
 import errno
 import string
 import random
-from time import time
+import time
 
 
 def get_env(name):
@@ -148,9 +148,11 @@ def run_sender(extra_args, url=""):
     sender_cmd = "bash -c \"set -o pipefail; " + sender_cmd \
                 + " 2>&1 | tee {0}/client{1}.log\"".format(root_dir, test_count)
     print("Sender: " + sender_cmd)
-    # return code of system is shifted by 8 bytes
-    sender_status = os.system(sender_cmd) >> 8
-    print("status for sender {0}".format(sender_status))
+    # On unix return code of system is shifted by 8 bytes but lower bits are
+    # set on signal too and sometimes it's not flipped so let's or it all
+    sender_status = os.system(sender_cmd)
+    sender_status = (sender_status >> 8) | (sender_status & 0xff)
+    print("status for sender {0}".format(hex(sender_status)))
     return sender_status
 
 
@@ -161,9 +163,9 @@ def error(msg):
 
 
 def print_server_log():
-    with open(server_log, 'r') as fin:
-        print(fin.read())
-
+    if server_log:
+        with open(server_log, 'r') as fin:
+            print(fin.read())
 
 def check_transfer_status(expect_failed=False, check_receiver=True):
     global receiver_status
@@ -256,18 +258,21 @@ def generate_random_files(total_size):
     gen_files = get_gen_files()
     for i in range(0, 4):
         file_name = "sample{0}".format(i)
-        os.system(
-            "{0} -directory={1} -filename={2} -gen_size_mb={3}".format(
-                gen_files, src_dir, file_name, seed_size / 1024. / 1024.
-            )
+        cmd = "{0} -directory={1} -filename={2} -gen_size_mb={3}".format(
+            gen_files, src_dir, file_name, seed_size / 1024. / 1024.
         )
+        status = os.system(cmd)
+        if status:
+            error("Failure generating data running {0}:{1}".format(cmd, status))
     for i in range(0, 16):
         file_name = "file{0}".format(i)
-        os.system(
+        status = os.system(
             "{0} -directory={1} -filename={2} -gen_size_mb={3}".format(
                 gen_files, src_dir, file_name, 4 * seed_size / 1024. / 1024.
             )
         )
+        if status:
+            error("Failure generating data")
     return src_dir
 
 

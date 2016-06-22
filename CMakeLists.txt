@@ -389,6 +389,9 @@ if (BUILD_TESTING)
   add_test(NAME WdtOptionsTypeTests COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_option_type_test.sh")
 
+  add_test(NAME hostname_override_test COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/hostname_override_test.py")
+
   add_test(NAME WdtPortBlockTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_port_block_test.py")
 
