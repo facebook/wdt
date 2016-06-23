@@ -8,10 +8,14 @@ namespace wdt {
 
 // this must be called first and exactly once:
 Wdt &Wdt::initializeWdt(const std::string &appName) {
+  static bool doGlobalFlagsInit = true;
   Wdt &res = getWdtInternal(appName);
+  WdtFlags::initializeFromFlags(res.options_);
+  if (doGlobalFlagsInit) {
+    WdtFlags::initializeFromFlags(WdtOptions::getMutable());
+    doGlobalFlagsInit = false;
+  }
   res.initializeWdtInternal(appName);
-  // TODO this should return the options
-  WdtFlags::initializeFromFlags();
   // At fb we do this for services - that's floody for cmd line though
   // res.printWdtOptions(WLOG(INFO));
   return res;
@@ -25,12 +29,7 @@ ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
   }
   appName_ = appName;
   initDone_ = true;
-  return OK;
-}
-
-ErrorCode Wdt::applySettings() {
-  resourceController_.setThrottler(Throttler::makeThrottler(options_));
-  settingsApplied_ = true;
+  resourceController_.getThrottler()->setThrottlerRates(options_);
   return OK;
 }
 
@@ -45,8 +44,7 @@ Wdt &Wdt::getWdt(const std::string &appName) {
 }
 
 ErrorCode Wdt::printWdtOptions(std::ostream &out) {
-  // TODO: should print this object's options instead
-  WdtFlags::printOptions(out);
+  WdtFlags::printOptions(out, options_);
   return OK;
 }
 
@@ -54,10 +52,6 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
                        const WdtTransferRequest &req,
                        std::shared_ptr<IAbortChecker> abortChecker,
                        bool terminateExistingOne) {
-  if (!settingsApplied_) {
-    applySettings();
-  }
-
   if (req.errorCode != OK) {
     WLOG(ERROR) << "Transfer request error " << errorCodeToStr(req.errorCode);
     return req.errorCode;
@@ -73,6 +67,11 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   if (errCode == ALREADY_EXISTS && terminateExistingOne) {
     WLOG(WARNING) << "Found pre-existing sender for " << wdtNamespace << " "
                   << secondKey << " aborting it and making a new one";
+    if (sender->getTransferRequest() == req) {
+      WLOG(WARNING) << "No need to recreate same sender with key: " << secondKey
+                    << " TransferRequest: " << req;
+      return errCode;
+    }
     sender->abort(ABORTED_BY_APPLICATION);
     // This may log an error too
     resourceController_.releaseSender(wdtNamespace, secondKey);
@@ -124,7 +123,7 @@ Wdt &Wdt::getWdtInternal(const std::string &appName) {
   if (it != s_wdtMap.end()) {
     return *(it->second);
   }
-  Wdt *wdtPtr = new Wdt(WdtOptions::getMutable());
+  Wdt *wdtPtr = new Wdt();
   std::unique_ptr<Wdt> wdt(wdtPtr);
   s_wdtMap.emplace(appName, std::move(wdt));
   return *wdtPtr;

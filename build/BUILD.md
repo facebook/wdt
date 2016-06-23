@@ -61,7 +61,7 @@ make -j && sudo make install
 ```
 
 ```
-svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
+git clone https://github.com/google/glog.git
 cd glog
 ./configure # add --with-gflags=whereyouinstalledgflags
 # to avoid ERROR: unknown command line flag 'minloglevel' later
@@ -172,15 +172,6 @@ cmake ../wdt -G "Eclipse CDT4 - Unix Makefiles" -DBUILD_TESTING=on
 
 
 # Troubleshooting
-
-## gmock build problem
-You may get certificate errors getting gmock and need to permanently
-accept the certificate from the commandline
-
-```
-svn list https://googlemock.googlecode.com
-# type "p", then ignore the output and make again
-```
 
 ## IPv6 DNS entry missing
 If the host you are running the tests on does not have an IPv6 address (either

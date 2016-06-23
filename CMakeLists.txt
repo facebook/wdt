@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.26.1605030)
+project("WDT" LANGUAGES C CXX VERSION 1.26.1606200)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -255,37 +255,38 @@ if (BUILD_TESTING)
 
   include(ExternalProject)
 
-  # GMock
-  set(GMOCK_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/gmock")
+  # GTest
+  set(GTEST_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/gtest")
   externalproject_add(
-    gmock
-    SVN_REPOSITORY https://googlemock.googlecode.com/svn/trunk/
+    gtest
+    GIT_REPOSITORY https://github.com/google/googletest.git
     INSTALL_COMMAND "" # Disable install step
     UPDATE_COMMAND "" # Doesn't change often
-    PREFIX "${GMOCK_PREFIX}"
+    PREFIX "${GTEST_PREFIX}"
     #CONFIGURE_COMMAND "" # skip
     #BUILD_COMMAND "" # skip
     LOG_DOWNLOAD ON
     LOG_CONFIGURE ON
     LOG_BUILD ON
   )
-  # Specify include dir for both gmock and gtest
-  externalproject_get_property(gmock SOURCE_DIR)
-  include_directories("${SOURCE_DIR}/include" "${SOURCE_DIR}/gtest/include")
+  # Specify include dir for gtest
+  externalproject_get_property(gtest SOURCE_DIR)
+  include_directories("${SOURCE_DIR}/googletest/include")
 
-  externalproject_get_property(gmock BINARY_DIR)
+  externalproject_get_property(gtest BINARY_DIR)
 
   #  add_library(gmock_all STATIC EXCLUDE_FROM_ALL
   #   ${GMOCK_PREFIX}/src/gmock/gtest/src/gtest-all.cc
   #   ${GMOCK_PREFIX}/src/gmock/gmock-all.cc
   #   ${GMOCK_PREFIX}/src/gmock/gmock_main.cc)
 
-  add_dependencies(wdt4tests_min gmock)
+  add_dependencies(wdt4tests_min gtest)
 
-  # ${BINARY_DIR}/libgmock.a works everywhere except xcode...
+  # ${BINARY_DIR}/libgtest.a works everywhere except xcode...
 # so ugly weird hack generating warnings about unknown dir for now:
   target_link_libraries(wdt4tests_min
-    "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
+    #"-L ${BINARY_DIR}/googlemock/gtest -L ${BINARY_DIR}/Debug -lgtest"
+    "-L ${BINARY_DIR}/googlemock/gtest -lgtest"
     wdt_min
   )
 
@@ -310,9 +311,9 @@ if (BUILD_TESTING)
   add_library(wdtbenchtestslib
     bench/WdtGenTestUtils.cpp
   )
-  add_dependencies(wdtbenchtestslib gmock)
+  add_dependencies(wdtbenchtestslib gtest)
   target_link_libraries(wdtbenchtestslib
-    "-L ${BINARY_DIR} -L ${BINARY_DIR}/Debug -lgmock"
+    "-L ${BINARY_DIR}/googlemock/gtest -lgtest"
     wdtbenchlib
     ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
   )
@@ -387,6 +388,9 @@ if (BUILD_TESTING)
 
   add_test(NAME WdtOptionsTypeTests COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_option_type_test.sh")
+
+  add_test(NAME hostname_override_test COMMAND
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/hostname_override_test.py")
 
   add_test(NAME WdtPortBlockTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_port_block_test.py")

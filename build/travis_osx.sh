@@ -25,12 +25,10 @@ mkdir double-conversion-build
 (cd double-conversion-build; cmake -DBUILD_SHARED_LIBS=on -DCMAKE_INSTALL_PREFIX=$HOME ../double-conversion; make -j 4 && make install)
 git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags-build; cd gflags-build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on ../gflags && make -j 4 && make install)
-svn checkout http://google-glog.googlecode.com/svn/trunk/ glog
+git clone https://github.com/google/glog.git
 ( cd glog && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
 git clone https://github.com/facebook/folly.git
 pwd ; ls -l
 cd wdt
-# to avoid svn clone errors of gmock later:
-( echo p | svn list https://googlemock.googlecode.com ) || true
 #set +e
 set +x

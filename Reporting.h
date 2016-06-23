@@ -348,17 +348,19 @@ class TransferReport {
                  std::vector<TransferStats> &failedSourceStats,
                  std::vector<TransferStats> &threadStats,
                  std::vector<std::string> &failedDirectories, double totalTime,
-                 int64_t totalFileSize, int64_t numDiscoveredFiles);
+                 int64_t totalFileSize, int64_t numDiscoveredFiles,
+                 bool fileDiscoveryFinished);
 
   /**
    * This function does not move the thread stats passed to it. This is called
    * by the progress reporter thread.
    */
   TransferReport(const std::vector<TransferStats> &threadStats,
-                 double totalTime, int64_t totalFileSize);
+                 double totalTime, int64_t totalFileSize,
+                 int64_t numDiscoveredFiles, bool fileDiscoveryFinished);
 
-  TransferReport(TransferStats &&stats, double totalTime,
-                 int64_t totalFileSize);
+  TransferReport(TransferStats &&stats, double totalTime, int64_t totalFileSize,
+                 int64_t numDiscoveredFiles, bool fileDiscoveryFinished);
   /// constructor used by receiver, does move the stats
   explicit TransferReport(TransferStats &&globalStats);
   /// @return   summary of the report
@@ -413,6 +415,12 @@ class TransferReport {
     summary_.setLocalErrorCode(errCode);
     summary_.setRemoteErrorCode(errCode);
   }
+  int64_t getNumDiscoveredFiles() const {
+    return numDiscoveredFiles_;
+  }
+  bool fileDiscoveryFinished() const {
+    return fileDiscoveryFinished_;
+  }
   friend std::ostream &operator<<(std::ostream &os,
                                   const TransferReport &report);
 
@@ -432,6 +440,10 @@ class TransferReport {
   int64_t totalFileSize_{0};
   /// recent throughput in bytes/sec
   double currentThroughput_{0};
+  /// Count of all files discovered so far
+  int64_t numDiscoveredFiles_{0};
+  /// Is file discovery finished?
+  bool fileDiscoveryFinished_{false};
 };
 
 /**
@@ -481,9 +493,12 @@ class ProgressReporter {
    * @param progress              progress percentage
    * @param throughput            average throughput
    * @param currentThroughput     recent throughput
+   * @param numDiscoveredFiles    number of files discovered so far
+   * @param fileDiscoveryFinished true once file discovery has compeleted
    */
   void displayProgress(int progress, double averageThroughput,
-                       double currentThroughput);
+                       double currentThroughput, int64_t numDiscoveredFiles,
+                       bool fileDiscoveryFinished);
 
   /**
    * logs progress details
@@ -492,9 +507,12 @@ class ProgressReporter {
    * @param progress              progress percentage
    * @param throughput            average throughput
    * @param currentThroughput     recent throughput
+   * @param numDiscoveredFiles    number of files discovered so far
+   * @param fileDiscoveryFinished true once file discovery has compeleted
    */
   void logProgress(int64_t effectiveDataBytes, int progress,
-                   double averageThroughput, double currentThroughput);
+                   double averageThroughput, double currentThroughput,
+                   int64_t numDiscoveredFiles, bool fileDiscoveryFinished);
 
   /// whether stdout is redirected to a terminal or not
   bool isTty_;

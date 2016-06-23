@@ -359,6 +359,9 @@ int main(int argc, char **argv) {
   const size_t totalTargetSz = FLAGS_gen_size_mb * 1024 * 1024;
   const size_t numThreads = FLAGS_num_threads;
   const size_t targetSzPerThread = totalTargetSz / numThreads;
+  if (targetSzPerThread < 1) {
+    LOG(FATAL) << "Invalid gen_size_mb and num_threads combo " << totalTargetSz;
+  }
   const size_t totalSz = targetSzPerThread * numThreads;
   if (FLAGS_gen_block_size < 1) {
     LOG(FATAL) << "Invalid gen_block_size " << FLAGS_gen_block_size;

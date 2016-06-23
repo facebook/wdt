@@ -86,20 +86,13 @@ class Wdt {
   }
 
  protected:
-  /// Set to true when the single instance is initialized
+  /// Set to true when each instance is initialized
   bool initDone_{false};
-
-  /**
-   * Set to true when settings are applied to avoid applying again
-   * This is needed because you can call wdtSend() independent of the thrift
-   * service
-   */
-  bool settingsApplied_{false};
 
   /// App name which is used in scuba reporting
   std::string appName_;
 
-  WdtOptions &options_;
+  WdtOptions options_;
 
   /// responsible for initializing openssl
   WdtCryptoIntializer cryptoInitializer_;
@@ -120,17 +113,9 @@ class Wdt {
   // Internal wdt object creator/holder
   static Wdt &getWdtInternal(const std::string &appName);
 
-  /**
-   * Apply the possibly changed settings, eg throttler.
-   * Automatically called for you.
-   */
-  ErrorCode applySettings();
-
-  /// Private constructor (TODO options to be returned by initializeFromFlags)
-  explicit Wdt(WdtOptions &opts) : options_(opts) {
+  /// Private constructor
+  explicit Wdt() : resourceController_(options_) {
   }
-
-  Wdt() = delete;
 
   /// Not copyable
   Wdt(const Wdt &) = delete;

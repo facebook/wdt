@@ -383,5 +383,12 @@ bool WdtTransferRequest::operator==(const WdtTransferRequest& that) const {
   // are same with respect to the wdt settings
   return result;
 }
+
+std::ostream& operator<<(std::ostream& os, const WdtTransferRequest& req) {
+  // getLogSafeString() returns a url string containing all fields. So should be
+  // enough for logging purpose.
+  os << "WdtTransferRequest represented by url: " << req.getLogSafeString();
+  return os;
+}
 }
 }

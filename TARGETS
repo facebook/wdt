@@ -59,6 +59,7 @@ cpp_unittest(
   srcs = [ 'test/WdtMiscTests.cpp', ],
   deps = [
       ":wdtlib",
+      "@/common/files:files",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -223,6 +224,8 @@ wdt_sh_test('wdt_stdin_test')
 wdt_sh_test('wdt_lock_failfast')
 
 wdt_sh_test('wdt_e2e_xfs_test')
+
+wdt_py_test('hostname_override_test')
 
 wdt_py_test('wdt_file_list_test')
 

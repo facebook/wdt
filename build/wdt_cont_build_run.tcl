@@ -82,7 +82,7 @@ proc sendEmail {reason} {
     close $f
     # rest of the body of the email:
     # filters info and vlog and normal compilation times:
-    exec egrep -v {^([IV]| [0-9].[0-9][0-9]s |BUILT)} $LOGF >> $emailFileName
+    exec egrep -v {^([IV]| [0-9].[0-9][0-9]s |BUILT|CACHE|FOUND)} $LOGF >> $emailFileName
     # Sending both
     exec sendmail $TO < $emailFileName
     file delete $emailFileName
@@ -108,18 +108,17 @@ if {$os == "Darwin"} {
     set timeoutCmd "timeout"
     set extraCmds "cd $CDIR/fbsource/fbcode &&\
      (sudo tc qdisc del dev lo root; sudo ip6tables --flush || true) &&\
-     time fbconfig --clang -r wdt &&\
-     time fbmake opt &&\
-     time wdt/test/wdt_max_send_test.sh |& tail -50 &&\
-     EXTRA_WDT_OPTIONS=\"-scuba_dataset=wdt_transfer_report_test\" time wdt/test/wdt_max_send_test.sh _bin/wdt/fbonly/wdt_fb |& tail -50 &&\
-     time fbconfig --sanitize address -r wdt &&\
-     time fbmake dbg &&\
-     time $timeoutCmd $maxTestDuration fbmake runtests --extended-tests --run-disabled --record-results --return-nonzero-on-timeouts &&\
+     time buck build @mode/opt wdt/... &&\
+     time wdt/test/wdt_max_send_test.sh ./buck-out/gen/wdt/wdt |& tail -50 &&\
+     EXTRA_WDT_OPTIONS=\"-scuba_dataset=wdt_transfer_report_test\" time wdt/test/wdt_max_send_test.sh ./buck-out/gen/wdt/fbonly/wdt_fb |& tail -50 &&\
+     time buck build @mode/dbg-asan wdt/... &&\
+     time $timeoutCmd $maxTestDuration buck test @mode/dbg-asan wdt/... -- --extended-tests --run-disabled --record-results --return-nonzero-on-timeouts --print-long-results &&\
      sudo tc qdisc add dev lo root netem delay 20ms 10ms \
      duplicate 1% corrupt 0.1% &&\
      echo rerunning tests with tc delays &&\
-     time $timeoutCmd $maxTestDuration buck test wdt/... -- --run-disabled --record-results --return-nonzero-on-timeouts &&\
-     sudo tc qdisc del dev lo root"
+     time $timeoutCmd $maxTestDuration buck test wdt/... -- --run-disabled --record-results --return-nonzero-on-timeouts --print-long-results &&\
+     sudo tc qdisc del dev lo root &&\
+     time $timeoutCmd $maxTestDuration buck test stargate/... -- --print-long-results --return-nonzero-on-timeouts"
     set targetDir "~/public_html/wdt_builds/"
     set sudo "sudo"
     set autoVersion 1
@@ -223,8 +222,8 @@ while {1} {
     }
     # works with fburl homedirs
     set target "${targetDir}${LOGTS}_${msg}.log"
-    file copy -force $LOGF $target
-    puts "Copied to $target"
+    catch {file copy -force $LOGF $target} copyMsg
+    puts "Copy to $target : $copyMsg"
     set last $msg
     set hgprev $hgout
 }

@@ -101,6 +101,10 @@ std::string WdtBase::getTransferId() {
   return transferRequest_.transferId;
 }
 
+const WdtTransferRequest& WdtBase::getTransferRequest() {
+  return transferRequest_;
+}
+
 void WdtBase::checkAndUpdateBufferSize() {
   int64_t bufSize = options_.buffer_size;
   if (bufSize < Protocol::kMaxHeader) {

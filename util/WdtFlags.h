@@ -17,12 +17,12 @@ class WdtFlags {
  public:
   /**
    * Set the values of options in WdtOptions from corresponding flags
-   * TODO: return the options (or set the ones passed in)
    */
-  static void initializeFromFlags();
+  static void initializeFromFlags(
+      WdtOptions& options = WdtOptions::getMutable());
 
-  /// TODO change this to take the options returned above
-  static void printOptions(std::ostream &out);
+  static void printOptions(
+      std::ostream& out, const WdtOptions& options = WdtOptions::getMutable());
 };
 }
 }

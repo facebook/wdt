@@ -21,6 +21,8 @@ namespace wdt {
 #define WVLOG(X) VLOG(X) << WDT_LOG_PREFIX
 #define WLOG_IF(X, Y) LOG_IF(X, Y) << WDT_LOG_PREFIX
 #define WVLOG_IF(X, Y) VLOG_IF(X, Y) << WDT_LOG_PREFIX
+#define WTLOG(X) WLOG(X) << *this << " "
+#define WVTLOG(X) WVLOG(X) << *this << " "
 
 // For now just does regular check, for some library embedding may consider
 // skipping or being DCHECK

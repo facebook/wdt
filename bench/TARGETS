@@ -22,9 +22,35 @@ cpp_library (
   compiler_flags = wdt_compiler_flags,
 )
 
+cpp_library (
+  name = "wdtbenchlibopt",
+  output_subdir = 'wblopt',
+  srcs = [
+    "Bigram.cpp",
+  ],
+  external_deps = [
+      ('glog', None, 'glog'),
+  ],
+  compiler_flags = [ "-O3" ],
+)
+
 
 cpp_binary(
     name= "wdt_gen_files",
+    srcs = [
+      "wdtGenFiles.cpp",
+    ],
+    deps = [
+        ":wdtbenchlibopt",
+        "@/wdt:version",
+    ],
+    preprocessor_flags = [ "-Iwdt" ],
+    compiler_flags = [ "-O3" ],
+)
+
+cpp_binary(
+    name= "wdt_gen_files_prof",
+    output_subdir = 'wbprof',
     srcs = [
       "wdtGenFiles.cpp",
     ],

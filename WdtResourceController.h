@@ -38,14 +38,8 @@ class WdtControllerBase {
   /// Update max senders limit
   virtual void updateMaxSendersLimit(int64_t maxNumSenders);
 
-  /// Setter for throttler
-  virtual void setThrottler(std::shared_ptr<Throttler> throttler);
-
-  /// Getter for throttler
-  virtual std::shared_ptr<Throttler> getThrottler() const;
-
  protected:
-  using GuardLock = std::unique_lock<std::mutex>;
+  using GuardLock = std::unique_lock<std::recursive_mutex>;
   /// Number of active receivers
   int64_t numReceivers_{0};
 
@@ -59,14 +53,13 @@ class WdtControllerBase {
   int64_t maxNumReceivers_{0};
 
   /// Mutex that protects all the private members of this class
-  mutable std::mutex controllerMutex_;
-
-  /// Throttler for this namespace
-  std::shared_ptr<Throttler> throttler_{nullptr};
+  mutable std::recursive_mutex controllerMutex_;
 
   /// Name of the resource controller
   std::string controllerName_;
 };
+
+class WdtResourceController;
 
 /**
  * Controller defined per namespace if the user wants to divide
@@ -75,12 +68,19 @@ class WdtControllerBase {
 class WdtNamespaceController : public WdtControllerBase {
  public:
   /// Constructor with a name for namespace
-  explicit WdtNamespaceController(const std::string &wdtNamespace);
+  WdtNamespaceController(const std::string &wdtNamespace,
+                         const WdtResourceController *const parent);
+
+  /// Is free to create sender.
+  bool hasSenderQuota() const;
 
   /// Add a receiver for this namespace with identifier
   ErrorCode createReceiver(const WdtTransferRequest &request,
                            const std::string &identifier,
                            ReceiverPtr &receiver);
+
+  /// Is free to create receiver.
+  bool hasReceiverQuota() const;
 
   /// Add a sender for this namespace with identifier
   ErrorCode createSender(const WdtTransferRequest &request,
@@ -131,6 +131,9 @@ class WdtNamespaceController : public WdtControllerBase {
 
   /// Map of senders associated with identifier
   std::unordered_map<std::string, SenderPtr> sendersMap_;
+
+  /// Throttler for this namespace
+  const WdtResourceController *const parent_;
 };
 
 /**
@@ -140,7 +143,13 @@ class WdtNamespaceController : public WdtControllerBase {
  */
 class WdtResourceController : public WdtControllerBase {
  public:
+  /// resource controller should take the option as reference so that it can be
+  /// changed later from the parent object
+  explicit WdtResourceController(const WdtOptions &options);
   WdtResourceController();
+
+  /// Is free to create sender specified by namespace.
+  bool hasSenderQuota(const std::string &wdtNamespace) const;
 
   /**
    * Add a sender specified by namespace and a identifier.
@@ -149,6 +158,9 @@ class WdtResourceController : public WdtControllerBase {
   ErrorCode createSender(const std::string &wdtNamespace,
                          const std::string &identifier,
                          const WdtTransferRequest &request, SenderPtr &sender);
+
+  /// Is free to create receiver specified by namespace.
+  bool hasReceiverQuota(const std::string &wdtNamespace) const;
 
   /// Add a receiver specified with namespace and identifier
   ErrorCode createReceiver(const std::string &wdtNamespace,
@@ -233,11 +245,20 @@ class WdtResourceController : public WdtControllerBase {
   ErrorCode getCounts(int32_t &numNamespaces, int32_t &numSenders,
                       int32_t &numReceivers);
 
+  /**
+   * getter for throttler.
+   * setThrottlerRates to this throttler may not take effect. Instead, update
+   * WdtOptions accordingly.
+   */
+  std::shared_ptr<Throttler> getThrottler() const;
+
+  const WdtOptions &getOptions() const;
+
  protected:
   typedef std::shared_ptr<WdtNamespaceController> NamespaceControllerPtr;
   /// Get the namespace controller
-  NamespaceControllerPtr getNamespaceController(const std::string &wdtNamespace,
-                                                bool isLock = false) const;
+  NamespaceControllerPtr getNamespaceController(
+      const std::string &wdtNamespace) const;
 
  private:
   NamespaceControllerPtr createNamespaceController(const std::string &name);
@@ -245,6 +266,14 @@ class WdtResourceController : public WdtControllerBase {
   std::unordered_map<std::string, NamespaceControllerPtr> namespaceMap_;
   /// Whether namespace need to be created explictly
   bool strictRegistration_{false};
+  /// Throttler for all the namespaces
+  std::shared_ptr<Throttler> throttler_{nullptr};
+  const WdtOptions &options_;
+  /// Internal method for checking hasSenderQuota & hasReceiverQuota
+  bool hasSenderQuotaInternal(const std::shared_ptr<WdtNamespaceController>
+                                  &controller = nullptr) const;
+  bool hasReceiverQuotaInternal(const std::shared_ptr<WdtNamespaceController>
+                                    &controller = nullptr) const;
 };
 }
 }

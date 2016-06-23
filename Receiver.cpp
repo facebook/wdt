@@ -405,11 +405,11 @@ void Receiver::progressTracker() {
       globalStats += receiverThread->getTransferStats();
     }
     totalSenderBytes = globalStats.getTotalSenderBytes();
-    if (totalSenderBytes == -1) {
-      continue;
-    }
+    // Note: totalSenderBytes may not be valid yet if sender has not
+    // completed file discovery.  But that's ok, report whatever progress
+    // we can.
     auto transferReport = folly::make_unique<TransferReport>(
-        std::move(globalStats), totalTime, totalSenderBytes);
+        std::move(globalStats), totalTime, totalSenderBytes, 0, true);
     intervalsSinceLastUpdate++;
     if (intervalsSinceLastUpdate >= throughputUpdateInterval) {
       auto curTime = Clock::now();

@@ -110,8 +110,8 @@ mkdir $DIR/extsrc
 
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec /usr/share $DIR/src
 #cp -R wdt folly /usr/bin /usr/lib /usr/lib64 /usr/libexec $DIR/src
-cp -R wdt folly /usr/bin /usr/lib $DIR/src
-#cp -R wdt folly /usr/bin $DIR/src
+#cp -R wdt folly /usr/bin /usr/lib $DIR/src
+cp -R wdt folly /usr/bin $DIR/src
 #cp -R wdt folly $DIR/src
 # Removing symlinks which point to the same source tree
 for link in `find -L $DIR/src -xtype l`

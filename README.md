@@ -85,7 +85,7 @@ CMake for building WDT - See [build/BUILD.md](build/BUILD.md)
 gflags (google flags library) but only for the command line,  the library
 doesn't depend on that
 
-gmock and gtest (google testing) but only for tests
+gtest (google testing) but only for tests
 
 glog (google logging library)
 

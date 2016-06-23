@@ -104,13 +104,16 @@ TransferReport::TransferReport(
     std::vector<TransferStats>& failedSourceStats,
     std::vector<TransferStats>& threadStats,
     std::vector<std::string>& failedDirectories, double totalTime,
-    int64_t totalFileSize, int64_t numDiscoveredFiles)
+    int64_t totalFileSize, int64_t numDiscoveredFiles,
+    bool fileDiscoveryFinished)
     : transferredSourceStats_(std::move(transferredSourceStats)),
       failedSourceStats_(std::move(failedSourceStats)),
       threadStats_(std::move(threadStats)),
       failedDirectories_(std::move(failedDirectories)),
       totalTime_(totalTime),
-      totalFileSize_(totalFileSize) {
+      totalFileSize_(totalFileSize),
+      numDiscoveredFiles_(numDiscoveredFiles),
+      fileDiscoveryFinished_(fileDiscoveryFinished) {
   for (const auto& stats : threadStats_) {
     summary_ += stats;
   }
@@ -160,15 +163,24 @@ TransferReport::TransferReport(
 }
 
 TransferReport::TransferReport(TransferStats&& globalStats, double totalTime,
-                               int64_t totalFileSize)
-    : summary_(std::move(globalStats)) {
-  totalTime_ = totalTime;
-  totalFileSize_ = totalFileSize;
+                               int64_t totalFileSize,
+                               int64_t numDiscoveredFiles,
+                               bool fileDiscoveryFinished)
+    : summary_(std::move(globalStats)),
+      totalTime_(totalTime),
+      totalFileSize_(totalFileSize),
+      numDiscoveredFiles_(numDiscoveredFiles),
+      fileDiscoveryFinished_(fileDiscoveryFinished) {
 }
 
 TransferReport::TransferReport(const std::vector<TransferStats>& threadStats,
-                               double totalTime, int64_t totalFileSize)
-    : totalTime_(totalTime), totalFileSize_(totalFileSize) {
+                               double totalTime, int64_t totalFileSize,
+                               int64_t numDiscoveredFiles,
+                               bool fileDiscoveryFinished)
+    : totalTime_(totalTime),
+      totalFileSize_(totalFileSize),
+      numDiscoveredFiles_(numDiscoveredFiles),
+      fileDiscoveryFinished_(fileDiscoveryFinished) {
   for (const auto& stats : threadStats) {
     summary_ += stats;
   }
@@ -261,11 +273,14 @@ void ProgressReporter::progress(const std::unique_ptr<TransferReport>& report) {
   }
   if (isTty_) {
     displayProgress(progress, report->getThroughputMBps(),
-                    report->getCurrentThroughputMBps());
+                    report->getCurrentThroughputMBps(),
+                    report->getNumDiscoveredFiles(),
+                    report->fileDiscoveryFinished());
   } else {
     logProgress(stats.getEffectiveDataBytes(), progress,
-                report->getThroughputMBps(),
-                report->getCurrentThroughputMBps());
+                report->getThroughputMBps(), report->getCurrentThroughputMBps(),
+                report->getNumDiscoveredFiles(),
+                report->fileDiscoveryFinished());
   }
 }
 
@@ -278,21 +293,34 @@ void ProgressReporter::end(const std::unique_ptr<TransferReport>& report) {
 }
 
 void ProgressReporter::displayProgress(int progress, double averageThroughput,
-                                       double currentThroughput) {
-  int scaledProgress = progress / 2;
+                                       double currentThroughput,
+                                       int64_t numDiscoveredFiles,
+                                       bool fileDiscoveryFinished) {
   std::cout << '\r';
+  int progressWidth = 50;
+  if (!fileDiscoveryFinished) {
+    std::cout << numDiscoveredFiles << "...";
+
+    // Progress bar is shorter while file discovery is ongoing
+    int digits = (numDiscoveredFiles > 0)
+                     ? ((int)log10((double)numDiscoveredFiles) + 1)
+                     : 1;
+    progressWidth -= (3 + digits);
+  }
+
+  int scaledProgress = (progress * progressWidth) / 100;
   std::cout << '[';
   for (int i = 0; i < scaledProgress - 1; i++) {
     std::cout << '=';
   }
-  if (scaledProgress != 0 && scaledProgress != 50) {
+  if (scaledProgress != 0 && scaledProgress != progressWidth) {
     std::cout << '>';
   }
-  for (int i = 0; i < 50 - scaledProgress - 1; i++) {
+  for (int i = 0; i < progressWidth - scaledProgress - 1; i++) {
     std::cout << ' ';
   }
-  std::cout << "] " << progress << "% " << std::setprecision(1) << std::fixed
-            << averageThroughput;
+  std::cout << "] " << std::setw(2) << progress << "% " << std::setprecision(1)
+            << std::fixed << averageThroughput;
   if (progress < 100) {
     std::cout << " " << currentThroughput << " Mbytes/s  ";
   } else {
@@ -303,11 +331,15 @@ void ProgressReporter::displayProgress(int progress, double averageThroughput,
 
 void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
                                    double averageThroughput,
-                                   double currentThroughput) {
+                                   double currentThroughput,
+                                   int64_t numDiscoveredFiles,
+                                   bool fileDiscoveryFinished) {
   WLOG(INFO) << "wdt transfer progress " << (effectiveDataBytes / kMbToB)
              << " Mbytes, completed " << progress << "%, Average throughput "
              << averageThroughput << " Mbytes/s, Recent throughput "
-             << currentThroughput << " Mbytes/s";
+             << currentThroughput << " Mbytes/s " << numDiscoveredFiles
+             << " Files discovered "
+             << (fileDiscoveryFinished ? "(complete)" : "(incomplete)");
 }
 
 const std::string PerfStatReport::statTypeDescription_[] = {

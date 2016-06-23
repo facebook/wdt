@@ -14,7 +14,7 @@ def wait_for_receiver_finish(receiver_process):
     global receiver_end_time
     global receiver_status
     receiver_status = receiver_process.wait()
-    receiver_end_time = time()
+    receiver_end_time = time.clock()
 
 
 def test(resumption):
@@ -73,7 +73,7 @@ def test(resumption):
     print(sender_cmd)
     status = os.system(sender_cmd)
     status >>= 8
-    sender_end_time = time()
+    sender_end_time = time.clock()
 
     # wait for receiver finish
     thread.join()

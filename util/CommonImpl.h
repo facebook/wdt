@@ -144,6 +144,9 @@ class SignalSubscriber {
   uint64_t epoch_;
 };
 
+template <class Tag>
+std::atomic<uint64_t> SignalSubscriber<Tag>::globalEpoch_ = {};
+
 struct ReportPerfTag {};
 typedef SignalSubscriber<ReportPerfTag> ReportPerfSignalSubscriber;
 }
