@@ -149,8 +149,9 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
   numBlocks_ = 0;
   for (auto &chunkInfo : previouslyTransferredChunks) {
     nextSeqId_ = std::max(nextSeqId_, chunkInfo.getSeqId() + 1);
+    auto fileName = chunkInfo.getFileName();
     previouslyTransferredChunks_.insert(
-        std::make_pair(chunkInfo.getFileName(), std::move(chunkInfo)));
+        std::make_pair(std::move(fileName), std::move(chunkInfo)));
   }
   clearSourceQueue();
   // recreate the queue
