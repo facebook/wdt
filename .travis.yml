@@ -4,7 +4,7 @@ language: cpp
 
 os:
   - linux
-  - osx
+#  - osx
 
 osx_image: xcode7.1
 
