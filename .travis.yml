@@ -17,7 +17,7 @@ addons:
     sources:
       - boost-latest
       - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise-3.6
+#      - llvm-toolchain-precise-3.6
     packages:
       - g++-4.9
 #      - clang-3.6
