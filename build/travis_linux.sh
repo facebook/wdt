@@ -20,6 +20,9 @@ if [[ "$CXX" == "clang++" ]] ; then
   export LD_LIBARY_PATH=$HOME/clang/lib:$LD_LIBRARY_PATH
   export CC=clang-3.7
   export CXX=clang++-3.7
+  which $CXX
+  ls -l $HOME/clang/bin
+  $CXX --version
 else
   ln -s /usr/bin/g++-4.9 $HOME/bin/g++
   ln -s /usr/bin/gcc-4.9 $HOME/bin/gcc
