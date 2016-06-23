@@ -12,8 +12,14 @@ export PATH=$HOME/bin:$PATH
 export LD_LIBRARY_PATH=$HOME/lib:$LD_LIBRARY_PATH
 openssl version
 if [[ "$CXX" == "clang++" ]] ; then
-  export CC=clang-3.6
-  export CXX=clang++-3.6
+  export LLVM_VERSION=3.7.1
+  wget http://llvm.org/releases/$LLVM_VERSION/clang+llvm-$LLVM_VERSION-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+  mkdir $HOME/clang
+  tar xf clang+llvm-$LLVM_VERSION-x86_64-linux-gnu-ubuntu-14.04.tar.xz -C $HOME/clang --strip-components 1
+  export PATH=$HOME/clang/bin:$PATH
+  export LD_LIBARY_PATH=$HOME/clang/lib:$LD_LIBRARY_PATH
+  export CC=clang-3.7
+  export CXX=clang++-3.7
 else
   ln -s /usr/bin/g++-4.9 $HOME/bin/g++
   ln -s /usr/bin/gcc-4.9 $HOME/bin/gcc
