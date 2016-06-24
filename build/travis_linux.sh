@@ -23,6 +23,10 @@ if [[ "$CXX" == "clang++" ]] ; then
   which $CXX || true
 #  ls -l $HOME/clang/bin
   $CXX --version
+# having issue with clang and glog use of libunwind somehow:
+  wget http://download.savannah.nongnu.org/releases/libunwind/libunwind-snap-070410.tar.gz
+  tar xfz libunwind-snap-070410.tar.gz
+  ( cd libunwind-0.99-alpha; ./configure --prefix=$HOME && make -j 4 && make install )
 else
   ln -s /usr/bin/g++-4.9 $HOME/bin/g++
   ln -s /usr/bin/gcc-4.9 $HOME/bin/gcc
