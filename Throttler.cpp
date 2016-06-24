@@ -118,18 +118,33 @@ void Throttler::setThrottlerRates(const WdtOptions& options) {
 }
 
 void Throttler::limit(ThreadCtx& threadCtx, double deltaProgress) {
-  // now should be before taking the lock
+  limitInternal(&threadCtx, deltaProgress);
+}
+
+void Throttler::limit(double deltaProgress) {
+  limitInternal(nullptr, deltaProgress);
+}
+
+void Throttler::limitInternal(ThreadCtx* threadCtx, double deltaProgress) {
   std::chrono::time_point<Clock> now = Clock::now();
   double sleepTimeSeconds = calculateSleep(deltaProgress, now);
   if (throttlerLogTimeMillis_ > 0) {
     printPeriodicLogs(now, deltaProgress);
   }
-  if (sleepTimeSeconds > 0) {
-    /* sleep override */
-    PerfStatCollector statCollector(threadCtx, PerfStatReport::THROTTLER_SLEEP);
-    std::this_thread::sleep_for(
-        std::chrono::duration<double>(sleepTimeSeconds));
+  if (sleepTimeSeconds <= 0) {
+    return;
   }
+  if (threadCtx == nullptr) {
+    sleep(sleepTimeSeconds);
+    return;
+  }
+  PerfStatCollector statCollector(*threadCtx, PerfStatReport::THROTTLER_SLEEP);
+  sleep(sleepTimeSeconds);
+}
+
+void Throttler::sleep(double sleepTimeSecs) const {
+  /* sleep override */
+  std::this_thread::sleep_for(std::chrono::duration<double>(sleepTimeSecs));
 }
 
 double Throttler::calculateSleep(double deltaProgress,
@@ -218,7 +233,7 @@ double Throttler::averageThrottler(const Clock::time_point& now) {
   return -1;
 }
 
-void Throttler::registerTransfer() {
+void Throttler::startTransfer() {
   folly::SpinLockGuard lock(throttlerMutex_);
   if (refCount_ == 0) {
     startTime_ = Clock::now();
@@ -231,7 +246,7 @@ void Throttler::registerTransfer() {
   refCount_++;
 }
 
-void Throttler::deRegisterTransfer() {
+void Throttler::endTransfer() {
   folly::SpinLockGuard lock(throttlerMutex_);
   WDT_CHECK(refCount_ > 0);
   refCount_--;
