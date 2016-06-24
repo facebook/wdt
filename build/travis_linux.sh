@@ -46,7 +46,9 @@ git clone https://github.com/floitsch/double-conversion.git
 git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on .. && make -j 4 && make install)
 git clone https://github.com/google/glog.git
-( cd glog && autoreconf --force --install && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
+(mkdir glog/build; cd glog/build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -DBUILD_SHARED_LIBS=on .. && make -j 4 && make install)
+# ( cd glog && autoreconf --force --install && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
+# -Dgflags_DIR=$HOME -Dgflags_NAMESPACE=google
 git clone https://github.com/facebook/folly.git
 pwd ; ls -l
 cd wdt
