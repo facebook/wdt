@@ -10,55 +10,38 @@ clearTcOptions() {
   sudo tc qdisc del dev lo root
 }
 
-acquireIptableLock() {
-  while true
-  do
-    lockfile -r 0 $IPTABLE_LOCK_FILE
-    STATUS=$?
-    if [ $STATUS -eq 0 ]; then
-      break
-    fi
-    echo "Failed to get iptable lock $IPTABLE_LOCK_FILE"
-  done
-}
-
-releaseIptableLock() {
-  rm -f $IPTABLE_LOCK_FILE
+runIptableCmd() {
+  flock -x "$IPTABLE_LOCK_FILE" -c "$1"
 }
 
 blockSportByDropping() {
   UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --sport $1 -j DROP"
-  acquireIptableLock
-  sudo ip6tables -A INPUT -p tcp --sport "$1" -j DROP
-  releaseIptableLock
+  CMD="sudo ip6tables -A INPUT -p tcp --sport $1 -j DROP"
+  runIptableCmd "$CMD"
 }
 
 blockDportByDropping() {
   UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --dport $1 -j DROP"
-  acquireIptableLock
-  sudo ip6tables -A INPUT -p tcp --dport "$1" -j DROP
-  releaseIptableLock
+  CMD="sudo ip6tables -A INPUT -p tcp --dport $1 -j DROP"
+  runIptableCmd "$CMD"
 }
 
 blockSportByRejecting() {
   UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --sport $1 -j REJECT"
-  acquireIptableLock
-  sudo ip6tables -A INPUT -p tcp --sport "$1" -j REJECT
-  releaseIptableLock
+  CMD="sudo ip6tables -A INPUT -p tcp --sport $1 -j REJECT"
+  runIptableCmd "$CMD"
 }
 
 blockDportByRejecting() {
   UNBLOCK_CMD="sudo ip6tables -D INPUT -p tcp --dport $1 -j REJECT"
-  acquireIptableLock
-  sudo ip6tables -A INPUT -p tcp --dport "$1" -j REJECT
-  releaseIptableLock
+  CMD="sudo ip6tables -A INPUT -p tcp --dport $1 -j REJECT"
+  runIptableCmd "$CMD"
 }
 
 undoLastIpTableChange() {
   if [ ! -z "$UNBLOCK_CMD" ]; then
-    acquireIptableLock
-    eval "$UNBLOCK_CMD"
-    releaseIptableLock
+    CMD="eval $UNBLOCK_CMD"
+    runIptableCmd "$CMD"
     unset UNBLOCK_CMD
   fi
 }
