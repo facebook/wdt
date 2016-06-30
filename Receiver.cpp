@@ -82,7 +82,7 @@ void Receiver::startNewGlobalSession(const std::string &peerIp) {
     // in the throttler. This is guranteed to work in either of the
     // modes long running or not. We will de register from the throttler
     // when the current session ends
-    throttler_->registerTransfer();
+    throttler_->startTransfer();
   }
   startTime_ = Clock::now();
   if (options_.enable_download_resumption) {
@@ -109,7 +109,7 @@ void Receiver::endCurGlobalSession() {
   }
   WLOG(INFO) << "Ending the transfer " << getTransferId();
   if (throttler_) {
-    throttler_->deRegisterTransfer();
+    throttler_->endTransfer();
   }
   checkpoints_.clear();
   if (fileCreator_) {

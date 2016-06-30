@@ -71,7 +71,7 @@ ErrorCode WdtNamespaceController::createReceiver(
       return QUOTA_EXCEEDED;
     }
     receiver = make_shared<Receiver>(request);
-    receiver->setThrottler(parent_->getThrottler());
+    receiver->setThrottler(parent_->getWdtThrottler());
     receiver->setWdtOptions(parent_->getOptions());
     receiversMap_[identifier] = receiver;
     ++numReceivers_;
@@ -108,7 +108,7 @@ ErrorCode WdtNamespaceController::createSender(
       return QUOTA_EXCEEDED;
     }
     sender = make_shared<Sender>(request);
-    sender->setThrottler(parent_->getThrottler());
+    sender->setThrottler(parent_->getWdtThrottler());
     sender->setWdtOptions(parent_->getOptions());
     sendersMap_[identifier] = sender;
     ++numSenders_;
@@ -663,7 +663,7 @@ void WdtResourceController::updateMaxSendersLimit(
   }
 }
 
-std::shared_ptr<Throttler> WdtResourceController::getThrottler() const {
+std::shared_ptr<Throttler> WdtResourceController::getWdtThrottler() const {
   return throttler_;
 }
 

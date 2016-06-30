@@ -31,13 +31,13 @@ void Sender::endCurTransfer() {
              << getTransferId();
   setTransferStatus(FINISHED);
   if (throttler_) {
-    throttler_->deRegisterTransfer();
+    throttler_->endTransfer();
   }
 }
 
 void Sender::startNewTransfer() {
   if (throttler_) {
-    throttler_->registerTransfer();
+    throttler_->startTransfer();
   }
   WLOG(INFO) << "Starting a new transfer " << getTransferId() << " to "
              << destHost_;

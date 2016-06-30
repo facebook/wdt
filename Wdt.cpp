@@ -29,7 +29,7 @@ ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
   }
   appName_ = appName;
   initDone_ = true;
-  resourceController_.getThrottler()->setThrottlerRates(options_);
+  resourceController_.getWdtThrottler()->setThrottlerRates(options_);
   return OK;
 }
 

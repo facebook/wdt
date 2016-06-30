@@ -70,6 +70,11 @@ class Throttler {
   virtual void limit(ThreadCtx& threadCtx, double deltaProgress);
 
   /**
+   * Same as the other limit, but without reporting for sleep duration
+   */
+  virtual void limit(double deltaProgress);
+
+  /**
    * This is thread safe implementation of token bucket
    * algorithm. Bucket is filled at the rate of bucketRateBytesPerSec_
    * till the limit of bytesTokenBucketLimit_
@@ -95,10 +100,10 @@ class Throttler {
 
   /// Anyone who is using the throttler should call this method to maintain
   /// the refCount_ and startTime_ correctly
-  void registerTransfer();
+  void startTransfer();
 
   /// Method to de-register the transfer and decrement the refCount_
-  void deRegisterTransfer();
+  void endTransfer();
 
   /// Get the average rate in bytes per sec
   double getAvgRateBytesPerSec();
@@ -130,6 +135,10 @@ class Throttler {
    * @param now                       Pass in the current time stamp
    */
   double averageThrottler(const Clock::time_point& now);
+
+  void limitInternal(ThreadCtx* threadCtx, double deltaProgress);
+
+  void sleep(double sleepTimeSecs) const;
 
   /**
    * This method periodically prints logs.
