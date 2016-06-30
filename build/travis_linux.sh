@@ -27,7 +27,7 @@ OPENSSL_VERSION=openssl-1.0.1q
 wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
 tar xfz $OPENSSL_VERSION.tar.gz
 ls -l $HOME/bin
-( cd $OPENSSL_VERSION ; ./config --prefix=$HOME threads shared; make -j 4; make install )
+( cd $OPENSSL_VERSION ; ./config --prefix=$HOME threads shared; make; make install )
 which openssl
 $HOME/bin/openssl version
 ldd $HOME/bin/openssl
@@ -37,7 +37,6 @@ git clone https://github.com/floitsch/double-conversion.git
 git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on .. && make -j 4 && make install)
 git clone https://github.com/google/glog.git
-# ( cd glog && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
 (mkdir glog/build; cd glog/build; cmake -DINCLUDE_DIRECTORIES=$HOME/include -DCMAKE_INSTALL_PREFIX=$HOME -DBUILD_SHARED_LIBS=on .. && make -j 4 && make install)
 git clone https://github.com/facebook/folly.git
 pwd ; ls -l
