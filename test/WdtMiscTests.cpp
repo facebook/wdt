@@ -80,6 +80,26 @@ TEST(BasicTest, MultiWdtSender) {
   files::FileUtil::removeAll(srcDir);
   files::FileUtil::removeAll(targetDir);
 }
+
+TEST(BasicTest, THROTTLER_WITHOUT_REPORTING) {
+  const double avgThrottlerRate = 1 * kMbToB;
+  shared_ptr<Throttler> throttler =
+      Throttler::makeThrottler(avgThrottlerRate, 0, 0, 0);
+  const int toWrite = 2 * kMbToB;
+  const int blockSize = 1024;
+  int written = 0;
+  throttler->startTransfer();
+  const auto startTime = Clock::now();
+  while (written < toWrite) {
+    throttler->limit(blockSize);
+    written += blockSize;
+  }
+  const auto endTime = Clock::now();
+  throttler->endTransfer();
+  int durationMs = durationMillis(endTime - startTime);
+  EXPECT_GT(durationMs, 1900);
+  EXPECT_LT(durationMs, 2200);
+}
 }
 }  // namespace end
 

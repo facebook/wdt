@@ -249,8 +249,15 @@ class WdtResourceController : public WdtControllerBase {
    * getter for throttler.
    * setThrottlerRates to this throttler may not take effect. Instead, update
    * WdtOptions accordingly.
+   * Applications have to register transfers with the throttler, and at the end
+   * de-register it. For example-
+   * throttler->startTransfer();
+   * ...
+   * throttler->limit(numBytes);
+   * ...
+   * throttler->endTransfer();
    */
-  std::shared_ptr<Throttler> getThrottler() const;
+  std::shared_ptr<Throttler> getWdtThrottler() const;
 
   const WdtOptions &getOptions() const;
 
