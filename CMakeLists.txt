@@ -346,6 +346,10 @@ if (BUILD_TESTING)
   target_link_libraries(wdt_url_test wdt4tests)
   add_test(NAME WdtUrlTests COMMAND wdt_url_test)
 
+  add_executable(wdt_misc_tests  test/WdtMiscTests.cpp)
+  target_link_libraries(wdt_misc_tests wdt4tests)
+  add_test(NAME WdtMiscTests COMMAND wdt_misc_tests)
+
   add_executable(wdt_fd_test  test/FdTest.cpp)
   target_link_libraries(wdt_fd_test wdt4tests)
   add_test(NAME WdtFdTests COMMAND wdt_fd_test)

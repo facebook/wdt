@@ -59,7 +59,6 @@ cpp_unittest(
   srcs = [ 'test/WdtMiscTests.cpp', ],
   deps = [
       ":wdtlib",
-      "@/common/files:files",
   ],
   compiler_flags = wdt_compiler_flags,
 )

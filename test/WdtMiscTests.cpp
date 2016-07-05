@@ -8,8 +8,6 @@
  */
 #include "TestCommon.h"
 
-#include "common/files/FileUtil.h"
-
 #include <wdt/Wdt.h>
 #include <thread>
 
@@ -25,44 +23,52 @@ TEST(BasicTest, ReceiverAcceptTimeout) {
   opts.max_accept_retries = 1;
   opts.max_retries = 1;
   WdtTransferRequest req;
-  //{
   Receiver r(0, 2, "/tmp/wdtTest");
+  // TODO: that shouldn't be necessary
+  r.setWdtOptions(opts);
   req = r.init();
   EXPECT_EQ(OK, r.transferAsync());
   auto report = r.finish();
   EXPECT_EQ(CONN_ERROR, report->getSummary().getErrorCode());
-  //}
   // Receiver object is still alive but has given up - we should not be able
   // to connect:
   req.directory = "/bin";
   EXPECT_EQ(CONN_ERROR, wdt.wdtSend("foo", req));
 }
 
+// TODO: should move temp dir making etc to wdt test common or use
+// python or bash for this kind of test
 TEST(BasicTest, MultiWdtSender) {
-  string srcDir = "/tmp/wdtSrc";
-  string srcFile = "/tmp/wdtSrc/srcFile";
-  string targetDir = "/tmp/wdtTest";
-  files::FileUtil::recreateDir(srcDir);
-  files::FileUtil::recreateDir(targetDir);
-
-  {
-    // Create 400mb srcFile
-    const uint size = 1024 * 1024;
-    uint a[size];
-    FILE *pFile;
-    pFile = fopen(srcFile.c_str(), "wb");
-    for (int i = 0; i < 100; ++i) {
-      fwrite(a, 1, size * sizeof(uint), pFile);
-    }
-    fclose(pFile);
+  char baseDir[] = "/tmp/wdtTest/XXXXXX";
+  if (!mkdtemp(baseDir)) {
+    PLOG(FATAL) << "unable to make " << baseDir;
   }
+  LOG(INFO) << "Testing in " << baseDir;
+  string srcDir(baseDir);
+  srcDir.append("/src");
+  string srcFile = "file1";
+  string targetDir(baseDir);
+  targetDir.append("/dst");
+  string srcFileFullPath = srcDir + "/" + srcFile;
 
   Wdt &wdt = Wdt::initializeWdt("unit test app");
   WdtOptions &options = wdt.getWdtOptions();
   options.avg_mbytes_per_sec = 100;
   WdtTransferRequest req(/* start port */ 0, /* num ports */ 1, targetDir);
-  Receiver r(req);
+  Receiver r(req); // this creates the receiver directory
   req = r.init();
+  mkdir(srcDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+  {
+    // Create 400mb srcFile
+    const int32_t size = 1024 * 1024;
+    uint a[size];
+    FILE *pFile;
+    pFile = fopen(srcFileFullPath.c_str(), "wb");
+    for (int i = 0; i < 100; ++i) {
+      fwrite(a, 1, sizeof(a), pFile);
+    }
+    fclose(pFile);
+  }
   EXPECT_EQ(OK, r.transferAsync());
   req.directory = string(srcDir);
   auto sender1Thread = thread([&wdt, &req]() {
@@ -77,11 +83,15 @@ TEST(BasicTest, MultiWdtSender) {
   sender2Thread.join();
 
   EXPECT_EQ(OK, r.finish()->getSummary().getErrorCode());
-  files::FileUtil::removeAll(srcDir);
-  files::FileUtil::removeAll(targetDir);
+  unlink(srcFileFullPath.c_str());
+  rmdir(srcDir.c_str());
+  string dstFile = targetDir + "/" + srcFile;
+  unlink(dstFile.c_str());
+  rmdir(targetDir.c_str());
+  rmdir(baseDir);
 }
 
-TEST(BasicTest, THROTTLER_WITHOUT_REPORTING) {
+TEST(BasicTest, ThrottlerWithoutReporting) {
   const double avgThrottlerRate = 1 * kMbToB;
   shared_ptr<Throttler> throttler =
       Throttler::makeThrottler(avgThrottlerRate, 0, 0, 0);
