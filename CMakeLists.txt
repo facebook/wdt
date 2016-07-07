@@ -420,6 +420,4 @@ if (BUILD_TESTING)
   add_test(NAME WdtLongRunningTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_long_running_test.py")
 
-  add_test(NAME TransferLogLockTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/test/transfer_log_lock_test.sh")
 endif(BUILD_TESTING)

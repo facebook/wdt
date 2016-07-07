@@ -184,8 +184,6 @@ custom_unittest(
 
 wdt_sh_test('receiver_throttler_ref_count_test')
 
-wdt_sh_test('transfer_log_lock_test')
-
 wdt_sh_test('wdt_error_codes_test', tags=['serialize'])
 
 wdt_sh_test('wdt_e2e_test', tags=['serialize'])
