@@ -25,7 +25,10 @@ cmake_minimum_required(VERSION 3.2)
 project("WDT" LANGUAGES C CXX VERSION 1.26.1607070)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
-set(CMAKE_CXX_STANDARD 11)
+# WDT itself works fine with C++11 (gcc 4.8 for instance) but more recent folly
+# started to require C++14, so you can either get an older snapshot of folly
+# and set "11" below or use this:
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 
 # somehow 'option' for this doesn't seeem to work/I don't know how to make it
