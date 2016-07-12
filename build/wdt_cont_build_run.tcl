@@ -13,13 +13,13 @@ set userdir $::env(USER)
 puts "Will run script with USER env = $userdir"
 
 set maxTestDuration "20m"
-set totalMaxDuration "45m"
+set totalMaxDuration "50m"
 
 puts "Max test duration: $maxTestDuration - Max total $totalMaxDuration"
 
 # Set throughput - lower for now / there is some issue with kernel or env
 # (or our code?)
-set ::env(WDT_THROUGHPUT) 12000
+set ::env(WDT_THROUGHPUT) 11000
 
 set CDIR "/data/users/$userdir"
 
@@ -79,6 +79,7 @@ proc sendEmail {reason} {
     puts $f {Content-type: text/plain; charset="UTF-8"}
     puts $f ""; # seperate headers from body
     puts $f "filtered log, full log at https://fburl.com/wdt_${type}_builds"
+    puts $f "and $LOGF on the machine"
     close $f
     # rest of the body of the email:
     # filters info and vlog and normal compilation times:

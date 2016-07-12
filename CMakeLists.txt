@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.26.1606230)
+project("WDT" LANGUAGES C CXX VERSION 1.26.1607070)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 set(CMAKE_CXX_STANDARD 11)
@@ -346,6 +346,10 @@ if (BUILD_TESTING)
   target_link_libraries(wdt_url_test wdt4tests)
   add_test(NAME WdtUrlTests COMMAND wdt_url_test)
 
+  add_executable(wdt_misc_tests  test/WdtMiscTests.cpp)
+  target_link_libraries(wdt_misc_tests wdt4tests)
+  add_test(NAME WdtMiscTests COMMAND wdt_misc_tests)
+
   add_executable(wdt_fd_test  test/FdTest.cpp)
   target_link_libraries(wdt_fd_test wdt4tests)
   add_test(NAME WdtFdTests COMMAND wdt_fd_test)
@@ -416,6 +420,4 @@ if (BUILD_TESTING)
   add_test(NAME WdtLongRunningTest COMMAND
     "${CMAKE_CURRENT_SOURCE_DIR}/test/wdt_long_running_test.py")
 
-  add_test(NAME TransferLogLockTest COMMAND
-    "${CMAKE_CURRENT_SOURCE_DIR}/test/transfer_log_lock_test.sh")
 endif(BUILD_TESTING)

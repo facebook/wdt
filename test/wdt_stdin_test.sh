@@ -6,7 +6,7 @@ setBinaries
 setDirectory
 generateRandomFiles "$SRC_DIR" .015625 # in Mbytes: 16k smallest file
 
-WDTBIN_OPTS="-fork -abort_after_seconds 3"
+WDTBIN_OPTS="-fork -abort_after_seconds 8"
 extendWdtOptions
 
 TEST_COUNT=0
