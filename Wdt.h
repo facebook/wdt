@@ -81,6 +81,9 @@ class Wdt {
     return &resourceController_;
   }
 
+  /// destroys WDT object for an app
+  static void releaseWdt(const std::string &appName);
+
   /// Virtual Destructor (for class hierarchy)
   virtual ~Wdt() {
   }
@@ -111,7 +114,8 @@ class Wdt {
       std::shared_ptr<IAbortChecker> abortChecker);
 
   // Internal wdt object creator/holder
-  static Wdt &getWdtInternal(const std::string &appName);
+  static Wdt &getWdtInternal(const std::string &appName,
+                             std::function<Wdt *()> factory);
 
   /// Private constructor
   explicit Wdt() : resourceController_(options_) {

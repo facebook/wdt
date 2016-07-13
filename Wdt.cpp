@@ -9,7 +9,7 @@ namespace wdt {
 // this must be called first and exactly once:
 Wdt &Wdt::initializeWdt(const std::string &appName) {
   static bool doGlobalFlagsInit = true;
-  Wdt &res = getWdtInternal(appName);
+  Wdt &res = getWdtInternal(appName, []() -> Wdt * { return new Wdt(); });
   WdtFlags::initializeFromFlags(res.options_);
   if (doGlobalFlagsInit) {
     WdtFlags::initializeFromFlags(WdtOptions::getMutable());
@@ -35,7 +35,7 @@ ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
 
 // this can be called many times after initializeWdt()
 Wdt &Wdt::getWdt(const std::string &appName) {
-  Wdt &res = getWdtInternal(appName);
+  Wdt &res = getWdtInternal(appName, nullptr);
   if (!res.initDone_) {
     WLOG(ERROR) << "Called getWdt() before/without initializeWdt()";
     WDT_CHECK(false) << "Must call initializeWdt() once before getWdt()";
@@ -114,19 +114,34 @@ WdtOptions &Wdt::getWdtOptions() {
   return options_;
 }
 
+static std::unordered_map<std::string, std::unique_ptr<Wdt>> s_wdtMap;
+static std::mutex s_mutex;
+
 // private version
-Wdt &Wdt::getWdtInternal(const std::string &appName) {
-  static std::unordered_map<std::string, std::unique_ptr<Wdt>> s_wdtMap;
-  static std::mutex mutex;
-  std::lock_guard<std::mutex> lock(mutex);
+Wdt &Wdt::getWdtInternal(const std::string &appName,
+                         std::function<Wdt *()> factory) {
+  std::lock_guard<std::mutex> lock(s_mutex);
   auto it = s_wdtMap.find(appName);
   if (it != s_wdtMap.end()) {
     return *(it->second);
   }
-  Wdt *wdtPtr = new Wdt();
+  WDT_CHECK(factory) << "Must call initializeWdt() once before getWdt() "
+                     << appName;
+  Wdt *wdtPtr = factory();
   std::unique_ptr<Wdt> wdt(wdtPtr);
   s_wdtMap.emplace(appName, std::move(wdt));
   return *wdtPtr;
+}
+
+void Wdt::releaseWdt(const std::string& appName) {
+  LOG(INFO) << "Releasing WDT for " << appName;
+  std::lock_guard<std::mutex> lock(s_mutex);
+  auto it = s_wdtMap.find(appName);
+  if (it == s_wdtMap.end()) {
+    LOG(ERROR) << appName << " not found in releaseWdt";
+    return;
+  }
+  s_wdtMap.erase(it);
 }
 }
 }  // namespaces
