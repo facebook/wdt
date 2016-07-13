@@ -329,15 +329,13 @@ bool WdtResourceController::hasSenderQuota(
 bool WdtResourceController::hasSenderQuotaInternal(
     const std::shared_ptr<WdtNamespaceController> &controller) const {
   GuardLock lock(controllerMutex_);
-  bool namespaceHasSenderQuota =
-      controller ? controller->hasSenderQuota() : true;
-  if ((numSenders_ >= maxNumSenders_ && maxNumSenders_ > 0) ||
-      !namespaceHasSenderQuota) {
+  if ((numSenders_ >= maxNumSenders_) && (maxNumSenders_ > 0)) {
     WLOG(WARNING) << "Exceeded quota on max senders. "
                   << "Max num senders " << maxNumSenders_ << " and we have "
                   << numSenders_ << " existing senders";
     return false;
-  } else if (controller && !controller->hasSenderQuota()) {
+  }
+  if (controller && !controller->hasSenderQuota()) {
     return false;
   }
   return true;
@@ -390,15 +388,13 @@ bool WdtResourceController::hasReceiverQuota(
 bool WdtResourceController::hasReceiverQuotaInternal(
     const std::shared_ptr<WdtNamespaceController> &controller) const {
   GuardLock lock(controllerMutex_);
-  bool namespaceHasReceiverQuota =
-      controller ? controller->hasReceiverQuota() : true;
-  if ((numReceivers_ >= maxNumReceivers_ && maxNumReceivers_ > 0) ||
-      !namespaceHasReceiverQuota) {
+  if ((numReceivers_ >= maxNumReceivers_) && (maxNumReceivers_ > 0)) {
     WLOG(WARNING) << "Exceeded quota on max receivers. "
                   << "Max num receivers " << maxNumReceivers_ << " and we have "
                   << numReceivers_ << " existing receivers";
     return false;
-  } else if (controller && !controller->hasReceiverQuota()) {
+  }
+  if (controller && !controller->hasReceiverQuota()) {
     return false;
   }
   return true;

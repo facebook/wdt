@@ -60,8 +60,9 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
 
   // try to create sender
   SenderPtr sender;
-  // TODO should be using recoverid
-  const std::string secondKey = req.hostName;
+  // Allow more than 1 destination per host by using the host:firstport
+  std::string secondKey;
+  folly::toAppend(req.hostName, ":", req.ports[0], &secondKey);
   ErrorCode errCode =
       resourceController_.createSender(wdtNamespace, secondKey, req, sender);
   if (errCode == ALREADY_EXISTS && terminateExistingOne) {
