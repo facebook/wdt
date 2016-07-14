@@ -97,16 +97,70 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   auto transferReport = sender->transfer();
   ErrorCode ret = transferReport->getSummary().getErrorCode();
   resourceController_.releaseSender(wdtNamespace, secondKey);
-  WLOG(INFO) << "wdtSend for " << wdtNamespace << " " << secondKey << " "
+  WLOG(INFO) << "wdtSend for " << wdtNamespace << " " << secondKey
              << " ended with " << errorCodeToStr(ret);
   return ret;
 }
 
+ErrorCode Wdt::wdtReceiveStart(const std::string &wdtNamespace,
+                               WdtTransferRequest &req,
+                               const std::string &identifier,
+                               std::shared_ptr<IAbortChecker> abortChecker) {
+  if (req.errorCode != OK) {
+    WLOG(ERROR) << "Transfer request namespace:" << wdtNamespace
+                << " identifier:" << identifier
+                << " error:" << errorCodeToStr(req.errorCode);
+    return req.errorCode;
+  }
+
+  ReceiverPtr receiver;
+  ErrorCode errCode = resourceController_.createReceiver(
+      wdtNamespace, identifier, req, receiver);
+  if (errCode != OK) {
+    WLOG(ERROR) << "Failed to create receiver " << errorCodeToStr(errCode)
+                << " " << wdtNamespace << " " << identifier;
+    req.errorCode = errCode;
+    return errCode;
+  }
+
+  wdtSetAbortSocketCreatorAndReporter(wdtNamespace, receiver.get(), req,
+                                      abortChecker);
+
+  req = receiver->init();
+  if (req.errorCode != OK) {
+    WLOG(ERROR) << "Couldn't init receiver with request for " << wdtNamespace
+                << " " << identifier;
+    return req.errorCode;
+  }
+  errCode = receiver->transferAsync();
+  WLOG(INFO) << "wdtReceiveStart for " << wdtNamespace << " " << identifier
+             << " : " << errorCodeToStr(errCode);
+  req.errorCode = errCode;
+  return errCode;
+}
+
+ErrorCode Wdt::wdtReceiveFinish(const std::string &wdtNamespace,
+                                const std::string &identifier) {
+  ReceiverPtr receiver =
+      resourceController_.getReceiver(wdtNamespace, identifier);
+  if (receiver == nullptr) {
+    WLOG(ERROR) << "Failed to get receiver " << errorCodeToStr(NOT_FOUND) << " "
+                << wdtNamespace << " " << identifier;
+    return NOT_FOUND;
+  }
+  auto report = receiver->finish();
+  ErrorCode errCode = report->getSummary().getErrorCode();
+  WLOG(INFO) << "wdtReceiveFinish for " << wdtNamespace << " " << identifier
+             << " ended with " << errorCodeToStr(errCode);
+  resourceController_.releaseReceiver(wdtNamespace, identifier);
+  return errCode;
+}
+
 ErrorCode Wdt::wdtSetAbortSocketCreatorAndReporter(
-    const std::string &, Sender *sender, const WdtTransferRequest &,
+    const std::string &, WdtBase *target, const WdtTransferRequest &,
     std::shared_ptr<IAbortChecker> abortChecker) {
   if (abortChecker.get() != nullptr) {
-    sender->setAbortChecker(abortChecker);
+    target->setAbortChecker(abortChecker);
   }
   return OK;
 }
