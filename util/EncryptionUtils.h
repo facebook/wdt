@@ -8,12 +8,9 @@
  */
 #pragma once
 
-#include <memory>
-#include <string>
-
-#include <folly/Memory.h>
 #include <openssl/evp.h>
 #include <wdt/ErrorCodes.h>
+#include <string>
 
 namespace facebook {
 namespace wdt {
@@ -100,24 +97,16 @@ class EncryptionParams {
 /// base class to share code between encyptor and decryptor
 class AESBase {
  protected:
-  AESBase();
-  virtual ~AESBase();
-
   /// evpCtx_ is copied into ctxOut
   /// @return     whether the cloning was successful
-  bool cloneCtx(EVP_CIPHER_CTX* const ctxOut) const;
+  bool cloneCtx(EVP_CIPHER_CTX* ctxOut) const;
 
-  using CipherCtxDeleter =
-      folly::static_function_deleter<EVP_CIPHER_CTX, &EVP_CIPHER_CTX_free>;
-
+ protected:
   /// @return   cipher for a encryption type
   const EVP_CIPHER* getCipher(const EncryptionType encryptionType);
-
-  static void resetCipherCtx(EVP_CIPHER_CTX* const ctx);
-
-  EncryptionType type_;
-  std::unique_ptr<EVP_CIPHER_CTX, CipherCtxDeleter> evpCtx_;
-  bool started_;
+  EncryptionType type_{ENC_NONE};
+  EVP_CIPHER_CTX evpCtx_;
+  bool started_{false};
 };
 
 /// encryptor class
@@ -159,7 +148,7 @@ class AESEncryptor : public AESBase {
   virtual ~AESEncryptor();
 
  private:
-  static bool finishInternal(EVP_CIPHER_CTX* const ctx, EncryptionType type,
+  static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
                              std::string& tagOut);
 };
 
@@ -201,16 +190,15 @@ class AESDecryptor : public AESBase {
   /// verify whether the given tag matches previously saved context
   bool verifyTag(const std::string& tag);
 
-  AESDecryptor();
   /// destructor
   virtual ~AESDecryptor();
 
  private:
-  static bool finishInternal(EVP_CIPHER_CTX* const ctx, EncryptionType type,
+  static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
                              const std::string& tag);
 
   /// saved cipher ctx
-  std::unique_ptr<EVP_CIPHER_CTX, CipherCtxDeleter> savedCtx_;
+  EVP_CIPHER_CTX savedCtx_;
 
   /// whether ctx has been saved
   bool ctxSaved_{false};
