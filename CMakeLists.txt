@@ -198,7 +198,7 @@ if (NOT FOLLY_HAVE_WEAK_SYMBOLS)
 endif()
 # For missing __throw_logic_error:
 if (NOT FOLLY_HAVE_BITS_FUNCTEXCEPT_H)
-  list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/detail/FunctionalExcept.cpp")
+  list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/portability/BitsFunctexcept.cpp")
   message(STATUS "no bits/functexcept.h, adding FunctionalExcept to folly src")
 endif()
 
