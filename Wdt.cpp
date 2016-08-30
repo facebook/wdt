@@ -9,12 +9,11 @@ namespace wdt {
 // this must be called first and exactly once:
 Wdt &Wdt::initializeWdt(const std::string &appName) {
   static bool doGlobalFlagsInit = true;
-  Wdt &res = getWdtInternal(appName, []() -> Wdt * { return new Wdt(); });
-  WdtFlags::initializeFromFlags(res.options_);
   if (doGlobalFlagsInit) {
     WdtFlags::initializeFromFlags(WdtOptions::getMutable());
     doGlobalFlagsInit = false;
   }
+  Wdt &res = getWdtInternal(appName, []() -> Wdt * { return new Wdt(); });
   res.initializeWdtInternal(appName);
   // At fb we do this for services - that's floody for cmd line though
   // res.printWdtOptions(WLOG(INFO));
@@ -29,7 +28,7 @@ ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
   }
   appName_ = appName;
   initDone_ = true;
-  resourceController_.getWdtThrottler()->setThrottlerRates(options_);
+  resourceController_->getWdtThrottler()->setThrottlerRates(options_);
   return OK;
 }
 
@@ -48,6 +47,11 @@ ErrorCode Wdt::printWdtOptions(std::ostream &out) {
   return OK;
 }
 
+Wdt::Wdt() {
+  WdtFlags::initializeFromFlags(options_);
+  resourceController_ = folly::make_unique<WdtResourceController>(options_);
+}
+
 ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
                        const WdtTransferRequest &req,
                        std::shared_ptr<IAbortChecker> abortChecker,
@@ -64,7 +68,7 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   std::string secondKey;
   folly::toAppend(req.hostName, ":", req.ports[0], &secondKey);
   ErrorCode errCode =
-      resourceController_.createSender(wdtNamespace, secondKey, req, sender);
+      resourceController_->createSender(wdtNamespace, secondKey, req, sender);
   if (errCode == ALREADY_EXISTS && terminateExistingOne) {
     WLOG(WARNING) << "Found pre-existing sender for " << wdtNamespace << " "
                   << secondKey << " aborting it and making a new one";
@@ -75,10 +79,10 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
     }
     sender->abort(ABORTED_BY_APPLICATION);
     // This may log an error too
-    resourceController_.releaseSender(wdtNamespace, secondKey);
+    resourceController_->releaseSender(wdtNamespace, secondKey);
     // Try#2
     errCode =
-        resourceController_.createSender(wdtNamespace, secondKey, req, sender);
+        resourceController_->createSender(wdtNamespace, secondKey, req, sender);
   }
   if (errCode != OK) {
     WLOG(ERROR) << "Failed to create sender " << errorCodeToStr(errCode) << " "
@@ -96,7 +100,7 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
   }
   auto transferReport = sender->transfer();
   ErrorCode ret = transferReport->getSummary().getErrorCode();
-  resourceController_.releaseSender(wdtNamespace, secondKey);
+  resourceController_->releaseSender(wdtNamespace, secondKey);
   WLOG(INFO) << "wdtSend for " << wdtNamespace << " " << secondKey
              << " ended with " << errorCodeToStr(ret);
   return ret;
@@ -114,7 +118,7 @@ ErrorCode Wdt::wdtReceiveStart(const std::string &wdtNamespace,
   }
 
   ReceiverPtr receiver;
-  ErrorCode errCode = resourceController_.createReceiver(
+  ErrorCode errCode = resourceController_->createReceiver(
       wdtNamespace, identifier, req, receiver);
   if (errCode != OK) {
     WLOG(ERROR) << "Failed to create receiver " << errorCodeToStr(errCode)
@@ -142,7 +146,7 @@ ErrorCode Wdt::wdtReceiveStart(const std::string &wdtNamespace,
 ErrorCode Wdt::wdtReceiveFinish(const std::string &wdtNamespace,
                                 const std::string &identifier) {
   ReceiverPtr receiver =
-      resourceController_.getReceiver(wdtNamespace, identifier);
+      resourceController_->getReceiver(wdtNamespace, identifier);
   if (receiver == nullptr) {
     WLOG(ERROR) << "Failed to get receiver " << errorCodeToStr(NOT_FOUND) << " "
                 << wdtNamespace << " " << identifier;
@@ -152,7 +156,7 @@ ErrorCode Wdt::wdtReceiveFinish(const std::string &wdtNamespace,
   ErrorCode errCode = report->getSummary().getErrorCode();
   WLOG(INFO) << "wdtReceiveFinish for " << wdtNamespace << " " << identifier
              << " ended with " << errorCodeToStr(errCode);
-  resourceController_.releaseReceiver(wdtNamespace, identifier);
+  resourceController_->releaseReceiver(wdtNamespace, identifier);
   return errCode;
 }
 

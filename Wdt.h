@@ -94,7 +94,7 @@ class Wdt {
   virtual ErrorCode printWdtOptions(std::ostream &out);
 
   WdtResourceController *getWdtResourceController() {
-    return &resourceController_;
+    return resourceController_.get();
   }
 
   /// destroys WDT object for an app
@@ -118,7 +118,7 @@ class Wdt {
 
   // TODO: share resource controller across apps
   /// wdt resource controller
-  WdtResourceController resourceController_;
+  std::unique_ptr<WdtResourceController> resourceController_;
 
   // Internal initialization so sub classes can share the code
   virtual ErrorCode initializeWdtInternal(const std::string &appName);
@@ -134,8 +134,7 @@ class Wdt {
                              std::function<Wdt *()> factory);
 
   /// Private constructor
-  explicit Wdt() : resourceController_(options_) {
-  }
+  explicit Wdt();
 
   /// Not copyable
   Wdt(const Wdt &) = delete;
