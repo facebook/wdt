@@ -22,14 +22,9 @@ TEST(BasicTest, ReceiverAcceptTimeout) {
   opts.accept_timeout_millis = 1;
   opts.max_accept_retries = 1;
   opts.max_retries = 1;
-  WdtTransferRequest req;
-  Receiver r(0, 2, "/tmp/wdtTest");
-  // TODO: that shouldn't be necessary
-  r.setWdtOptions(opts);
-  req = r.init();
-  EXPECT_EQ(OK, r.transferAsync());
-  auto report = r.finish();
-  EXPECT_EQ(CONN_ERROR, report->getSummary().getErrorCode());
+  WdtTransferRequest req(0, 2, "/tmp/wdtTest");
+  EXPECT_EQ(OK, wdt.wdtReceiveStart("foo", req));
+  EXPECT_EQ(CONN_ERROR, wdt.wdtReceiveFinish("foo"));
   // Receiver object is still alive but has given up - we should not be able
   // to connect:
   req.directory = "/bin";
@@ -55,8 +50,6 @@ TEST(BasicTest, MultiWdtSender) {
   WdtOptions &options = wdt.getWdtOptions();
   options.avg_mbytes_per_sec = 100;
   WdtTransferRequest req(/* start port */ 0, /* num ports */ 1, targetDir);
-  Receiver r(req); // this creates the receiver directory
-  req = r.init();
   mkdir(srcDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   {
     // Create 400mb srcFile
@@ -69,7 +62,7 @@ TEST(BasicTest, MultiWdtSender) {
     }
     fclose(pFile);
   }
-  EXPECT_EQ(OK, r.transferAsync());
+  EXPECT_EQ(OK, wdt.wdtReceiveStart("foo", req));
   req.directory = string(srcDir);
   auto sender1Thread = thread([&wdt, &req]() {
     EXPECT_EQ(OK, wdt.wdtSend("foo", req, nullptr, true));
@@ -82,7 +75,7 @@ TEST(BasicTest, MultiWdtSender) {
   sender1Thread.join();
   sender2Thread.join();
 
-  EXPECT_EQ(OK, r.finish()->getSummary().getErrorCode());
+  EXPECT_EQ(OK, wdt.wdtReceiveFinish("foo"));
   unlink(srcFileFullPath.c_str());
   rmdir(srcDir.c_str());
   string dstFile = targetDir + "/" + srcFile;

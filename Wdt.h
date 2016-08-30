@@ -75,11 +75,30 @@ class Wdt {
       std::shared_ptr<IAbortChecker> abortChecker = nullptr,
       bool terminateExistingOne = false);
 
+  /**
+   * Receive data. It creates a receiver on specified namespace/identifier and
+   * initialize it.
+   */
+  virtual ErrorCode wdtReceiveStart(
+      const std::string &wdtNamespace, WdtTransferRequest &wdtRequest,
+      const std::string &identifier = "default",
+      std::shared_ptr<IAbortChecker> abortChecker = nullptr);
+
+  /**
+   * Finish receiving data. It finishes the receiver on specified
+   * namespace/identifier.
+   */
+  virtual ErrorCode wdtReceiveFinish(const std::string &wdtNamespace,
+                                     const std::string &identifier = "default");
+
   virtual ErrorCode printWdtOptions(std::ostream &out);
 
   WdtResourceController *getWdtResourceController() {
-    return &resourceController_;
+    return resourceController_.get();
   }
+
+  /// destroys WDT object for an app
+  static void releaseWdt(const std::string &appName);
 
   /// Virtual Destructor (for class hierarchy)
   virtual ~Wdt() {
@@ -99,23 +118,23 @@ class Wdt {
 
   // TODO: share resource controller across apps
   /// wdt resource controller
-  WdtResourceController resourceController_;
+  std::unique_ptr<WdtResourceController> resourceController_;
 
   // Internal initialization so sub classes can share the code
   virtual ErrorCode initializeWdtInternal(const std::string &appName);
 
   // Optionally set socket creator and progress reporter (used for fb)
   virtual ErrorCode wdtSetAbortSocketCreatorAndReporter(
-      const std::string &wdtNamespace, Sender *sender,
+      const std::string &wdtNamespace, WdtBase *target,
       const WdtTransferRequest &req,
       std::shared_ptr<IAbortChecker> abortChecker);
 
   // Internal wdt object creator/holder
-  static Wdt &getWdtInternal(const std::string &appName);
+  static Wdt &getWdtInternal(const std::string &appName,
+                             std::function<Wdt *()> factory);
 
   /// Private constructor
-  explicit Wdt() : resourceController_(options_) {
-  }
+  explicit Wdt();
 
   /// Not copyable
   Wdt(const Wdt &) = delete;

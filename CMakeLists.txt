@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.26.1607070)
+project("WDT" LANGUAGES C CXX VERSION 1.26.1607121)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 # WDT itself works fine with C++11 (gcc 4.8 for instance) but more recent folly
@@ -198,7 +198,7 @@ if (NOT FOLLY_HAVE_WEAK_SYMBOLS)
 endif()
 # For missing __throw_logic_error:
 if (NOT FOLLY_HAVE_BITS_FUNCTEXCEPT_H)
-  list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/detail/FunctionalExcept.cpp")
+  list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/portability/BitsFunctexcept.cpp")
   message(STATUS "no bits/functexcept.h, adding FunctionalExcept to folly src")
 endif()
 
