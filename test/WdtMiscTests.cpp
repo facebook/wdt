@@ -17,7 +17,7 @@ namespace facebook {
 namespace wdt {
 
 TEST(BasicTest, ReceiverAcceptTimeout) {
-  Wdt &wdt = Wdt::initializeWdt("unit test app");
+  Wdt &wdt = Wdt::initializeWdt("unit test ReceiverAcceptTimeout");
   WdtOptions &opts = wdt.getWdtOptions();
   opts.accept_timeout_millis = 1;
   opts.max_accept_retries = 1;
@@ -46,7 +46,7 @@ TEST(BasicTest, MultiWdtSender) {
   targetDir.append("/dst");
   string srcFileFullPath = srcDir + "/" + srcFile;
 
-  Wdt &wdt = Wdt::initializeWdt("unit test app");
+  Wdt &wdt = Wdt::initializeWdt("unit test MultiWdtSender");
   WdtOptions &options = wdt.getWdtOptions();
   options.avg_mbytes_per_sec = 100;
   WdtTransferRequest req(/* start port */ 0, /* num ports */ 1, targetDir);
