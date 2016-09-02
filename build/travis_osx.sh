@@ -10,14 +10,14 @@ mkdir $HOME/bin || true
 brew update
 brew install openssl || true
 brew link --force openssl || true
-CMAKE_BASE=cmake-3.3.2-Darwin-x86_64
+CMAKE_BASE=cmake-3.6.1-Darwin-x86_64
 cd ..
 CMAKE_BIN_DIR=`pwd`/$CMAKE_BASE/CMake.app/Contents/bin
 export PATH=/usr/local/opt/openssl/bin:$CMAKE_BIN_DIR:$HOME/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/opt/openssl/lib:$HOME/lib:$LD_LIBRARY_PATH
 export OPENSSL_ROOT_DIR=/usr/local/opt/openssl
 openssl version -a
-wget https://www.cmake.org/files/v3.3/$CMAKE_BASE.tar.gz
+wget https://www.cmake.org/files/v3.6/$CMAKE_BASE.tar.gz
 tar xfz $CMAKE_BASE.tar.gz
 which cmake
 cmake --version
