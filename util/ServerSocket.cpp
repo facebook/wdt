@@ -207,7 +207,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
   WDT_CHECK(!listeningFds_.empty());
   WDT_CHECK(timeoutMillis > 0);
 
-  const WdtOptions& options = threadCtx_.getOptions();
+  const WdtOptions &options = threadCtx_.getOptions();
   const bool checkAbort = (options.abort_check_interval_millis > 0);
 
   const int numFds = listeningFds_.size();

@@ -14,6 +14,8 @@
 #include <poll.h>
 #include <sys/socket.h>
 
+#include <folly/ScopeGuard.h>
+
 namespace facebook {
 namespace wdt {
 

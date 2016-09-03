@@ -146,6 +146,7 @@ while {1} {
      $sudo rm -rf /tmp/wdtTest_$userdir /dev/shm/wdtTest_$userdir wdtTest &&\
      cd $CDIR/fbsource/fbcode && time hg pull -r master -u --dest master &&\
      hg log -l 1 && hg log -v -l 1 folly && hg log -v -l 1 wdt &&\
+     hg log -v -l 1 stargate &&\
      cd $CDIR/cmake_wdt_build && time make -j 4 && \
      CTEST_OUTPUT_ON_FAILURE=1 time $timeoutCmd $maxTestDuration make test &&\
      $extraCmds" >& $LOGF < /dev/null} results options]} {

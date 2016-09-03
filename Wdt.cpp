@@ -192,7 +192,7 @@ Wdt &Wdt::getWdtInternal(const std::string &appName,
   return *wdtPtr;
 }
 
-void Wdt::releaseWdt(const std::string& appName) {
+void Wdt::releaseWdt(const std::string &appName) {
   LOG(INFO) << "Releasing WDT for " << appName;
   std::lock_guard<std::mutex> lock(s_mutex);
   auto it = s_wdtMap.find(appName);
