@@ -48,7 +48,7 @@ proc check_clean {} {
 
 proc switch_to_and_update_master {} {
     puts "*** Switching to and updating master:"
-    puts [exec hg pull]
+    puts [exec hg pull 2>@1]
     puts [exec hg update master]
 }
 
