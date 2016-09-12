@@ -165,7 +165,7 @@ while {1} {
         set autoPkgNext 0
     } else {
         set firstLine [lindex [split $prevDesc \n] 0];
-        if {![string compare $firstLine "wdt version bump"]} {
+        if {![string compare $firstLine "wdt/stargate version bump"]} {
             puts "Previous commit is auto commit, will not auto commit!"
             set autoBump 0
         } else {
