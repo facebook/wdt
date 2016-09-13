@@ -94,13 +94,8 @@ void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
   configureOptions(avgRateBytesPerSec, bucketRateBytesPerSec,
                    bytesTokenBucketLimit);
   folly::SpinLockGuard lock(throttlerMutex_);
-  if (refCount_ > 0 && avgRateBytesPerSec < avgRateBytesPerSec_) {
-    WLOG(INFO) << "new avg rate : " << avgRateBytesPerSec
-               << " cur avg rate : " << avgRateBytesPerSec_
-               << " Average throttler rate can't be "
-               << "lowered mid transfer. Ignoring the new value";
-    avgRateBytesPerSec = avgRateBytesPerSec_;
-  }
+
+  resetState();
 
   WLOG(INFO) << "Updating the rates avgRateBytesPerSec : " << avgRateBytesPerSec
              << " bucketRateBytesPerSec : " << bucketRateBytesPerSec
@@ -236,14 +231,18 @@ double Throttler::averageThrottler(const Clock::time_point& now) {
 void Throttler::startTransfer() {
   folly::SpinLockGuard lock(throttlerMutex_);
   if (refCount_ == 0) {
-    startTime_ = Clock::now();
-    lastFillTime_ = startTime_;
-    lastLogTime_ = startTime_;
-    instantProgress_ = 0;
-    bytesProgress_ = 0;
-    bytesTokenBucket_ = 0;
+    resetState();
   }
   refCount_++;
+}
+
+void Throttler::resetState() {
+  startTime_ = Clock::now();
+  lastFillTime_ = startTime_;
+  lastLogTime_ = startTime_;
+  instantProgress_ = 0;
+  bytesProgress_ = 0;
+  bytesTokenBucket_ = 0;
 }
 
 void Throttler::endTransfer() {

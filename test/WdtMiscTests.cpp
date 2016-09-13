@@ -34,6 +34,8 @@ TEST(BasicTest, ReceiverAcceptTimeout) {
 // TODO: should move temp dir making etc to wdt test common or use
 // python or bash for this kind of test
 TEST(BasicTest, MultiWdtSender) {
+  // make sure root directory exists
+  mkdir("/tmp/wdtTest", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   char baseDir[] = "/tmp/wdtTest/XXXXXX";
   if (!mkdtemp(baseDir)) {
     PLOG(FATAL) << "unable to make " << baseDir;

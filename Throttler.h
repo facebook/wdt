@@ -140,6 +140,8 @@ class Throttler {
 
   void sleep(double sleepTimeSecs) const;
 
+  void resetState();
+
   /**
    * This method periodically prints logs.
    * The period is defined by FLAGS_peak_log_time_ms
