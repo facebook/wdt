@@ -153,6 +153,10 @@ struct WdtTransferRequest {
   /// Address on which receiver binded the ports / sender is sending data to
   std::string hostName;
 
+  /// Unique identifier for destination. This is useful to distinguish multiple
+  /// destinations in the same host
+  std::string destIdentifier;
+
   /// Directory to write the data to / read the data from
   std::string directory;
 

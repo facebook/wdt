@@ -374,7 +374,8 @@ ErrorCode WdtResourceController::createSender(
     WLOG(ERROR) << "Failed in creating sender for " << wdtNamespace << " "
                 << errorCodeToStr(code);
   } else {
-    WLOG(INFO) << "Successfully added a sender for " << wdtNamespace;
+    WLOG(INFO) << "Successfully added a sender for " << wdtNamespace
+               << " identifier " << identifier;
   }
   return code;
 }
@@ -433,7 +434,8 @@ ErrorCode WdtResourceController::createReceiver(
     WLOG(ERROR) << "Failed in creating receiver for " << wdtNamespace << " "
                 << errorCodeToStr(code);
   } else {
-    WLOG(INFO) << "Successfully added a receiver for " << wdtNamespace;
+    WLOG(INFO) << "Successfully added a receiver for " << wdtNamespace
+               << " identifier " << identifier;
   }
   return code;
 }

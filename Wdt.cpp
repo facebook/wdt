@@ -64,18 +64,19 @@ ErrorCode Wdt::wdtSend(const std::string &wdtNamespace,
 
   // try to create sender
   SenderPtr sender;
-  // Allow more than 1 destination per host by using the host:firstport
-  std::string secondKey;
-  folly::toAppend(req.hostName, ":", req.ports[0], &secondKey);
+  std::string secondKey = req.destIdentifier;
+  if (secondKey.empty()) {
+    secondKey = req.hostName;
+  }
   ErrorCode errCode =
       resourceController_->createSender(wdtNamespace, secondKey, req, sender);
   if (errCode == ALREADY_EXISTS && terminateExistingOne) {
     WLOG(WARNING) << "Found pre-existing sender for " << wdtNamespace << " "
                   << secondKey << " aborting it and making a new one";
-    if (sender->getTransferRequest() == req) {
+    if (sender->getTransferRequest().transferId == req.transferId) {
       WLOG(WARNING) << "No need to recreate same sender with key: " << secondKey
                     << " TransferRequest: " << req;
-      return errCode;
+      return ALREADY_EXISTS;
     }
     sender->abort(ABORTED_BY_APPLICATION);
     // This may log an error too
