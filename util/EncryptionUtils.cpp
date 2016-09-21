@@ -9,7 +9,8 @@
 #include <wdt/util/EncryptionUtils.h>
 #include <folly/Conv.h>
 #include <folly/SpinLock.h>
-#include <folly/String.h>  // for humanify
+#include <folly/String.h>            // for humanify
+#include <wdt/WdtTransferRequest.h>  // for to/fromHex utils
 
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
@@ -137,40 +138,22 @@ EncryptionParams::~EncryptionParams() {
   erase();
 }
 
-char toHex(unsigned char v) {
-  WDT_CHECK_LT(v, 16);
-  if (v <= 9) {
-    return '0' + v;
-  }
-  return 'a' + v - 10;
-}
-
-int fromHex(char c) {
-  if (c < '0' || (c > '9' && (c < 'a' || c > 'f'))) {
-    return -1;  // invalid not 0-9a-f hex char
-  }
-  if (c <= '9') {
-    return c - '0';
-  }
-  return c - 'a' + 10;
-}
-
 string EncryptionParams::getUrlSafeString() const {
   string res;
   res.reserve(/* 1 byte type, 1 byte colon */ 2 +
               /* hex is 2x length */ (2 * data_.length()));
-  res.push_back(toHex(type_));
+  res.push_back(WdtUri::toHex(type_));
   res.push_back(':');
   for (unsigned char c : data_) {
-    res.push_back(toHex(c >> 4));
-    res.push_back(toHex(c & 0xf));
+    res.push_back(WdtUri::toHex(c >> 4));
+    res.push_back(WdtUri::toHex(c & 0xf));
   }
   return res;
 }
 
 string EncryptionParams::getLogSafeString() const {
   string res;
-  res.push_back(toHex(type_));
+  res.push_back(WdtUri::toHex(type_));
   res.push_back(':');
   res.append("...");
   res.append(std::to_string(std::hash<string>()(data_)));
@@ -202,7 +185,7 @@ ErrorCode EncryptionParams::unserialize(const string& input,
         continue;
       }
     }
-    int v = fromHex(c);
+    int v = WdtUri::fromHex(c);
     if (v < 0) {
       WLOG(ERROR) << "Not hex found " << (int)c << " in " << input;
       return ERROR;

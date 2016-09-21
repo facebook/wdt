@@ -93,6 +93,16 @@ class WdtUri {
   /// Generate url by serializing the members of this struct
   std::string generateUrl() const;
 
+  /// Url escape a value (which can be binary)
+  static std::string escape(const std::string& binaryStr);
+  /// Url unescape a value (escaped by escape()) - returns true if successful,
+  /// false if there is a malformed % sequence in the string
+  static bool unescape(std::string& result, folly::StringPiece escapedValue);
+  /// 0-16 -> '0'-'f'
+  static char toHex(unsigned char v);
+  /// '0'-'f' -> 0-16
+  static int fromHex(char c);
+
   /// Assignment operator to convert string to wdt uri object
   WdtUri& operator=(const std::string& url);
 
