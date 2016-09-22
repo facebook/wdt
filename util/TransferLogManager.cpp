@@ -221,13 +221,6 @@ bool LogEncoderDecoder::decodeDirectoryInvalidationEntry(char *buf,
   return !checkForOverflow(br.start() - (uint8_t *)buf, size);
 }
 
-void TransferLogManager::setRootDir(const std::string &rootDir) {
-  rootDir_ = rootDir;
-  if (rootDir_.back() != '/') {
-    rootDir_.push_back('/');
-  }
-}
-
 std::string TransferLogManager::getFullPath(const std::string &relPath) {
   WDT_CHECK(!rootDir_.empty()) << "Root directory not set";
   std::string fullPath = rootDir_;

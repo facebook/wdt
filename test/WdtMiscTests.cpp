@@ -23,12 +23,13 @@ TEST(BasicTest, ReceiverAcceptTimeout) {
   opts.max_accept_retries = 1;
   opts.max_retries = 1;
   WdtTransferRequest req(0, 2, "/tmp/wdtTest");
+  req.wdtNamespace = "foo";
   EXPECT_EQ(OK, wdt.wdtReceiveStart("foo", req));
   EXPECT_EQ(CONN_ERROR, wdt.wdtReceiveFinish("foo"));
   // Receiver object is still alive but has given up - we should not be able
   // to connect:
   req.directory = "/bin";
-  EXPECT_EQ(CONN_ERROR, wdt.wdtSend("foo", req));
+  EXPECT_EQ(CONN_ERROR, wdt.wdtSend(req));
 }
 
 // TODO: should move temp dir making etc to wdt test common or use
@@ -51,7 +52,9 @@ TEST(BasicTest, MultiWdtSender) {
   Wdt &wdt = Wdt::initializeWdt("unit test MultiWdtSender");
   WdtOptions &options = wdt.getWdtOptions();
   options.avg_mbytes_per_sec = 100;
-  WdtTransferRequest req(/* start port */ 0, /* num ports */ 1, targetDir);
+  WdtTransferRequest req(/* start port */ 0,
+                         /* num ports */ 1, targetDir);
+  req.wdtNamespace = "foo";
   mkdir(srcDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   {
     // Create 400mb srcFile
@@ -66,13 +69,12 @@ TEST(BasicTest, MultiWdtSender) {
   }
   EXPECT_EQ(OK, wdt.wdtReceiveStart("foo", req));
   req.directory = string(srcDir);
-  auto sender1Thread = thread([&wdt, &req]() {
-    EXPECT_EQ(OK, wdt.wdtSend("foo", req, nullptr, true));
-  });
+  auto sender1Thread = thread(
+      [&wdt, &req]() { EXPECT_EQ(OK, wdt.wdtSend(req, nullptr, true)); });
   auto sender2Thread = thread([&wdt, &req]() {
     /* sleep override */
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    EXPECT_EQ(ALREADY_EXISTS, wdt.wdtSend("foo", req, nullptr, true));
+    EXPECT_EQ(ALREADY_EXISTS, wdt.wdtSend(req, nullptr, true));
   });
   sender1Thread.join();
   sender2Thread.join();

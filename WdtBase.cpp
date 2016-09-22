@@ -82,26 +82,36 @@ void WdtBase::setTransferId(const std::string& transferId) {
   WLOG(INFO) << "Setting transfer id " << transferId;
 }
 
-void WdtBase::setProtocolVersion(int64_t protocol) {
+void WdtBase::negotiateProtocol() {
+  int protocol = transferRequest_.protocolVersion;
   WDT_CHECK(protocol > 0) << "Protocol version can't be <= 0 " << protocol;
   int negotiatedPv = Protocol::negotiateProtocol(protocol);
   if (negotiatedPv != protocol) {
     WLOG(WARNING) << "Negotiated protocol version " << protocol << " -> "
                   << negotiatedPv;
   }
-  protocolVersion_ = negotiatedPv;
-  WLOG(INFO) << "using wdt protocol version " << protocolVersion_;
+  transferRequest_.protocolVersion = negotiatedPv;
+  WLOG(INFO) << "using wdt protocol version "
+             << transferRequest_.protocolVersion;
 }
 
 int WdtBase::getProtocolVersion() const {
-  return protocolVersion_;
+  return transferRequest_.protocolVersion;
+}
+
+void WdtBase::setProtocolVersion(int protocolVersion) {
+  transferRequest_.protocolVersion = protocolVersion;
 }
 
 std::string WdtBase::getTransferId() {
   return transferRequest_.transferId;
 }
 
-const WdtTransferRequest& WdtBase::getTransferRequest() {
+const std::string& WdtBase::getDirectory() const {
+  return transferRequest_.directory;
+}
+
+WdtTransferRequest& WdtBase::getTransferRequest() {
   return transferRequest_;
 }
 

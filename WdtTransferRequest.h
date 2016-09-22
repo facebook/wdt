@@ -167,6 +167,9 @@ struct WdtTransferRequest {
   /// destinations in the same host
   std::string destIdentifier;
 
+  /// Namespace for the transfer
+  std::string wdtNamespace;
+
   /// Directory to write the data to / read the data from
   std::string directory;
 
@@ -225,6 +228,8 @@ struct WdtTransferRequest {
   const static std::string NUM_PORTS_PARAM;
   /// Encryption parameters (proto:key for now, certificate,... potentially)
   const static std::string ENCRYPTION_PARAM;
+  const static std::string NAMESPACE_PARAM;
+  const static std::string DEST_IDENTIFIER_PARAM;
 
   /// Get ports vector from startPort and numPorts
   static std::vector<int32_t> genPortsVector(int32_t startPort,

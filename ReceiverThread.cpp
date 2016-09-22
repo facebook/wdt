@@ -111,7 +111,7 @@ ReceiverState ReceiverThread::listen() {
   const bool doActualWrites = !options_.skip_writes;
   int32_t port = socket_->getPort();
   WVLOG(1) << "Server Thread for port " << port << " with backlog "
-           << socket_->getBackLog() << " on " << wdtParent_->getDir()
+           << socket_->getBackLog() << " on " << wdtParent_->getDirectory()
            << " writes = " << doActualWrites;
 
   for (int retry = 1; retry < options_.max_retries; ++retry) {

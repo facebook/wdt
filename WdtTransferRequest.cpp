@@ -280,6 +280,8 @@ const string WdtTransferRequest::PORTS_PARAM{"ports"};
 const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
 const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
 const string WdtTransferRequest::ENCRYPTION_PARAM{"enc"};
+const string WdtTransferRequest::NAMESPACE_PARAM{"ns"};
+const string WdtTransferRequest::DEST_IDENTIFIER_PARAM{"dstid"};
 
 WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
                                        const string& directory) {
@@ -298,6 +300,8 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   errorCode = wdtUri.getErrorCode();
   hostName = wdtUri.getHostName();
   transferId = wdtUri.getQueryParam(TRANSFER_ID_PARAM);
+  wdtNamespace = wdtUri.getQueryParam(NAMESPACE_PARAM);
+  destIdentifier = wdtUri.getQueryParam(DEST_IDENTIFIER_PARAM);
   directory = wdtUri.getQueryParam(DIRECTORY_PARAM);
   string encStr = wdtUri.getQueryParam(ENCRYPTION_PARAM);
   if (!encStr.empty()) {
@@ -394,6 +398,8 @@ string WdtTransferRequest::generateUrlInternal(bool genFull,
   WdtUri wdtUri;
   wdtUri.setHostName(hostName);
   wdtUri.setQueryParam(TRANSFER_ID_PARAM, transferId);
+  wdtUri.setQueryParam(NAMESPACE_PARAM, wdtNamespace);
+  wdtUri.setQueryParam(DEST_IDENTIFIER_PARAM, destIdentifier);
   wdtUri.setQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
   serializePorts(wdtUri);
@@ -445,14 +451,13 @@ string WdtTransferRequest::getSerializedPortsList() const {
 }
 
 bool WdtTransferRequest::operator==(const WdtTransferRequest& that) const {
-  // TODO: fix this to use normal short-cutting
-  bool result = true;
-  result &= (transferId == that.transferId);
-  result &= (protocolVersion == that.protocolVersion);
-  result &= (directory == that.directory);
-  result &= (hostName == that.hostName);
-  result &= (ports == that.ports);
-  result &= (encryptionData == that.encryptionData);
+  bool result = (transferId == that.transferId) &&
+                (protocolVersion == that.protocolVersion) &&
+                (directory == that.directory) && (hostName == that.hostName) &&
+                (ports == that.ports) &&
+                (encryptionData == that.encryptionData) &&
+                (destIdentifier == that.destIdentifier) &&
+                (wdtNamespace == that.wdtNamespace);
   // No need to check the file info, simply checking whether two objects
   // are same with respect to the wdt settings
   return result;

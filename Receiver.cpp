@@ -45,8 +45,7 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
   return checkpoints;
 }
 
-Receiver::Receiver(const WdtTransferRequest &transferRequest)
-    : transferLogManager_(options_) {
+Receiver::Receiver(const WdtTransferRequest &transferRequest) {
   WLOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
   transferRequest_ = transferRequest;
 }
@@ -57,7 +56,8 @@ Receiver::Receiver(int port, int numSockets, const std::string &destDir)
 
 void Receiver::traverseDestinationDir(
     std::vector<FileChunksInfo> &fileChunksInfo) {
-  DirectorySourceQueue dirQueue(options_, destDir_, &abortCheckerCallback_);
+  DirectorySourceQueue dirQueue(options_, getDirectory(),
+                                &abortCheckerCallback_);
   dirQueue.buildQueueSynchronously();
   auto &discoveredFilesInfo = dirQueue.getDiscoveredFilesMetaData();
   for (auto &fileInfo : discoveredFilesInfo) {
@@ -86,8 +86,8 @@ void Receiver::startNewGlobalSession(const std::string &peerIp) {
   }
   startTime_ = Clock::now();
   if (options_.enable_download_resumption) {
-    transferLogManager_.startThread();
-    bool verifySuccessful = transferLogManager_.verifySenderIp(peerIp);
+    transferLogManager_->startThread();
+    bool verifySuccessful = transferLogManager_->verifySenderIp(peerIp);
     if (!verifySuccessful) {
       fileChunksInfo_.clear();
     }
@@ -125,17 +125,18 @@ const WdtTransferRequest &Receiver::init() {
                 << transferRequest_.getLogSafeString();
     return transferRequest_;
   }
+  transferLogManager_ =
+      folly::make_unique<TransferLogManager>(options_, getDirectory());
   checkAndUpdateBufferSize();
   backlog_ = options_.backlog;
   if (getTransferId().empty()) {
     setTransferId(WdtBase::generateTransferId());
   }
-  setProtocolVersion(transferRequest_.protocolVersion);
-  setDir(transferRequest_.directory);
+  negotiateProtocol();
   auto numThreads = transferRequest_.ports.size();
   // This creates the destination directory (which is needed for transferLogMgr)
-  fileCreator_.reset(new FileCreator(destDir_, numThreads, transferLogManager_,
-                                     options_.skip_writes));
+  fileCreator_.reset(new FileCreator(
+      getDirectory(), numThreads, *transferLogManager_, options_.skip_writes));
   // Make sure we can get the lock on the transfer log manager early
   // so if we can't we don't generate a valid but useless url and end up
   // starting a sender doomed to fail
@@ -146,13 +147,13 @@ const WdtTransferRequest &Receiver::init() {
       WDT_CHECK(!options_.shouldPreallocateFiles())
           << "Can not resume using directory tree if preallocation is enabled";
     }
-    ErrorCode errCode = transferLogManager_.openLog();
+    ErrorCode errCode = transferLogManager_->openLog();
     if (errCode != OK) {
       WLOG(ERROR) << "Failed to open transfer log " << errorCodeToStr(errCode);
       transferRequest_.errorCode = errCode;
       return transferRequest_;
     }
-    ErrorCode code = transferLogManager_.parseAndMatch(
+    ErrorCode code = transferLogManager_->parseAndMatch(
         recoveryId_, getTransferConfig(), fileChunksInfo_);
     if (code == OK && options_.resume_using_dir_tree) {
       WDT_CHECK(fileChunksInfo_.empty());
@@ -163,7 +164,7 @@ const WdtTransferRequest &Receiver::init() {
   EncryptionType encryptionType = parseEncryptionType(options_.encryption_type);
   // is encryption enabled?
   bool encrypt = (encryptionType != ENC_NONE &&
-                  protocolVersion_ >= Protocol::ENCRYPTION_V1_VERSION);
+                  getProtocolVersion() >= Protocol::ENCRYPTION_V1_VERSION);
   if (encrypt) {
     WLOG(INFO) << encryptionTypeToStr(encryptionType)
                << " encryption is enabled for this transfer ";
@@ -182,7 +183,7 @@ const WdtTransferRequest &Receiver::init() {
   } else {
     if (encryptionType != ENC_NONE) {
       WLOG(WARNING) << "Encryption is enabled, but protocol version is "
-                    << protocolVersion_
+                    << getProtocolVersion()
                     << ", minimum version required for encryption is "
                     << Protocol::ENCRYPTION_V1_VERSION;
     }
@@ -213,7 +214,6 @@ const WdtTransferRequest &Receiver::init() {
       code = ERROR;
     }
   }
-  transferRequest_.protocolVersion = protocolVersion_;
 
   transferRequest_.ports.clear();
   for (const auto &receiverThread : receiverThreads_) {
@@ -230,26 +230,16 @@ const WdtTransferRequest &Receiver::init() {
       code = ERROR;
     }
   }
-  transferRequest_.directory = getDir();
   transferRequest_.errorCode = code;
   return transferRequest_;
 }
 
-void Receiver::setDir(const std::string &destDir) {
-  destDir_ = destDir;
-  transferLogManager_.setRootDir(destDir_);
-}
-
 TransferLogManager &Receiver::getTransferLogManager() {
-  return transferLogManager_;
+  return *transferLogManager_;
 }
 
 std::unique_ptr<FileCreator> &Receiver::getFileCreator() {
   return fileCreator_;
-}
-
-const std::string &Receiver::getDir() {
-  return destDir_;
 }
 
 void Receiver::setRecoveryId(const std::string &recoveryId) {
@@ -447,7 +437,7 @@ ErrorCode Receiver::start() {
       << "There is already a transfer running on this instance of receiver";
   startTime_ = Clock::now();
   WLOG(INFO) << "Starting (receiving) server on ports [ "
-             << transferRequest_.ports << "] Target dir : " << destDir_;
+             << transferRequest_.ports << "] Target dir : " << getDirectory();
   // TODO do the init stuff here
   if (!throttler_) {
     configureThrottler();
@@ -498,14 +488,14 @@ void Receiver::addTransferLogHeader(bool isBlockMode, bool isSenderResuming) {
     invalidationEntryNeeded = true;
   }
   if (invalidationEntryNeeded) {
-    transferLogManager_.invalidateDirectory();
+    transferLogManager_->invalidateDirectory();
   }
   bool isInconsistentDirectory =
-      (transferLogManager_.getResumptionStatus() == INCONSISTENT_DIRECTORY);
+      (transferLogManager_->getResumptionStatus() == INCONSISTENT_DIRECTORY);
   bool shouldWriteHeader =
       (!options_.resume_using_dir_tree || !isInconsistentDirectory);
   if (shouldWriteHeader) {
-    transferLogManager_.writeLogHeader();
+    transferLogManager_->writeLogHeader();
   }
 }
 
@@ -515,23 +505,23 @@ void Receiver::fixAndCloseTransferLog(bool transferSuccess) {
   }
 
   bool isInconsistentDirectory =
-      (transferLogManager_.getResumptionStatus() == INCONSISTENT_DIRECTORY);
+      (transferLogManager_->getResumptionStatus() == INCONSISTENT_DIRECTORY);
   bool isInvalidLog =
-      (transferLogManager_.getResumptionStatus() == INVALID_LOG);
+      (transferLogManager_->getResumptionStatus() == INVALID_LOG);
   if (transferSuccess && isInconsistentDirectory) {
     // write log header to validate directory in case of success
     WDT_CHECK(options_.resume_using_dir_tree);
-    transferLogManager_.writeLogHeader();
+    transferLogManager_->writeLogHeader();
   }
-  transferLogManager_.closeLog();
+  transferLogManager_->closeLog();
   if (!transferSuccess) {
     return;
   }
   if (isInvalidLog) {
-    transferLogManager_.renameBuggyLog();
+    transferLogManager_->renameBuggyLog();
   }
   if (!options_.keep_transfer_log) {
-    transferLogManager_.unlink();
+    transferLogManager_->unlink();
   }
 }
 }

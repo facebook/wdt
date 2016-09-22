@@ -482,7 +482,7 @@ class ProgressReporter {
   }
 
  protected:
-  /// Reference to the wdt transfer request for the wdt bas
+  /// Reference to the wdt transfer request for the wdt base
   /// object using the progress reporter
   const WdtTransferRequest &transferRequest_;
 

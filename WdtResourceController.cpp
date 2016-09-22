@@ -354,7 +354,9 @@ ErrorCode WdtResourceController::createSender(
         WLOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
         return NOT_FOUND;
       } else {
-        WLOG(INFO) << "First time " << wdtNamespace << " is seen, creating.";
+        WLOG(INFO) << "First time "
+                   << (wdtNamespace.empty() ? "(default)" : wdtNamespace)
+                   << " is seen, creating.";
         controller = createNamespaceController(wdtNamespace);
       }
     }

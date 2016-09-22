@@ -25,6 +25,7 @@ enum ProtoNegotiationStatus {
   V_MISMATCH_RESOLVED,  // version mismatch processed and was successful
   V_MISMATCH_FAILED,    // version mismatch processed and it failed
 };
+
 /**
  * The sender for the transfer. One instance of sender should only be
  * responsible for one transfer. For a second transfer you should make
@@ -36,25 +37,6 @@ class Sender : public WdtBase {
  public:
   /// Creates a counter part sender for the receiver according to the details
   explicit Sender(const WdtTransferRequest &transferRequest);
-
-  /**
-   * @param destHost    destination hostname
-   * @param srcDir      source directory
-   */
-  Sender(const std::string &destHost, const std::string &srcDir);
-
-  // TODO: get rid of this constructor
-  /**
-   * @param destHost    destination hostname
-   * @param srcDir      source directory
-   * @param ports       list of destination ports
-   * @param srcFileInfo list of (file, size) pair
-   * @param disableDirectoryTraversal use fileInfo even if empty
-   */
-  Sender(const std::string &destHost, const std::string &srcDir,
-         const std::vector<int32_t> &ports,
-         const std::vector<WdtFileInfo> &srcFileInfo,
-         bool disableDirectoryTraversal);
 
   /// Setup before start (@see WdtBase.h)
   const WdtTransferRequest &init() override;
@@ -92,33 +74,9 @@ class Sender : public WdtBase {
   /// End time of the transfer
   Clock::time_point getEndTime();
 
-  /// Sets regex representing files to include for transfer
-  /// @param includeRegex     regex for files to include for transfer
-  void setIncludeRegex(const std::string &includeRegex);
-
-  /// Sets regex representing files to exclude for transfer
-  /// @param excludeRegex     regex for files to exclude for transfer
-  void setExcludeRegex(const std::string &excludeRegex);
-
-  /// Sets regex representing directories to exclude for transfer
-  /// @param pruneDirRegex    regex for directories to exclude
-  void setPruneDirRegex(const std::string &pruneDirRegex);
-
-  /// Sets specific files to be transferred
-  /// @param setFileInfo      list of (file, size) pair
-  void setSrcFileInfo(const std::vector<WdtFileInfo> &srcFileInfo);
-
-  /// Sets whether to follow symlink or not
-  /// @param followSymlinks   whether to follow symlinks or not
-  void setFollowSymlinks(bool followSymlinks);
-
   /// Get the destination sender is sending to
   /// @return     destination host-name
   const std::string &getDestination() const;
-
-  /// Get the source directory sender is reading from
-  /// @return     source directory
-  const std::string &getSrcDir() const;
 
   /**
    * @param progressReportIntervalMillis_   interval(ms) between progress
@@ -213,14 +171,10 @@ class Sender : public WdtBase {
 
   void logPerfStats() const override;
 
-  /// Address of the destination host where the files are sent
-  const std::string destHost_;
   /// Pointer to DirectorySourceQueue which reads the srcDir and the files
   std::unique_ptr<DirectorySourceQueue> dirQueue_;
   /// Number of active threads, decremented every time a thread is finished
   int32_t numActiveThreads_{0};
-  /// The directory from where the files are read
-  std::string srcDir_;
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_;
   /// Socket creator used to optionally create different kinds of client socket

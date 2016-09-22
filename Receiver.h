@@ -62,12 +62,6 @@ class Receiver : public WdtBase {
    */
   ErrorCode transferAsync() override;
 
-  /// Setter for the directory where the files received are written to
-  void setDir(const std::string &destDir);
-
-  /// Get the dir where receiver is transferring
-  const std::string &getDir();
-
   /// @param recoveryId   unique-id used to verify transfer log
   void setRecoveryId(const std::string &recoveryId);
 
@@ -152,9 +146,6 @@ class Receiver : public WdtBase {
   /// Flag based on which threads finish processing on receiving a done
   bool isJoinable_{false};
 
-  /// Destination directory where the received files will be written
-  std::string destDir_;
-
   /// Responsible for writing files on the disk
   std::unique_ptr<FileCreator> fileCreator_{nullptr};
 
@@ -173,7 +164,7 @@ class Receiver : public WdtBase {
   std::vector<std::unique_ptr<WdtThread>> receiverThreads_;
 
   /// Transfer log manager
-  TransferLogManager transferLogManager_;
+  std::unique_ptr<TransferLogManager> transferLogManager_;
 
   /// Global list of checkpoints
   std::vector<Checkpoint> checkpoints_;
