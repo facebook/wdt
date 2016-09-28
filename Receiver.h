@@ -65,6 +65,19 @@ class Receiver : public WdtBase {
   /// @param recoveryId   unique-id used to verify transfer log
   void setRecoveryId(const std::string &recoveryId);
 
+  /// Returns true if at least one thread has accepted connection
+  bool hasNewTransferStarted() const;
+
+  // Different accept modes for the Receiver
+  enum AcceptMode {
+    ACCEPT_WITH_RETRIES,  // Receiver gives up after max_accept_retries
+    ACCEPT_FOREVER,       // Receiver never gives up
+    STOP_ACCEPTING,       // Receiver stops accepting
+  };
+
+  /// @param acceptMode   acceptMode to use
+  void setAcceptMode(AcceptMode acceptMode);
+
   /**
    * Destructor for the receiver. The destructor automatically cancels
    * any incomplete transfers that are going on. 'Incomplete transfer' is a
@@ -118,9 +131,6 @@ class Receiver : public WdtBase {
   /// Does the steps needed before a new transfer is started
   void startNewGlobalSession(const std::string &peerIp);
 
-  /// Returns true if at least one thread has accepted connection
-  bool hasNewTransferStarted() const;
-
   /// Has steps to do when the current transfer is ended
   void endCurGlobalSession();
 
@@ -139,6 +149,8 @@ class Receiver : public WdtBase {
 
   /// @return     transfer config encoded as int
   int64_t getTransferConfig() const;
+
+  AcceptMode getAcceptMode();
 
   /// The thread that is responsible for calling running the progress tracker
   std::thread progressTrackerThread_;
@@ -180,6 +192,8 @@ class Receiver : public WdtBase {
 
   /// Backlog used by the sockets
   int backlog_;
+
+  AcceptMode acceptMode_{ACCEPT_WITH_RETRIES};
 };
 }
 }  // namespace facebook::wdt

@@ -189,6 +189,11 @@ const WdtTransferRequest &Receiver::init() {
     }
     transferRequest_.encryptionData.erase();
   }
+  if (options_.max_accept_retries <= 0) {
+    WLOG(INFO) << "Max accept retries " << options_.max_accept_retries
+               << ", will accept forever";
+    setAcceptMode(ACCEPT_FOREVER);
+  }
   threadsController_ = new ThreadsController(numThreads);
   threadsController_->setNumFunnels(ReceiverThread::NUM_FUNNELS);
   threadsController_->setNumBarriers(ReceiverThread::NUM_BARRIERS);
@@ -245,6 +250,16 @@ std::unique_ptr<FileCreator> &Receiver::getFileCreator() {
 void Receiver::setRecoveryId(const std::string &recoveryId) {
   recoveryId_ = recoveryId;
   WLOG(INFO) << "recovery id " << recoveryId_;
+}
+
+void Receiver::setAcceptMode(const AcceptMode acceptMode) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  acceptMode_ = acceptMode;
+}
+
+Receiver::AcceptMode Receiver::getAcceptMode() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return acceptMode_;
 }
 
 Receiver::~Receiver() {

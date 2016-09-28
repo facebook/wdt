@@ -53,7 +53,7 @@ void WdtBase::setAbortChecker(const std::shared_ptr<IAbortChecker>& checker) {
   abortChecker_ = checker;
 }
 
-ErrorCode WdtBase::getCurAbortCode() {
+ErrorCode WdtBase::getCurAbortCode() const {
   // external check, if any:
   if (abortChecker_ && abortChecker_->shouldAbort()) {
     return ABORTED_BY_APPLICATION;
@@ -168,6 +168,11 @@ void WdtBase::setTransferStatus(TransferStatus transferStatus) {
 bool WdtBase::isStale() {
   TransferStatus status = getTransferStatus();
   return (status == FINISHED || status == THREADS_JOINED);
+}
+
+bool WdtBase::hasStarted() {
+  TransferStatus status = getTransferStatus();
+  return (status != NOT_STARTED);
 }
 
 void WdtBase::configureThrottler() {

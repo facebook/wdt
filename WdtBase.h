@@ -76,7 +76,7 @@ class WdtBase {
 
   /// threads can call this method to find out
   /// whether transfer has been marked from abort
-  ErrorCode getCurAbortCode();
+  ErrorCode getCurAbortCode() const;
 
   /// Wdt objects can report progress. Setter for progress reporter
   /// defined in Reporting.h
@@ -122,6 +122,9 @@ class WdtBase {
   /// @param      whether the object is stale. If all the transferring threads
   ///             have finished, the object will marked as stale
   bool isStale();
+
+  /// @return       Whether the transfer has started
+  bool hasStarted();
 
   /// abort checker class passed to socket functions
   class AbortChecker : public IAbortChecker {
@@ -199,7 +202,7 @@ class WdtBase {
   WdtOptions options_;
 
  private:
-  folly::RWSpinLock abortCodeLock_;
+  mutable folly::RWSpinLock abortCodeLock_;
   /// Internal and default abort code
   ErrorCode abortCode_{OK};
   /// Additional external source of check for abort requested

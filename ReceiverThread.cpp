@@ -149,11 +149,26 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
     if (wdtParent_->hasNewTransferStarted()) {
       return ACCEPT_WITH_TIMEOUT;
     }
-    if (acceptAttempts == options_.max_accept_retries) {
-      WTLOG(ERROR) << "Unable to accept after " << acceptAttempts
-                   << " attempts";
-      threadStats_.setLocalErrorCode(CONN_ERROR);
-      return FINISH_WITH_ERROR;
+    switch (wdtParent_->getAcceptMode()) {
+      case Receiver::AcceptMode::ACCEPT_WITH_RETRIES: {
+        if (acceptAttempts >= options_.max_accept_retries) {
+          WTLOG(ERROR) << "Unable to accept after " << acceptAttempts
+                       << " attempts";
+          threadStats_.setLocalErrorCode(CONN_ERROR);
+          return FINISH_WITH_ERROR;
+        }
+        break;
+      }
+      case Receiver::AcceptMode::ACCEPT_FOREVER: {
+        WVTLOG(2) << "Receiver is configured to accept for-ever";
+        break;
+      }
+      case Receiver::AcceptMode::STOP_ACCEPTING: {
+        WTLOG(ERROR) << "Receiver is asked to stop accepting, attempts : "
+                     << acceptAttempts;
+        threadStats_.setLocalErrorCode(CONN_ERROR);
+        return FINISH_WITH_ERROR;
+      }
     }
     if (wdtParent_->getCurAbortCode() != OK) {
       WTLOG(ERROR) << "Thread marked to abort while trying to accept "
