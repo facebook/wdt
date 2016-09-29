@@ -27,7 +27,7 @@ cat <<EOF
                 "shell": "cd wdt_build; CTEST_OUTPUT_ON_FAILURE=1 make test",
                 "required": true
             }
-        ],
+        ]
     }
 }]
 EOF
