@@ -18,7 +18,7 @@ cat <<EOF
             {
                 "user": "facebook",
                 "name": "Build Wdt",
-                "shell": "mkdir wdt_build; cd wdt_build; cmake ../wdt -DFOLLY_SOURCE_DIR=$(cd ..;pwd) -DBUILD_TESTING=on && make -j",
+                "shell": "mkdir wdt_build; cd wdt_build; pwd; cmake ../wdt -DFOLLY_SOURCE_DIR=$BOX_DIR -DBUILD_TESTING=on && make -j",
                 "required": true
             },
             {
