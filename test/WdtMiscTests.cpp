@@ -89,9 +89,9 @@ TEST(BasicTest, MultiWdtSender) {
 }
 
 TEST(BasicTest, ThrottlerWithoutReporting) {
-  const double avgThrottlerRate = 1 * kMbToB;
-  shared_ptr<Throttler> throttler =
-      Throttler::makeThrottler(avgThrottlerRate, 0, 0, 0);
+  WdtOptions options;
+  options.avg_mbytes_per_sec = 1;
+  shared_ptr<Throttler> throttler = Throttler::makeThrottler(options);
   const int toWrite = 2 * kMbToB;
   const int blockSize = 1024;
   int written = 0;
