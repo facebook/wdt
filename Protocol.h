@@ -151,6 +151,8 @@ class FileChunksInfo {
   /// merges all the chunks
   void mergeChunks();
 
+  int64_t getTotalChunkSize() const;
+
   /// @return   list of chunks which are not part of the chunks-list
   std::vector<Interval> getRemainingChunks(int64_t curFileSize);
 

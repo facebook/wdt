@@ -340,6 +340,7 @@ class TransferStats {
  */
 class TransferReport {
  public:
+  // TODO: too many constructor parameters, needs to clean-up
   /**
    * This constructor moves all the stat objects to member variables. This is
    * only called at the end of transfer by the sender
@@ -349,7 +350,7 @@ class TransferReport {
                  std::vector<TransferStats> &threadStats,
                  std::vector<std::string> &failedDirectories, double totalTime,
                  int64_t totalFileSize, int64_t numDiscoveredFiles,
-                 bool fileDiscoveryFinished);
+                 int64_t previouslySentBytes, bool fileDiscoveryFinished);
 
   /**
    * This function does not move the thread stats passed to it. This is called
@@ -421,6 +422,9 @@ class TransferReport {
   bool fileDiscoveryFinished() const {
     return fileDiscoveryFinished_;
   }
+  int64_t getPreviouslySentBytes() const {
+    return previouslySentBytes_;
+  }
   friend std::ostream &operator<<(std::ostream &os,
                                   const TransferReport &report);
 
@@ -442,6 +446,8 @@ class TransferReport {
   double currentThroughput_{0};
   /// Count of all files discovered so far
   int64_t numDiscoveredFiles_{0};
+  /// Number of bytes sent in previous transfers
+  int64_t previouslySentBytes_{0};
   /// Is file discovery finished?
   bool fileDiscoveryFinished_{false};
 };

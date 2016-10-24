@@ -105,7 +105,7 @@ TransferReport::TransferReport(
     std::vector<TransferStats>& threadStats,
     std::vector<std::string>& failedDirectories, double totalTime,
     int64_t totalFileSize, int64_t numDiscoveredFiles,
-    bool fileDiscoveryFinished)
+    int64_t previouslySentBytes, bool fileDiscoveryFinished)
     : transferredSourceStats_(std::move(transferredSourceStats)),
       failedSourceStats_(std::move(failedSourceStats)),
       threadStats_(std::move(threadStats)),
@@ -113,6 +113,7 @@ TransferReport::TransferReport(
       totalTime_(totalTime),
       totalFileSize_(totalFileSize),
       numDiscoveredFiles_(numDiscoveredFiles),
+      previouslySentBytes_(previouslySentBytes),
       fileDiscoveryFinished_(fileDiscoveryFinished) {
   for (const auto& stats : threadStats_) {
     summary_ += stats;
@@ -221,6 +222,7 @@ TransferReport::TransferReport(TransferStats&& globalStats)
 
 std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
   os << report.getSummary();
+  os << " Previously sent bytes : " << report.getPreviouslySentBytes() << ".";
   if (!report.failedSourceStats_.empty()) {
     if (report.summary_.getNumFiles() == 0) {
       os << " All files failed.";

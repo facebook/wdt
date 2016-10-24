@@ -19,7 +19,6 @@
 #include <folly/Memory.h>
 #include <folly/ScopeGuard.h>
 #include <folly/String.h>
-#include <sys/stat.h>
 
 namespace facebook {
 namespace wdt {
@@ -248,6 +247,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
           transferredSourceStats, dirQueue_->getFailedSourceStats(),
           threadStats, dirQueue_->getFailedDirectories(), totalTime,
           totalFileSize, dirQueue_->getCount(),
+          dirQueue_->getPreviouslySentBytes(),
           dirQueue_->fileDiscoveryFinished());
 
   if (progressReportEnabled) {

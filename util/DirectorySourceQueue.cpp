@@ -501,6 +501,10 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
     prevSeqId = it->second.getSeqId();
   } else {
     auto &fileChunksInfo = it->second;
+    // Some portion of the file was sent in previous transfers. Receiver sends
+    // the list of chunks to the sender. Adding all the bytes of those chunks
+    // should give us the number of bytes saved due to incremental download
+    previouslySentBytes_ += fileChunksInfo.getTotalChunkSize();
     remainingChunks = fileChunksInfo.getRemainingChunks(fileSize);
     if (remainingChunks.empty()) {
       WLOG(INFO) << relPath << " completely sent in previous transfer";
@@ -596,6 +600,10 @@ std::pair<int64_t, ErrorCode> DirectorySourceQueue::getNumBlocksAndStatus()
 int64_t DirectorySourceQueue::getTotalSize() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return totalFileSize_;
+}
+
+int64_t DirectorySourceQueue::getPreviouslySentBytes() const {
+  return previouslySentBytes_;
 }
 
 bool DirectorySourceQueue::fileDiscoveryFinished() const {
