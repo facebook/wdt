@@ -231,6 +231,13 @@ class WdtOptions {
   double disk_sync_interval_mb{0.5};
 
   /**
+   * If true, each file is fsync'ed after its last block is
+   * received. This is disabled by default because fsync can cause a
+   * significant performance hit on some filesystems.
+   */
+  bool fsync{false};
+
+  /**
    * Intervals in millis after which progress reporter updates current
    * throughput
    */

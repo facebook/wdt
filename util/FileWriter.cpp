@@ -84,7 +84,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
     WVLOG(1) << "Successfully written " << count << " bytes to fd " << fd_
              << " for file " << blockDetails_->fileName;
     bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
-    if (finished && options.isLogBasedResumption()) {
+    if (finished && (options.isLogBasedResumption() || options.fsync)) {
       PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC_STATS);
       if (fsync(fd_) != 0) {
         PLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
@@ -93,6 +93,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
                     << blockDetails_->dataSize;
         return FILE_WRITE_ERROR;
       }
+      WVLOG(1) << "File " << blockDetails_->fileName << " fsync'ed";
     } else {
       syncFileRange(count, finished);
     }
