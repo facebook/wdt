@@ -72,9 +72,10 @@ ErrorCode ClientSocket::connect() {
     // make the socket non blocking
     int sockArg = fcntl(fd_, F_GETFL, nullptr);
     sockArg |= O_NONBLOCK;
-    int retValue = fcntl(fd_, F_SETFL, sockArg);
-    if (retValue == -1) {
-      PLOG(ERROR) << "Could not make the socket non-blocking " << port_;
+    res = fcntl(fd_, F_SETFL, sockArg);
+    if (res < 0) {
+      PLOG(ERROR) << "Failed to make the socket non-blocking "
+                  << port_ << " sock " << sockArg << " res " << res;
       closeConnection();
       continue;
     }
@@ -112,13 +113,12 @@ ErrorCode ClientSocket::connect() {
                      threadCtx_.getOptions().abort_check_interval_millis);
         struct pollfd pollFds[] = {{fd_, POLLOUT, 0}};
 
-        int retValue;
-        if ((retValue = poll(pollFds, 1, pollTimeout)) <= 0) {
+        if ((res = poll(pollFds, 1, pollTimeout)) <= 0) {
           if (errno == EINTR) {
             WVLOG(1) << "poll() call interrupted. retrying... " << port_;
             continue;
           }
-          if (retValue == 0) {
+          if (res == 0) {
             WVLOG(1) << "poll() timed out " << host << " " << port;
             continue;
           }
@@ -148,8 +148,8 @@ ErrorCode ClientSocket::connect() {
     // Set to blocking mode again
     sockArg = fcntl(fd_, F_GETFL, nullptr);
     sockArg &= (~O_NONBLOCK);
-    retValue = fcntl(fd_, F_SETFL, sockArg);
-    if (retValue == -1) {
+    res = fcntl(fd_, F_SETFL, sockArg);
+    if (res == -1) {
       PLOG(ERROR) << "Could not make the socket blocking " << port_;
       closeConnection();
       continue;

@@ -575,10 +575,10 @@ ReceiverState ReceiverThread::processFileCmd() {
     }
     int32_t receivedChecksum;
     std::string receivedTag;
-    bool success = Protocol::decodeFooter(
+    bool ok = Protocol::decodeFooter(
         buf_, off_, oldOffset_ + Protocol::kMaxFooter, receivedChecksum,
         receivedTag, (footerType_ == ENC_TAG_FOOTER));
-    if (!success) {
+    if (!ok) {
       WTLOG(ERROR) << "Unable to decode footer cmd";
       threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return FINISH_WITH_ERROR;

@@ -488,16 +488,16 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
       buckets[currentBucketIndex] += count;
     }
     os << '\n' << WDT_LOG_PREFIX;
-    for (int i = 0; i < numBuckets; i++) {
-      if (buckets[i] == 0) {
+    for (int j = 0; j < numBuckets; j++) {
+      if (buckets[j] == 0) {
         continue;
       }
       int64_t bucketStart =
-          (i == 0 ? 0 : PerfStatReport::kHistogramBuckets[i - 1]);
+          (j == 0 ? 0 : PerfStatReport::kHistogramBuckets[j - 1]);
       int64_t bucketEnd =
-          (i < numBuckets - 1 ? PerfStatReport::kHistogramBuckets[i]
+          (j < numBuckets - 1 ? PerfStatReport::kHistogramBuckets[j]
                               : std::numeric_limits<int64_t>::max());
-      os << "[" << bucketStart << ", " << bucketEnd << ") --> " << buckets[i]
+      os << "[" << bucketStart << ", " << bucketEnd << ") --> " << buckets[j]
          << '\n'
          << WDT_LOG_PREFIX;
     }
