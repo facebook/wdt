@@ -70,7 +70,7 @@ ErrorCode Wdt::createWdtSender(const WdtTransferRequest &req,
   // Protocol issues will/should be flagged as error when we call createSender
 
   // try to create sender
-  const std::string& wdtNamespace = req.wdtNamespace;
+  const std::string &wdtNamespace = req.wdtNamespace;
   const std::string secondKey = getSenderIdentifier(req);
   ErrorCode errCode = resourceController_->createSender(wdtNamespace, secondKey,
                                                         req, senderPtr);

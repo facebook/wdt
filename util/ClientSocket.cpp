@@ -74,8 +74,8 @@ ErrorCode ClientSocket::connect() {
     sockArg |= O_NONBLOCK;
     res = fcntl(fd_, F_SETFL, sockArg);
     if (res < 0) {
-      PLOG(ERROR) << "Failed to make the socket non-blocking "
-                  << port_ << " sock " << sockArg << " res " << res;
+      PLOG(ERROR) << "Failed to make the socket non-blocking " << port_
+                  << " sock " << sockArg << " res " << res;
       closeConnection();
       continue;
     }
