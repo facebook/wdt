@@ -7,18 +7,28 @@ proc find_base_dir {} {
     return [file dirname $argv0]
 }
 
-proc version_update {} {
+proc wdt_version_update {} {
+    set curDir [pwd]
     set basedir [find_base_dir]
     cd [file join $basedir ".."]
     # that script expects to be run from wdt/
     source build/version_update.tcl
+    cd $curDir
 }
 
+proc sg_version_update {} {
+    set curDir [pwd]
+    set basedir [find_base_dir]
+    cd [file join $basedir ".." ".." "stargate"]
+    # that script expects to be run from stargate/
+    source version_update.tcl
+    cd $curDir
+}
 
 proc auto_commit {} {
-    set commit_msg {wdt version bump
+    set commit_msg {wdt/stargate version bump
 Summary:
-wdt version bump auto commit
+wdt/stargate version bump auto commit
 
 Test Plan:
 n/a
@@ -48,14 +58,15 @@ proc check_clean {} {
 
 proc switch_to_and_update_master {} {
     puts "*** Switching to and updating master:"
-    puts [exec hg pull]
+    puts [exec hg pull 2>@1]
     puts [exec hg update master]
 }
 
 # Put it all together:
 switch_to_and_update_master
 check_clean
-version_update
+wdt_version_update
+sg_version_update
 puts "*** WARNING - this will auto land:"
 puts [exec hg status]
 puts "Interrupt now if that's not what you want..."

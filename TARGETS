@@ -138,11 +138,20 @@ cpp_unittest(
   compiler_flags = wdt_compiler_flags,
 )
 
-
 cpp_unittest(
   name = 'threadscontroller_test',
   headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
   srcs = [ 'test/ThreadsControllerTest.cpp', ],
+  deps = [
+      ":wdtlib4tests",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_unittest(
+  name = 'throttler_test',
+  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  srcs = [ 'test/ThrottlerTest.cpp', ],
   deps = [
       ":wdtlib4tests",
   ],

@@ -354,7 +354,9 @@ ErrorCode WdtResourceController::createSender(
         WLOG(WARNING) << "Couldn't find controller for " << wdtNamespace;
         return NOT_FOUND;
       } else {
-        WLOG(INFO) << "First time " << wdtNamespace << " is seen, creating.";
+        WLOG(INFO) << "First time "
+                   << (wdtNamespace.empty() ? "(default)" : wdtNamespace)
+                   << " is seen, creating.";
         controller = createNamespaceController(wdtNamespace);
       }
     }
@@ -374,7 +376,8 @@ ErrorCode WdtResourceController::createSender(
     WLOG(ERROR) << "Failed in creating sender for " << wdtNamespace << " "
                 << errorCodeToStr(code);
   } else {
-    WLOG(INFO) << "Successfully added a sender for " << wdtNamespace;
+    WLOG(INFO) << "Successfully added a sender for " << wdtNamespace
+               << " identifier " << identifier;
   }
   return code;
 }
@@ -433,7 +436,8 @@ ErrorCode WdtResourceController::createReceiver(
     WLOG(ERROR) << "Failed in creating receiver for " << wdtNamespace << " "
                 << errorCodeToStr(code);
   } else {
-    WLOG(INFO) << "Successfully added a receiver for " << wdtNamespace;
+    WLOG(INFO) << "Successfully added a receiver for " << wdtNamespace
+               << " identifier " << identifier;
   }
   return code;
 }

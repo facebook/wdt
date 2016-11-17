@@ -76,7 +76,7 @@ class WdtBase {
 
   /// threads can call this method to find out
   /// whether transfer has been marked from abort
-  ErrorCode getCurAbortCode();
+  ErrorCode getCurAbortCode() const;
 
   /// Wdt objects can report progress. Setter for progress reporter
   /// defined in Reporting.h
@@ -88,17 +88,17 @@ class WdtBase {
   /// Sets the transferId for this transfer
   void setTransferId(const std::string& transferId);
 
-  /// Sets the protocol version for the transfer
-  void setProtocolVersion(int64_t protocolVersion);
-
   ///  Get the protocol version of the transfer
   int getProtocolVersion() const;
+
+  /// Sets protocol version to use
+  void setProtocolVersion(int protocolVersion);
 
   /// Get the transfer id of the object
   std::string getTransferId();
 
   /// Get the transfer request
-  const WdtTransferRequest& getTransferRequest();
+  WdtTransferRequest& getTransferRequest();
 
   /// Finishes the wdt object and returns a report
   virtual std::unique_ptr<TransferReport> finish() = 0;
@@ -116,9 +116,15 @@ class WdtBase {
   /// Get the throttler
   std::shared_ptr<Throttler> getThrottler() const;
 
+  /// @return   Root directory
+  const std::string& getDirectory() const;
+
   /// @param      whether the object is stale. If all the transferring threads
   ///             have finished, the object will marked as stale
   bool isStale();
+
+  /// @return       Whether the transfer has started
+  bool hasStarted();
 
   /// abort checker class passed to socket functions
   class AbortChecker : public IAbortChecker {
@@ -154,6 +160,9 @@ class WdtBase {
   /// @param transferStatus   current transfer status
   void setTransferStatus(TransferStatus transferStatus);
 
+  /// Sets the protocol version for the transfer
+  void negotiateProtocol();
+
   /// Dumps performance statistics if enable_perf_stat_collection is true.
   virtual void logPerfStats() const = 0;
 
@@ -165,10 +174,6 @@ class WdtBase {
 
   /// Holds the instance of the progress reporter default or customized
   std::unique_ptr<ProgressReporter> progressReporter_;
-
-  /// protocol version to use, this is determined by negotiating protocol
-  /// version with the other side
-  int protocolVersion_{Protocol::protocol_version};
 
   /// abort checker passed to socket functions
   AbortChecker abortCheckerCallback_;
@@ -197,7 +202,7 @@ class WdtBase {
   WdtOptions options_;
 
  private:
-  folly::RWSpinLock abortCodeLock_;
+  mutable folly::RWSpinLock abortCodeLock_;
   /// Internal and default abort code
   ErrorCode abortCode_{OK};
   /// Additional external source of check for abort requested

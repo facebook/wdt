@@ -105,7 +105,7 @@ TransferReport::TransferReport(
     std::vector<TransferStats>& threadStats,
     std::vector<std::string>& failedDirectories, double totalTime,
     int64_t totalFileSize, int64_t numDiscoveredFiles,
-    bool fileDiscoveryFinished)
+    int64_t previouslySentBytes, bool fileDiscoveryFinished)
     : transferredSourceStats_(std::move(transferredSourceStats)),
       failedSourceStats_(std::move(failedSourceStats)),
       threadStats_(std::move(threadStats)),
@@ -113,6 +113,7 @@ TransferReport::TransferReport(
       totalTime_(totalTime),
       totalFileSize_(totalFileSize),
       numDiscoveredFiles_(numDiscoveredFiles),
+      previouslySentBytes_(previouslySentBytes),
       fileDiscoveryFinished_(fileDiscoveryFinished) {
   for (const auto& stats : threadStats_) {
     summary_ += stats;
@@ -221,6 +222,7 @@ TransferReport::TransferReport(TransferStats&& globalStats)
 
 std::ostream& operator<<(std::ostream& os, const TransferReport& report) {
   os << report.getSummary();
+  os << " Previously sent bytes : " << report.getPreviouslySentBytes() << ".";
   if (!report.failedSourceStats_.empty()) {
     if (report.summary_.getNumFiles() == 0) {
       os << " All files failed.";
@@ -486,16 +488,16 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
       buckets[currentBucketIndex] += count;
     }
     os << '\n' << WDT_LOG_PREFIX;
-    for (int i = 0; i < numBuckets; i++) {
-      if (buckets[i] == 0) {
+    for (int j = 0; j < numBuckets; j++) {
+      if (buckets[j] == 0) {
         continue;
       }
       int64_t bucketStart =
-          (i == 0 ? 0 : PerfStatReport::kHistogramBuckets[i - 1]);
+          (j == 0 ? 0 : PerfStatReport::kHistogramBuckets[j - 1]);
       int64_t bucketEnd =
-          (i < numBuckets - 1 ? PerfStatReport::kHistogramBuckets[i]
+          (j < numBuckets - 1 ? PerfStatReport::kHistogramBuckets[j]
                               : std::numeric_limits<int64_t>::max());
-      os << "[" << bucketStart << ", " << bucketEnd << ") --> " << buckets[i]
+      os << "[" << bucketStart << ", " << bucketEnd << ") --> " << buckets[j]
          << '\n'
          << WDT_LOG_PREFIX;
     }

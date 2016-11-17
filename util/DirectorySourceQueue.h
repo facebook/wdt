@@ -207,6 +207,9 @@ class DirectorySourceQueue : public SourceQueue {
   /// @return   returns list of directories which could not be opened
   std::vector<std::string> &getFailedDirectories();
 
+  /// @return   number of bytes previously sent
+  int64_t getPreviouslySentBytes() const;
+
   virtual ~DirectorySourceQueue();
 
   /// @return   discovered files metadata
@@ -387,6 +390,9 @@ class DirectorySourceQueue : public SourceQueue {
   /// Stores the time difference between the start and the end of the
   /// traversal of directory
   double directoryTime_{0};
+
+  /// Number of bytes previously sent
+  int64_t previouslySentBytes_{0};
 
   /**
    * Count and trigger of files to open (negative is keep opening until we run

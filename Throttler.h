@@ -28,16 +28,8 @@ namespace wdt {
  */
 class Throttler {
  public:
-  /**
-   * Utility method that configures the avg rate, peak rate and bucket limit
-   * based on the values passed to this method and returns a shared ptr to an
-   * instance of this throttler. It can return nullptr if throttling is off.
-   */
-  static std::shared_ptr<Throttler> makeThrottler(
-      double avgRateBytesPerSec, double peakRateBytesPerSec,
-      double bucketLimitBytes, int64_t throttlerLogTimeMillis);
-
-  /// Utility method that makes throttler using the wdt options
+  /// Utility method that makes throttler using the wdt options. It can return
+  /// nullptr if throttling is off
   static std::shared_ptr<Throttler> makeThrottler(const WdtOptions& options);
 
   /**
@@ -49,30 +41,16 @@ class Throttler {
                                double& bucketLimitBytes);
 
   /**
-   * @param averageRateBytesPerSec    Average rate in progress/second
-   *                                  at which data should be transmitted
-   *
-   * @param peakRateBytesPerSec       Max burst rate allowed by the
-   *                                  token bucket
-   * @param bucketLimitBytes          Max size of bucket, specify 0 for auto
-   *                                  configure. In auto mode, it will be twice
-   *                                  the data you send in 1/4th of a second
-   *                                  at the peak rate
-   */
-  Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
-            double bucketLimitBytes, int64_t throttlerLogTimeMillis = 0);
-
-  /**
    * Calls calculateSleep which is a thread safe method. Finds out the
    * time thread has to sleep and makes it sleep.
    * Also calls the throttler logger to log the stats
    */
-  virtual void limit(ThreadCtx& threadCtx, double deltaProgress);
+  virtual void limit(ThreadCtx& threadCtx, int64_t deltaProgress);
 
   /**
    * Same as the other limit, but without reporting for sleep duration
    */
-  virtual void limit(double deltaProgress);
+  virtual void limit(int64_t deltaProgress);
 
   /**
    * This is thread safe implementation of token bucket
@@ -128,6 +106,26 @@ class Throttler {
 
  private:
   /**
+   * @param averageRateBytesPerSec    Average rate in progress/second
+   *                                  at which data should be transmitted
+   * @param peakRateBytesPerSec       Max burst rate allowed by the
+   *                                  token bucket
+   * @param bucketLimitBytes          Max size of bucket, specify 0 for auto
+   *                                  configure. In auto mode, it will be twice
+   *                                  the data you send in 1/4th of a second
+   *                                  at the peak rate
+   * @param singleRequestLimit        Internal limit to the maximum number of
+   *                                  bytes that can be throttled in one call.
+   *                                  If more bytes are requested to be
+   *                                  throttled, that requested gets broken down
+   *                                  and it is treated as multiple throttle
+   *                                  calls.
+   */
+  Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
+            double bucketLimitBytes, int64_t singleRequestLimit,
+            int64_t throttlerLogTimeMillis = 0);
+
+  /**
    * This method is invoked repeatedly with the amount of progress made
    * (e.g. number of bytes written) till now. If the total progress
    * till now is over the allowed average progress then it returns the
@@ -136,9 +134,13 @@ class Throttler {
    */
   double averageThrottler(const Clock::time_point& now);
 
-  void limitInternal(ThreadCtx* threadCtx, double deltaProgress);
+  void limitInternal(ThreadCtx* threadCtx, int64_t deltaProgress);
+
+  void limitSingleRequest(ThreadCtx* threadCtx, int64_t deltaProgress);
 
   void sleep(double sleepTimeSecs) const;
+
+  void resetState();
 
   /**
    * This method periodically prints logs.
@@ -177,6 +179,8 @@ class Throttler {
   double bytesTokenBucketLimit_;
   /// Rate at which bucket is filled
   double bucketRateBytesPerSec_;
+  /// Max number of bytes that can be requested in a single call
+  int64_t singleRequestLimit_;
   /// Interval between every print of throttler logs
   int64_t throttlerLogTimeMillis_;
 };

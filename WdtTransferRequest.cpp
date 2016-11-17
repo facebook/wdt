@@ -37,6 +37,73 @@ ErrorCode WdtUri::getErrorCode() const {
   return errorCode_;
 }
 
+/* static */
+char WdtUri::toHex(unsigned char v) {
+  WDT_CHECK_LT(v, 16);
+  if (v <= 9) {
+    return '0' + v;
+  }
+  return 'a' + v - 10;
+}
+/* static */
+int WdtUri::fromHex(char c) {
+  if (c < '0' || (c > '9' && (c < 'a' || c > 'f'))) {
+    return -1;  // invalid not 0-9a-f hex char
+  }
+  if (c <= '9') {
+    return c - '0';
+  }
+  return c - 'a' + 10;
+}
+
+/* static */
+string WdtUri::escape(const string& binaryStr) {
+  string res;
+  res.reserve(binaryStr.length());  // most time nothing to escape
+  for (unsigned char c : binaryStr) {
+    // Allow 0-9 A-Z a-z (alphanum) and , : . _ + - (note that : is arguable)
+    // (and we could use an array lookup instead of a bunch of ||s)
+    if (c == ',' || c == ':' || c == '.' || c == '_' || c == '+' || c == '-' ||
+        (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+        (c >= '0' && c <= '9')) {
+      res.push_back(c);
+    } else {
+      res.push_back('%');
+      res.push_back(toHex(c >> 4));
+      res.push_back(toHex(c & 0xf));
+    }
+  }
+  return res;
+}
+
+/* static */
+bool WdtUri::unescape(string& res, StringPiece escapedValue) {
+  res.reserve(res.length() + escapedValue.size());
+  for (size_t i = 0; i < escapedValue.size(); ++i) {
+    char c = escapedValue[i];
+    if (c != '%') {
+      res.push_back(c);
+      continue;
+    }
+    i += 2;
+    // Make sure there room for both hex
+    if (i >= escapedValue.size()) {
+      WLOG(ERROR) << "Can't decode \"" << escapedValue
+                  << "\" end with unfinished % sequence";
+      return false;
+    }
+    const int msb = fromHex(escapedValue[i - 1]);
+    const int lsb = fromHex(escapedValue[i]);
+    if (msb < 0 || lsb < 0) {
+      WLOG(ERROR) << "Can't decode \"" << escapedValue
+                  << "\" % sequence with non 0-9a-f characters";
+      return false;
+    }
+    res.push_back(msb << 4 | lsb);
+  }
+  return true;
+}
+
 string WdtUri::generateUrl() const {
   string url = WDT_URL_PREFIX;
   if (hostName_.find(':') != string::npos) {
@@ -51,8 +118,11 @@ string WdtUri::generateUrl() const {
   }
   char prefix = '?';
   for (const auto& pair : queryParams_) {
-    folly::toAppend(prefix, pair.first, "=", pair.second, &url);
-    prefix = '&';
+    if (!pair.second.empty()) {
+      string value = WdtUri::escape(pair.second);
+      folly::toAppend(prefix, pair.first, "=", value, &url);
+      prefix = '&';
+    }
   }
   return url;
 }
@@ -74,7 +144,7 @@ ErrorCode WdtUri::process(const string& url) {
     return URI_PARSE_ERROR;
   }
   ErrorCode status = OK;
-  // Parse hot name
+  // Parse hostname
   if (urlPiece[0] == '[') {
     urlPiece.advance(1);
     size_t hostNameEnd = urlPiece.find(']');
@@ -150,7 +220,11 @@ ErrorCode WdtUri::process(const string& url) {
       status = URI_PARSE_ERROR;
       break;
     }
-    queryParams_[key.toString()] = value.toString();
+    string unescapedValue;
+    if (!unescape(unescapedValue, value)) {
+      status = URI_PARSE_ERROR;
+    }
+    queryParams_[key.toString()] = unescapedValue;
   }
   return status;
 }
@@ -206,6 +280,8 @@ const string WdtTransferRequest::PORTS_PARAM{"ports"};
 const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
 const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
 const string WdtTransferRequest::ENCRYPTION_PARAM{"enc"};
+const string WdtTransferRequest::NAMESPACE_PARAM{"ns"};
+const string WdtTransferRequest::DEST_IDENTIFIER_PARAM{"dstid"};
 
 WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
                                        const string& directory) {
@@ -224,6 +300,8 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
   errorCode = wdtUri.getErrorCode();
   hostName = wdtUri.getHostName();
   transferId = wdtUri.getQueryParam(TRANSFER_ID_PARAM);
+  wdtNamespace = wdtUri.getQueryParam(NAMESPACE_PARAM);
+  destIdentifier = wdtUri.getQueryParam(DEST_IDENTIFIER_PARAM);
   directory = wdtUri.getQueryParam(DIRECTORY_PARAM);
   string encStr = wdtUri.getQueryParam(ENCRYPTION_PARAM);
   if (!encStr.empty()) {
@@ -320,6 +398,8 @@ string WdtTransferRequest::generateUrlInternal(bool genFull,
   WdtUri wdtUri;
   wdtUri.setHostName(hostName);
   wdtUri.setQueryParam(TRANSFER_ID_PARAM, transferId);
+  wdtUri.setQueryParam(NAMESPACE_PARAM, wdtNamespace);
+  wdtUri.setQueryParam(DEST_IDENTIFIER_PARAM, destIdentifier);
   wdtUri.setQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
   serializePorts(wdtUri);
@@ -371,14 +451,13 @@ string WdtTransferRequest::getSerializedPortsList() const {
 }
 
 bool WdtTransferRequest::operator==(const WdtTransferRequest& that) const {
-  // TODO: fix this to use normal short-cutting
-  bool result = true;
-  result &= (transferId == that.transferId);
-  result &= (protocolVersion == that.protocolVersion);
-  result &= (directory == that.directory);
-  result &= (hostName == that.hostName);
-  result &= (ports == that.ports);
-  result &= (encryptionData == that.encryptionData);
+  bool result = (transferId == that.transferId) &&
+                (protocolVersion == that.protocolVersion) &&
+                (directory == that.directory) && (hostName == that.hostName) &&
+                (ports == that.ports) &&
+                (encryptionData == that.encryptionData) &&
+                (destIdentifier == that.destIdentifier) &&
+                (wdtNamespace == that.wdtNamespace);
   // No need to check the file info, simply checking whether two objects
   // are same with respect to the wdt settings
   return result;

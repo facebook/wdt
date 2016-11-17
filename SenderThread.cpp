@@ -45,10 +45,10 @@ std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
   if (!wdtParent_->socketCreator_) {
     // socket creator not set, creating ClientSocket
     socket = folly::make_unique<ClientSocket>(
-        *threadCtx_, wdtParent_->destHost_, port, encryptionData);
+        *threadCtx_, wdtParent_->getDestination(), port, encryptionData);
   } else {
     socket = wdtParent_->socketCreator_->makeSocket(
-        *threadCtx_, wdtParent_->destHost_, port, encryptionData);
+        *threadCtx_, wdtParent_->getDestination(), port, encryptionData);
   }
   double retryInterval = options_.sleep_millis;
   int maxRetries = options_.max_retries;
@@ -76,9 +76,9 @@ std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
   }
   double elapsedSecsConn = durationSeconds(Clock::now() - startTime);
   if (errCode != OK) {
-    WTLOG(ERROR) << "Unable to connect to " << wdtParent_->destHost_ << " "
-                 << port << " despite " << connectAttempts << " retries in "
-                 << elapsedSecsConn << " seconds.";
+    WTLOG(ERROR) << "Unable to connect to " << wdtParent_->getDestination()
+                 << " " << port << " despite " << connectAttempts
+                 << " retries in " << elapsedSecsConn << " seconds.";
     errCode = CONN_ERROR;
     return nullptr;
   }
@@ -817,18 +817,17 @@ SenderState SenderThread::processVersionMismatch() {
           return END;
         }
         int negotiatedProtocol = 0;
-        for (int threadProtocolVersion_ :
-             wdtParent_->getNegotiatedProtocols()) {
-          if (threadProtocolVersion_ > 0) {
+        for (int threadProtocolVersion : wdtParent_->getNegotiatedProtocols()) {
+          if (threadProtocolVersion > 0) {
             if (negotiatedProtocol > 0 &&
-                negotiatedProtocol != threadProtocolVersion_) {
+                negotiatedProtocol != threadProtocolVersion) {
               WTLOG(ERROR)
                   << "Different threads negotiated different protocols "
-                  << negotiatedProtocol << " " << threadProtocolVersion_;
+                  << negotiatedProtocol << " " << threadProtocolVersion;
               execFunnel->notifySuccess();
               return END;
             }
-            negotiatedProtocol = threadProtocolVersion_;
+            negotiatedProtocol = threadProtocolVersion;
           }
         }
         WDT_CHECK_GT(negotiatedProtocol, 0);

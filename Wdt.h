@@ -63,17 +63,22 @@ class Wdt {
 
   /// High level APIs:
 
-  // TODO: add receiver side...
-
   /**
    * Send data for the shard identified by shardId to an already running/setup
    * receiver whose connection url was used to make a WdtTransferRequest.
    * Optionally passes an abort checker.
    */
   virtual ErrorCode wdtSend(
-      const std::string &wdtNamespace, const WdtTransferRequest &wdtRequest,
+      const WdtTransferRequest &wdtRequest,
       std::shared_ptr<IAbortChecker> abortChecker = nullptr,
       bool terminateExistingOne = false);
+
+  virtual ErrorCode createWdtSender(const WdtTransferRequest &wdtRequest,
+                                    std::shared_ptr<IAbortChecker> abortChecker,
+                                    bool terminateExistingOne,
+                                    SenderPtr &senderPtr);
+
+  virtual ErrorCode releaseWdtSender(const WdtTransferRequest &wdtRequest);
 
   /**
    * Receive data. It creates a receiver on specified namespace/identifier and
@@ -100,6 +105,9 @@ class Wdt {
   /// destroys WDT object for an app
   static void releaseWdt(const std::string &appName);
 
+  /// @return  sender identifier for a transfer request
+  static std::string getSenderIdentifier(const WdtTransferRequest &req);
+
   /// Virtual Destructor (for class hierarchy)
   virtual ~Wdt() {
   }
@@ -125,8 +133,7 @@ class Wdt {
 
   // Optionally set socket creator and progress reporter (used for fb)
   virtual ErrorCode wdtSetAbortSocketCreatorAndReporter(
-      const std::string &wdtNamespace, WdtBase *target,
-      const WdtTransferRequest &req,
+      WdtBase *target, const WdtTransferRequest &req,
       std::shared_ptr<IAbortChecker> abortChecker);
 
   // Internal wdt object creator/holder

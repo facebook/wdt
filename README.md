@@ -322,6 +322,9 @@ Make sure to do the following, before "arc diff":
  wdt/test/wdt_max_send_test.sh
  # Check buck build
  buck build wdt/...
+ # Debug a specific test with full output even on success:
+ buck test wdt:xxx -- --run-disabled --extended-tests --print-passing-details\
+   --print-long-results
 ```
 
 and check the output of the last step to make sure one of the 3 runs is

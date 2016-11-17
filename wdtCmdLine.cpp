@@ -85,6 +85,11 @@ DEFINE_string(test_only_encryption_secret, "",
 
 DEFINE_string(app_name, "wdt", "Identifier used for reporting (scuba, at fb)");
 
+DEFINE_string(namespace, "", "WDT namespace (e.g shard)");
+
+DEFINE_string(dest_id, "",
+              "Unique destination identifier (will default to hostname)");
+
 DECLARE_bool(help);
 
 using namespace facebook::wdt;
@@ -246,8 +251,7 @@ int main(int argc, char *argv[]) {
   if (FLAGS_parse_transfer_log) {
     // Log parsing mode
     options.enable_download_resumption = true;
-    TransferLogManager transferLogManager(options);
-    transferLogManager.setRootDir(FLAGS_directory);
+    TransferLogManager transferLogManager(options, FLAGS_directory);
     transferLogManager.openLog();
     bool success = transferLogManager.parseAndPrint();
     WLOG_IF(ERROR, !success) << "Transfer log parsing failed";
@@ -278,10 +282,14 @@ int main(int argc, char *argv[]) {
     WLOG(INFO) << "Parsed url as " << reqPtr->getLogSafeString();
   }
   WdtTransferRequest &req = *reqPtr;
+  req.wdtNamespace = FLAGS_namespace;
+  if (!FLAGS_dest_id.empty()) {
+    req.destIdentifier = FLAGS_dest_id;
+  }
   if (FLAGS_protocol_version > 0) {
     req.protocolVersion = FLAGS_protocol_version;
   }
-  if (FLAGS_hostname.size()) {
+  if (!FLAGS_hostname.empty()) {
     reqPtr->hostName = FLAGS_hostname;
   }
   if (FLAGS_destination.empty() && connectUrl.empty()) {
@@ -357,10 +365,7 @@ int main(int argc, char *argv[]) {
     WLOG(INFO) << "Making Sender with encryption set = "
                << req.encryptionData.isSet();
 
-    // TODO: find something more useful for namespace (userid ? directory?)
-    // (shardid at fb)
-    retCode = wdt.wdtSend(WdtResourceController::kGlobalNamespace, req,
-                          setupAbortChecker());
+    retCode = wdt.wdtSend(req, setupAbortChecker());
   }
   cancelAbort();
   if (retCode == OK) {

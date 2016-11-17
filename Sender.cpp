@@ -19,7 +19,6 @@
 #include <folly/Memory.h>
 #include <folly/ScopeGuard.h>
 #include <folly/String.h>
-#include <sys/stat.h>
 
 namespace facebook {
 namespace wdt {
@@ -40,59 +39,19 @@ void Sender::startNewTransfer() {
     throttler_->startTransfer();
   }
   WLOG(INFO) << "Starting a new transfer " << getTransferId() << " to "
-             << destHost_;
+             << transferRequest_.hostName;
 }
 
-Sender::Sender(const std::string &destHost, const std::string &srcDir)
-    : queueAbortChecker_(this), destHost_(destHost) {
-  WLOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
-  srcDir_ = srcDir;
-  int port = options_.start_port;
-  int numSockets = options_.num_ports;
-  for (int i = 0; i < numSockets; i++) {
-    transferRequest_.ports.push_back(port + i);
-  }
-  dirQueue_.reset(
-      new DirectorySourceQueue(options_, srcDir_, &queueAbortChecker_));
-  WVLOG(3) << "Configuring the  directory queue";
-  dirQueue_->setIncludePattern(options_.include_regex);
-  dirQueue_->setExcludePattern(options_.exclude_regex);
-  dirQueue_->setPruneDirPattern(options_.prune_dir_regex);
-  dirQueue_->setFollowSymlinks(options_.follow_symlinks);
-  dirQueue_->setBlockSizeMbytes(options_.block_size_mbytes);
-  dirQueue_->setNumClientThreads(numSockets);
-  dirQueue_->setOpenFilesDuringDiscovery(options_.open_files_during_discovery);
-  dirQueue_->setDirectReads(options_.odirect_reads);
-  progressReportIntervalMillis_ = options_.progress_report_interval_millis;
-}
-
-// TODO: argghhhh
 Sender::Sender(const WdtTransferRequest &transferRequest)
-    : Sender(transferRequest.hostName, transferRequest.directory,
-             transferRequest.ports, transferRequest.fileInfo,
-             transferRequest.disableDirectoryTraversal) {
+    : queueAbortChecker_(this) {
+  WLOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   transferRequest_ = transferRequest;
+
+  progressReportIntervalMillis_ = options_.progress_report_interval_millis;
+
   if (getTransferId().empty()) {
     WLOG(WARNING) << "Sender without transferId... will likely fail to connect";
   }
-  // TODO: use transferRequest_
-  setProtocolVersion(transferRequest.protocolVersion);
-}
-
-// TODO: cleanup constructors - stick to transferRequest_
-
-Sender::Sender(const std::string &destHost, const std::string &srcDir,
-               const std::vector<int32_t> &ports,
-               const std::vector<WdtFileInfo> &srcFileInfo,
-               bool disableDirectoryTraversal)
-    : Sender(destHost, srcDir) {
-  // TODO let's not copy vectors around to ourselves
-  transferRequest_.ports = ports;
-  if (!srcFileInfo.empty() || disableDirectoryTraversal) {
-    dirQueue_->setFileInfo(srcFileInfo);
-  }
-  transferHistoryController_ =
-      folly::make_unique<TransferHistoryController>(*dirQueue_);
 }
 
 ErrorCode Sender::validateTransferRequest() {
@@ -111,15 +70,12 @@ ErrorCode Sender::validateTransferRequest() {
 const WdtTransferRequest &Sender::init() {
   WVLOG(1) << "Sender Init() with encryption set = "
            << transferRequest_.encryptionData.isSet();
+  negotiateProtocol();
   if (validateTransferRequest() != OK) {
     WLOG(ERROR) << "Couldn't validate the transfer request "
                 << transferRequest_.getLogSafeString();
     return transferRequest_;
   }
-  // TODO cleanup / most not necessary / duplicate state
-  transferRequest_.protocolVersion = protocolVersion_;
-  transferRequest_.directory = srcDir_;
-  transferRequest_.hostName = destHost_;
   // TODO Figure out what to do with file info
   // transferRequest.fileInfo = dirQueue_->getFileInfo();
   transferRequest_.errorCode = OK;
@@ -138,33 +94,9 @@ Sender::~Sender() {
   finish();
 }
 
-void Sender::setIncludeRegex(const std::string &includeRegex) {
-  dirQueue_->setIncludePattern(includeRegex);
-}
-
-void Sender::setExcludeRegex(const std::string &excludeRegex) {
-  dirQueue_->setExcludePattern(excludeRegex);
-}
-
-void Sender::setPruneDirRegex(const std::string &pruneDirRegex) {
-  dirQueue_->setPruneDirPattern(pruneDirRegex);
-}
-
-void Sender::setSrcFileInfo(const std::vector<WdtFileInfo> &srcFileInfo) {
-  dirQueue_->setFileInfo(srcFileInfo);
-}
-
-void Sender::setFollowSymlinks(const bool followSymlinks) {
-  dirQueue_->setFollowSymlinks(followSymlinks);
-}
-
 void Sender::setProgressReportIntervalMillis(
     const int progressReportIntervalMillis) {
   progressReportIntervalMillis_ = progressReportIntervalMillis;
-}
-
-const std::string &Sender::getSrcDir() const {
-  return srcDir_;
 }
 
 ProtoNegotiationStatus Sender::getNegotiationStatus() {
@@ -185,7 +117,7 @@ void Sender::setProtoNegotiationStatus(ProtoNegotiationStatus status) {
 
 bool Sender::isSendFileChunks() const {
   return (downloadResumptionEnabled_ &&
-          protocolVersion_ >= Protocol::DOWNLOAD_RESUMPTION_VERSION);
+          getProtocolVersion() >= Protocol::DOWNLOAD_RESUMPTION_VERSION);
 }
 
 bool Sender::isFileChunksReceived() {
@@ -205,13 +137,18 @@ void Sender::setFileChunksInfo(
 }
 
 const std::string &Sender::getDestination() const {
-  return destHost_;
+  return transferRequest_.hostName;
 }
 
 std::unique_ptr<TransferReport> Sender::getTransferReport() {
-  int64_t totalFileSize = dirQueue_->getTotalSize();
-  int64_t fileCount = dirQueue_->getCount();
-  bool fileDiscoveryFinished = dirQueue_->fileDiscoveryFinished();
+  int64_t totalFileSize = 0;
+  int64_t fileCount = 0;
+  bool fileDiscoveryFinished = false;
+  if (dirQueue_ != nullptr) {
+    totalFileSize = dirQueue_->getTotalSize();
+    fileCount = dirQueue_->getCount();
+    fileDiscoveryFinished = dirQueue_->fileDiscoveryFinished();
+  }
   double totalTime = durationSeconds(Clock::now() - startTime_);
   auto globalStats = getGlobalTransferStats();
   std::unique_ptr<TransferReport> transferReport =
@@ -310,6 +247,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
           transferredSourceStats, dirQueue_->getFailedSourceStats(),
           threadStats, dirQueue_->getFailedDirectories(), totalTime,
           totalFileSize, dirQueue_->getCount(),
+          dirQueue_->getPreviouslySentBytes(),
           dirQueue_->fileDiscoveryFinished());
 
   if (progressReportEnabled) {
@@ -348,9 +286,29 @@ ErrorCode Sender::start() {
     }
     transferStatus_ = ONGOING;
   }
+
+  // set up directory queue
+  dirQueue_.reset(new DirectorySourceQueue(options_, transferRequest_.directory,
+                                           &queueAbortChecker_));
+  WVLOG(3) << "Configuring the  directory queue";
+  dirQueue_->setIncludePattern(options_.include_regex);
+  dirQueue_->setExcludePattern(options_.exclude_regex);
+  dirQueue_->setPruneDirPattern(options_.prune_dir_regex);
+  dirQueue_->setFollowSymlinks(options_.follow_symlinks);
+  dirQueue_->setBlockSizeMbytes(options_.block_size_mbytes);
+  dirQueue_->setNumClientThreads(transferRequest_.ports.size());
+  dirQueue_->setOpenFilesDuringDiscovery(options_.open_files_during_discovery);
+  dirQueue_->setDirectReads(options_.odirect_reads);
+  if (!transferRequest_.fileInfo.empty() ||
+      transferRequest_.disableDirectoryTraversal) {
+    dirQueue_->setFileInfo(transferRequest_.fileInfo);
+  }
+  transferHistoryController_ =
+      folly::make_unique<TransferHistoryController>(*dirQueue_);
+
   checkAndUpdateBufferSize();
   const bool twoPhases = options_.two_phases;
-  WLOG(INFO) << "Client (sending) to " << destHost_ << ", Using ports [ "
+  WLOG(INFO) << "Client (sending) to " << getDestination() << ", Using ports [ "
              << transferRequest_.ports << "]";
   startTime_ = Clock::now();
   downloadResumptionEnabled_ = options_.enable_download_resumption;
@@ -374,12 +332,12 @@ ErrorCode Sender::start() {
   senderThreads_ = threadsController_->makeThreads<Sender, SenderThread>(
       this, transferRequest_.ports.size(), transferRequest_.ports);
   if (downloadResumptionEnabled_ && options_.delete_extra_files) {
-    if (protocolVersion_ >= Protocol::DELETE_CMD_VERSION) {
+    if (getProtocolVersion() >= Protocol::DELETE_CMD_VERSION) {
       dirQueue_->enableFileDeletion();
     } else {
       WLOG(WARNING) << "Turning off extra file deletion on the receiver side "
                        "because of protocol version "
-                    << protocolVersion_;
+                    << getProtocolVersion();
     }
   }
   dirThread_ = dirQueue_->buildQueueAsynchronously();

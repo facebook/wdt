@@ -81,7 +81,7 @@ WDT_OPT(accept_timeout_millis, int32,
 WDT_OPT(max_accept_retries, int32,
         "max number of retries for accept call in receiver. First "
         "connection from sender must come before max_accept_retries * "
-        "accept_timeout_ms milliseconds.");
+        "accept_timeout_ms milliseconds. 0 or negative means infinite retries");
 WDT_OPT(accept_window_millis, int32,
         "accept window size in milliseconds. For a session, after the "
         "first connection is received, other connections must be "
@@ -171,3 +171,5 @@ WDT_OPT(
     delete_extra_files, bool,
     "If true, extra files on the receiver side is deleted during resumption");
 WDT_OPT(skip_fadvise, bool, "If true, fadvise is skipped after block write");
+WDT_OPT(fsync, bool,
+        "If true, each file is fsync'ed after its last block is received");

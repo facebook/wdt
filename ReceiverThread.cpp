@@ -111,7 +111,7 @@ ReceiverState ReceiverThread::listen() {
   const bool doActualWrites = !options_.skip_writes;
   int32_t port = socket_->getPort();
   WVLOG(1) << "Server Thread for port " << port << " with backlog "
-           << socket_->getBackLog() << " on " << wdtParent_->getDir()
+           << socket_->getBackLog() << " on " << wdtParent_->getDirectory()
            << " writes = " << doActualWrites;
 
   for (int retry = 1; retry < options_.max_retries; ++retry) {
@@ -149,11 +149,26 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
     if (wdtParent_->hasNewTransferStarted()) {
       return ACCEPT_WITH_TIMEOUT;
     }
-    if (acceptAttempts == options_.max_accept_retries) {
-      WTLOG(ERROR) << "Unable to accept after " << acceptAttempts
-                   << " attempts";
-      threadStats_.setLocalErrorCode(CONN_ERROR);
-      return FINISH_WITH_ERROR;
+    switch (wdtParent_->getAcceptMode()) {
+      case Receiver::AcceptMode::ACCEPT_WITH_RETRIES: {
+        if (acceptAttempts >= options_.max_accept_retries) {
+          WTLOG(ERROR) << "Unable to accept after " << acceptAttempts
+                       << " attempts";
+          threadStats_.setLocalErrorCode(CONN_ERROR);
+          return FINISH_WITH_ERROR;
+        }
+        break;
+      }
+      case Receiver::AcceptMode::ACCEPT_FOREVER: {
+        WVTLOG(2) << "Receiver is configured to accept for-ever";
+        break;
+      }
+      case Receiver::AcceptMode::STOP_ACCEPTING: {
+        WTLOG(ERROR) << "Receiver is asked to stop accepting, attempts : "
+                     << acceptAttempts;
+        threadStats_.setLocalErrorCode(CONN_ERROR);
+        return FINISH_WITH_ERROR;
+      }
     }
     if (wdtParent_->getCurAbortCode() != OK) {
       WTLOG(ERROR) << "Thread marked to abort while trying to accept "
@@ -560,10 +575,10 @@ ReceiverState ReceiverThread::processFileCmd() {
     }
     int32_t receivedChecksum;
     std::string receivedTag;
-    bool success = Protocol::decodeFooter(
+    bool ok = Protocol::decodeFooter(
         buf_, off_, oldOffset_ + Protocol::kMaxFooter, receivedChecksum,
         receivedTag, (footerType_ == ENC_TAG_FOOTER));
-    if (!success) {
+    if (!ok) {
       WTLOG(ERROR) << "Unable to decode footer cmd";
       threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return FINISH_WITH_ERROR;

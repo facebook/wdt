@@ -93,6 +93,16 @@ class WdtUri {
   /// Generate url by serializing the members of this struct
   std::string generateUrl() const;
 
+  /// Url escape a value (which can be binary)
+  static std::string escape(const std::string& binaryStr);
+  /// Url unescape a value (escaped by escape()) - returns true if successful,
+  /// false if there is a malformed % sequence in the string
+  static bool unescape(std::string& result, folly::StringPiece escapedValue);
+  /// 0-16 -> '0'-'f'
+  static char toHex(unsigned char v);
+  /// '0'-'f' -> 0-16
+  static int fromHex(char c);
+
   /// Assignment operator to convert string to wdt uri object
   WdtUri& operator=(const std::string& url);
 
@@ -153,6 +163,13 @@ struct WdtTransferRequest {
   /// Address on which receiver binded the ports / sender is sending data to
   std::string hostName;
 
+  /// Unique identifier for destination. This is useful to distinguish multiple
+  /// destinations in the same host
+  std::string destIdentifier;
+
+  /// Namespace for the transfer
+  std::string wdtNamespace;
+
   /// Directory to write the data to / read the data from
   std::string directory;
 
@@ -211,6 +228,8 @@ struct WdtTransferRequest {
   const static std::string NUM_PORTS_PARAM;
   /// Encryption parameters (proto:key for now, certificate,... potentially)
   const static std::string ENCRYPTION_PARAM;
+  const static std::string NAMESPACE_PARAM;
+  const static std::string DEST_IDENTIFIER_PARAM;
 
   /// Get ports vector from startPort and numPorts
   static std::vector<int32_t> genPortsVector(int32_t startPort,

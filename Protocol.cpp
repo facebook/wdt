@@ -60,6 +60,14 @@ std::ostream &operator<<(std::ostream &os, const Checkpoint &checkpoint) {
   return os;
 }
 
+int64_t FileChunksInfo::getTotalChunkSize() const {
+  int64_t totalChunkSize = 0;
+  for (const auto &chunk : chunks_) {
+    totalChunkSize += chunk.size();
+  }
+  return totalChunkSize;
+}
+
 void FileChunksInfo::addChunk(const Interval &chunk) {
   chunks_.emplace_back(chunk);
 }

@@ -125,7 +125,12 @@ class TransferLogManager {
   /// bytes for seq-id, 10 bytes for file-size, 10 bytes for timestamp
   static const int64_t kMaxEntryLength = 2 + 1 + 10 + PATH_MAX + 2 * 10;
 
-  explicit TransferLogManager(const WdtOptions &options) : options_(options) {
+  TransferLogManager(const WdtOptions &options, const std::string &rootDir)
+      : options_(options) {
+    rootDir_ = rootDir;
+    if (rootDir_.back() != '/') {
+      rootDir_.push_back('/');
+    }
   }
 
   /**
@@ -227,9 +232,6 @@ class TransferLogManager {
    * Unlinks wdt transfer log
    */
   void unlink();
-
-  /// @param rootDir        root directory of the receiver
-  void setRootDir(const std::string &rootDir);
 
   /// destructor
   ~TransferLogManager();

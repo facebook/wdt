@@ -10,9 +10,10 @@ fi
 set -o pipefail
 set -e
 
-transferId1=$($binary -v=1 2>&1 | grep Generated | head -1 | \
+searchStr='Generated a transfer id'
+transferId1=$($binary -v=1 2>&1 | grep "$searchStr" | head -1 | \
   awk '{print $10}')
-transferId2=$($binary -v=1 2>&1 | grep Generated | head -1 | \
+transferId2=$($binary -v=1 2>&1 | grep "$searchStr" | head -1 | \
   awk '{print $10}')
 
 if [ "$transferId1" == "$transferId2" ]; then

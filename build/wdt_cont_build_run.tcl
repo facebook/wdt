@@ -107,7 +107,7 @@ if {$os == "Darwin"} {
 } else {
     set type "unix"
     set timeoutCmd "timeout"
-    set extraCmds "cd $CDIR/fbsource/fbcode &&\
+    set extraCmds "df -h /dev/shm && cd $CDIR/fbsource/fbcode &&\
      (sudo tc qdisc del dev lo root; sudo ip6tables --flush || true) &&\
      time buck build @mode/opt wdt/... &&\
      time wdt/test/wdt_max_send_test.sh ./buck-out/gen/wdt/wdt |& tail -50 &&\
@@ -143,7 +143,8 @@ while {1} {
     # cleanup previous builds failure - sudo not needed/asking for passwd on mac
     if {[catch {exec $timeoutCmd $totalMaxDuration sh -c "set -o pipefail;\
      set -x; date; uname -a;\
-     $sudo rm -rf /tmp/wdtTest_$userdir /dev/shm/wdtTest_$userdir wdtTest &&\
+     $sudo rm -rf /tmp/wdtTest_$userdir /dev/shm/wdtTest_$userdir wdtTest \
+     /dev/shm/stargate-* &&\
      cd $CDIR/fbsource/fbcode && time hg pull -r master -u --dest master &&\
      hg log -l 1 && hg log -v -l 1 folly && hg log -v -l 1 wdt &&\
      hg log -v -l 1 stargate &&\
@@ -165,7 +166,7 @@ while {1} {
         set autoPkgNext 0
     } else {
         set firstLine [lindex [split $prevDesc \n] 0];
-        if {![string compare $firstLine "wdt version bump"]} {
+        if {![string compare $firstLine "wdt/stargate version bump"]} {
             puts "Previous commit is auto commit, will not auto commit!"
             set autoBump 0
         } else {
@@ -173,7 +174,7 @@ while {1} {
             set autoPkgNext 0
         }
     }
-    catch {exec hg log -l 1 -T "{rev}" wdt} hgout
+    catch {exec hg log -l 1 -T "{rev}" wdt stargate} hgout
     puts "wdt changeset now $hgout (autoBump $autoBump, good $good, autoPkg $autoPkgNext) $firstLine"
     if {[string length $last]==0} {
         sendEmail "contbuild restarted"

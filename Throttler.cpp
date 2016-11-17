@@ -9,7 +9,6 @@
 #include <wdt/Throttler.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/WdtOptions.h>
-#include <cmath>
 
 namespace facebook {
 namespace wdt {
@@ -24,17 +23,13 @@ std::shared_ptr<Throttler> Throttler::makeThrottler(const WdtOptions& options) {
   double avgRateBytesPerSec = options.avg_mbytes_per_sec * kMbToB;
   double peakRateBytesPerSec = options.max_mbytes_per_sec * kMbToB;
   double bucketLimitBytes = options.throttler_bucket_limit * kMbToB;
-  return Throttler::makeThrottler(avgRateBytesPerSec, peakRateBytesPerSec,
-                                  bucketLimitBytes,
-                                  options.throttler_log_time_millis);
-}
-
-std::shared_ptr<Throttler> Throttler::makeThrottler(
-    double avgRateBytesPerSec, double peakRateBytesPerSec,
-    double bucketLimitBytes, int64_t throttlerLogTimeMillis) {
-  configureOptions(avgRateBytesPerSec, peakRateBytesPerSec, bucketLimitBytes);
-  return std::make_shared<Throttler>(avgRateBytesPerSec, peakRateBytesPerSec,
-                                     bucketLimitBytes, throttlerLogTimeMillis);
+  int64_t singleRequestLimit =
+      options.buffer_size;  // Throttler limit is generally called with
+                            // buffer_size amount of data
+  Throttler* throttler =
+      new Throttler(avgRateBytesPerSec, peakRateBytesPerSec, bucketLimitBytes,
+                    singleRequestLimit, options.throttler_log_time_millis);
+  return std::shared_ptr<Throttler>(throttler);
 }
 
 void Throttler::configureOptions(double& avgRateBytesPerSec,
@@ -56,7 +51,8 @@ void Throttler::configureOptions(double& avgRateBytesPerSec,
 }
 
 Throttler::Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
-                     double bucketLimitBytes, int64_t throttlerLogTimeMillis)
+                     double bucketLimitBytes, int64_t singleRequestLimit,
+                     int64_t throttlerLogTimeMillis)
     : avgRateBytesPerSec_(avgRateBytesPerSec) {
   bucketRateBytesPerSec_ = peakRateBytesPerSec;
   bytesTokenBucketLimit_ =
@@ -83,6 +79,8 @@ Throttler::Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
   } else {
     WLOG(INFO) << "No peak rate specified";
   }
+  WDT_CHECK_GT(singleRequestLimit, 0);
+  singleRequestLimit_ = singleRequestLimit;
   throttlerLogTimeMillis_ = throttlerLogTimeMillis;
 }
 
@@ -94,13 +92,8 @@ void Throttler::setThrottlerRates(double& avgRateBytesPerSec,
   configureOptions(avgRateBytesPerSec, bucketRateBytesPerSec,
                    bytesTokenBucketLimit);
   folly::SpinLockGuard lock(throttlerMutex_);
-  if (refCount_ > 0 && avgRateBytesPerSec < avgRateBytesPerSec_) {
-    WLOG(INFO) << "new avg rate : " << avgRateBytesPerSec
-               << " cur avg rate : " << avgRateBytesPerSec_
-               << " Average throttler rate can't be "
-               << "lowered mid transfer. Ignoring the new value";
-    avgRateBytesPerSec = avgRateBytesPerSec_;
-  }
+
+  resetState();
 
   WLOG(INFO) << "Updating the rates avgRateBytesPerSec : " << avgRateBytesPerSec
              << " bucketRateBytesPerSec : " << bucketRateBytesPerSec
@@ -117,15 +110,34 @@ void Throttler::setThrottlerRates(const WdtOptions& options) {
   setThrottlerRates(avgRateBytesPerSec, peakRateBytesPerSec, bucketLimitBytes);
 }
 
-void Throttler::limit(ThreadCtx& threadCtx, double deltaProgress) {
+void Throttler::limit(ThreadCtx& threadCtx, int64_t deltaProgress) {
   limitInternal(&threadCtx, deltaProgress);
 }
 
-void Throttler::limit(double deltaProgress) {
+void Throttler::limit(int64_t deltaProgress) {
   limitInternal(nullptr, deltaProgress);
 }
 
-void Throttler::limitInternal(ThreadCtx* threadCtx, double deltaProgress) {
+void Throttler::limitInternal(ThreadCtx* threadCtx, int64_t deltaProgress) {
+  const int kLogInterval = 100;
+  int64_t numThrottled = 0;
+  int64_t count = 0;
+  while (numThrottled < deltaProgress) {
+    const int64_t toThrottle =
+        std::min(singleRequestLimit_, deltaProgress - numThrottled);
+    limitSingleRequest(threadCtx, toThrottle);
+    numThrottled += toThrottle;
+    count++;
+    if (count % kLogInterval == 0) {
+      WLOG(INFO) << "Throttling large amount data, to-throttle: "
+                 << deltaProgress << ", num-throttled: " << numThrottled;
+    }
+  }
+}
+
+void Throttler::limitSingleRequest(ThreadCtx* threadCtx,
+                                   int64_t deltaProgress) {
+  WDT_CHECK_LE(deltaProgress, singleRequestLimit_);
   std::chrono::time_point<Clock> now = Clock::now();
   double sleepTimeSeconds = calculateSleep(deltaProgress, now);
   if (throttlerLogTimeMillis_ > 0) {
@@ -236,14 +248,18 @@ double Throttler::averageThrottler(const Clock::time_point& now) {
 void Throttler::startTransfer() {
   folly::SpinLockGuard lock(throttlerMutex_);
   if (refCount_ == 0) {
-    startTime_ = Clock::now();
-    lastFillTime_ = startTime_;
-    lastLogTime_ = startTime_;
-    instantProgress_ = 0;
-    bytesProgress_ = 0;
-    bytesTokenBucket_ = 0;
+    resetState();
   }
   refCount_++;
+}
+
+void Throttler::resetState() {
+  startTime_ = Clock::now();
+  lastFillTime_ = startTime_;
+  lastLogTime_ = startTime_;
+  instantProgress_ = 0;
+  bytesProgress_ = 0;
+  bytesTokenBucket_ = 0;
 }
 
 void Throttler::endTransfer() {
