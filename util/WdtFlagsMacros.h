@@ -4,14 +4,14 @@
 
 /// Which options object to use (we can reuse those macros for fbonly options)
 #ifndef OPTIONS
-#define OPTIONS WdtOptions
+#define OPTIONS wdt::WdtOptions
 #endif
 
 // Short symbol A is a field inside the Options struct
 // The flag name is either the short one DEFINE_type(A,...) or
 // prefixed by wdt_ so we play nice with others when making a
 // library (long flag)
-#define WDT_READ_OPT(A) facebook::wdt::OPTIONS::get().A
+#define WDT_READ_OPT(A) facebook::OPTIONS::get().A
 #define WDT_OPT_VARIABLE(A) options.A
 
 // Generic macros to concat and stringify:
@@ -24,7 +24,9 @@
 #define WDT_TOSTR1(x) #x
 #define WDT_TOSTR(x) WDT_TOSTR1(x)
 
+#ifndef WDT_LONG_PREFIX
 #define WDT_LONG_PREFIX wdt_
+#endif
 
 #ifndef STANDALONE_APP
 #define WDT_PREFIX(argument) WDT_CONCAT(WDT_LONG_PREFIX, argument)
