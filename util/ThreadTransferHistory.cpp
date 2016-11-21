@@ -81,7 +81,7 @@ ErrorCode ThreadTransferHistory::setCheckpointAndReturnToQueue(
     return INVALID_CHECKPOINT;
   }
   globalCheckpoint_ |= globalCheckpoint;
-  lastCheckpoint_ = folly::make_unique<Checkpoint>(checkpoint);
+  lastCheckpoint_ = std::make_unique<Checkpoint>(checkpoint);
   int64_t numFailedSources = historySize - numReceivedSources;
   if (numFailedSources == 0 && lastBlockReceivedBytes > 0) {
     if (!globalCheckpoint) {
@@ -252,7 +252,7 @@ ThreadTransferHistory &TransferHistoryController::getTransferHistory(
 void TransferHistoryController::addThreadHistory(int32_t port,
                                                  TransferStats &threadStats) {
   WVLOG(1) << "Adding the history for " << port;
-  threadHistoriesMap_.emplace(port, folly::make_unique<ThreadTransferHistory>(
+  threadHistoriesMap_.emplace(port, std::make_unique<ThreadTransferHistory>(
                                         dirQueue_, threadStats, port));
 }
 

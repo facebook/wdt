@@ -109,7 +109,7 @@ class TransferStats {
 
   explicit TransferStats(bool isLocked = false) {
     if (isLocked) {
-      mutex_ = folly::make_unique<folly::RWSpinLock>();
+      mutex_ = std::make_unique<folly::RWSpinLock>();
     }
   }
 

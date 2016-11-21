@@ -31,7 +31,7 @@ class WdtThread {
         port_(port),
         threadProtocolVersion_(protocolVersion) {
     controller_ = controller;
-    threadCtx_ = folly::make_unique<ThreadCtx>(
+    threadCtx_ = std::make_unique<ThreadCtx>(
         options, /* allocate buffer */ true, threadIndex);
     const Buffer *buffer = threadCtx_->getBuffer();
     WDT_CHECK(buffer);

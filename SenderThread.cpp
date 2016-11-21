@@ -44,7 +44,7 @@ std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
       wdtParent_->transferRequest_.encryptionData;
   if (!wdtParent_->socketCreator_) {
     // socket creator not set, creating ClientSocket
-    socket = folly::make_unique<ClientSocket>(
+    socket = std::make_unique<ClientSocket>(
         *threadCtx_, wdtParent_->getDestination(), port, encryptionData);
   } else {
     socket = wdtParent_->socketCreator_->makeSocket(

@@ -126,7 +126,7 @@ const WdtTransferRequest &Receiver::init() {
     return transferRequest_;
   }
   transferLogManager_ =
-      folly::make_unique<TransferLogManager>(options_, getDirectory());
+      std::make_unique<TransferLogManager>(options_, getDirectory());
   checkAndUpdateBufferSize();
   backlog_ = options_.backlog;
   if (getTransferId().empty()) {
@@ -338,7 +338,7 @@ std::unique_ptr<TransferReport> Receiver::getTransferReport() {
     globalStats += receiverThread->getTransferStats();
   }
   std::unique_ptr<TransferReport> transferReport =
-      folly::make_unique<TransferReport>(std::move(globalStats));
+      std::make_unique<TransferReport>(std::move(globalStats));
   TransferStatus status = getTransferStatus();
   ErrorCode errCode = transferReport->getSummary().getErrorCode();
   if (status == NOT_STARTED && errCode == OK) {
@@ -354,7 +354,7 @@ ErrorCode Receiver::transferAsync() {
   int progressReportIntervalMillis = options_.progress_report_interval_millis;
   if (!progressReporter_ && progressReportIntervalMillis > 0) {
     // if progress reporter has not been set, use the default one
-    progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
+    progressReporter_ = std::make_unique<ProgressReporter>(transferRequest_);
   }
   return start();
 }
@@ -413,7 +413,7 @@ void Receiver::progressTracker() {
     // Note: totalSenderBytes may not be valid yet if sender has not
     // completed file discovery.  But that's ok, report whatever progress
     // we can.
-    auto transferReport = folly::make_unique<TransferReport>(
+    auto transferReport = std::make_unique<TransferReport>(
         std::move(globalStats), totalTime, totalSenderBytes, 0, true);
     intervalsSinceLastUpdate++;
     if (intervalsSinceLastUpdate >= throughputUpdateInterval) {

@@ -962,7 +962,7 @@ int32_t ReceiverThread::getPort() const {
 ErrorCode ReceiverThread::init() {
   const EncryptionParams &encryptionData =
       wdtParent_->transferRequest_.encryptionData;
-  socket_ = folly::make_unique<ServerSocket>(
+  socket_ = std::make_unique<ServerSocket>(
       *threadCtx_, port_, wdtParent_->backlog_, encryptionData);
   int max_retries = options_.max_retries;
   for (int retries = 0; retries < max_retries; retries++) {

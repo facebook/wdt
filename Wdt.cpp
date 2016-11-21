@@ -49,7 +49,7 @@ ErrorCode Wdt::printWdtOptions(std::ostream &out) {
 
 Wdt::Wdt() {
   WdtFlags::initializeFromFlags(options_);
-  resourceController_ = folly::make_unique<WdtResourceController>(options_);
+  resourceController_ = std::make_unique<WdtResourceController>(options_);
 }
 
 std::string Wdt::getSenderIdentifier(const WdtTransferRequest &req) {
