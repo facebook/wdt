@@ -71,6 +71,7 @@ set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Checksum.cpp"
+"${FOLLY_SOURCE_DIR}/folly/ScopeGuard.cpp"
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
@@ -158,7 +159,8 @@ check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
 check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
 check_function_exists(posix_fadvise HAS_POSIX_FADVISE)
 # C based check (which fail with the c++ setting thereafter...)
-check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
+check_function_exists(clock_gettime FOLLY_HAVE_CLOCK_GETTIME)
+# was: check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
 check_function_exists(memrchr FOLLY_HAVE_MEMRCHR)
 set(SAVE_CMRL ${CMAKE_REQUIRED_LIBRARIES}) #globals are evil/ugly
 set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
