@@ -1,5 +1,5 @@
-type Repository$options = {
-  allowDirectMerges: false,
-  allowBotCommands: false,
-  internalRepository: fbsource
-};
+{
+  "allowDirectMerges": false,
+  "allowBotCommands": false,
+  "internalRepository": "fbsource"
+}
