@@ -32,7 +32,9 @@ def set_binaries():
         wdt_binary = binary
         print("Set default binary from WDT_BINARY env var: " + wdt_binary)
     else:
-        wdt_binary = "./_bin/wdt/wdt"
+        wdt_binary = "./buck-out/gen/wdt/wdt"
+        if not os.path.exists(wdt_binary):
+            wdt_binary = "./_bin/wdt/wdt"
     sender = get_env('WDT_SENDER')
     if sender:
         sender_binary = sender
@@ -50,7 +52,9 @@ def set_binaries():
         gen_files_binary = gen_files
         print("Set gen_files_binary from WDT_GEN_FILES env var: " + gen_files)
     else:
-        gen_files_binary = "./_bin/wdt/bench/wdt_gen_files"
+        gen_files_binary = "./buck-out/gen/wdt/bench/wdt_gen_files"
+        if not os.path.exists(gen_files_binary):
+            gen_files_binary = "./_bin/wdt/bench/wdt_gen_files"
     bigrams = get_env('WDT_GEN_BIGRAMS')
     if bigrams:
         gen_files_bigrams = bigrams
