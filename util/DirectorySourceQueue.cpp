@@ -17,7 +17,6 @@
 #include <utility>
 
 #include <fcntl.h>
-#include <folly/Memory.h>
 #include <regex>
 
 // NOTE: this should remain standalone code and not use WdtOptions directly
@@ -60,8 +59,8 @@ void WdtFileInfo::verifyAndFixFlags() {
 DirectorySourceQueue::DirectorySourceQueue(const WdtOptions &options,
                                            const string &rootDir,
                                            IAbortChecker const *abortChecker) {
-  threadCtx_ = folly::make_unique<ThreadCtx>(
-      options, /* do not allocate buffer */ false);
+  threadCtx_ =
+      std::make_unique<ThreadCtx>(options, /* do not allocate buffer */ false);
   threadCtx_->setAbortChecker(abortChecker);
   setRootDir(rootDir);
 }
@@ -525,7 +524,7 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
     do {
       const int64_t size = std::min<int64_t>(remainingBytes, blockSize);
       std::unique_ptr<ByteSource> source =
-          folly::make_unique<FileByteSource>(metadata, size, offset);
+          std::make_unique<FileByteSource>(metadata, size, offset);
       sourceQueue_.push(std::move(source));
       remainingBytes -= size;
       offset += size;
@@ -643,7 +642,7 @@ void DirectorySourceQueue::enqueueFilesToBeDeleted() {
     sharedFileData_.emplace_back(metadata);
     // create a byte source with size and offset equal to 0
     std::unique_ptr<ByteSource> source =
-        folly::make_unique<FileByteSource>(metadata, 0, 0);
+        std::make_unique<FileByteSource>(metadata, 0, 0);
     sourceQueue_.push(std::move(source));
     numFilesToBeDeleted++;
   }

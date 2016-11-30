@@ -49,7 +49,8 @@ constexpr char kWdtBuggyLogName[] = ".wdt.log.bug";
 class LogEncoderDecoder {
  public:
   /// encodes header entry
-  int64_t encodeLogHeader(char *dest, const std::string &recoveryId,
+  int64_t encodeLogHeader(char *dest, int64_t max,
+                          const std::string &recoveryId,
                           const std::string &senderIp, int64_t config);
 
   /// decodes header entry
@@ -58,7 +59,8 @@ class LogEncoderDecoder {
                        std::string &senderIp, int64_t &config);
 
   /// encodes file creation entry
-  int64_t encodeFileCreationEntry(char *dest, const std::string &fileName,
+  int64_t encodeFileCreationEntry(char *dest, int64_t max,
+                                  const std::string &fileName,
                                   const int64_t seqId, const int64_t fileSize);
 
   /// decodes file creation entry
@@ -67,7 +69,7 @@ class LogEncoderDecoder {
                                int64_t &fileSize);
 
   /// encodes block write entry
-  int64_t encodeBlockWriteEntry(char *dest, const int64_t seqId,
+  int64_t encodeBlockWriteEntry(char *dest, int64_t max, const int64_t seqId,
                                 const int64_t offset, const int64_t blockSize);
 
   /// decodes block write entry
@@ -76,7 +78,7 @@ class LogEncoderDecoder {
                              int64_t &blockSize);
 
   /// encodes file resize entry
-  int64_t encodeFileResizeEntry(char *dest, const int64_t seqId,
+  int64_t encodeFileResizeEntry(char *dest, int64_t max, const int64_t seqId,
                                 const int64_t fileSize);
 
   /// decodes file resize entry
@@ -84,14 +86,15 @@ class LogEncoderDecoder {
                              int64_t &seqId, int64_t &fileSize);
 
   /// encodes file invalidation entry
-  int64_t encodeFileInvalidationEntry(char *dest, const int64_t &seqId);
+  int64_t encodeFileInvalidationEntry(char *dest, int64_t max,
+                                      const int64_t &seqId);
 
   /// decodes file invalidation entry
   bool decodeFileInvalidationEntry(char *buf, int16_t size, int64_t &timestamp,
                                    int64_t &seqId);
 
   /// encodes directory invalidation entry
-  int64_t encodeDirectoryInvalidationEntry(char *buf);
+  int64_t encodeDirectoryInvalidationEntry(char *buf, int64_t max);
 
   /// decodes directory invalidation entry
   bool decodeDirectoryInvalidationEntry(char *buf, int16_t size,
@@ -328,7 +331,7 @@ class LogParser {
    *
    * @return          If successful, true, else false
    */
-  bool truncateExtraBytesAtEnd(int fd, int extraBytes);
+  bool truncateExtraBytesAtEnd(int fd, int64_t extraBytes);
 
   /**
    * writes invalidation entries to the disk.
@@ -337,17 +340,19 @@ class LogParser {
    */
   bool writeFileInvalidationEntries(int fd, const std::set<int64_t> &seqIds);
 
-  ErrorCode processHeaderEntry(char *buf, int size, std::string &senderIp);
+  ErrorCode processHeaderEntry(char *buf, int64_t max, int64_t size,
+                               std::string &senderIp);
 
-  ErrorCode processFileCreationEntry(char *buf, int size);
+  // TODO: switch to ByteRange
+  ErrorCode processFileCreationEntry(char *buf, int64_t size);
 
-  ErrorCode processBlockWriteEntry(char *buf, int size);
+  ErrorCode processBlockWriteEntry(char *buf, int64_t size);
 
-  ErrorCode processFileResizeEntry(char *buf, int size);
+  ErrorCode processFileResizeEntry(char *buf, int64_t size);
 
-  ErrorCode processFileInvalidationEntry(char *buf, int size);
+  ErrorCode processFileInvalidationEntry(char *buf, int64_t size);
 
-  ErrorCode processDirectoryInvalidationEntry(char *buf, int size);
+  ErrorCode processDirectoryInvalidationEntry(char *buf, int64_t size);
 
   const WdtOptions &options_;
   LogEncoderDecoder &encoderDecoder_;

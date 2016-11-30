@@ -30,12 +30,12 @@ struct SourceMetaData {
   /// relative pathname
   std::string relPath;
   /**
-   * sequence number associated with the file. Sequence number
+   * Sequence number associated with the file. Sequence number
    * represents the order in which files were first added to the queue.
    * This is a file level identifier. It is same for blocks belonging
    * to the same file. This is efficient while using in sets. Instead
    * of using full path of the file, we can use this to identify the
-   * file.
+   * file. First valid sequence id is 1
    */
   int64_t seqId{0};
   /// size of the entire source

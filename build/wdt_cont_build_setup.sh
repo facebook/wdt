@@ -2,8 +2,12 @@
 # A lot of this is facebook specific but can give an idea of how
 # to setup custom tests for WDT - Very similar to travis_linux.sh
 # run this once and then _run will run a loop and email results
+echo "if sending email later fails, you might need:"
+echo "sudo sed -ie 's#^\(mailhub\).*$#\1=localhost#' /etc/ssmtp/ssmtp.conf"
 set -x
-while sh -c "g++ --version | fgrep 4.4." ; do
+sudo yum install iproute-tc devtoolset-4-gcc-c++ automake autoconf boost-devel
+export PATH=/opt/rh/devtoolset-4/root/bin:$PATH
+while sh -c "g++ --version | fgrep 4.8." ; do
   smcc add-services -e hhvm.oss $HOSTNAME:22
   date
   echo "you have an old g++ let see if chefctl can upgrade it"
@@ -44,8 +48,9 @@ git clone https://github.com/floitsch/double-conversion.git
 git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$CDIR -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on .. && make -j 16 && make install)
 git clone https://github.com/google/glog.git
+echo "if this fails with aclocal error; run autoreconf"
 ( cd glog && ./configure --with-gflags=$CDIR --prefix=$CDIR && make -j 16 && make install )
-OPENSSL_VERSION=openssl-1.0.1q
+OPENSSL_VERSION=openssl-1.0.1u
 wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
 tar xfz $OPENSSL_VERSION.tar.gz
 ( cd $OPENSSL_VERSION ; ./config --prefix=$CDIR threads shared; make ; make install )

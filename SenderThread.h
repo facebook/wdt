@@ -81,7 +81,7 @@ class SenderThread : public WdtThread {
         transferHistoryController_(sender->transferHistoryController_.get()) {
     controller_->registerThread(threadIndex_);
     transferHistoryController_->addThreadHistory(port_, threadStats_);
-    threadAbortChecker_ = folly::make_unique<SocketAbortChecker>(this);
+    threadAbortChecker_ = std::make_unique<SocketAbortChecker>(this);
     threadCtx_->setAbortChecker(threadAbortChecker_.get());
     threadStats_.setId(folly::to<std::string>(threadIndex_));
   }

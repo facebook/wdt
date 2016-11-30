@@ -152,9 +152,9 @@ std::unique_ptr<TransferReport> Sender::getTransferReport() {
   double totalTime = durationSeconds(Clock::now() - startTime_);
   auto globalStats = getGlobalTransferStats();
   std::unique_ptr<TransferReport> transferReport =
-      folly::make_unique<TransferReport>(std::move(globalStats), totalTime,
-                                         totalFileSize, fileCount,
-                                         fileDiscoveryFinished);
+      std::make_unique<TransferReport>(std::move(globalStats), totalTime,
+                                       totalFileSize, fileCount,
+                                       fileDiscoveryFinished);
   TransferStatus status = getTransferStatus();
   ErrorCode errCode = transferReport->getSummary().getErrorCode();
   if (status == NOT_STARTED && errCode == OK) {
@@ -243,7 +243,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
   int64_t totalFileSize = dirQueue_->getTotalSize();
   double totalTime = durationSeconds(endTime_ - startTime_);
   std::unique_ptr<TransferReport> transferReport =
-      folly::make_unique<TransferReport>(
+      std::make_unique<TransferReport>(
           transferredSourceStats, dirQueue_->getFailedSourceStats(),
           threadStats, dirQueue_->getFailedDirectories(), totalTime,
           totalFileSize, dirQueue_->getCount(),
@@ -304,7 +304,7 @@ ErrorCode Sender::start() {
     dirQueue_->setFileInfo(transferRequest_.fileInfo);
   }
   transferHistoryController_ =
-      folly::make_unique<TransferHistoryController>(*dirQueue_);
+      std::make_unique<TransferHistoryController>(*dirQueue_);
 
   checkAndUpdateBufferSize();
   const bool twoPhases = options_.two_phases;
@@ -314,7 +314,7 @@ ErrorCode Sender::start() {
   downloadResumptionEnabled_ = options_.enable_download_resumption;
   if (!progressReporter_) {
     WVLOG(1) << "No progress reporter provided, making a default one";
-    progressReporter_ = folly::make_unique<ProgressReporter>(transferRequest_);
+    progressReporter_ = std::make_unique<ProgressReporter>(transferRequest_);
   }
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;

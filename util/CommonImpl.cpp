@@ -61,7 +61,7 @@ ThreadCtx::ThreadCtx(const WdtOptions& options, bool allocateBuffer)
   if (!allocateBuffer) {
     return;
   }
-  buffer_ = folly::make_unique<Buffer>(options_.buffer_size);
+  buffer_ = std::make_unique<Buffer>(options_.buffer_size);
 }
 
 ThreadCtx::ThreadCtx(const WdtOptions& options, bool allocateBuffer,

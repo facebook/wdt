@@ -274,7 +274,7 @@ class ThreadsController {
       const std::vector<int32_t> &ports) {
     std::vector<std::unique_ptr<WdtThread>> threads;
     for (int threadIndex = 0; threadIndex < numThreads; ++threadIndex) {
-      threads.emplace_back(folly::make_unique<WdtThreadType>(
+      threads.emplace_back(std::make_unique<WdtThreadType>(
           wdtParent, threadIndex, ports[threadIndex], this));
     }
     return threads;

@@ -11,6 +11,9 @@ namespace facebook {
 namespace wdt {
 
 /// base socket class
+/// Do not read/write more than 2Gb at a time (int sizes)
+/// This is ok because you don't want internal blocks bigger than a few
+/// Mbytes anyway.
 class WdtSocket {
  public:
   WdtSocket(ThreadCtx &threadCtx, int port,
@@ -71,7 +74,7 @@ class WdtSocket {
   ErrorCode getWriteErrCode() const;
 
   /// saves decryptor ctx after offset
-  void saveDecryptorCtx(int offset);
+  void saveDecryptorCtx(int64_t offset);
 
   /// verify whether the given tag matches previously saved context
   bool verifyTag(std::string &tag);
@@ -149,11 +152,11 @@ class WdtSocket {
   /// Have we already read the tag and completed decryption
   bool readsFinalized_{false};
 
-  const int OFFSET_NOT_SET = -1;
-  const int CTX_SAVED = -2;
+  const int64_t OFFSET_NOT_SET = -1;
+  const int64_t CTX_SAVED = -2;
 
   /// offset after which decryptor ctx should be saved
-  int ctxSaveOffset_{OFFSET_NOT_SET};
+  int64_t ctxSaveOffset_{OFFSET_NOT_SET};
 
  private:
   /// computes effective timeout depending on the network timeout and abort

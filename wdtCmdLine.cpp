@@ -262,7 +262,7 @@ int main(int argc, char *argv[]) {
   // General case : Sender or Receiver
   std::unique_ptr<WdtTransferRequest> reqPtr;
   if (connectUrl.empty()) {
-    reqPtr = folly::make_unique<WdtTransferRequest>(
+    reqPtr = std::make_unique<WdtTransferRequest>(
         options.start_port, options.num_ports, FLAGS_directory);
     reqPtr->hostName = FLAGS_destination;
     reqPtr->transferId = FLAGS_transfer_id;
@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
                            FLAGS_test_only_encryption_secret);
     }
   } else {
-    reqPtr = folly::make_unique<WdtTransferRequest>(connectUrl);
+    reqPtr = std::make_unique<WdtTransferRequest>(connectUrl);
     if (reqPtr->errorCode != OK) {
       WLOG(ERROR) << "Invalid url \"" << connectUrl
                   << "\" : " << errorCodeToStr(reqPtr->errorCode);

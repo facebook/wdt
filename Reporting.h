@@ -22,9 +22,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <folly/Memory.h>
 #include <folly/RWSpinLock.h>
-#include <folly/SpinLock.h>
 
 namespace facebook {
 namespace wdt {
@@ -109,7 +107,7 @@ class TransferStats {
 
   explicit TransferStats(bool isLocked = false) {
     if (isLocked) {
-      mutex_ = folly::make_unique<folly::RWSpinLock>();
+      mutex_ = std::make_unique<folly::RWSpinLock>();
     }
   }
 

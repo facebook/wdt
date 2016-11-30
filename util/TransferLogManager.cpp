@@ -12,17 +12,23 @@
 
 #include <fcntl.h>
 #include <folly/Bits.h>
+#include <folly/Conv.h>
 #include <folly/Range.h>
 #include <folly/ScopeGuard.h>
-#include <folly/String.h>
+
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <wdt/Reporting.h>
 #include <ctime>
 #include <iomanip>
 
+using folly::ByteRange;
+using std::string;
+
 namespace facebook {
 namespace wdt {
+
+// TODO consider revamping this log format
 
 const int TransferLogManager::WLOG_VERSION = 2;
 
@@ -33,197 +39,206 @@ int64_t LogEncoderDecoder::timestampInMicroseconds() const {
       .count();
 }
 
-int64_t LogEncoderDecoder::encodeLogHeader(char *dest,
-                                           const std::string &recoveryId,
-                                           const std::string &senderIp,
+int64_t LogEncoderDecoder::encodeLogHeader(char *dest, int64_t max,
+                                           const string &recoveryId,
+                                           const string &senderIp,
                                            int64_t config) {
   // increment by 2 bytes to later store the total length
   char *ptr = dest + sizeof(int16_t);
+  max -= sizeof(int16_t);
   int64_t size = 0;
+  WDT_CHECK_GE(max, 1);
   ptr[size++] = TransferLogManager::HEADER;
-  encodeInt(ptr, size, timestampInMicroseconds());
-  encodeInt(ptr, size, TransferLogManager::WLOG_VERSION);
-  encodeString(ptr, size, recoveryId);
-  encodeString(ptr, size, senderIp);
-  encodeInt(ptr, size, config);
-
+  bool ok = encodeVarI64C(ptr, max, size, timestampInMicroseconds()) &&
+            encodeVarI64C(ptr, max, size, TransferLogManager::WLOG_VERSION) &&
+            encodeString(ptr, max, size, recoveryId) &&
+            encodeString(ptr, max, size, senderIp) &&
+            encodeVarI64C(ptr, max, size, config);
+  if (!ok) {
+    WLOG(ERROR) << "Log header buffer too small " << max << " for header "
+                << recoveryId << " , " << senderIp;
+    return -1;
+  }
   folly::storeUnaligned<int16_t>(dest, size);
   return (size + sizeof(int16_t));
 }
 
 bool LogEncoderDecoder::decodeLogHeader(char *buf, int16_t size,
                                         int64_t &timestamp, int &version,
-                                        std::string &recoveryId,
-                                        std::string &senderIp,
+                                        string &recoveryId, string &senderIp,
                                         int64_t &config) {
-  folly::ByteRange br((uint8_t *)buf, size);
-  try {
-    timestamp = decodeInt(br);
-    version = decodeInt(br);
-    if (!decodeString(br, buf, size, recoveryId)) {
-      return false;
-    }
-    if (!decodeString(br, buf, size, senderIp)) {
-      return false;
-    }
-    config = decodeInt(br);
-  } catch (const std::exception &ex) {
-    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+  ByteRange br = makeByteRange(buf, size);
+  bool ok = decodeInt64C(br, timestamp) && decodeInt32C(br, version) &&
+            decodeString(br, recoveryId) && decodeString(br, senderIp) &&
+            decodeInt64C(br, config);
+  if (!ok || br.size() != 0) {
+    WLOG(ERROR) << "Error decoding log header size " << size << " ok " << ok
+                << " left over " << br.size();
     return false;
   }
-  return !checkForOverflow(br.start() - (uint8_t *)buf, size);
+  return ok;
 }
 
-int64_t LogEncoderDecoder::encodeFileCreationEntry(char *dest,
-                                                   const std::string &fileName,
+int64_t LogEncoderDecoder::encodeFileCreationEntry(char *dest, int64_t max,
+                                                   const string &fileName,
                                                    const int64_t seqId,
                                                    const int64_t fileSize) {
   // increment by 2 bytes to later store the total length
-  char *ptr = dest + sizeof(int16_t);
-  int64_t size = 0;
-  ptr[size++] = TransferLogManager::FILE_CREATION;
-  encodeInt(ptr, size, timestampInMicroseconds());
-  encodeString(ptr, size, fileName);
-  encodeInt(ptr, size, seqId);
-  encodeInt(ptr, size, fileSize);
-
-  folly::storeUnaligned<int16_t>(dest, size);
-  return (size + sizeof(int16_t));
+  int64_t size = sizeof(int16_t);
+  WDT_CHECK_GE(max, size + 1);
+  dest[size++] = TransferLogManager::FILE_CREATION;
+  bool ok = encodeVarI64C(dest, max, size, timestampInMicroseconds()) &&
+            encodeString(dest, max, size, fileName) &&
+            encodeVarI64C(dest, max, size, seqId) &&
+            encodeVarI64C(dest, max, size, fileSize);
+  if (!ok) {
+    WLOG(ERROR) << "Log header buffer too small " << max << " for file c entry "
+                << fileName;
+    return -1;
+  }
+  folly::storeUnaligned<int16_t>(dest, size - sizeof(int16_t));
+  return size;
 }
 
 bool LogEncoderDecoder::decodeFileCreationEntry(char *buf, int16_t size,
                                                 int64_t &timestamp,
-                                                std::string &fileName,
+                                                string &fileName,
                                                 int64_t &seqId,
                                                 int64_t &fileSize) {
-  folly::ByteRange br((uint8_t *)buf, size);
-  try {
-    timestamp = decodeInt(br);
-    if (!decodeString(br, buf, size, fileName)) {
-      return false;
-    }
-    seqId = decodeInt(br);
-    fileSize = decodeInt(br);
-  } catch (const std::exception &ex) {
-    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+  ByteRange br = makeByteRange(buf, size);
+  bool ok = decodeInt64C(br, timestamp) && decodeString(br, fileName) &&
+            decodeInt64C(br, seqId) && decodeInt64C(br, fileSize);
+  if (!ok || (br.size() != 0)) {
+    WLOG(ERROR) << "Did not decode properly file creat entry " << size << " ok "
+                << ok << " left over " << br.size();
     return false;
   }
-  return !checkForOverflow(br.start() - (uint8_t *)buf, size);
+  return true;
 }
 
-int64_t LogEncoderDecoder::encodeBlockWriteEntry(char *dest,
+int64_t LogEncoderDecoder::encodeBlockWriteEntry(char *dest, int64_t max,
                                                  const int64_t seqId,
                                                  const int64_t offset,
                                                  const int64_t blockSize) {
-  char *ptr = dest + sizeof(int16_t);
-  int64_t size = 0;
-  ptr[size++] = TransferLogManager::BLOCK_WRITE;
-  encodeInt(ptr, size, timestampInMicroseconds());
-  encodeInt(ptr, size, seqId);
-  encodeInt(ptr, size, offset);
-  encodeInt(ptr, size, blockSize);
-
-  folly::storeUnaligned<int16_t>(dest, size);
-  return (size + sizeof(int16_t));
+  int64_t size = sizeof(int16_t);
+  WDT_CHECK_GE(max, size + 1);
+  dest[size++] = TransferLogManager::BLOCK_WRITE;
+  bool ok = encodeVarI64C(dest, max, size, timestampInMicroseconds()) &&
+            encodeVarI64C(dest, max, size, seqId) &&
+            encodeVarI64C(dest, max, size, offset) &&
+            encodeVarI64C(dest, max, size, blockSize);
+  if (!ok) {
+    WLOG(ERROR) << "Failed to encode blockwrite entry into " << max;
+    return -1;
+  }
+  folly::storeUnaligned<int16_t>(dest, size - sizeof(int16_t));
+  return size;
 }
 
 bool LogEncoderDecoder::decodeBlockWriteEntry(char *buf, int16_t size,
                                               int64_t &timestamp,
                                               int64_t &seqId, int64_t &offset,
                                               int64_t &blockSize) {
-  folly::ByteRange br((uint8_t *)buf, size);
-  try {
-    timestamp = decodeInt(br);
-    seqId = decodeInt(br);
-    offset = decodeInt(br);
-    blockSize = decodeInt(br);
-  } catch (const std::exception &ex) {
-    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+  ByteRange br = makeByteRange(buf, size);
+  bool ok = decodeInt64C(br, timestamp) && decodeInt64C(br, seqId) &&
+            decodeInt64C(br, offset) && decodeInt64C(br, blockSize);
+  if (!ok || (br.size() != 0)) {
+    WLOG(ERROR) << "Did not decode properly block write entry " << size
+                << " ok " << ok << " left over " << br.size();
     return false;
   }
-  return !checkForOverflow(br.start() - (uint8_t *)buf, size);
+  return true;
 }
 
-int64_t LogEncoderDecoder::encodeFileResizeEntry(char *dest,
+int64_t LogEncoderDecoder::encodeFileResizeEntry(char *dest, int64_t max,
                                                  const int64_t seqId,
                                                  const int64_t fileSize) {
-  char *ptr = dest + sizeof(int16_t);
-  int64_t size = 0;
-  ptr[size++] = TransferLogManager::FILE_RESIZE;
-  encodeInt(ptr, size, timestampInMicroseconds());
-  encodeInt(ptr, size, seqId);
-  encodeInt(ptr, size, fileSize);
-
-  folly::storeUnaligned<int16_t>(dest, size);
-  return (size + sizeof(int16_t));
+  int64_t size = sizeof(int16_t);
+  WDT_CHECK_GE(max, size + 1);
+  dest[size++] = TransferLogManager::FILE_RESIZE;
+  bool ok = encodeVarI64C(dest, max, size, timestampInMicroseconds()) &&
+            encodeVarI64C(dest, max, size, seqId) &&
+            encodeVarI64C(dest, max, size, fileSize);
+  if (!ok) {
+    return -1;
+  }
+  folly::storeUnaligned<int16_t>(dest, size - sizeof(int16_t));
+  return size;
 }
 
 bool LogEncoderDecoder::decodeFileResizeEntry(char *buf, int16_t size,
                                               int64_t &timestamp,
                                               int64_t &seqId,
                                               int64_t &fileSize) {
-  folly::ByteRange br((uint8_t *)buf, size);
-  try {
-    timestamp = decodeInt(br);
-    seqId = decodeInt(br);
-    fileSize = decodeInt(br);
-  } catch (const std::exception &ex) {
-    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+  ByteRange br = makeByteRange(buf, size);
+  bool ok = decodeInt64C(br, timestamp) && decodeInt64C(br, seqId) &&
+            decodeInt64C(br, fileSize);
+  if (!ok || (br.size() != 0)) {
+    WLOG(ERROR) << "Did not decode properly block write entry " << size
+                << " ok " << ok << " left over " << br.size();
     return false;
   }
-  return !checkForOverflow(br.start() - (uint8_t *)buf, size);
+  return true;
 }
 
-int64_t LogEncoderDecoder::encodeFileInvalidationEntry(char *dest,
+int64_t LogEncoderDecoder::encodeFileInvalidationEntry(char *dest, int64_t max,
                                                        const int64_t &seqId) {
-  char *ptr = dest + sizeof(int16_t);
-  int64_t size = 0;
-  ptr[size++] = TransferLogManager::FILE_INVALIDATION;
-  encodeInt(ptr, size, timestampInMicroseconds());
-  encodeInt(ptr, size, seqId);
-  folly::storeUnaligned<int16_t>(dest, size);
-  return (size + sizeof(int16_t));
+  int64_t size = sizeof(int16_t);
+  WDT_CHECK_GE(max, size + 1);
+  dest[size++] = TransferLogManager::FILE_INVALIDATION;
+  bool ok = encodeVarI64C(dest, max, size, timestampInMicroseconds()) &&
+            encodeVarI64C(dest, max, size, seqId);
+  if (!ok) {
+    WLOG(ERROR) << "Failed to encode inval entry into " << max;
+    return -1;
+  }
+  folly::storeUnaligned<int16_t>(dest, size - sizeof(int16_t));
+  return size;
 }
 
 bool LogEncoderDecoder::decodeFileInvalidationEntry(char *buf, int16_t size,
                                                     int64_t &timestamp,
                                                     int64_t &seqId) {
-  folly::ByteRange br((uint8_t *)buf, size);
-  try {
-    timestamp = decodeInt(br);
-    seqId = decodeInt(br);
-  } catch (const std::exception &ex) {
-    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+  ByteRange br = makeByteRange(buf, size);
+  bool ok = decodeInt64C(br, timestamp) && decodeInt64C(br, seqId);
+  if (!ok || (br.size() != 0)) {
+    WLOG(ERROR) << "Did not decode properly file inval entry " << size << " ok "
+                << ok << " left over " << br.size();
     return false;
   }
-  return !checkForOverflow(br.start() - (uint8_t *)buf, size);
+  return true;
 }
 
-int64_t LogEncoderDecoder::encodeDirectoryInvalidationEntry(char *dest) {
-  char *ptr = dest + sizeof(int16_t);
-  int64_t size = 0;
-  ptr[size++] = TransferLogManager::DIRECTORY_INVALIDATION;
-  encodeInt(ptr, size, timestampInMicroseconds());
-  folly::storeUnaligned<int16_t>(dest, size);
-  return (size + sizeof(int16_t));
+int64_t LogEncoderDecoder::encodeDirectoryInvalidationEntry(char *dest,
+                                                            int64_t max) {
+  int64_t size = sizeof(int16_t);
+  WDT_CHECK_GE(max, size + 1);
+  dest[size++] = TransferLogManager::DIRECTORY_INVALIDATION;
+  if (!encodeVarI64C(dest, max, size, timestampInMicroseconds())) {
+    WLOG(ERROR) << "No room in " << max << " for dir inval entry";
+    return -1;
+  }
+  folly::storeUnaligned<int16_t>(dest, size - sizeof(int16_t));
+  return size;
 }
 
+// TODO make the caller make and pass the byterange
 bool LogEncoderDecoder::decodeDirectoryInvalidationEntry(char *buf,
                                                          int16_t size,
                                                          int64_t &timestamp) {
-  folly::ByteRange br((uint8_t *)buf, size);
-  try {
-    timestamp = decodeInt(br);
-  } catch (const std::exception &ex) {
-    WLOG(ERROR) << "got exception " << folly::exceptionStr(ex);
+  ByteRange br = makeByteRange(buf, size);
+  bool ok = decodeInt64C(br, timestamp);
+  if (!ok || (br.size() != 0)) {
+    WLOG(ERROR) << "Did not decode properly dir inval entry " << size << " ok "
+                << ok << " left over " << br.size();
     return false;
   }
-  return !checkForOverflow(br.start() - (uint8_t *)buf, size);
+  return true;
 }
 
-std::string TransferLogManager::getFullPath(const std::string &relPath) {
+string TransferLogManager::getFullPath(const string &relPath) {
   WDT_CHECK(!rootDir_.empty()) << "Root directory not set";
-  std::string fullPath = rootDir_;
+  string fullPath = rootDir_;
   fullPath.append(relPath);
   return fullPath;
 }
@@ -233,7 +248,7 @@ ErrorCode TransferLogManager::openLog() {
   WDT_CHECK(!rootDir_.empty()) << "Root directory not set";
   WDT_CHECK(options_.enable_download_resumption);
 
-  const std::string logPath = getFullPath(kWdtLogName);
+  const string logPath = getFullPath(kWdtLogName);
   fd_ = ::open(logPath.c_str(), O_RDWR);
   if (fd_ < 0) {
     if (errno != ENOENT) {
@@ -287,7 +302,7 @@ ErrorCode TransferLogManager::checkLog() {
     WLOG(WARNING) << "No log to check";
     return ERROR;
   }
-  const std::string fullLogName = getFullPath(kWdtLogName);
+  const string fullLogName = getFullPath(kWdtLogName);
   struct stat stat1, stat2;
   if (stat(fullLogName.c_str(), &stat1)) {
     PLOG(ERROR) << "CORRUPTION! Can't stat log file " << fullLogName
@@ -350,7 +365,7 @@ void TransferLogManager::writeEntriesToDisk() {
   WDT_CHECK(options_.transfer_log_write_interval_ms >= 0);
   auto waitingTime =
       std::chrono::milliseconds(options_.transfer_log_write_interval_ms);
-  std::vector<std::string> entries;
+  std::vector<string> entries;
   bool finished = false;
   while (!finished) {
     {
@@ -362,7 +377,7 @@ void TransferLogManager::writeEntriesToDisk() {
       entries = entries_;
       entries_.clear();
     }
-    std::string buffer;
+    string buffer;
     // write entries to disk
     for (const auto &entry : entries) {
       buffer.append(entry);
@@ -371,8 +386,8 @@ void TransferLogManager::writeEntriesToDisk() {
       // do not write when there is nothing to write
       continue;
     }
-    int toWrite = buffer.size();
-    int written = ::write(fd_, buffer.c_str(), toWrite);
+    int64_t toWrite = buffer.size();
+    int64_t written = ::write(fd_, buffer.c_str(), toWrite);
     if (written != toWrite) {
       PLOG(ERROR) << "Disk write error while writing transfer log " << written
                   << " " << toWrite;
@@ -382,7 +397,7 @@ void TransferLogManager::writeEntriesToDisk() {
   WLOG(INFO) << "Transfer log writer thread finished";
 }
 
-bool TransferLogManager::verifySenderIp(const std::string &curSenderIp) {
+bool TransferLogManager::verifySenderIp(const string &curSenderIp) {
   if (fd_ < 0) {
     return false;
   }
@@ -421,7 +436,8 @@ void TransferLogManager::invalidateDirectory() {
   WLOG(WARNING) << "Invalidating directory " << rootDir_;
   resumptionStatus_ = INCONSISTENT_DIRECTORY;
   char buf[kMaxEntryLength];
-  int64_t size = encoderDecoder_.encodeDirectoryInvalidationEntry(buf);
+  int64_t size =
+      encoderDecoder_.encodeDirectoryInvalidationEntry(buf, sizeof(buf));
   int64_t written = ::write(fd_, buf, size);
   if (written != size) {
     PLOG(ERROR)
@@ -441,8 +457,8 @@ void TransferLogManager::writeLogHeader() {
              << " recovery-id: " << recoveryId_ << " config: " << config_
              << " sender-ip: " << senderIp_;
   char buf[kMaxEntryLength];
-  int64_t size =
-      encoderDecoder_.encodeLogHeader(buf, recoveryId_, senderIp_, config_);
+  int64_t size = encoderDecoder_.encodeLogHeader(
+      buf, kMaxEntryLength, recoveryId_, senderIp_, config_);
   int64_t written = ::write(fd_, buf, size);
   if (written != size) {
     PLOG(ERROR) << "Disk write error while writing log header " << written
@@ -456,7 +472,7 @@ void TransferLogManager::writeLogHeader() {
   headerWritten_ = true;
 }
 
-void TransferLogManager::addFileCreationEntry(const std::string &fileName,
+void TransferLogManager::addFileCreationEntry(const string &fileName,
                                               int64_t seqId, int64_t fileSize) {
   if (fd_ < 0 || !headerWritten_) {
     return;
@@ -464,8 +480,8 @@ void TransferLogManager::addFileCreationEntry(const std::string &fileName,
   WVLOG(1) << "Adding file entry to log " << fileName << " " << seqId << " "
            << fileSize;
   char buf[kMaxEntryLength];
-  int64_t size =
-      encoderDecoder_.encodeFileCreationEntry(buf, fileName, seqId, fileSize);
+  int64_t size = encoderDecoder_.encodeFileCreationEntry(
+      buf, sizeof(buf), fileName, seqId, fileSize);
 
   std::lock_guard<std::mutex> lock(mutex_);
   entries_.emplace_back(buf, size);
@@ -479,8 +495,8 @@ void TransferLogManager::addBlockWriteEntry(int64_t seqId, int64_t offset,
   WVLOG(1) << "Adding block entry to log " << seqId << " " << offset << " "
            << blockSize;
   char buf[kMaxEntryLength];
-  int64_t size =
-      encoderDecoder_.encodeBlockWriteEntry(buf, seqId, offset, blockSize);
+  int64_t size = encoderDecoder_.encodeBlockWriteEntry(buf, sizeof(buf), seqId,
+                                                       offset, blockSize);
 
   std::lock_guard<std::mutex> lock(mutex_);
   entries_.emplace_back(buf, size);
@@ -492,7 +508,8 @@ void TransferLogManager::addFileResizeEntry(int64_t seqId, int64_t fileSize) {
   }
   WVLOG(1) << "Adding file resize entry to log " << seqId << " " << fileSize;
   char buf[kMaxEntryLength];
-  int64_t size = encoderDecoder_.encodeFileResizeEntry(buf, seqId, fileSize);
+  int64_t size =
+      encoderDecoder_.encodeFileResizeEntry(buf, sizeof(buf), seqId, fileSize);
 
   std::lock_guard<std::mutex> lock(mutex_);
   entries_.emplace_back(buf, size);
@@ -504,7 +521,8 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
   }
   WLOG(INFO) << "Adding invalidation entry " << seqId;
   char buf[kMaxEntryLength];
-  int64_t size = encoderDecoder_.encodeFileInvalidationEntry(buf, seqId);
+  int64_t size =
+      encoderDecoder_.encodeFileInvalidationEntry(buf, kMaxEntryLength, seqId);
   std::lock_guard<std::mutex> lock(mutex_);
   entries_.emplace_back(buf, size);
 }
@@ -512,7 +530,7 @@ void TransferLogManager::addFileInvalidationEntry(int64_t seqId) {
 void TransferLogManager::unlink() {
   WDT_CHECK_LT(fd_, 0) << "Unlink called before closeLog!";
   WLOG(INFO) << "unlinking " << kWdtLogName;
-  std::string fullLogName = getFullPath(kWdtLogName);
+  string fullLogName = getFullPath(kWdtLogName);
   if (::unlink(fullLogName.c_str()) != 0) {
     PLOG(ERROR) << "Could not unlink " << fullLogName;
   }
@@ -539,7 +557,7 @@ bool TransferLogManager::parseAndPrint() {
 }
 
 ErrorCode TransferLogManager::parseAndMatch(
-    const std::string &recoveryId, int64_t config,
+    const string &recoveryId, int64_t config,
     std::vector<FileChunksInfo> &fileChunksInfo) {
   recoveryId_ = recoveryId;
   config_ = config;
@@ -547,7 +565,7 @@ ErrorCode TransferLogManager::parseAndMatch(
 }
 
 ErrorCode TransferLogManager::parseVerifyAndFix(
-    const std::string &recoveryId, int64_t config, bool parseOnly,
+    const string &recoveryId, int64_t config, bool parseOnly,
     std::vector<FileChunksInfo> &parsedInfo) {
   if (fd_ < 0) {
     return INVALID_LOG;
@@ -572,9 +590,8 @@ ErrorCode TransferLogManager::parseVerifyAndFix(
 }
 
 LogParser::LogParser(const WdtOptions &options,
-                     LogEncoderDecoder &encoderDecoder,
-                     const std::string &rootDir, const std::string &recoveryId,
-                     int64_t config, bool parseOnly)
+                     LogEncoderDecoder &encoderDecoder, const string &rootDir,
+                     const string &recoveryId, int64_t config, bool parseOnly)
     : options_(options),
       encoderDecoder_(encoderDecoder),
       rootDir_(rootDir),
@@ -587,8 +604,9 @@ bool LogParser::writeFileInvalidationEntries(int fd,
                                              const std::set<int64_t> &seqIds) {
   char buf[TransferLogManager::kMaxEntryLength];
   for (auto seqId : seqIds) {
-    int64_t size = encoderDecoder_.encodeFileInvalidationEntry(buf, seqId);
-    int written = ::write(fd, buf, size);
+    int64_t size =
+        encoderDecoder_.encodeFileInvalidationEntry(buf, sizeof(buf), seqId);
+    int64_t written = ::write(fd, buf, size);
     if (written != size) {
       PLOG(ERROR) << "Disk write error while writing invalidation entry to "
                      "transfer log "
@@ -599,7 +617,7 @@ bool LogParser::writeFileInvalidationEntries(int fd,
   return true;
 }
 
-bool LogParser::truncateExtraBytesAtEnd(int fd, int extraBytes) {
+bool LogParser::truncateExtraBytesAtEnd(int fd, int64_t extraBytes) {
   WLOG(INFO) << "Removing extra " << extraBytes
              << " bytes from the end of transfer log";
   struct stat statBuffer;
@@ -627,7 +645,7 @@ void LogParser::clearParsedData() {
   invalidSeqIds_.clear();
 }
 
-std::string LogParser::getFormattedTimestamp(int64_t timestampMicros) {
+string LogParser::getFormattedTimestamp(int64_t timestampMicros) {
   // This assumes Clock's epoch is Posix's epoch (1970/1/1)
   // to_time_t is unfortunately only on the system_clock and not
   // on high_resolution_clock (on MacOS at least it isn't)
@@ -643,11 +661,15 @@ std::string LogParser::getFormattedTimestamp(int64_t timestampMicros) {
   return buf;
 }
 
-ErrorCode LogParser::processHeaderEntry(char *buf, int size,
-                                        std::string &senderIp) {
+ErrorCode LogParser::processHeaderEntry(char *buf, int64_t max, int64_t size,
+                                        string &senderIp) {
+  if (size > max) {
+    WLOG(ERROR) << "Bad size " << size << " vs max " << max;
+    return INVALID_LOG;
+  }
   int64_t timestamp;
   int logVersion;
-  std::string logRecoveryId;
+  string logRecoveryId;
   int64_t logConfig;
   if (!encoderDecoder_.decodeLogHeader(buf, size, timestamp, logVersion,
                                        logRecoveryId, senderIp, logConfig)) {
@@ -686,14 +708,14 @@ ErrorCode LogParser::processHeaderEntry(char *buf, int size,
   return OK;
 }
 
-ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
+ErrorCode LogParser::processFileCreationEntry(char *buf, int64_t size) {
   if (!headerParsed_) {
     WLOG(ERROR)
         << "Invalid log: File creation entry found before transfer log header";
     return INVALID_LOG;
   }
   int64_t timestamp, seqId, fileSize;
-  std::string fileName;
+  string fileName;
   if (!encoderDecoder_.decodeFileCreationEntry(buf, size, timestamp, fileName,
                                                seqId, fileSize)) {
     return INVALID_LOG;
@@ -719,7 +741,7 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
   // verify size
   bool sizeVerificationSuccess = false;
   struct stat buffer;
-  std::string fullPath;
+  string fullPath;
   folly::toAppend(rootDir_, fileName, &fullPath);
   if (stat(fullPath.c_str(), &buffer) != 0) {
     PLOG(ERROR) << "stat failed for " << fileName;
@@ -743,7 +765,7 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int size) {
   return OK;
 }
 
-ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
+ErrorCode LogParser::processFileResizeEntry(char *buf, int64_t size) {
   if (!headerParsed_) {
     WLOG(ERROR)
         << "Invalid log: File resize entry found before transfer log header";
@@ -773,7 +795,7 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
     return INVALID_LOG;
   }
   FileChunksInfo &chunksInfo = it->second;
-  const std::string &fileName = chunksInfo.getFileName();
+  const string &fileName = chunksInfo.getFileName();
   auto sizeIt = seqIdToSizeMap_.find(seqId);
   WDT_CHECK(sizeIt != seqIdToSizeMap_.end());
   if (fileSize < sizeIt->second) {
@@ -793,7 +815,7 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int size) {
   return OK;
 }
 
-ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
+ErrorCode LogParser::processBlockWriteEntry(char *buf, int64_t size) {
   if (!headerParsed_) {
     WLOG(ERROR)
         << "Invalid log: Block write entry found before transfer log header";
@@ -840,7 +862,7 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int size) {
   return OK;
 }
 
-ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
+ErrorCode LogParser::processFileInvalidationEntry(char *buf, int64_t size) {
   if (!headerParsed_) {
     WLOG(ERROR) << "Invalid log: File invalidation entry found before transfer "
                    "log header";
@@ -872,7 +894,8 @@ ErrorCode LogParser::processFileInvalidationEntry(char *buf, int size) {
   return OK;
 }
 
-ErrorCode LogParser::processDirectoryInvalidationEntry(char *buf, int size) {
+ErrorCode LogParser::processDirectoryInvalidationEntry(char *buf,
+                                                       int64_t size) {
   int64_t timestamp;
   if (!encoderDecoder_.decodeDirectoryInvalidationEntry(buf, size, timestamp)) {
     return INVALID_LOG;
@@ -886,15 +909,15 @@ ErrorCode LogParser::processDirectoryInvalidationEntry(char *buf, int size) {
   return INCONSISTENT_DIRECTORY;
 }
 
-ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
+ErrorCode LogParser::parseLog(int fd, string &senderIp,
                               std::vector<FileChunksInfo> &fileChunksInfo) {
   char entry[TransferLogManager::kMaxEntryLength];
   // empty log is valid
   ErrorCode status = OK;
   while (true) {
     int16_t entrySize;
-    int toRead = sizeof(int16_t);
-    int numRead = ::read(fd, &entrySize, toRead);
+    int64_t toRead = sizeof(int16_t);
+    int64_t numRead = ::read(fd, &entrySize, toRead);
     if (numRead < 0) {
       PLOG(ERROR) << "Error while reading transfer log " << numRead << " "
                   << toRead;
@@ -943,24 +966,27 @@ ErrorCode LogParser::parseLog(int fd, std::string &senderIp,
       // header, because only a header can validate a directory
       continue;
     }
+    char *buf = entry + 1;
+    const int64_t bufSize = sizeof(entry) - 1;
+    const int64_t entryLen = entrySize - 1;
     switch (type) {
       case TransferLogManager::HEADER:
-        status = processHeaderEntry(entry + 1, entrySize - 1, senderIp);
+        status = processHeaderEntry(buf, bufSize, entryLen, senderIp);
         break;
       case TransferLogManager::FILE_CREATION:
-        status = processFileCreationEntry(entry + 1, entrySize - 1);
+        status = processFileCreationEntry(buf, entryLen);
         break;
       case TransferLogManager::BLOCK_WRITE:
-        status = processBlockWriteEntry(entry + 1, entrySize - 1);
+        status = processBlockWriteEntry(buf, entryLen);
         break;
       case TransferLogManager::FILE_RESIZE:
-        status = processFileResizeEntry(entry + 1, entrySize - 1);
+        status = processFileResizeEntry(buf, entryLen);
         break;
       case TransferLogManager::FILE_INVALIDATION:
-        status = processFileInvalidationEntry(entry + 1, entrySize - 1);
+        status = processFileInvalidationEntry(buf, entryLen);
         break;
       case TransferLogManager::DIRECTORY_INVALIDATION:
-        status = processDirectoryInvalidationEntry(entry + 1, entrySize - 1);
+        status = processDirectoryInvalidationEntry(buf, entryLen);
         break;
       default:
         WLOG(ERROR) << "Invalid entry type found " << type;

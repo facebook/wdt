@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.26.1611030)
+project("WDT" LANGUAGES C CXX VERSION 1.27.1611290)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 # WDT itself works fine with C++11 (gcc 4.8 for instance) but more recent folly
@@ -71,6 +71,7 @@ set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Checksum.cpp"
+"${FOLLY_SOURCE_DIR}/folly/ScopeGuard.cpp"
 )
 
 # WDT's library proper - comes from: ls -1 *.cpp | grep -iv test
@@ -158,7 +159,8 @@ check_function_exists(sync_file_range HAS_SYNC_FILE_RANGE)
 check_function_exists(posix_memalign HAS_POSIX_MEMALIGN)
 check_function_exists(posix_fadvise HAS_POSIX_FADVISE)
 # C based check (which fail with the c++ setting thereafter...)
-check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
+check_function_exists(clock_gettime FOLLY_HAVE_CLOCK_GETTIME)
+# was: check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
 check_function_exists(memrchr FOLLY_HAVE_MEMRCHR)
 set(SAVE_CMRL ${CMAKE_REQUIRED_LIBRARIES}) #globals are evil/ugly
 set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
@@ -340,6 +342,10 @@ if (BUILD_TESTING)
   add_executable(protocol_test test/ProtocolTest.cpp)
   target_link_libraries(protocol_test wdt4tests)
   add_test(NAME AllTestsInProtocolTest COMMAND protocol_test)
+
+  add_executable(test_encdeci64_func test/test_encdeci64_func.cpp)
+  target_link_libraries(test_encdeci64_func wdt4tests)
+  add_test(NAME test_encdeci64_func COMMAND test_encdeci64_func)
 
   add_executable(resource_controller_test  test/WdtResourceControllerTest.cpp)
   target_link_libraries(resource_controller_test wdt4tests)

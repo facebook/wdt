@@ -48,7 +48,12 @@ undoLastIpTableChange() {
 
 setBinaries() {
   if [ -z "$WDT_BINARY" ]; then
-    WDT_BINARY="./_bin/wdt/wdt"
+    # Inside fb, building with buck, look there:
+    WDT_BINARY="./buck-out/gen/wdt/wdt"
+    if [ ! -x "$WDT_BINARY" ]; then
+      # Open source / Cmake / old fbmake path:
+      WDT_BINARY="./_bin/wdt/wdt"
+    fi
   fi
   if [ -z "$WDT_SENDER" ]; then
     WDT_SENDER=$WDT_BINARY
@@ -57,7 +62,10 @@ setBinaries() {
     WDT_RECEIVER=$WDT_BINARY
   fi
   if [ -z "$WDT_GEN_FILES" ]; then
-    WDT_GEN_FILES="./_bin/wdt/bench/wdt_gen_files"
+    WDT_GEN_FILES="./buck-out/gen/wdt/bench/wdt_gen_files"
+    if [ ! -x "$WDT_GEN_FILES" ]; then
+      WDT_GEN_FILES="./_bin/wdt/bench/wdt_gen_files"
+    fi
   fi
   if [ -z "$WDT_GEN_BIGRAMS" ]; then
     WDT_GEN_BIGRAMS="$(dirname "$0")/../bench/book1.bigrams"
@@ -220,7 +228,7 @@ verifyTransferAndCleanup() {
     echo "Found md5sum as $MD5SUM"
   fi
 
-  stat $DIR/dst${TEST_COUNT}/.wdt.log
+  stat $DIR/dst${TEST_COUNT}/.wdt.log 2> /dev/null
   if [ $? -eq 0 ]; then
     # transfer log present, verify for correctness
     echo "Verifying transfer log in $DIR/dst${TEST_COUNT}"

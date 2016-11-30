@@ -364,7 +364,8 @@ class DirectorySourceQueue : public SourceQueue {
   int64_t numEntries_{0};
 
   /// Seq-id of the next file to be inserted into the queue
-  int64_t nextSeqId_{0};
+  /// first valid seq is 1 so we can use 0 as unintilized/invalid in protocol.h
+  int64_t nextSeqId_{1};
 
   /// total number of blocks that have passed through the queue. Even when
   /// blocks are actually disabled, our code internally treats files like single

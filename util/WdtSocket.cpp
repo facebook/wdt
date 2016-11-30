@@ -422,7 +422,7 @@ ErrorCode WdtSocket::getNonRetryableErrCode() const {
   return errCode;
 }
 
-void WdtSocket::saveDecryptorCtx(const int offset) {
+void WdtSocket::saveDecryptorCtx(const int64_t offset) {
   WDT_CHECK_EQ(OFFSET_NOT_SET, ctxSaveOffset_);
   ctxSaveOffset_ = offset;
 }

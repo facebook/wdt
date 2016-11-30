@@ -234,9 +234,8 @@ ReceiverState ReceiverThread::acceptWithTimeout() {
 
 /***SEND_LOCAL_CHECKPOINT STATE***/
 ReceiverState ReceiverThread::sendLocalCheckpoint() {
-  WTLOG(INFO) << "entered SEND_LOCAL_CHECKPOINT state";
+  WTLOG(INFO) << "entered SEND_LOCAL_CHECKPOINT state " << checkpoint_;
   std::vector<Checkpoint> checkpoints;
-  WVTLOG(1) << "sending local checkpoint " << checkpoint_;
   checkpoints.emplace_back(checkpoint_);
 
   int64_t off = 0;
@@ -721,7 +720,9 @@ ReceiverState ReceiverThread::sendFileChunks() {
         buf_[off++] = Protocol::CHUNKS_CMD;
         const auto &fileChunksInfo = wdtParent_->getFileChunksInfo();
         const int64_t numParsedChunksInfo = fileChunksInfo.size();
-        Protocol::encodeChunksCmd(buf_, off, bufSize_, numParsedChunksInfo);
+        Protocol::encodeChunksCmd(buf_, off, /* size of buf_ */ bufSize_,
+                                  /* param to send */ bufSize_,
+                                  numParsedChunksInfo);
         int written = socket_->write(buf_, off);
         if (written > 0) {
           threadStats_.addHeaderBytes(written);
@@ -806,7 +807,7 @@ ReceiverState ReceiverThread::sendAbortCmd() {
   WTLOG(INFO) << "entered SEND_ABORT_CMD state";
   int64_t offset = 0;
   buf_[offset++] = Protocol::ABORT_CMD;
-  Protocol::encodeAbort(buf_, offset, threadProtocolVersion_,
+  Protocol::encodeAbort(buf_, offset, bufSize_, threadProtocolVersion_,
                         threadStats_.getLocalErrorCode(),
                         threadStats_.getNumFiles());
   socket_->write(buf_, offset);
@@ -962,7 +963,7 @@ int32_t ReceiverThread::getPort() const {
 ErrorCode ReceiverThread::init() {
   const EncryptionParams &encryptionData =
       wdtParent_->transferRequest_.encryptionData;
-  socket_ = folly::make_unique<ServerSocket>(
+  socket_ = std::make_unique<ServerSocket>(
       *threadCtx_, port_, wdtParent_->backlog_, encryptionData);
   int max_retries = options_.max_retries;
   for (int retries = 0; retries < max_retries; retries++) {

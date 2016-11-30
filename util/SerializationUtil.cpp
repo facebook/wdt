@@ -7,45 +7,128 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/util/SerializationUtil.h>
-#include <folly/Varint.h>
+
+using folly::ByteRange;
+using std::string;
 
 namespace facebook {
 namespace wdt {
-void encodeInt(char *dest, int64_t &off, int64_t value) {
-  off += folly::encodeVarint(value, (uint8_t *)dest + off);
+
+ByteRange makeByteRange(string str) {
+  return ByteRange((uint8_t *)str.data(), str.size());
 }
 
-int64_t decodeInt(folly::ByteRange &br) {
-  return folly::decodeVarint(br);
+ByteRange makeByteRange(char *dest, int64_t sz, int64_t off) {
+  WDT_CHECK_GE(off, 0);
+  WDT_CHECK_GE(sz, 0);
+  WDT_CHECK(dest != nullptr);
+  return ByteRange((uint8_t *)(dest + off), sz - off);
 }
 
-void encodeString(char *dest, int64_t &off, const std::string &str) {
-  int64_t strLen = str.length();
-  off += folly::encodeVarint(strLen, (uint8_t *)dest + off);
+int64_t offset(const folly::ByteRange &newRange,
+               const folly::ByteRange &oldRange) {
+  WDT_CHECK_EQ(newRange.end(), oldRange.end());
+  return newRange.start() - oldRange.start();
+}
+
+bool decodeInt32(ByteRange &br, int32_t &res32) {
+  int64_t res64;
+  ByteRange obr = br;
+  bool ok = decodeInt64(br, res64);
+  if (!ok) {
+    return false;
+  }
+  if (res64 > INT32_MAX || res64 < INT32_MIN) {
+    WLOG(ERROR) << "var int32 decoded value " << res64
+                << " does not fit in a 32 bit number as expected";
+    br = obr;
+    return false;
+  }
+  res32 = static_cast<int32_t>(res64);
+  return true;
+}
+
+bool decodeInt64(ByteRange &br, int64_t &res) {
+  int64_t pos = 0;
+  bool ret = decodeVarI64((const char *)(br.start()), br.size(), pos, res);
+  if (!ret) {
+    return false;
+  }
+  WDT_CHECK_GE(pos, 1);
+  br.advance(pos);
+  return true;
+}
+
+bool decodeUInt64(ByteRange &br, uint64_t &res) {
+  int64_t pos = 0;
+  bool ret = decodeVarU64((const char *)(br.start()), br.size(), pos, res);
+  if (!ret) {
+    return false;
+  }
+  WDT_CHECK_GE(pos, 1);
+  br.advance(pos);
+  return true;
+}
+
+bool decodeInt64C(ByteRange &br, int64_t &sres) {
+  uint64_t ures;
+  bool ret = decodeUInt64(br, ures);
+  if (!ret) {
+    return false;
+  }
+  if (ures > INT64_MAX) {
+    WLOG(ERROR) << "Decoded as unsigned into signed, too large " << ures;
+    return false;
+  }
+  sres = ures;
+  return true;
+}
+
+bool decodeInt32C(ByteRange &br, int32_t &res32) {
+  int64_t res64;
+  ByteRange obr = br;
+  bool ok = decodeInt64C(br, res64);
+  if (!ok) {
+    return false;
+  }
+  if (res64 > INT32_MAX || res64 < 0) {
+    WLOG(ERROR) << "var int32 decoded value " << res64
+                << " does not fit in a 31 bit positive number as expected";
+    br = obr;
+    return false;
+  }
+  res32 = static_cast<int32_t>(res64);
+  return true;
+}
+
+bool encodeString(char *dest, int64_t sz, int64_t &off, const string &str) {
+  if (!encodeVarU64(dest, sz, off, str.length())) {
+    return false;
+  }
+  const int64_t strLen = str.length();
+  if ((off + strLen) > sz) {
+    LOG(ERROR) << "Not enough room to encode \"" << str << "\" in buf of size "
+               << sz;
+    return false;
+  }
   memcpy(dest + off, str.data(), strLen);
   off += strLen;
+  return true;
 }
 
-bool decodeString(folly::ByteRange &br, char *src, int64_t max,
-                  std::string &str) {
-  int64_t strLen = folly::decodeVarint(br);
-  int64_t off = br.start() - (uint8_t *)src;
-  if (off + strLen > max) {
-    WLOG(ERROR) << "Not enough room with " << max << " to decode " << strLen
-                << " at " << off;
+bool decodeString(ByteRange &br, string &str) {
+  uint64_t strLen;
+  if (!decodeUInt64(br, strLen)) {
+    return false;
+  }
+  if (strLen > br.size()) {
+    WLOG(ERROR) << "Not enough room with " << br.size() << " to decode "
+                << strLen;
     return false;
   }
   str.assign((const char *)(br.start()), strLen);
   br.advance(strLen);
   return true;
-}
-
-bool checkForOverflow(int64_t off, int64_t max) {
-  if (off > max) {
-    WLOG(ERROR) << "Read past the end:" << off << " " << max;
-    return true;
-  }
-  return false;
 }
 }
 }

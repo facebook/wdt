@@ -163,7 +163,7 @@ done
 touch file
 cd $CURDIR
 # start the sender without starting receiver and set connect retries to 1
-_bin/wdt/wdt -directory $DIR/d -destination $HOSTNAME -max_retries 1 \
+$WDT_SENDER -directory $DIR/d -destination $HOSTNAME -max_retries 1 \
 -start_port $STARTING_PORT -num_ports $threads
 checkLastCmdStatusExpectingFailure
 TEST_COUNT=$((TEST_COUNT + 1))

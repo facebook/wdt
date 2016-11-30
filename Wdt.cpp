@@ -49,7 +49,7 @@ ErrorCode Wdt::printWdtOptions(std::ostream &out) {
 
 Wdt::Wdt() {
   WdtFlags::initializeFromFlags(options_);
-  resourceController_ = folly::make_unique<WdtResourceController>(options_);
+  resourceController_ = std::make_unique<WdtResourceController>(options_);
 }
 
 std::string Wdt::getSenderIdentifier(const WdtTransferRequest &req) {
@@ -70,7 +70,7 @@ ErrorCode Wdt::createWdtSender(const WdtTransferRequest &req,
   // Protocol issues will/should be flagged as error when we call createSender
 
   // try to create sender
-  const std::string& wdtNamespace = req.wdtNamespace;
+  const std::string &wdtNamespace = req.wdtNamespace;
   const std::string secondKey = getSenderIdentifier(req);
   ErrorCode errCode = resourceController_->createSender(wdtNamespace, secondKey,
                                                         req, senderPtr);

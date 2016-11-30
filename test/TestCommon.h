@@ -14,5 +14,6 @@
 namespace facebook {
 namespace wdt {
 uint32_t rand32();
+uint64_t rand64();
 }
 }
