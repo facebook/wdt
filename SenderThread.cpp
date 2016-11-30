@@ -487,9 +487,15 @@ SenderState SenderThread::readFileChunks() {
   threadStats_.addHeaderBytes(numRead);
   int64_t off = 0;
   int64_t bufSize, numFiles;
-  Protocol::decodeChunksCmd(buf_, off, bufSize, numFiles);
+  Protocol::decodeChunksCmd(buf_, off, bufSize_, bufSize, numFiles);
   WTLOG(INFO) << "File chunk list has " << numFiles
               << " entries and is broken in buffers of length " << bufSize;
+  if (bufSize < 0 || numFiles < 0) {
+    WLOG(ERROR) << "Decoded bogus size for file chunks list bufSize = "
+                << bufSize << " num files " << numFiles;
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
+    return END;
+  }
   std::unique_ptr<char[]> chunkBuffer(new char[bufSize]);
   std::vector<FileChunksInfo> fileChunksInfoList;
   while (true) {
@@ -673,7 +679,9 @@ ErrorCode SenderThread::readAndVerifySpuriousCheckpoint() {
       return OK;
     }
   }
-  WTLOG(ERROR) << "Failed to verify spurious local checkpoint, port " << port_;
+  WTLOG(ERROR) << "Failed to verify spurious local checkpoint, port " << port_
+               << " numRead " << numRead << " chkptsz " << checkpoints.size()
+               << " chkplen " << checkpointLen;
   threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
   return PROTOCOL_ERROR;
 }
@@ -764,7 +772,7 @@ SenderState SenderThread::processAbortCmd() {
   int32_t negotiatedProtocol;
   ErrorCode remoteError;
   int64_t checkpoint;
-  Protocol::decodeAbort(buf_, offset, negotiatedProtocol, remoteError,
+  Protocol::decodeAbort(buf_, offset, bufSize_, negotiatedProtocol, remoteError,
                         checkpoint);
   threadStats_.setRemoteErrorCode(remoteError);
   std::string failedFileName = transferHistory.getSourceId(checkpoint);

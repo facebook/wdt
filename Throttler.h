@@ -8,7 +8,6 @@
  */
 #pragma once
 #include <folly/SpinLock.h>
-#include <folly/Synchronized.h>
 #include <glog/logging.h>
 #include <wdt/util/CommonImpl.h>
 #include <thread>

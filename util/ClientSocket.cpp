@@ -14,6 +14,7 @@
 #include <poll.h>
 #include <sys/socket.h>
 
+#include <folly/Conv.h>
 #include <folly/ScopeGuard.h>
 
 namespace facebook {

@@ -5,7 +5,8 @@ wdt_compiler_flags = [
   "-Wsign-compare",
   "-Wno-unused-parameter",
   "-Wunused-variable",
-    #"-Wconversion",
+ # "-Wshorten-64-to-32",
+ # "-Wconversion",
     #"-Wmaybe-uninitialized", not working because of D955599
     #"-Iwdt",
 ]
@@ -60,6 +61,28 @@ cpp_unittest(
   srcs = [ 'test/WdtMiscTests.cpp', ],
   deps = [
       ":wdtlib",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_unittest(
+  name = 'test_encdeci64_func',
+  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  srcs = [ 'test/test_encdeci64_func.cpp', ],
+  deps = [
+      ":testcommon",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_binary(
+  name = 'test_encdeci64_perf',
+  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  srcs = [ 'test/test_encdeci64_perf.cpp', ],
+  deps = [
+      ":testcommon",
+      "@folly:benchmark",
+      "@common/encode:coding",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -502,7 +525,13 @@ cpp_library (
   compiler_flags = wdt_compiler_flags,
   deps = [
     ":inc",
-    "@/folly:folly",
+    # Try hard to keep the folly depenencies minimum, think before adding:
+    "@/folly:conv",
+    "@/folly:spin_lock",
+    "@/folly:r_w_spin_lock",
+    "@/folly:folly-sse42",
+#    "@/folly:memory",
+
   ],
   external_deps = [ ("openssl", None, "crypto") ],
 )
@@ -538,15 +567,21 @@ cpp_library (
 )
 
 cpp_library (
+    name = "testcommon",
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    srcs = [
+        "test/TestCommon.cpp"
+        ],
+  external_deps = [ ("gtest", None) ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+cpp_library (
   name = "wdtlib4tests",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-  srcs = [
-      "test/TestCommon.cpp"
-  ],
   deps = [
+    ":testcommon",
     ":wdtlib",
   ],
-  external_deps = [ ("gtest", None) ],
   compiler_flags = wdt_compiler_flags,
 )
 

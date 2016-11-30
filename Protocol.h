@@ -20,6 +20,17 @@
 namespace facebook {
 namespace wdt {
 
+// Note: we use int64_t internally for most things - it helps for arithmetic
+// and not getting accidental overflow when substracting, it helps comparaison
+// and also idendtifying errors as negative values.
+// BUT we made a mistake in early version of wdt where we used an encoding that
+// doesn't efficiently represent negative values - so in term of serializing
+// ints on the wire we expect all numbers to actually be positive (which is
+// more efficient when only positive numbers are indeed encoded)
+// For future fields where small negative value occurs, do use the I64 functions
+// without the trailing C for compatibility or use U64 when you know for sure
+// the data encoded is >= 0 (in util/SerializationUtil.h)
+
 /// Checkpoint consists of port number, number of successfully transferred
 /// blocks and number of bytes received for the last block
 struct Checkpoint {
@@ -27,8 +38,9 @@ struct Checkpoint {
   /// number of complete blocks received
   int64_t numBlocks{0};
   /// Next three fields are only set if a block is received partially
-  /// seq-id of the partially received block
-  int64_t lastBlockSeqId{-1};
+  /// seq-id of the partially received block (and we don't use encryption
+  /// which doesn't allow using partial blocks as they can't be authenticated)
+  int64_t lastBlockSeqId{0};  // was -1 in 1.26
   /// block offset of the partially received block
   int64_t lastBlockOffset{0};
   /// number of bytes received for the partially received block
@@ -41,9 +53,13 @@ struct Checkpoint {
     this->port = port;
   }
 
+  bool hasPartialBlockInfo() const {
+    return (hasSeqId && lastBlockSeqId >= 0 && lastBlockReceivedBytes > 0);
+  }
+
   void resetLastBlockDetails() {
     lastBlockReceivedBytes = 0;
-    lastBlockSeqId = -1;
+    lastBlockSeqId = 0;  // was -1 in 1.26
     lastBlockOffset = 0;
   }
 
@@ -248,6 +264,8 @@ class Protocol {
   static const int INCREMENTAL_TAG_VERIFICATION_VERSION;
   /// version from which file deletion was supported for resumption
   static const int DELETE_CMD_VERSION;
+  /// version from which we switched varint to better one
+  static const int VARINT_CHANGE;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
@@ -270,6 +288,9 @@ class Protocol {
     ENCRYPTION_CMD = 0x65,  // (e)ncryption
   };
 
+  // TODO: move the rest of those definitions closer to where they need to be
+  // correct, ie in cpp like kAbortLength and kChunksCmdLen
+
   /// Max size of sender or receiver id
   static const int64_t kMaxTransferIdLength = 50;
   /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 4
@@ -289,11 +310,11 @@ class Protocol {
   /// for tag
   static const int64_t kMaxFooter = 1 + 1 + 16;
   /// max size of chunks cmd
-  static const int64_t kChunksCmdLen = sizeof(int64_t) + sizeof(int64_t);
+  static const int64_t kChunksCmdLen;
   /// max size of chunkInfo encoding length
   static const int64_t kMaxChunkEncodeLen = 20;
   /// abort cmd length
-  static const int64_t kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
+  static const int64_t kAbortLength;
   /// max size of version encoding
   static const int64_t kMaxVersion = 10;
   /// max size of encryption cmd(1 byte for cmd, 1 byte for
@@ -329,7 +350,7 @@ class Protocol {
   /// encodes blockDetails into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
+  static bool encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
                            int64_t max, const BlockDetails &blockDetails);
 
   /// decodes from src+off and consumes/moves off but not past max
@@ -341,7 +362,7 @@ class Protocol {
   /// encodes checkpoints into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeCheckpoints(int protocolVersion, char *dest, int64_t &off,
+  static bool encodeCheckpoints(int protocolVersion, char *dest, int64_t &off,
                                 int64_t max,
                                 const std::vector<Checkpoint> &checkpoints);
 
@@ -355,7 +376,7 @@ class Protocol {
   /// encodes numBlocks, totalBytes into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeDone(int protocolVersion, char *dest, int64_t &off,
+  static bool encodeDone(int protocolVersion, char *dest, int64_t &off,
                          int64_t max, int64_t numBlocks, int64_t totalBytes);
 
   /// decodes from src+off and consumes/moves off but not past max
@@ -367,7 +388,7 @@ class Protocol {
   /// encodes settings into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeSettings(int senderProtocolVersion, char *dest,
+  static bool encodeSettings(int senderProtocolVersion, char *dest,
                              int64_t &off, int64_t max,
                              const Settings &settings);
 
@@ -386,7 +407,7 @@ class Protocol {
   /// encodes encryption info into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeEncryptionSettings(char *dest, int64_t &off, int64_t max,
+  static bool encodeEncryptionSettings(char *dest, int64_t &off, int64_t max,
                                        const EncryptionType encryptionType,
                                        const std::string &iv);
 
@@ -400,7 +421,7 @@ class Protocol {
   /// encodes totalNumBytes into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeSize(char *dest, int64_t &off, int64_t max,
+  static bool encodeSize(char *dest, int64_t &off, int64_t max,
                          int64_t totalNumBytes);
 
   /// decodes from src+off and consumes/moves off but not past max
@@ -412,7 +433,7 @@ class Protocol {
   /// encodes checksum or tag into dest+off
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
-  static void encodeFooter(char *dest, int64_t &off, int64_t max,
+  static bool encodeFooter(char *dest, int64_t &off, int64_t max,
                            int32_t checksum, const std::string &tag);
 
   /// decodes from src+off and consumes/moves off but not past max
@@ -423,44 +444,45 @@ class Protocol {
 
   /// encodes protocolVersion, errCode and checkpoint into dest+off
   /// moves the off into dest pointer
-  static void encodeAbort(char *dest, int64_t &off, int32_t protocolVersion,
-                          ErrorCode errCode, int64_t checkpoint);
+  static bool encodeAbort(char *dest, int64_t &off, int64_t max,
+                          int32_t protocolVersion, ErrorCode errCode,
+                          int64_t checkpoint);
 
   /// decodes from src+off and consumes/moves off
   /// sets protocolversion, errcode, checkpoint
-  static void decodeAbort(char *src, int64_t &off, int32_t &protocolVersion,
-                          ErrorCode &errCode, int64_t &checkpoint);
+  static bool decodeAbort(char *src, int64_t &off, int64_t max,
+                          int32_t &protocolVersion, ErrorCode &errCode,
+                          int64_t &checkpoint);
 
   /// encodes bufSize and numFiles into dest+off
   /// moves the off into dest pointer
-  static void encodeChunksCmd(char *dest, int64_t &off, int64_t bufSize,
-                              int64_t numFiles);
+  static bool encodeChunksCmd(char *dest, int64_t &off, int64_t max,
+                              int64_t bufSize, int64_t numFiles);
 
   /// decodes from src+off and consumes/moves off
   /// sets bufSize and numFiles
-  static void decodeChunksCmd(char *src, int64_t &off, int64_t &bufSize,
-                              int64_t &numFiles);
+  static bool decodeChunksCmd(char *src, int64_t &off, int64_t max,
+                              int64_t &bufSize, int64_t &numFiles);
 
   /// encodes chunk into dest+off
   /// moves the off into dest pointer
-  static void encodeChunkInfo(char *dest, int64_t &off, int64_t max,
+  static bool encodeChunkInfo(char *dest, int64_t &off, int64_t max,
                               const Interval &chunk);
 
   /// decodes from src+off and consumes/moves off
   /// sets chunk
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeChunkInfo(folly::ByteRange &br, char *src, int64_t max,
-                              Interval &chunk);
+  static bool decodeChunkInfo(folly::ByteRange &br, Interval &chunk);
 
   /// encodes fileChunksInfo into dest+off
   /// moves the off into dest pointer
-  static void encodeFileChunksInfo(char *dest, int64_t &off, int64_t max,
+  static bool encodeFileChunksInfo(char *dest, int64_t &off, int64_t max,
                                    const FileChunksInfo &fileChunksInfo);
 
   /// decodes from src+off and consumes/moves off
   /// sets fileChunksInfo
   /// @return false if there isn't enough data in src+off to src+max
-  static bool decodeFileChunksInfo(folly::ByteRange &br, char *src, int64_t max,
+  static bool decodeFileChunksInfo(folly::ByteRange &br,
                                    FileChunksInfo &fileChunksInfo);
 
   /**

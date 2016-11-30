@@ -17,7 +17,6 @@
 #include <utility>
 
 #include <fcntl.h>
-#include <folly/Memory.h>
 #include <regex>
 
 // NOTE: this should remain standalone code and not use WdtOptions directly
