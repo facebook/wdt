@@ -457,10 +457,18 @@ ReceiverState ReceiverThread::processFileCmd() {
       threadStats_.addEffectiveBytes(headerBytes, writer.getTotalWritten());
     }
   });
-  if (writer.open() != OK) {
-    threadStats_.setLocalErrorCode(FILE_WRITE_ERROR);
-    return SEND_ABORT_CMD;
+
+  // writer.open() deletes files if status == TO_BE_DELETED
+  // therefore if !(!delete_extra_files && status == TO_BE_DELETED)
+  // we should skip writer.open() call altogether
+  if (options_.delete_extra_files ||
+      blockDetails.allocationStatus != TO_BE_DELETED) {
+    if (writer.open() != OK) {
+      threadStats_.setLocalErrorCode(FILE_WRITE_ERROR);
+      return SEND_ABORT_CMD;
+    }
   }
+
   int32_t checksum = 0;
   int64_t remainingData = numRead_ + oldOffset_ - off_;
   int64_t toWrite = remainingData;

@@ -179,6 +179,10 @@ struct WdtTransferRequest {
   /// Use fileInfo even if empty (don't use the directory exploring)
   bool disableDirectoryTraversal{false};
 
+  // download resumption is enabled on the receiver side
+  // and is requested from the sender
+  bool downloadResumptionEnabled{false};
+
   /// Any error associated with this transfer request upon processing
   ErrorCode errorCode{OK};
 
@@ -230,6 +234,7 @@ struct WdtTransferRequest {
   const static std::string ENCRYPTION_PARAM;
   const static std::string NAMESPACE_PARAM;
   const static std::string DEST_IDENTIFIER_PARAM;
+  const static std::string DOWNLOAD_RESUMPTION_PARAM;
 
   /// Get ports vector from startPort and numPorts
   static std::vector<int32_t> genPortsVector(int32_t startPort,

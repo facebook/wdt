@@ -134,6 +134,10 @@ const WdtTransferRequest &Receiver::init() {
   // This creates the destination directory (which is needed for transferLogMgr)
   fileCreator_.reset(new FileCreator(
       getDirectory(), numThreads, *transferLogManager_, options_.skip_writes));
+
+  transferRequest_.downloadResumptionEnabled =
+      options_.enable_download_resumption;
+
   // Make sure we can get the lock on the transfer log manager early
   // so if we can't we don't generate a valid but useless url and end up
   // starting a sender doomed to fail

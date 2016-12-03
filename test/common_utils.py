@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
 import os
 import hashlib
 import difflib
@@ -252,6 +248,14 @@ def get_source_dir():
     return root_dir + "/src/"
 
 
+def get_dest_dir():
+    return os.path.join(root_dir, "dst{0}".format(test_count))
+
+
+def get_test_count():
+    return test_count
+
+
 def generate_random_files(total_size):
     src_dir = get_source_dir()
     print(
@@ -288,6 +292,8 @@ def create_md5_for_directory(src_dir, md5_file_name):
     lines = []
     for root, dirs, files in os.walk(src_dir):
         for file in files:
+            if file == ".wdt.log":
+                continue
             full_path = os.path.join(root, file)
             md5 = get_md5_for_file(full_path)
             lines.append("{0} {1}".format(md5, file))

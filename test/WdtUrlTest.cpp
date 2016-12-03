@@ -287,6 +287,36 @@ TEST(RequestSerializationTest, UrlTests) {
     auto retTransferRequest = receiver.init();
     EXPECT_EQ(retTransferRequest.errorCode, ERROR);
   }
+  {
+    string uri = "wdt://localhost?dr=1";
+    WdtTransferRequest transferRequest(uri);
+    ASSERT_TRUE(transferRequest.downloadResumptionEnabled);
+  }
+  {
+    string uri = "wdt://localhost?dr=0";
+    WdtTransferRequest transferRequest(uri);
+    ASSERT_TRUE(!transferRequest.downloadResumptionEnabled);
+  }
+  {
+    string uri = "wdt://localhost?jimmy=1";
+    WdtTransferRequest transferRequest(uri);
+    ASSERT_TRUE(!transferRequest.downloadResumptionEnabled);
+  }
+  {
+    for (int i = 0; i < 2; i++) {
+      WdtTransferRequest transferRequest1(55000, 1, "");
+      transferRequest1.hostName = "localhost";
+      transferRequest1.downloadResumptionEnabled = (bool)i;
+      WLOG(INFO) << "Download Resumption="
+                 << transferRequest1.downloadResumptionEnabled;
+      string serializedString = transferRequest1.genWdtUrlWithSecret();
+      WLOG(INFO) << "serialized string=" << serializedString;
+      WdtTransferRequest transferRequest(serializedString);
+      Receiver receiver(transferRequest);
+      transferRequest = receiver.init();
+      EXPECT_EQ(transferRequest.downloadResumptionEnabled, (bool)i);
+    }
+  }
 }
 
 TEST(RequestSerializationTest, TransferIdGenerationTest) {
