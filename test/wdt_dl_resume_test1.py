@@ -19,7 +19,7 @@ test_count = get_test_count()
 start_time = time.time()
 start_receiver("-num_ports=1 -avg_mbytes_per_sec=10 -enable_download_resumption -abort_after_seconds=7 -delete_extra_files=true")
 run_sender("-avg_mbytes_per_sec=10 -block_size_mbytes=1")
-check_transfer_status(True, True)
+check_transfer_status(expect_failed=True, check_receiver=True)
 dur1 = time.time() - start_time
 start_time = time.time()
 start_receiver("-num_ports=1 -avg_mbytes_per_sec=10 -enable_download_resumption -delete_extra_files=true")
