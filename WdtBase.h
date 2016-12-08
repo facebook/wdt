@@ -29,7 +29,7 @@ namespace wdt {
 
 /**
  * Shared code/functionality between Receiver and Sender
- * TODO: a lot more code from sender/receiver should move here
+ * TODO: check if more of Receiver/Sender should move here
  */
 class WdtBase {
  public:

@@ -4,6 +4,7 @@
 # run this once and then _run will run a loop and email results
 echo "if sending email later fails, you might need:"
 echo "sudo sed -ie 's#^\(mailhub\).*$#\1=localhost#' /etc/ssmtp/ssmtp.conf"
+echo "but that shouldn't be necessary anymore"
 set -x
 sudo yum install iproute-tc devtoolset-4-gcc-c++ automake autoconf boost-devel
 export PATH=/opt/rh/devtoolset-4/root/bin:$PATH

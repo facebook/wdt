@@ -311,7 +311,10 @@ ErrorCode Sender::start() {
   WLOG(INFO) << "Client (sending) to " << getDestination() << ", Using ports [ "
              << transferRequest_.ports << "]";
   startTime_ = Clock::now();
-  downloadResumptionEnabled_ = options_.enable_download_resumption;
+  downloadResumptionEnabled_ = (transferRequest_.downloadResumptionEnabled ||
+                                options_.enable_download_resumption);
+  bool deleteExtraFiles = (transferRequest_.downloadResumptionEnabled ||
+                           options_.delete_extra_files);
   if (!progressReporter_) {
     WVLOG(1) << "No progress reporter provided, making a default one";
     progressReporter_ = std::make_unique<ProgressReporter>(transferRequest_);
@@ -331,7 +334,7 @@ ErrorCode Sender::start() {
   // TODO: fix this ! use transferRequest! (and dup from Receiver)
   senderThreads_ = threadsController_->makeThreads<Sender, SenderThread>(
       this, transferRequest_.ports.size(), transferRequest_.ports);
-  if (downloadResumptionEnabled_ && options_.delete_extra_files) {
+  if (downloadResumptionEnabled_ && deleteExtraFiles) {
     if (getProtocolVersion() >= Protocol::DELETE_CMD_VERSION) {
       dirQueue_->enableFileDeletion();
     } else {

@@ -282,6 +282,7 @@ const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
 const string WdtTransferRequest::ENCRYPTION_PARAM{"enc"};
 const string WdtTransferRequest::NAMESPACE_PARAM{"ns"};
 const string WdtTransferRequest::DEST_IDENTIFIER_PARAM{"dstid"};
+const string WdtTransferRequest::DOWNLOAD_RESUMPTION_PARAM{"dr"};
 
 WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
                                        const string& directory) {
@@ -312,6 +313,17 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
       errorCode = getMoreInterestingError(code, errorCode);
     }
   }
+  string downloadResume = wdtUri.getQueryParam(DOWNLOAD_RESUMPTION_PARAM);
+  try {
+    if (!downloadResume.empty()) {
+      downloadResumptionEnabled = folly::to<bool>(downloadResume);
+    }
+  } catch (std::exception& e) {
+    WLOG(ERROR) << "Error parsing download resume " << downloadResume << " "
+                << e.what();
+    errorCode = URI_PARSE_ERROR;
+  }
+
   const string recpv = wdtUri.getQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM);
   if (recpv.empty()) {
     WLOG(WARNING) << RECEIVER_PROTOCOL_VERSION_PARAM << " not specified in URI";
@@ -402,6 +414,10 @@ string WdtTransferRequest::generateUrlInternal(bool genFull,
   wdtUri.setQueryParam(DEST_IDENTIFIER_PARAM, destIdentifier);
   wdtUri.setQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
+  if (downloadResumptionEnabled) {
+    wdtUri.setQueryParam(DOWNLOAD_RESUMPTION_PARAM,
+                         folly::to<string>(downloadResumptionEnabled));
+  }
   serializePorts(wdtUri);
   if (genFull) {
     wdtUri.setQueryParam(DIRECTORY_PARAM, directory);
