@@ -38,7 +38,8 @@ cat <<EOF
     "user": "ldemailly",
     "capabilities": {
         "vcs": "fbcode-fbsource",
-        "type": "lego-mac"
+        "type": "lego-mac",
+        "xcode": "stable"
     },
     "args": {
         "name": "wdt-opensource-mac",
