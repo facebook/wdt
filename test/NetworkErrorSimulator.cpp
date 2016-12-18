@@ -7,7 +7,6 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <glog/logging.h>
-#include <stdlib.h>
 #include <sys/socket.h>
 #include <wdt/WdtOptions.h>
 #include <wdt/test/TestCommon.h>
