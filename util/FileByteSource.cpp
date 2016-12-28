@@ -38,7 +38,7 @@ int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
                << "for " << filename;
       int ret = fcntl(fd, F_NOCACHE, 1);
       if (ret) {
-        PLOG(ERROR) << "Not able to set F_NOCACHE";
+        WPLOG(ERROR) << "Not able to set F_NOCACHE";
       }
 #else
       WDT_CHECK(false)
@@ -48,7 +48,7 @@ int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
 #endif
     }
   } else {
-    PLOG(ERROR) << "Error opening file " << filename;
+    WPLOG(ERROR) << "Error opening file " << filename;
   }
   return fd;
 }
@@ -124,11 +124,11 @@ char *FileByteSource::read(int64_t &size) {
     numRead = ::pread(fd_, buffer->getData(), physicalRead, seekPos);
   }
   if (numRead < 0) {
-    PLOG(ERROR) << "Failure while reading file " << metadata_->fullPath
-                << " need align " << alignedReadNeeded_ << " physicalRead "
-                << physicalRead << " offset " << offset_ << " seepPos "
-                << seekPos << " offsetRemainder " << offsetRemainder
-                << " bytesRead " << bytesRead_;
+    WPLOG(ERROR) << "Failure while reading file " << metadata_->fullPath
+                 << " need align " << alignedReadNeeded_ << " physicalRead "
+                 << physicalRead << " offset " << offset_ << " seepPos "
+                 << seekPos << " offsetRemainder " << offsetRemainder
+                 << " bytesRead " << bytesRead_;
     this->close();
     transferStats_.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
     return nullptr;
@@ -173,8 +173,8 @@ void FileByteSource::clearPageCache() {
   if (bytesRead_ > 0 && !options.skip_fadvise) {
     PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FADVISE);
     if (posix_fadvise(fd_, offset_, bytesRead_, POSIX_FADV_DONTNEED) != 0) {
-      PLOG(ERROR) << "posix_fadvise failed for " << getIdentifier() << " "
-                  << offset_ << " " << bytesRead_;
+      WPLOG(ERROR) << "posix_fadvise failed for " << getIdentifier() << " "
+                   << offset_ << " " << bytesRead_;
     }
   }
 #endif

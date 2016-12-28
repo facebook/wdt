@@ -33,7 +33,7 @@ void ServerSocket::closeAllNoCheck() {
     if (listeningFd >= 0) {
       int ret = ::close(listeningFd);
       if (ret != 0) {
-        PLOG(ERROR)
+        WPLOG(ERROR)
             << "Error closing listening fd for server socket. listeningFd: "
             << listeningFd << " port: " << port_;
       }
@@ -53,29 +53,30 @@ int ServerSocket::listenInternal(struct addrinfo *info,
   int listeningFd =
       socket(info->ai_family, info->ai_socktype, info->ai_protocol);
   if (listeningFd == -1) {
-    PLOG(WARNING) << "Error making server socket " << host << " " << port_;
+    WPLOG(WARNING) << "Error making server socket " << host << " " << port_;
     return -1;
   }
   setReceiveBufferSize(listeningFd);
   int optval = 1;
   if (setsockopt(listeningFd, SOL_SOCKET, SO_REUSEADDR, &optval,
                  sizeof(optval)) != 0) {
-    PLOG(ERROR) << "Unable to set SO_REUSEADDR option " << host << " " << port_;
+    WPLOG(ERROR) << "Unable to set SO_REUSEADDR option " << host << " "
+                 << port_;
   }
   if (info->ai_family == AF_INET6) {
     // for ipv6 address, turn on ipv6 only flag
     if (setsockopt(listeningFd, IPPROTO_IPV6, IPV6_V6ONLY, &optval,
                    sizeof(optval)) != 0) {
-      PLOG(ERROR) << "Unable to set IPV6_V6ONLY flag " << host << " " << port_;
+      WPLOG(ERROR) << "Unable to set IPV6_V6ONLY flag " << host << " " << port_;
     }
   }
   if (bind(listeningFd, info->ai_addr, info->ai_addrlen)) {
-    PLOG(WARNING) << "Error binding " << host << " " << port_;
+    WPLOG(WARNING) << "Error binding " << host << " " << port_;
     ::close(listeningFd);
     return -1;
   }
   if (::listen(listeningFd, backlog_)) {
-    PLOG(ERROR) << "listen error for port " << host << " " << port_;
+    WPLOG(ERROR) << "listen error for port " << host << " " << port_;
     ::close(listeningFd);
     return -1;
   }
@@ -90,7 +91,7 @@ int ServerSocket::getSelectedPortAndNewAddress(int listeningFd,
   struct sockaddr_in sin;
   socklen_t len = sizeof(sin);
   if (getsockname(listeningFd, (struct sockaddr *)&sin, &len) == -1) {
-    PLOG(ERROR) << "getsockname failed " << host;
+    WPLOG(ERROR) << "getsockname failed " << host;
     return -1;
   }
   port = ntohs(sin.sin_port);
@@ -136,7 +137,7 @@ ErrorCode ServerSocket::listen() {
   std::string portStr = folly::to<std::string>(port_);
   int res = getaddrinfo(nullptr, portStr.c_str(), &sa, &infoList);
   if (res) {
-    // not errno, can't use PLOG (perror)
+    // not errno, can't use WPLOG (perror)
     WLOG(ERROR) << "Failed getaddrinfo ai_passive on " << port_ << " : " << res
                 << " : " << gai_strerror(res);
     return CONN_ERROR;
@@ -248,8 +249,8 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
                << ", listening fds : " << listeningFds_;
       continue;
     }
-    PLOG(ERROR) << "poll() failed on port : " << port_
-                << ", listening fds : " << listeningFds_;
+    WPLOG(ERROR) << "poll() failed on port : " << port_
+                 << ", listening fds : " << listeningFds_;
     return CONN_ERROR;
   }
 
@@ -268,7 +269,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
       socklen_t addrLen = sizeof(addr);
       fd_ = accept(pollFd.fd, (struct sockaddr *)&addr, &addrLen);
       if (fd_ < 0) {
-        PLOG(ERROR) << "accept error";
+        WPLOG(ERROR) << "accept error";
         return CONN_ERROR;
       }
       getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_, peerPort_);
@@ -291,8 +292,8 @@ void ServerSocket::setReceiveBufferSize(int fd) {
   int status =
       ::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bufSize, sizeof(bufSize));
   if (status != 0) {
-    PLOG(ERROR) << "Failed to set receive buffer " << port_ << " size "
-                << bufSize << " fd " << fd;
+    WPLOG(ERROR) << "Failed to set receive buffer " << port_ << " size "
+                 << bufSize << " fd " << fd;
     return;
   }
   WVLOG(1) << "Receive buffer size set to " << bufSize << " port " << port_;

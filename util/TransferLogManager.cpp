@@ -252,15 +252,15 @@ ErrorCode TransferLogManager::openLog() {
   fd_ = ::open(logPath.c_str(), O_RDWR);
   if (fd_ < 0) {
     if (errno != ENOENT) {
-      PLOG(ERROR) << "Could not open wdt log " << logPath;
+      WPLOG(ERROR) << "Could not open wdt log " << logPath;
       return TRANSFER_LOG_ACQUIRE_ERROR;
     } else {
       // creation of the log path (which can still be a race)
       WLOG(INFO) << logPath << " doesn't exist... creating...";
       fd_ = ::open(logPath.c_str(), O_CREAT | O_EXCL, 0644);
       if (fd_ < 0) {
-        PLOG(WARNING) << "Could not create wdt log (maybe ok if race): "
-                      << logPath;
+        WPLOG(WARNING) << "Could not create wdt log (maybe ok if race): "
+                       << logPath;
       } else {
         // On windows/cygwin for instance the flock will silently succeed yet
         // not lock on a newly created file... workaround is to close and reopen
@@ -268,16 +268,16 @@ ErrorCode TransferLogManager::openLog() {
       }
       fd_ = ::open(logPath.c_str(), O_RDWR);
       if (fd_ < 0) {
-        PLOG(ERROR) << "Still couldn't open wdt log after create attempt: "
-                    << logPath;
+        WPLOG(ERROR) << "Still couldn't open wdt log after create attempt: "
+                     << logPath;
         return TRANSFER_LOG_ACQUIRE_ERROR;
       }
     }
   }
   // try to acquire file lock
   if (::flock(fd_, LOCK_EX | LOCK_NB) != 0) {
-    PLOG(ERROR) << "Failed to acquire transfer log lock " << logPath << " "
-                << fd_;
+    WPLOG(ERROR) << "Failed to acquire transfer log lock " << logPath << " "
+                 << fd_;
     close();
     return TRANSFER_LOG_ACQUIRE_ERROR;
   }
@@ -305,13 +305,13 @@ ErrorCode TransferLogManager::checkLog() {
   const string fullLogName = getFullPath(kWdtLogName);
   struct stat stat1, stat2;
   if (stat(fullLogName.c_str(), &stat1)) {
-    PLOG(ERROR) << "CORRUPTION! Can't stat log file " << fullLogName
-                << " (deleted under us)";
+    WPLOG(ERROR) << "CORRUPTION! Can't stat log file " << fullLogName
+                 << " (deleted under us)";
     exit(TRANSFER_LOG_ACQUIRE_ERROR);
     return ERROR;
   }
   if (fstat(fd_, &stat2)) {
-    PLOG(ERROR) << "Unable to stat log by fd " << fd_;
+    WPLOG(ERROR) << "Unable to stat log by fd " << fd_;
     exit(TRANSFER_LOG_ACQUIRE_ERROR);
     return ERROR;
   }
@@ -332,7 +332,7 @@ void TransferLogManager::close() {
   }
   checkLog();
   if (::close(fd_) != 0) {
-    PLOG(ERROR) << "Failed to close wdt log " << fd_;
+    WPLOG(ERROR) << "Failed to close wdt log " << fd_;
   } else {
     WLOG(INFO) << "Transfer log closed";
   }
@@ -389,8 +389,8 @@ void TransferLogManager::writeEntriesToDisk() {
     int64_t toWrite = buffer.size();
     int64_t written = ::write(fd_, buffer.c_str(), toWrite);
     if (written != toWrite) {
-      PLOG(ERROR) << "Disk write error while writing transfer log " << written
-                  << " " << toWrite;
+      WPLOG(ERROR) << "Disk write error while writing transfer log " << written
+                   << " " << toWrite;
       return;
     }
   }
@@ -425,7 +425,7 @@ bool TransferLogManager::verifySenderIp(const string &curSenderIp) {
 void TransferLogManager::fsync() {
   WDT_CHECK(fd_ >= 0);
   if (::fsync(fd_) != 0) {
-    PLOG(ERROR) << "fsync failed for transfer log " << fd_;
+    WPLOG(ERROR) << "fsync failed for transfer log " << fd_;
   }
 }
 
@@ -440,7 +440,7 @@ void TransferLogManager::invalidateDirectory() {
       encoderDecoder_.encodeDirectoryInvalidationEntry(buf, sizeof(buf));
   int64_t written = ::write(fd_, buf, size);
   if (written != size) {
-    PLOG(ERROR)
+    WPLOG(ERROR)
         << "Disk write error while writing directory invalidation entry "
         << written << " " << size;
     closeLog();
@@ -461,8 +461,8 @@ void TransferLogManager::writeLogHeader() {
       buf, kMaxEntryLength, recoveryId_, senderIp_, config_);
   int64_t written = ::write(fd_, buf, size);
   if (written != size) {
-    PLOG(ERROR) << "Disk write error while writing log header " << written
-                << " " << size;
+    WPLOG(ERROR) << "Disk write error while writing log header " << written
+                 << " " << size;
     closeLog();
     return;
   }
@@ -532,7 +532,7 @@ void TransferLogManager::unlink() {
   WLOG(INFO) << "unlinking " << kWdtLogName;
   string fullLogName = getFullPath(kWdtLogName);
   if (::unlink(fullLogName.c_str()) != 0) {
-    PLOG(ERROR) << "Could not unlink " << fullLogName;
+    WPLOG(ERROR) << "Could not unlink " << fullLogName;
   }
 }
 
@@ -541,8 +541,8 @@ void TransferLogManager::renameBuggyLog() {
   WLOG(INFO) << "Renaming " << kWdtLogName << " to " << kWdtBuggyLogName;
   if (::rename(getFullPath(kWdtLogName).c_str(),
                getFullPath(kWdtBuggyLogName).c_str()) != 0) {
-    PLOG(ERROR) << "log rename failed " << kWdtLogName << " "
-                << kWdtBuggyLogName;
+    WPLOG(ERROR) << "log rename failed " << kWdtLogName << " "
+                 << kWdtBuggyLogName;
   }
   return;
 }
@@ -608,9 +608,9 @@ bool LogParser::writeFileInvalidationEntries(int fd,
         encoderDecoder_.encodeFileInvalidationEntry(buf, sizeof(buf), seqId);
     int64_t written = ::write(fd, buf, size);
     if (written != size) {
-      PLOG(ERROR) << "Disk write error while writing invalidation entry to "
-                     "transfer log "
-                  << written << " " << size;
+      WPLOG(ERROR) << "Disk write error while writing invalidation entry to "
+                      "transfer log "
+                   << written << " " << size;
       return false;
     }
   }
@@ -622,18 +622,18 @@ bool LogParser::truncateExtraBytesAtEnd(int fd, int64_t extraBytes) {
              << " bytes from the end of transfer log";
   struct stat statBuffer;
   if (fstat(fd, &statBuffer) != 0) {
-    PLOG(ERROR) << "fstat failed on fd " << fd;
+    WPLOG(ERROR) << "fstat failed on fd " << fd;
     return false;
   }
   off_t fileSize = statBuffer.st_size;
   if (::ftruncate(fd, fileSize - extraBytes) != 0) {
-    PLOG(ERROR) << "ftruncate failed for fd " << fd;
+    WPLOG(ERROR) << "ftruncate failed for fd " << fd;
     return false;
   }
   // ftruncate does not change the offset, so change the offset to the end of
   // the log
   if (::lseek(fd, fileSize - extraBytes, SEEK_SET) < 0) {
-    PLOG(ERROR) << "lseek failed for fd " << fd;
+    WPLOG(ERROR) << "lseek failed for fd " << fd;
     return false;
   }
   return true;
@@ -744,7 +744,7 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int64_t size) {
   string fullPath;
   folly::toAppend(rootDir_, fileName, &fullPath);
   if (stat(fullPath.c_str(), &buffer) != 0) {
-    PLOG(ERROR) << "stat failed for " << fileName;
+    WPLOG(ERROR) << "stat failed for " << fileName;
   } else {
     if (options_.shouldPreallocateFiles()) {
       sizeVerificationSuccess = (buffer.st_size >= fileSize);
@@ -919,8 +919,8 @@ ErrorCode LogParser::parseLog(int fd, string &senderIp,
     int64_t toRead = sizeof(int16_t);
     int64_t numRead = ::read(fd, &entrySize, toRead);
     if (numRead < 0) {
-      PLOG(ERROR) << "Error while reading transfer log " << numRead << " "
-                  << toRead;
+      WPLOG(ERROR) << "Error while reading transfer log " << numRead << " "
+                   << toRead;
       return INVALID_LOG;
     }
     if (numRead == 0) {
@@ -944,8 +944,8 @@ ErrorCode LogParser::parseLog(int fd, string &senderIp,
     }
     numRead = ::read(fd, entry, entrySize);
     if (numRead < 0) {
-      PLOG(ERROR) << "Error while reading transfer log " << numRead << " "
-                  << entrySize;
+      WPLOG(ERROR) << "Error while reading transfer log " << numRead << " "
+                   << entrySize;
       return INVALID_LOG;
     }
     if (numRead != entrySize) {

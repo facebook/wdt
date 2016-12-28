@@ -87,7 +87,8 @@ doesn't depend on that
 
 gtest (google testing) but only for tests
 
-glog (google logging library)
+glog (google logging library) - use W*LOG macros so everything logged by WDT
+is always prefixed by "wdt>" which helps when embedded in another service
 
 Parts of Facebook's Folly open source library (as set in the CMakefile)
 Mostly conv, threadlocal and checksum support.

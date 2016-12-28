@@ -232,7 +232,7 @@ const WdtTransferRequest &Receiver::init() {
     if (ret == 0) {
       transferRequest_.hostName.assign(hostName);
     } else {
-      PLOG(ERROR) << "Couldn't find the host name";
+      WPLOG(ERROR) << "Couldn't find the local host name";
       code = ERROR;
     }
   }

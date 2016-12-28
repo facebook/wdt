@@ -35,8 +35,8 @@ ErrorCode FileWriter::open() {
       ret = lseek(fd_, blockDetails_->offset, SEEK_SET);
     }
     if (ret < 0) {
-      PLOG(ERROR) << "Unable to seek to " << blockDetails_->offset << " for "
-                  << blockDetails_->fileName;
+      WPLOG(ERROR) << "Unable to seek to " << blockDetails_->offset << " for "
+                   << blockDetails_->fileName;
       close();
     }
   }
@@ -51,7 +51,7 @@ void FileWriter::close() {
   if (fd_ >= 0) {
     PerfStatCollector statCollector(threadCtx_, PerfStatReport::FILE_CLOSE);
     if (::close(fd_) != 0) {
-      PLOG(ERROR) << "Unable to close fd " << fd_;
+      WPLOG(ERROR) << "Unable to close fd " << fd_;
     }
     fd_ = -1;
   }
@@ -74,9 +74,9 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
                    << blockDetails_->fileName;
           continue;
         }
-        PLOG(ERROR) << "File write failed for " << blockDetails_->fileName
-                    << "fd : " << fd_ << " " << written << " " << count << " "
-                    << size;
+        WPLOG(ERROR) << "File write failed for " << blockDetails_->fileName
+                     << "fd : " << fd_ << " " << written << " " << count << " "
+                     << size;
         return FILE_WRITE_ERROR;
       }
       count += written;
@@ -87,10 +87,10 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
     if (finished && (options.isLogBasedResumption() || options.fsync)) {
       PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC_STATS);
       if (fsync(fd_) != 0) {
-        PLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
-                    << " offset " << blockDetails_->offset << " file-size "
-                    << blockDetails_->fileSize << " data-size "
-                    << blockDetails_->dataSize;
+        WPLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
+                     << " offset " << blockDetails_->offset << " file-size "
+                     << blockDetails_->fileSize << " data-size "
+                     << blockDetails_->dataSize;
         return FILE_WRITE_ERROR;
       }
       WVLOG(1) << "File " << blockDetails_->fileName << " fsync'ed";
@@ -102,9 +102,9 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
       PerfStatCollector statCollector(threadCtx_, PerfStatReport::FADVISE);
       if (posix_fadvise(fd_, blockDetails_->offset, blockDetails_->dataSize,
                         POSIX_FADV_DONTNEED) != 0) {
-        PLOG(ERROR) << "posix_fadvise failed for " << blockDetails_->fileName
-                    << " " << blockDetails_->offset << " "
-                    << blockDetails_->dataSize;
+        WPLOG(ERROR) << "posix_fadvise failed for " << blockDetails_->fileName
+                     << " " << blockDetails_->offset << " "
+                     << blockDetails_->dataSize;
       }
     }
 #endif
@@ -140,8 +140,8 @@ void FileWriter::syncFileRange(int64_t written, bool forced) {
                                SYNC_FILE_RANGE_WRITE);
     }
     if (status != 0) {
-      PLOG(ERROR) << "sync_file_range() failed for " << blockDetails_->fileName
-                  << "fd " << fd_;
+      WPLOG(ERROR) << "sync_file_range() failed for " << blockDetails_->fileName
+                   << "fd " << fd_;
       return;
     }
     WVLOG(1) << "file range [" << nextSyncOffset_ << " "

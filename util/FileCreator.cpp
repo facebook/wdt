@@ -21,7 +21,7 @@ namespace wdt {
 bool FileCreator::setFileSize(ThreadCtx &threadCtx, int fd, int64_t fileSize) {
   struct stat fileStat;
   if (fstat(fd, &fileStat) != 0) {
-    PLOG(ERROR) << "fstat() failed for " << fd;
+    WPLOG(ERROR) << "fstat() failed for " << fd;
     return false;
   }
   if (fileStat.st_size > fileSize) {
@@ -29,7 +29,7 @@ bool FileCreator::setFileSize(ThreadCtx &threadCtx, int fd, int64_t fileSize) {
     int64_t sizeToTruncate =
         (threadCtx.getOptions().shouldPreallocateFiles() ? fileSize : 0);
     if (ftruncate(fd, sizeToTruncate) != 0) {
-      PLOG(ERROR) << "ftruncate() failed for " << fd << " " << sizeToTruncate;
+      WPLOG(ERROR) << "ftruncate() failed for " << fd << " " << sizeToTruncate;
       return false;
     }
   }
@@ -134,7 +134,7 @@ int FileCreator::openForBlocks(ThreadCtx &threadCtx,
       status = ::unlink(path.c_str());
     }
     if (status != 0) {
-      PLOG(ERROR) << "Failed to delete file " << path;
+      WPLOG(ERROR) << "Failed to delete file " << path;
     } else {
       WLOG(INFO) << "Successfully deleted file " << path;
     }
@@ -190,7 +190,7 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
     res = open(path.c_str(), openFlags, 0644);
   }
   if (res < 0) {
-    PLOG(ERROR) << "failed opening file " << path;
+    WPLOG(ERROR) << "failed opening file " << path;
     return -1;
   }
   WVLOG(1) << "successfully opened file " << path;
@@ -259,11 +259,11 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
   }
   if (res < 0) {
     if (dir.empty()) {
-      PLOG(ERROR) << "failed creating file " << path;
+      WPLOG(ERROR) << "failed creating file " << path;
       return -1;
     }
-    PLOG(ERROR) << "failed creating file " << path << ", trying to "
-                << "force directory creation";
+    WPLOG(ERROR) << "failed creating file " << path << ", trying to "
+                 << "force directory creation";
     bool dirSuccess;
     {
       PerfStatCollector statCollector(threadCtx,
@@ -279,7 +279,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
       res = open(path.c_str(), openFlags, 0644);
     }
     if (res < 0) {
-      PLOG(ERROR) << "failed creating file " << path;
+      WPLOG(ERROR) << "failed creating file " << path;
       return -1;
     }
   }
@@ -313,7 +313,7 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
   std::string fullDirPath = getFullPath(dir);
   int code = mkdir(fullDirPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   if (code != 0 && errno != EEXIST && errno != EISDIR) {
-    PLOG(ERROR) << "failed to make directory " << fullDirPath;
+    WPLOG(ERROR) << "failed to make directory " << fullDirPath;
     return false;
   } else if (code != 0) {
     WLOG(INFO) << "dir already exists " << fullDirPath;

@@ -170,7 +170,7 @@ DirectorySourceQueue::~DirectorySourceQueue() {
     if (fileData->needToClose && fileData->fd >= 0) {
       int ret = ::close(fileData->fd);
       if (ret) {
-        PLOG(ERROR) << "Failed to close file " << fileData->fullPath;
+        WPLOG(ERROR) << "Failed to close file " << fileData->fullPath;
       }
     }
     delete fileData;
@@ -227,7 +227,7 @@ string DirectorySourceQueue::resolvePath(const string &path) {
   string result;
   char *resolvedPath = realpath(path.c_str(), nullptr);
   if (!resolvedPath) {
-    PLOG(ERROR) << "Couldn't resolve " << path;
+    WPLOG(ERROR) << "Couldn't resolve " << path;
     return result;  // empty string == error
   }
   result.assign(resolvedPath);
@@ -262,7 +262,7 @@ bool DirectorySourceQueue::explore() {
     WVLOG(1) << "Processing directory " << fullPath;
     DIR *dirPtr = opendir(fullPath.c_str());
     if (!dirPtr) {
-      PLOG(ERROR) << "Error opening dir " << fullPath;
+      WPLOG(ERROR) << "Error opening dir " << fullPath;
       failedDirectories_.emplace_back(fullPath);
       hasError = true;
       continue;
@@ -279,7 +279,7 @@ bool DirectorySourceQueue::explore() {
       dirEntryRes = readdir(dirPtr);
       if (!dirEntryRes) {
         if (errno) {
-          PLOG(ERROR) << "Error reading dir " << fullPath;
+          WPLOG(ERROR) << "Error reading dir " << fullPath;
           // closedir always called
           hasError = true;
         } else {
@@ -321,7 +321,7 @@ bool DirectorySourceQueue::explore() {
         // On XFS we don't know yet if this is a symlink, so check
         // if following symlinks is ok we will do stat() too
         if (lstat(newFullPath.c_str(), &fileStat) != 0) {
-          PLOG(ERROR) << "lstat() failed on path " << newFullPath;
+          WPLOG(ERROR) << "lstat() failed on path " << newFullPath;
           hasError = true;
           continue;
         }
@@ -331,7 +331,7 @@ bool DirectorySourceQueue::explore() {
           // Use stat to see if the pointed file is of the right type
           // (overrides previous stat call result)
           if (stat(newFullPath.c_str(), &fileStat) != 0) {
-            PLOG(ERROR) << "stat() failed on path " << newFullPath;
+            WPLOG(ERROR) << "stat() failed on path " << newFullPath;
             hasError = true;
             continue;
           }
@@ -560,7 +560,7 @@ bool DirectorySourceQueue::enqueueFiles() {
     if (info.fileSize < 0) {
       struct stat fileStat;
       if (stat(fullPath.c_str(), &fileStat) != 0) {
-        PLOG(ERROR) << "stat failed on path " << fullPath;
+        WPLOG(ERROR) << "stat failed on path " << fullPath;
         return false;
       }
       info.fileSize = fileStat.st_size;

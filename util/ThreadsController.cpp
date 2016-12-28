@@ -31,8 +31,8 @@ void ConditionGuardImpl::wait(int timeoutMillis, const ThreadCtx &threadCtx) {
     }
     // check for abort
     if (threadCtx.getAbortChecker()->shouldAbort()) {
-      LOG(ERROR) << "Transfer aborted during condition guard wait "
-                 << threadCtx.getThreadIndex();
+      WLOG(ERROR) << "Transfer aborted during condition guard wait "
+                  << threadCtx.getThreadIndex();
       return;
     }
     remainingTime -= waitTime;
