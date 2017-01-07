@@ -529,13 +529,31 @@ void Receiver::fixAndCloseTransferLog(bool transferSuccess) {
     WDT_CHECK(options_.resume_using_dir_tree);
     transferLogManager_->writeLogHeader();
   }
+
+  if (options_.enable_transfer_log_compaction && transferSuccess &&
+      !isInvalidLog && options_.keep_transfer_log &&
+      !options_.resume_using_dir_tree) {
+    transferLogManager_->compactLog();
+  } else {
+    WLOG(INFO) << "Skip compacting transfer log";
+    WVLOG(1) << "options_.enable_transfer_log_compaction="
+             << options_.enable_transfer_log_compaction
+             << " isInvalidLog=" << isInvalidLog
+             << " options_.keep_transfer_log=" << options_.keep_transfer_log
+             << " options_.resume_using_dir_tree="
+             << options_.resume_using_dir_tree;
+  }
+
   transferLogManager_->closeLog();
+
   if (!transferSuccess) {
     return;
   }
+
   if (isInvalidLog) {
     transferLogManager_->renameBuggyLog();
   }
+
   if (!options_.keep_transfer_log) {
     transferLogManager_->unlink();
   }

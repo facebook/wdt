@@ -291,10 +291,23 @@ ErrorCode TransferLogManager::startThread() {
     if (resumptionStatus_ != OK) {
       return resumptionStatus_;
     }
-    writerThread_ = std::thread(&TransferLogManager::writeEntriesToDisk, this);
+    writerThread_ =
+        std::thread(&TransferLogManager::threadProcWriteEntriesToDisk, this);
     WLOG(INFO) << "Log writer thread started";
   }
   return OK;
+}
+
+void TransferLogManager::shutdownThread() {
+  if (writerThread_.joinable()) {
+    // stop writer thread
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      finished_ = true;
+    }
+    conditionFinished_.notify_one();
+    writerThread_.join();
+  }
 }
 
 ErrorCode TransferLogManager::checkLog() {
@@ -343,14 +356,8 @@ void TransferLogManager::closeLog() {
   if (fd_ < 0) {
     return;
   }
-  if (!options_.resume_using_dir_tree && writerThread_.joinable()) {
-    // stop writer thread
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      finished_ = true;
-    }
-    conditionFinished_.notify_one();
-    writerThread_.join();
+  if (!options_.resume_using_dir_tree) {
+    shutdownThread();
   }
   close();
 }
@@ -359,10 +366,33 @@ TransferLogManager::~TransferLogManager() {
   WDT_CHECK_LT(fd_, 0) << "Destructor called, but transfer log not closed";
 }
 
-void TransferLogManager::writeEntriesToDisk() {
+bool TransferLogManager::writeEntriesToDiskNoLock(
+    const std::vector<std::string> &entries) {
+  string buffer;
+  // write entries to disk
+  for (const auto &entry : entries) {
+    buffer.append(entry);
+  }
+  if (buffer.empty()) {
+    // do not write when there is nothing to write
+    return true;
+  }
+  int64_t toWrite = buffer.size();
+  int64_t written = ::write(fd_, buffer.c_str(), toWrite);
+  if (written != toWrite) {
+    WPLOG(ERROR) << "Disk write error while writing transfer log " << written
+                 << " " << toWrite;
+    return false;
+  }
+
+  return true;
+}
+
+void TransferLogManager::threadProcWriteEntriesToDisk() {
   WDT_CHECK(fd_ >= 0) << "Writer thread started before the log is opened";
   WLOG(INFO) << "Transfer log writer thread started";
   WDT_CHECK(options_.transfer_log_write_interval_ms >= 0);
+
   auto waitingTime =
       std::chrono::milliseconds(options_.transfer_log_write_interval_ms);
   std::vector<string> entries;
@@ -370,6 +400,10 @@ void TransferLogManager::writeEntriesToDisk() {
   while (!finished) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
+      // conditionFinished_ will put writer thread to sleep. However, writer
+      // thread wakes up at interval of "watingTime" (in ms) to write log
+      // entries to disk. When "shutdownThread" is called, writer thread will
+      // wake up immediately and exit after writing current log entries to disk
       conditionFinished_.wait_for(lock, waitingTime);
       finished = finished_;
       // make a copy of all the entries so that we do not need to hold lock
@@ -377,20 +411,8 @@ void TransferLogManager::writeEntriesToDisk() {
       entries = entries_;
       entries_.clear();
     }
-    string buffer;
-    // write entries to disk
-    for (const auto &entry : entries) {
-      buffer.append(entry);
-    }
-    if (buffer.empty()) {
-      // do not write when there is nothing to write
-      continue;
-    }
-    int64_t toWrite = buffer.size();
-    int64_t written = ::write(fd_, buffer.c_str(), toWrite);
-    if (written != toWrite) {
-      WPLOG(ERROR) << "Disk write error while writing transfer log " << written
-                   << " " << toWrite;
+
+    if (!writeEntriesToDiskNoLock(entries)) {
       return;
     }
   }
@@ -422,7 +444,7 @@ bool TransferLogManager::verifySenderIp(const string &curSenderIp) {
   return verifySuccessful;
 }
 
-void TransferLogManager::fsync() {
+void TransferLogManager::fsyncLog() {
   WDT_CHECK(fd_ >= 0);
   if (::fsync(fd_) != 0) {
     WPLOG(ERROR) << "fsync failed for transfer log " << fd_;
@@ -445,7 +467,7 @@ void TransferLogManager::invalidateDirectory() {
         << written << " " << size;
     closeLog();
   }
-  fsync();
+  fsyncLog();
   return;
 }
 
@@ -466,7 +488,7 @@ void TransferLogManager::writeLogHeader() {
     closeLog();
     return;
   }
-  fsync();
+  fsyncLog();
   // header signifies a valid directory state
   resumptionStatus_ = OK;
   headerWritten_ = true;
@@ -587,6 +609,92 @@ ErrorCode TransferLogManager::parseVerifyAndFix(
   WLOG(INFO) << "Transfer log parsing finished "
              << errorCodeToStr(resumptionStatus_);
   return resumptionStatus_;
+}
+
+void TransferLogManager::compactLog() {
+
+  auto fullLogPath = getFullPath(kWdtLogName);
+
+  WLOG(INFO) << "Started compacting transfer log " << fullLogPath;
+
+  if (fd_ <  0) {
+    WLOG(ERROR) << "Failed to compact transfer log because log handle has "
+                << "been closed";
+    return;
+  }
+
+
+  // Shutdown writer thread to avoid race conditon against fd_
+  shutdownThread();
+
+  // Make sure log data is flushed.
+  fsyncLog();
+
+  if (::lseek(fd_, 0, SEEK_SET) < 0) {
+    WPLOG(ERROR) << "lseek failed for fd " << fd_;
+    return;
+  }
+
+  std::vector<FileChunksInfo> fileChunksInfoVec;
+  auto code = parseAndMatch(recoveryId_, config_, fileChunksInfoVec);
+  if (code != OK) {
+    WLOG(ERROR) << "Failed to parse "
+                << fullLogPath << " "
+                << errorCodeToStr(code);
+    return;
+  }
+
+  for (const auto &fileChunksInfo : fileChunksInfoVec) {
+    // Found multiple chunks for a file.
+    if (fileChunksInfo.getChunks().size() != 1) {
+      WLOG(ERROR) << "File " << fileChunksInfo.getFileName()
+                  << " has fragemented log entries";
+      return;
+    }
+
+    if (fileChunksInfo.getTotalChunkSize() != fileChunksInfo.getFileSize()) {
+      WLOG(ERROR) << "File " << fileChunksInfo.getFileName()
+                  << " has mismatched total chunk size and file size";
+      return;
+    }
+  }
+
+  WLOG(INFO) << "Successfully verified transfer log integrity";
+
+  if (::ftruncate(fd_, 0) != 0) {
+    WPLOG(ERROR) << "ftruncate failed for fd " << fd_;
+    return;
+  }
+
+  if (::lseek(fd_, 0, SEEK_SET) < 0) {
+    WPLOG(ERROR) << "lseek failed for fd " << fd_;
+    return;
+  }
+
+  writeLogHeader();
+
+  for (const auto &fileChunksInfo : fileChunksInfoVec) {
+    addFileCreationEntry(fileChunksInfo.getFileName(),
+                         fileChunksInfo.getSeqId(),
+                         fileChunksInfo.getFileSize());
+    addBlockWriteEntry(fileChunksInfo.getSeqId(), 0,
+                       fileChunksInfo.getFileSize());
+  }
+
+  std::vector<string> entries;
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    entries = entries_;
+    entries_.clear();
+  }
+
+  bool writeSuccess = writeEntriesToDiskNoLock(entries);
+  if (writeSuccess) {
+    WLOG(INFO) << "Finished compacting transfer log";
+  } else {
+    WLOG(ERROR) << "Failed compacting transfer log";
+  }
 }
 
 LogParser::LogParser(const WdtOptions &options,

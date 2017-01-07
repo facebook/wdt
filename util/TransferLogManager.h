@@ -214,6 +214,9 @@ class TransferLogManager {
   /// renames .wdt.log to .wdt.log.bug
   void renameBuggyLog();
 
+  /// Compacts transfer log
+  void compactLog();
+
   /**
    * parses transfer log, does validation and fixes the log in case of partial
    * writes from previous transfer. Also parsed info is cached for later use and
@@ -240,16 +243,24 @@ class TransferLogManager {
   ~TransferLogManager();
 
  private:
+
+  /// Shutdown the log writer thread
+  void shutdownThread();
+
   std::string getFullPath(const std::string &relPath);
 
   /**
    * entry point for the writer thread. This thread periodically writes buffer
    * contents to disk
    */
-  void writeEntriesToDisk();
+  void threadProcWriteEntriesToDisk();
+
+  /// Write 'entries' to disk synchronously
+  /// return true if entries are written successfully, otherwise false.
+  bool writeEntriesToDiskNoLock(const std::vector<std::string> &entries);
 
   /// fsync transfer log
-  void fsync();
+  void fsyncLog();
 
   /// Check log or directory hasn't been removed under us
   /// TODO: consider calling periodically from the thread for early warning

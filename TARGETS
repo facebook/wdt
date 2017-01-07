@@ -488,6 +488,8 @@ wdt_py_test("wdt_protocol_negotiation_test")
 
 wdt_py_test("wdt_bad_server_test")
 
+wdt_py_test("wdt_transfer_log_compaction_test")
+
 wdt_sh_test("wdt_global_checkpoint_test",  tags = ['serialize', 'disabled'])
 
 

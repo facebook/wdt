@@ -137,8 +137,9 @@ class Receiver : public WdtBase {
   /// adds log header and also a directory invalidation entry if needed
   void addTransferLogHeader(bool isBlockMode, bool isSenderResuming);
 
-  /// fix and close transfer log
+  /// fix, compact (if enabled) and close transfer log
   void fixAndCloseTransferLog(bool transferSuccess);
+
   /**
    * Get transfer report, meant to be called after threads have been finished
    * This method is not thread safe
