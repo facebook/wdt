@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.27.1701090)
+project("WDT" LANGUAGES C CXX VERSION 1.27.1701120)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 # WDT itself works fine with C++11 (gcc 4.8 for instance) but more recent folly
