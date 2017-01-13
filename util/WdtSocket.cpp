@@ -253,8 +253,8 @@ int64_t WdtSocket::ioWithAbortCheck(F readOrWrite, T tbuf, int64_t numBytes,
     if (ret < 0) {
       // error
       if (errno != EINTR && errno != EAGAIN) {
-        PLOG(ERROR) << "non-retryable error encountered during socket io "
-                    << fd_ << " " << doneBytes << " " << retries;
+        WPLOG(ERROR) << "non-retryable error encountered during socket io "
+                     << fd_ << " " << doneBytes << " " << retries;
         return (doneBytes > 0 ? doneBytes : ret);
       }
     } else if (ret == 0) {
@@ -296,7 +296,7 @@ ErrorCode WdtSocket::shutdownWrites() {
   ErrorCode code = finalizeWrites(true);
   if (::shutdown(fd_, SHUT_WR) < 0) {
     if (code == OK) {
-      PLOG(WARNING) << "Socket shutdown failed for fd " << fd_;
+      WPLOG(WARNING) << "Socket shutdown failed for fd " << fd_;
       code = ERROR;
     }
   }
@@ -346,7 +346,7 @@ ErrorCode WdtSocket::finalizeWrites(bool doTagIOs) {
     const int timeoutMs = threadCtx_.getOptions().write_timeout_millis;
     const int expected = tag.size();
     if (writeInternal(tag.data(), tag.size(), timeoutMs, false) != expected) {
-      PLOG(ERROR) << "Encryption Tag write error";
+      WPLOG(ERROR) << "Encryption Tag write error";
       code = ENCRYPTION_ERROR;
     }
   }
@@ -374,7 +374,7 @@ ErrorCode WdtSocket::closeConnectionInternal(bool doTagIOs) {
     errorCode = getMoreInterestingError(errorCode, finalizeReads(doTagIOs));
   }
   if (::close(fd_) != 0) {
-    PLOG(ERROR) << "Failed to close socket " << fd_ << " " << port_;
+    WPLOG(ERROR) << "Failed to close socket " << fd_ << " " << port_;
     errorCode = getMoreInterestingError(ERROR, errorCode);
   }
   // This looks like a reset() make it explicit (and check it's complete)
@@ -454,7 +454,7 @@ void WdtSocket::setSocketTimeouts() {
     tv.tv_usec = (readTimeout % 1000) * 1000;  // milli to micro
     if (setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,
                    sizeof(struct timeval)) != 0) {
-      PLOG(ERROR) << "Unable to set read timeout for " << port_ << " " << fd_;
+      WPLOG(ERROR) << "Unable to set read timeout for " << port_ << " " << fd_;
     }
   }
   int writeTimeout =
@@ -465,7 +465,7 @@ void WdtSocket::setSocketTimeouts() {
     tv.tv_usec = (writeTimeout % 1000) * 1000;  // milli to micro
     if (setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv,
                    sizeof(struct timeval)) != 0) {
-      PLOG(ERROR) << "Unable to set write timeout for " << port_ << " " << fd_;
+      WPLOG(ERROR) << "Unable to set write timeout for " << port_ << " " << fd_;
     }
   }
 }
@@ -508,7 +508,7 @@ int WdtSocket::getUnackedBytes() const {
     ret = ::ioctl(fd_, SIOCOUTQ, &numUnackedBytes);
   }
   if (ret != 0) {
-    PLOG(ERROR) << "Failed to get unacked bytes for socket " << fd_;
+    WPLOG(ERROR) << "Failed to get unacked bytes for socket " << fd_;
     numUnackedBytes = -1;
   }
   return numUnackedBytes;

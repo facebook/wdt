@@ -49,7 +49,7 @@ ErrorCode ClientSocket::connect() {
   string portStr = folly::to<string>(port_);
   int res = getaddrinfo(dest_.c_str(), portStr.c_str(), &sa_, &infoList);
   if (res) {
-    // not errno, can't use PLOG (perror)
+    // not errno, can't use WPLOG (perror)
     WLOG(ERROR) << "Failed getaddrinfo " << dest_ << " , " << port_ << " : "
                 << res << " : " << gai_strerror(res);
     return CONN_ERROR;
@@ -63,7 +63,7 @@ ErrorCode ClientSocket::connect() {
     WVLOG(2) << "will connect to " << host << " " << port;
     fd_ = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd_ == -1) {
-      PLOG(WARNING) << "Error making socket for port " << port_;
+      WPLOG(WARNING) << "Error making socket for port " << port_;
       continue;
     }
     WVLOG(1) << "new socket " << fd_ << " for port " << port_;
@@ -75,15 +75,15 @@ ErrorCode ClientSocket::connect() {
     sockArg |= O_NONBLOCK;
     res = fcntl(fd_, F_SETFL, sockArg);
     if (res < 0) {
-      PLOG(ERROR) << "Failed to make the socket non-blocking " << port_
-                  << " sock " << sockArg << " res " << res;
+      WPLOG(ERROR) << "Failed to make the socket non-blocking " << port_
+                   << " sock " << sockArg << " res " << res;
       closeConnection();
       continue;
     }
 
     if (::connect(fd_, info->ai_addr, info->ai_addrlen) != 0) {
       if (errno != EINPROGRESS) {
-        PLOG(INFO) << "Error connecting on " << host << " " << port;
+        WPLOG(INFO) << "Error connecting on " << host << " " << port;
         closeConnection();
         continue;
       }
@@ -123,7 +123,7 @@ ErrorCode ClientSocket::connect() {
             WVLOG(1) << "poll() timed out " << host << " " << port;
             continue;
           }
-          PLOG(ERROR) << "poll() failed " << host << " " << port << " " << fd_;
+          WPLOG(ERROR) << "poll() failed " << host << " " << port << " " << fd_;
           closeConnection();
           return CONN_ERROR;
         }
@@ -134,7 +134,7 @@ ErrorCode ClientSocket::connect() {
       int connectResult;
       socklen_t len = sizeof(connectResult);
       if (getsockopt(fd_, SOL_SOCKET, SO_ERROR, &connectResult, &len) < 0) {
-        PLOG(WARNING) << "getsockopt() failed";
+        WPLOG(WARNING) << "getsockopt() failed";
         closeConnection();
         continue;
       }
@@ -151,7 +151,7 @@ ErrorCode ClientSocket::connect() {
     sockArg &= (~O_NONBLOCK);
     res = fcntl(fd_, F_SETFL, sockArg);
     if (res == -1) {
-      PLOG(ERROR) << "Could not make the socket blocking " << port_;
+      WPLOG(ERROR) << "Could not make the socket blocking " << port_;
       closeConnection();
       continue;
     }
@@ -187,8 +187,8 @@ void ClientSocket::setSendBufferSize() {
   int status =
       ::setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &bufSize, sizeof(bufSize));
   if (status != 0) {
-    PLOG(ERROR) << "Failed to set send buffer " << port_ << " size " << bufSize
-                << " fd " << fd_;
+    WPLOG(ERROR) << "Failed to set send buffer " << port_ << " size " << bufSize
+                 << " fd " << fd_;
     return;
   }
   WVLOG(1) << "Send buffer size set to " << bufSize << " port " << port_;

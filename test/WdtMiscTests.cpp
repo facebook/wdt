@@ -39,7 +39,7 @@ TEST(BasicTest, MultiWdtSender) {
   mkdir("/tmp/wdtTest", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
   char baseDir[] = "/tmp/wdtTest/XXXXXX";
   if (!mkdtemp(baseDir)) {
-    PLOG(FATAL) << "unable to make " << baseDir;
+    WPLOG(FATAL) << "unable to make " << baseDir;
   }
   LOG(INFO) << "Testing in " << baseDir;
   string srcDir(baseDir);

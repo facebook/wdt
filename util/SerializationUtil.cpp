@@ -107,8 +107,8 @@ bool encodeString(char *dest, int64_t sz, int64_t &off, const string &str) {
   }
   const int64_t strLen = str.length();
   if ((off + strLen) > sz) {
-    LOG(ERROR) << "Not enough room to encode \"" << str << "\" in buf of size "
-               << sz;
+    WLOG(ERROR) << "Not enough room to encode \"" << str << "\" in buf of size "
+                << sz;
     return false;
   }
   memcpy(dest + off, str.data(), strLen);

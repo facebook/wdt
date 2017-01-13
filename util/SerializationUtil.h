@@ -113,7 +113,7 @@ inline bool encodeVarU64(char *data, size_t datasz, int64_t &pos, uint64_t v) {
   while ((++count < 9) && (v >= 128)) {
 #if WDT_EDI64_DO_CHECKS
     if (p >= end) {
-      LOG(WARNING) << "not enough space to store full value";
+      WLOG(WARNING) << "not enough space to store full value";
       return false;
     }
 #endif
@@ -122,7 +122,7 @@ inline bool encodeVarU64(char *data, size_t datasz, int64_t &pos, uint64_t v) {
   }
 #if WDT_EDI64_DO_CHECKS
   if (p >= end) {
-    LOG(WARNING) << "not enough space to store full value";
+    WLOG(WARNING) << "not enough space to store full value";
     return false;
   }
 #endif
@@ -164,7 +164,7 @@ inline bool decodeVarU64(const char *data, size_t datalen, int64_t &pos,
                          uint64_t &res) {
 #if WDT_EDI64_DO_CHECKS
   if (pos < 0) {
-    LOG(WARNING) << "negative writing offset " << pos;
+    WLOG(WARNING) << "negative writing offset " << pos;
     return false;
   }
 #endif
@@ -175,8 +175,8 @@ inline bool decodeVarU64(const char *data, size_t datalen, int64_t &pos,
   int count = 0;
 #if WDT_EDI64_DO_CHECKS
   if (p >= end) {
-    LOG(WARNING) << "not enough space to store full value at start, l="
-                 << datalen << " p=" << pos;
+    WLOG(WARNING) << "not enough space to store full value at start, l="
+                  << datalen << " p=" << pos;
     return false;
   }
 #endif
@@ -185,7 +185,7 @@ inline bool decodeVarU64(const char *data, size_t datalen, int64_t &pos,
     shift += 7;
 #if WDT_EDI64_DO_CHECKS
     if (p >= end) {
-      LOG(WARNING) << "not enough space to store full value l=" << datalen;
+      WLOG(WARNING) << "not enough space to store full value l=" << datalen;
       return false;
     }
 #endif

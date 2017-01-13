@@ -259,6 +259,11 @@ class WdtOptions {
   int transfer_log_write_interval_ms{100};
 
   /**
+   * If true, compact transfer log if transfer finishes successfully
+   */
+  bool enable_transfer_log_compaction{false};
+
+  /**
    * If true, download resumption is enabled
    */
   bool enable_download_resumption{false};

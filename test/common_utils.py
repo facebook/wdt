@@ -68,6 +68,14 @@ def set_binaries():
 set_binaries()
 
 
+def run_command(cmd):
+    print("Running %s" % cmd)
+    p = subprocess.Popen(cmd,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         shell=True)
+    return p.communicate()
+
 # note globals in python can be read without being declared global (!!)
 def get_wdt_binary():
     return wdt_binary

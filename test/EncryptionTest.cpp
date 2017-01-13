@@ -3,8 +3,6 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include <cstring>
-
 namespace facebook {
 namespace wdt {
 

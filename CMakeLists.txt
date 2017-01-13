@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.27.1612070)
+project("WDT" LANGUAGES C CXX VERSION 1.27.1701121)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 # WDT itself works fine with C++11 (gcc 4.8 for instance) but more recent folly
@@ -99,6 +99,7 @@ WdtOptions.cpp
 util/FileWriter.cpp
 util/TransferLogManager.cpp
 util/SerializationUtil.cpp
+util/Stats.cpp
 WdtBase.cpp
 WdtResourceController.cpp
 util/CommonImpl.cpp
@@ -346,6 +347,13 @@ if (BUILD_TESTING)
   add_executable(test_encdeci64_func test/test_encdeci64_func.cpp)
   target_link_libraries(test_encdeci64_func wdt4tests)
   add_test(NAME test_encdeci64_func COMMAND test_encdeci64_func)
+
+  add_executable(test_stats test/Stats_test.cpp)
+  target_link_libraries(test_stats wdt4tests)
+  add_test(NAME test_stats COMMAND test_stats)
+
+  add_executable(histogram test/Histogram.cpp)
+  target_link_libraries(histogram wdt_min)
 
   add_executable(resource_controller_test  test/WdtResourceControllerTest.cpp)
   target_link_libraries(resource_controller_test wdt4tests)

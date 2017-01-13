@@ -41,7 +41,7 @@ int64_t readAtLeast(ServerSocket &s, char *buf, int64_t max, int64_t atLeast,
     // read is false
     int64_t n = s.read(buf + len, max - len, false);
     if (n < 0) {
-      PLOG(ERROR) << "Read error on " << s.getPort() << " after " << count;
+      WPLOG(ERROR) << "Read error on " << s.getPort() << " after " << count;
       if (len) {
         return len;
       } else {
@@ -68,7 +68,7 @@ int64_t readAtMost(ServerSocket &s, char *buf, int64_t max, int64_t atMost) {
   // read is false
   int64_t n = s.read(buf, target, false);
   if (n < 0) {
-    PLOG(ERROR) << "Read error on " << s.getPort() << " with target " << target;
+    WPLOG(ERROR) << "Read error on " << s.getPort() << " target " << target;
     return n;
   }
   if (n == 0) {
@@ -107,7 +107,7 @@ ReceiverThread::ReceiverThread(Receiver *wdtParent, int threadIndex,
 
 /**LISTEN STATE***/
 ReceiverState ReceiverThread::listen() {
-  WVTLOG(1) << "entered LISTEN state";
+  WTVLOG(1) << "entered LISTEN state";
   const bool doActualWrites = !options_.skip_writes;
   int32_t port = socket_->getPort();
   WVLOG(1) << "Server Thread for port " << port << " with backlog "
@@ -137,7 +137,7 @@ ReceiverState ReceiverThread::listen() {
 
 /***ACCEPT_FIRST_CONNECTION***/
 ReceiverState ReceiverThread::acceptFirstConnection() {
-  WVTLOG(1) << "entered ACCEPT_FIRST_CONNECTION state";
+  WTVLOG(1) << "entered ACCEPT_FIRST_CONNECTION state";
 
   reset();
   socket_->closeNoCheck();
@@ -160,7 +160,7 @@ ReceiverState ReceiverThread::acceptFirstConnection() {
         break;
       }
       case Receiver::AcceptMode::ACCEPT_FOREVER: {
-        WVTLOG(2) << "Receiver is configured to accept for-ever";
+        WTVLOG(2) << "Receiver is configured to accept for-ever";
         break;
       }
       case Receiver::AcceptMode::STOP_ACCEPTING: {
@@ -256,7 +256,7 @@ ReceiverState ReceiverThread::sendLocalCheckpoint() {
 
 /***READ_NEXT_CMD***/
 ReceiverState ReceiverThread::readNextCmd() {
-  WVTLOG(1) << "entered READ_NEXT_CMD state";
+  WTVLOG(1) << "entered READ_NEXT_CMD state";
   oldOffset_ = off_;
   // TODO: we shouldn't have off_ here and buffer/size inside buffer.
   numRead_ = readAtLeast(*socket_, buf_ + off_, bufSize_ - off_,
@@ -287,7 +287,7 @@ ReceiverState ReceiverThread::readNextCmd() {
 
 /***PROCESS_SETTINGS_CMD***/
 ReceiverState ReceiverThread::processSettingsCmd() {
-  WVTLOG(1) << "entered PROCESS_SETTINGS_CMD state";
+  WTVLOG(1) << "entered PROCESS_SETTINGS_CMD state";
   Settings settings;
   int senderProtocolVersion;
 
@@ -371,7 +371,7 @@ ReceiverState ReceiverThread::processSettingsCmd() {
 
 /***PROCESS_FILE_CMD***/
 ReceiverState ReceiverThread::processFileCmd() {
-  WVTLOG(1) << "entered PROCESS_FILE_CMD state";
+  WTVLOG(1) << "entered PROCESS_FILE_CMD state";
   // following block needs to be executed for the first file cmd. There is no
   // harm in executing it more than once. number of blocks equal to 0 is a good
   // approximation for first file cmd. Did not want to introduce another boolean
@@ -396,7 +396,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   ErrorCode transferStatus = (ErrorCode)buf_[off_++];
   if (transferStatus != OK) {
     // TODO: use this status information to implement fail fast mode
-    WVTLOG(1) << "sender entered into error state "
+    WTVLOG(1) << "sender entered into error state "
               << errorCodeToStr(transferStatus);
   }
   int16_t headerLen = folly::loadUnaligned<int16_t>(buf_ + off_);
@@ -444,7 +444,7 @@ ReceiverState ReceiverThread::processFileCmd() {
 
   // received a well formed file cmd, apply the pending checkpoint update
   checkpointIndex_ = pendingCheckpointIndex_;
-  WVTLOG(1) << "Read id:" << blockDetails.fileName
+  WTVLOG(1) << "Read id:" << blockDetails.fileName
             << " size:" << blockDetails.dataSize << " ooff:" << oldOffset_
             << " off_: " << off_ << " numRead_: " << numRead_;
   auto &fileCreator = wdtParent_->getFileCreator();
@@ -645,7 +645,7 @@ void ReceiverThread::markReceivedBlocksVerified() {
 }
 
 ReceiverState ReceiverThread::processDoneCmd() {
-  WVTLOG(1) << "entered PROCESS_DONE_CMD state";
+  WTVLOG(1) << "entered PROCESS_DONE_CMD state";
   if (numRead_ != Protocol::kMinBufLength) {
     WTLOG(ERROR) << "Unexpected state for done command"
                  << " off_: " << off_ << " numRead_: " << numRead_;
@@ -674,7 +674,7 @@ ReceiverState ReceiverThread::processDoneCmd() {
 }
 
 ReceiverState ReceiverThread::processSizeCmd() {
-  WVTLOG(1) << "entered PROCESS_SIZE_CMD state";
+  WTVLOG(1) << "entered PROCESS_SIZE_CMD state";
   int64_t totalSenderBytes;
   bool success = Protocol::decodeSize(
       buf_, off_, oldOffset_ + Protocol::kMaxSize, totalSenderBytes);
@@ -832,10 +832,10 @@ ReceiverState ReceiverThread::sendAbortCmd() {
 }
 
 ReceiverState ReceiverThread::sendDoneCmd() {
-  WVTLOG(1) << "entered SEND_DONE_CMD state";
+  WTVLOG(1) << "entered SEND_DONE_CMD state";
   buf_[0] = Protocol::DONE_CMD;
   if (socket_->write(buf_, 1) != 1) {
-    PLOG(ERROR) << *this << " unable to send DONE " << threadIndex_;
+    WTPLOG(ERROR) << "unable to send DONE " << threadIndex_;
     threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
     return ACCEPT_WITH_TIMEOUT;
   }
@@ -928,7 +928,7 @@ ReceiverState ReceiverThread::waitForFinishOrNewCheckpoint() {
     // send WAIT cmd to keep sender thread alive
     buf_[0] = Protocol::WAIT_CMD;
     if (socket_->write(buf_, 1) != 1) {
-      PLOG(ERROR) << *this << " unable to write WAIT ";
+      WTPLOG(ERROR) << "unable to write WAIT";
       threadStats_.setLocalErrorCode(SOCKET_WRITE_ERROR);
       controller_->markState(threadIndex_, RUNNING);
       return ACCEPT_WITH_TIMEOUT;
