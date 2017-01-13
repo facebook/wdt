@@ -81,11 +81,59 @@ cpp_binary(
   srcs = [ 'test/test_encdeci64_perf.cpp', ],
   deps = [
       ":testcommon",
-      "@folly:benchmark",
+      "@/folly:benchmark",
       "@common/encode:coding",
   ],
   compiler_flags = wdt_compiler_flags,
 )
+
+cpp_library (
+  name = "stats",
+  headers = [ "util/Stats.h" ],
+  srcs = [
+        "util/Stats.cpp"
+    ],
+  deps = [
+    "@/folly:thread_local",
+  ],
+  compiler_flags = wdt_compiler_flags,
+)
+
+
+cpp_unittest (
+  name = "stats_test",
+  srcs = [
+    "test/Stats_test.cpp",
+  ],
+  deps = [
+    ":wdtlib",
+  ],
+)
+
+
+cpp_benchmark (
+  name = "stats_benchmark",
+  srcs = [
+    "test/Stats_test_benchmark.cpp",
+  ],
+  deps = [
+    ":testcommon",
+    ":stats",
+    "@/folly:benchmark",
+    "@/folly:singleton",
+    "@common/stats:stats",
+  ],
+)
+
+cpp_binary(
+    name = 'histogram',
+    srcs = [ 'test/Histogram.cpp', ],
+    deps = [
+        ":stats",
+    ],
+    compiler_flags = wdt_compiler_flags,
+)
+
 
 cpp_unittest(
   name = 'protocol_test',
@@ -527,6 +575,7 @@ cpp_library (
   compiler_flags = wdt_compiler_flags,
   deps = [
     ":inc",
+    ":stats",
     # Try hard to keep the folly depenencies minimum, think before adding:
     "@/folly:conv",
     "@/folly:spin_lock",

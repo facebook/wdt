@@ -612,17 +612,15 @@ ErrorCode TransferLogManager::parseVerifyAndFix(
 }
 
 void TransferLogManager::compactLog() {
-
   auto fullLogPath = getFullPath(kWdtLogName);
 
   WLOG(INFO) << "Started compacting transfer log " << fullLogPath;
 
-  if (fd_ <  0) {
+  if (fd_ < 0) {
     WLOG(ERROR) << "Failed to compact transfer log because log handle has "
                 << "been closed";
     return;
   }
-
 
   // Shutdown writer thread to avoid race conditon against fd_
   shutdownThread();
@@ -638,8 +636,7 @@ void TransferLogManager::compactLog() {
   std::vector<FileChunksInfo> fileChunksInfoVec;
   auto code = parseAndMatch(recoveryId_, config_, fileChunksInfoVec);
   if (code != OK) {
-    WLOG(ERROR) << "Failed to parse "
-                << fullLogPath << " "
+    WLOG(ERROR) << "Failed to parse " << fullLogPath << " "
                 << errorCodeToStr(code);
     return;
   }

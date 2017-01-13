@@ -243,7 +243,6 @@ class TransferLogManager {
   ~TransferLogManager();
 
  private:
-
   /// Shutdown the log writer thread
   void shutdownThread();
 

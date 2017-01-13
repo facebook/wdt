@@ -99,6 +99,7 @@ WdtOptions.cpp
 util/FileWriter.cpp
 util/TransferLogManager.cpp
 util/SerializationUtil.cpp
+util/Stats.cpp
 WdtBase.cpp
 WdtResourceController.cpp
 util/CommonImpl.cpp
@@ -346,6 +347,13 @@ if (BUILD_TESTING)
   add_executable(test_encdeci64_func test/test_encdeci64_func.cpp)
   target_link_libraries(test_encdeci64_func wdt4tests)
   add_test(NAME test_encdeci64_func COMMAND test_encdeci64_func)
+
+  add_executable(test_stats test/Stats_test.cpp)
+  target_link_libraries(test_stats wdt4tests)
+  add_test(NAME test_stats COMMAND test_stats)
+
+  add_executable(histogram test/Histogram.cpp)
+  target_link_libraries(histogram wdt_min)
 
   add_executable(resource_controller_test  test/WdtResourceControllerTest.cpp)
   target_link_libraries(resource_controller_test wdt4tests)
