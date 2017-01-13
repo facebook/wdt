@@ -82,7 +82,7 @@ cpp_binary(
   deps = [
       ":testcommon",
       "@/folly:benchmark",
-      "@common/encode:coding",
+      "@/common/encode:coding",
   ],
   compiler_flags = wdt_compiler_flags,
 )
