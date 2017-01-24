@@ -8,6 +8,7 @@
  */
 #pragma once
 #include <ostream>
+#include <set>
 
 #include <wdt/WdtOptions.h>
 
@@ -23,6 +24,8 @@ class WdtFlags {
 
   static void printOptions(
       std::ostream& out, const WdtOptions& options = WdtOptions::getMutable());
+
+  static std::set<std::string> getUserSpecifiedOptions();
 };
 }
 }
