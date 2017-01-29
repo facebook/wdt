@@ -13,7 +13,6 @@
 
 #include <folly/Bits.h>
 #include <folly/Conv.h>
-#include <folly/ScopeGuard.h>
 
 #include <fcntl.h>
 #include <gflags/gflags.h>

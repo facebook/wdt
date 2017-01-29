@@ -14,7 +14,6 @@
 #include <folly/Bits.h>
 #include <folly/Conv.h>
 #include <folly/Range.h>
-#include <folly/ScopeGuard.h>
 
 #include <sys/file.h>
 #include <sys/stat.h>
