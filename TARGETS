@@ -121,7 +121,7 @@ cpp_benchmark (
     ":stats",
     "@/folly:benchmark",
     "@/folly:singleton",
-    "@common/stats:stats",
+    "@/common/stats:stats",
   ],
 )
 

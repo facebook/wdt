@@ -45,7 +45,7 @@ void testHeader() {
   EXPECT_EQ(nbd.seqId, bd.seqId);
   EXPECT_EQ(nbd.fileSize, bd.fileSize);
   EXPECT_EQ(nbd.offset, bd.offset);
-  EXPECT_EQ(nbd.dataSize, nbd.dataSize);
+  EXPECT_EQ(nbd.dataSize, bd.dataSize);
   EXPECT_EQ(nbd.allocationStatus, bd.allocationStatus);
   noff = 0;
   // exact size:
@@ -85,7 +85,7 @@ void testHeader() {
   EXPECT_EQ(nbd.seqId, bd.seqId);
   EXPECT_EQ(nbd.fileSize, bd.fileSize);
   EXPECT_EQ(nbd.offset, bd.offset);
-  EXPECT_EQ(nbd.dataSize, nbd.dataSize);
+  EXPECT_EQ(nbd.dataSize, bd.dataSize);
   EXPECT_EQ(nbd.allocationStatus, bd.allocationStatus);
   EXPECT_EQ(nbd.prevSeqId, bd.prevSeqId);
   WLOG(INFO) << "got size of " << nbd.dataSize;

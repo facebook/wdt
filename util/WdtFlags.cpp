@@ -42,7 +42,7 @@ std::string getOptionNameFromFlagName(const std::string &flagName) {
 
 // getFlagNameFromOptionName is WDT_FLAG_STR()
 
-std::set<std::string> getUserSpecifiedOptions() {
+std::set<std::string> WdtFlags::getUserSpecifiedOptions() {
   std::set<std::string> userSpecifiedFlags;
   std::vector<google::CommandLineFlagInfo> allFlags;
   google::GetAllFlags(&allFlags);
