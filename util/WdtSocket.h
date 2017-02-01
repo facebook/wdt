@@ -10,6 +10,8 @@
 namespace facebook {
 namespace wdt {
 
+using Func = std::function<void()>;
+
 /// base socket class
 /// Do not read/write more than 2Gb at a time (int sizes)
 /// This is ok because you don't want internal blocks bigger than a few
@@ -17,7 +19,8 @@ namespace wdt {
 class WdtSocket {
  public:
   WdtSocket(ThreadCtx &threadCtx, int port,
-            const EncryptionParams &encryptionParams);
+            const EncryptionParams &encryptionParams,
+            Func &&tagVerificationSuccessCallback);
 
   // making the object non-copyable and non-movable
   WdtSocket(const WdtSocket &stats) = delete;
@@ -73,12 +76,6 @@ class WdtSocket {
   /// @return     write error code
   ErrorCode getWriteErrCode() const;
 
-  /// saves decryptor ctx after offset
-  void saveDecryptorCtx(int64_t offset);
-
-  /// verify whether the given tag matches previously saved context
-  bool verifyTag(std::string &tag);
-
   /// @return   tcp receive buffer size
   int getReceiveBufferSize() const;
 
@@ -94,8 +91,37 @@ class WdtSocket {
  protected:
   // TODO: doc would be nice... (for tryFull, retry...)
 
+  // computes next tag offset
+  int computeNextTagOffset(int64_t totalProcessed, int64_t tagInterval);
+
+  // reads from socket and decrypts. Does not understand tag verification
+  int readAndDecrypt(char *buf, int nbyte, int timeoutMs, bool tryFull);
+
+  // reads from socket, decrypts and verifies tag. If the read contains a tag,
+  // first, we read till the tag and decrypt. Then, the tag(plain-text) is read
+  // and verified. After that remaining bytes are read.
+  // This method expects one tag contained in the read. So, nbyte must be
+  // less than readTagInterval_
+  int readAndDecryptWithTag(char *buf, int nbyte, int timeoutMs, bool tryFull);
+
+  // reads encryption tag. Returns empty string in case of failure.
+  std::string readEncryptionTag();
+
+  // reads from socket. Does not understand encryption
   int readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull);
 
+  // encrypts and writes. Does not understand encryption tag
+  int encryptAndWrite(char *buf, int nbyte, int timeoutMs, bool retry);
+
+  // encrypts, writes and also adds tag if necessary.
+  // This method expects one tag contained in the write. So, nbyte must be less
+  // than writeTagInterval_
+  int encryptAndWriteWithTag(char *buf, int nbyte, int timeoutMs, bool retry);
+
+  // writes encryption tag. Returns status
+  bool writeEncryptionTag();
+
+  // writes to socket. Does not understand encryption
   int writeInternal(const char *buf, int nbyte, int timeoutMs, bool retry);
 
   void readEncryptionSettingsOnce(int timeoutMs);
@@ -131,12 +157,21 @@ class WdtSocket {
   ThreadCtx &threadCtx_;
 
   EncryptionParams encryptionParams_;
+
+  Func tagVerificationSuccessCallback_{nullptr};
+
   bool encryptionSettingsWritten_{false};
   bool encryptionSettingsRead_{false};
   AESEncryptor encryptor_;
   AESDecryptor decryptor_;
   /// buffer used to encrypt/decrypt
-  char buf_[Protocol::kMaxEncryption];
+  char buf_[Protocol::kEncryptionCmdLen];
+
+  int32_t readTagInterval_{0};
+  int32_t writeTagInterval_{0};
+
+  int64_t totalRead_{0};
+  int64_t totalWritten_{0};
 
   /// If this is true, then if we get a cmd other than encryption cmd from the
   /// peer, we expect the other side to not be encryption aware. We turn off
@@ -151,12 +186,6 @@ class WdtSocket {
   bool writesFinalized_{false};
   /// Have we already read the tag and completed decryption
   bool readsFinalized_{false};
-
-  const int64_t OFFSET_NOT_SET = -1;
-  const int64_t CTX_SAVED = -2;
-
-  /// offset after which decryptor ctx should be saved
-  int64_t ctxSaveOffset_{OFFSET_NOT_SET};
 
  private:
   /// computes effective timeout depending on the network timeout and abort

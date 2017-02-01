@@ -36,6 +36,14 @@ bool decodeUInt64(folly::ByteRange &br, uint64_t &res);
 bool decodeInt64C(folly::ByteRange &br, int64_t &res);
 /// Encoded with encodeVarI64C (aka as unsigned) and fits in 32 bits
 bool decodeInt32C(folly::ByteRange &br, int32_t &result);
+/// Decodes fixed length int32
+bool decodeInt32FixedLength(folly::ByteRange &br, int32_t &res);
+/// Decodes fixed length int64
+bool decodeInt64FixedLength(folly::ByteRange &br, int64_t &res);
+/// Encodes fixed length int32
+bool encodeInt32FixedLength(char *dest, int64_t sz, int64_t &off, int32_t val);
+/// Encodes fixed length int64
+bool encodeInt64FixedLength(char *dest, int64_t sz, int64_t &off, int64_t val);
 
 /// encodes str into dest + off; not writing past dest + sz
 /// moves the off into the dest pointer, returns true if successful, false if

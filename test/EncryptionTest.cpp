@@ -89,7 +89,6 @@ void testEncryption(const EncryptionType encryptionType,
     success = decryptor.decrypt(encryptedText + lenSum, lengths[i],
                                 decryptedText + lenSum);
     EXPECT_TRUE(success);
-    decryptor.saveContext();
     success = decryptor.verifyTag(tags[i]);
     EXPECT_TRUE(success);
     lenSum += lengths[i];

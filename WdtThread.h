@@ -98,7 +98,6 @@ class WdtThread {
   enum FooterType {
     NO_FOOTER,
     CHECKSUM_FOOTER,
-    ENC_TAG_FOOTER,
   };
 
   FooterType footerType_{NO_FOOTER};

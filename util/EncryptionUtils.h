@@ -184,10 +184,7 @@ class AESDecryptor : public AESBase {
    */
   bool finish(const std::string& tag);
 
-  /// saves current cipher context
-  bool saveContext();
-
-  /// verify whether the given tag matches previously saved context
+  /// verify whether the given tag matches current tag
   bool verifyTag(const std::string& tag);
 
   /// destructor
@@ -196,12 +193,6 @@ class AESDecryptor : public AESBase {
  private:
   static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
                              const std::string& tag);
-
-  /// saved cipher ctx
-  EVP_CIPHER_CTX savedCtx_;
-
-  /// whether ctx has been saved
-  bool ctxSaved_{false};
 };
 }
 }  // End of namespaces

@@ -355,13 +355,9 @@ TransferStats SenderThread::sendOneByteSource(
         << totalThrottlerBytes << " " << (actualSize + totalThrottlerBytes);
   }
   if (footerType_ != NO_FOOTER) {
-    std::string tag;
-    if (footerType_ == ENC_TAG_FOOTER) {
-      tag = socket_->computeCurEncryptionTag();
-    }
     off = 0;
     headerBuf[off++] = Protocol::FOOTER_CMD;
-    Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum, tag);
+    Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum);
     int toWrite = off;
     written = socket_->write(headerBuf, toWrite);
     if (written != toWrite) {
@@ -872,15 +868,9 @@ SenderState SenderThread::processVersionMismatch() {
 }
 
 void SenderThread::setFooterType() {
-  // determine footer type to use
-  EncryptionType encryptionType =
-      wdtParent_->transferRequest_.encryptionData.getType();
-  int protocolVersion = wdtParent_->getProtocolVersion();
-  if (protocolVersion >= Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION &&
-      encryptionTypeToTagLen(encryptionType)) {
-    footerType_ = ENC_TAG_FOOTER;
-  } else if (protocolVersion >= Protocol::CHECKSUM_VERSION &&
-             options_.enable_checksum) {
+  const int protocolVersion = wdtParent_->getProtocolVersion();
+  if (protocolVersion >= Protocol::CHECKSUM_VERSION &&
+      options_.enable_checksum) {
     footerType_ = CHECKSUM_FOOTER;
   } else {
     footerType_ = NO_FOOTER;

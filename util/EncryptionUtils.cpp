@@ -445,21 +445,13 @@ bool AESDecryptor::decrypt(const char* in, const int inLength, char* out) {
   return true;
 }
 
-bool AESDecryptor::saveContext() {
-  WDT_CHECK(!ctxSaved_);
-  if (!cloneCtx(&savedCtx_)) {
-    return false;
-  }
-  ctxSaved_ = true;
-  return true;
-}
-
 bool AESDecryptor::verifyTag(const std::string& tag) {
   WDT_CHECK_EQ(ENC_AES128_GCM, type_);
-  WDT_CHECK(ctxSaved_);
-  bool status = finishInternal(savedCtx_, type_, tag);
-  ctxSaved_ = false;
-  return status;
+  EVP_CIPHER_CTX clonedCtx;
+  if (!cloneCtx(&clonedCtx)) {
+    return false;
+  }
+  return finishInternal(clonedCtx, type_, tag);
 }
 
 /* static */
@@ -503,10 +495,6 @@ bool AESDecryptor::finish(const std::string& tag) {
   bool status = finishInternal(evpCtx_, type_, tag);
   WLOG_IF(INFO, status) << "Successful end of decryption with tag = "
                         << folly::humanify(tag);
-  if (ctxSaved_) {
-    EVP_CIPHER_CTX_cleanup(&savedCtx_);
-    ctxSaved_ = false;
-  }
   return status;
 }
 

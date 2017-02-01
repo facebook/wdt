@@ -25,7 +25,7 @@ using std::string;
 ClientSocket::ClientSocket(ThreadCtx &threadCtx, const string &dest,
                            const int port,
                            const EncryptionParams &encryptionParams)
-    : WdtSocket(threadCtx, port, encryptionParams), dest_(dest) {
+    : WdtSocket(threadCtx, port, encryptionParams, nullptr), dest_(dest) {
   memset(&sa_, 0, sizeof(sa_));
   if (threadCtx_.getOptions().ipv6) {
     sa_.ai_family = AF_INET6;

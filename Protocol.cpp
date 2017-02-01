@@ -12,7 +12,6 @@
 #include <wdt/WdtOptions.h>
 #include <wdt/util/SerializationUtil.h>
 
-#include <folly/Bits.h>
 #include <algorithm>
 
 namespace facebook {
@@ -304,8 +303,6 @@ bool Protocol::decodeSize(char *src, int64_t &off, int64_t max,
   return ok;
 }
 
-const int64_t Protocol::kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
-
 bool Protocol::encodeAbort(char *dest, int64_t &off, const int64_t max,
                            int32_t protocolVersion, ErrorCode errCode,
                            int64_t checkpoint) {
@@ -314,13 +311,12 @@ bool Protocol::encodeAbort(char *dest, int64_t &off, const int64_t max,
                 << " off " << off;
     return false;
   }
-  folly::storeUnaligned<int32_t>(dest + off,
-                                 folly::Endian::little(protocolVersion));
-  off += sizeof(int32_t);
+  bool ok = encodeInt32FixedLength(dest, max, off, protocolVersion);
+  if (!ok) {
+    return false;
+  }
   dest[off++] = errCode;
-  folly::storeUnaligned<int64_t>(dest + off, folly::Endian::little(checkpoint));
-  off += sizeof(int64_t);
-  return true;
+  return encodeInt64FixedLength(dest, max, off, checkpoint);
 }
 
 bool Protocol::decodeAbort(char *src, int64_t &off, int64_t max,
@@ -331,46 +327,33 @@ bool Protocol::decodeAbort(char *src, int64_t &off, int64_t max,
                 << " at off " << off;
     return false;
   }
-  protocolVersion = folly::loadUnaligned<int32_t>(src + off);
-  protocolVersion = folly::Endian::little(protocolVersion);
-  off += sizeof(int32_t);
-  errCode = (ErrorCode)src[off++];
-  checkpoint = folly::loadUnaligned<int64_t>(src + off);
-  checkpoint = folly::Endian::little(checkpoint);
-  off += sizeof(int64_t);
-  return true;
+  ByteRange br = makeByteRange(src, max, off);  // will check for off>0 max>0
+  const ByteRange obr = br;
+  bool ok = decodeInt32FixedLength(br, protocolVersion);
+  if (!ok) {
+    return false;
+  }
+  errCode = (ErrorCode)br.front();
+  br.pop_front();
+  ok = decodeInt64FixedLength(br, checkpoint);
+  off += offset(br, obr);
+  return ok;
 }
-
-const int64_t Protocol::kChunksCmdLen = 2 * sizeof(int64_t);
 
 bool Protocol::encodeChunksCmd(char *dest, int64_t &off, int64_t max,
                                int64_t bufSize, int64_t numFiles) {
-  if (off + kChunksCmdLen > max) {
-    WLOG(ERROR) << "Trying to encode chunk in too small of a buffer sz " << max
-                << " off " << off;
-    return false;
-  }
-  folly::storeUnaligned<int64_t>(dest + off, folly::Endian::little(bufSize));
-  off += sizeof(int64_t);
-  folly::storeUnaligned<int64_t>(dest + off, folly::Endian::little(numFiles));
-  off += sizeof(int64_t);
-  return true;
+  return encodeInt64FixedLength(dest, max, off, bufSize) &&
+         encodeInt64FixedLength(dest, max, off, numFiles);
 }
 
 bool Protocol::decodeChunksCmd(char *src, int64_t &off, int64_t max,
                                int64_t &bufSize, int64_t &numFiles) {
-  if (off + kChunksCmdLen > max) {
-    WLOG(ERROR) << "Trying to decode chunk in too small of a buffer sz " << max
-                << " off " << off;
-    return false;
-  }
-  bufSize = folly::loadUnaligned<int64_t>(src + off);
-  bufSize = folly::Endian::little(bufSize);
-  off += sizeof(int64_t);
-  numFiles = folly::loadUnaligned<int64_t>(src + off);
-  numFiles = folly::Endian::little(numFiles);
-  off += sizeof(int64_t);
-  return true;
+  ByteRange br = makeByteRange(src, max, off);  // will check for off>0 max>0
+  const ByteRange obr = br;
+  bool ok = decodeInt64FixedLength(br, bufSize) &&
+            decodeInt64FixedLength(br, numFiles);
+  off += offset(br, obr);
+  return ok;
 }
 
 bool Protocol::encodeChunkInfo(char *dest, int64_t &off, int64_t max,
@@ -539,19 +522,22 @@ bool Protocol::decodeSettings(int protocolVersion, char *src, int64_t &off,
 /* static */
 bool Protocol::encodeEncryptionSettings(char *dest, int64_t &off, int64_t max,
                                         const EncryptionType encryptionType,
-                                        const string &iv) {
+                                        const string &iv,
+                                        const int32_t tagInterval) {
   return encodeVarI64C(dest, max, off, encryptionType) &&
-         encodeString(dest, max, off, iv);
+         encodeString(dest, max, off, iv) &&
+         encodeInt32FixedLength(dest, max, off, tagInterval);
 }
 
 /* static */
 bool Protocol::decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
                                         EncryptionType &encryptionType,
-                                        string &iv) {
+                                        string &iv, int32_t &tagInterval) {
   ByteRange br = makeByteRange(src, max, off);
   const ByteRange obr = br;
   int64_t v;
-  bool ok = decodeInt64C(br, v) && decodeString(br, iv);
+  bool ok = decodeInt64C(br, v) && decodeString(br, iv) &&
+            decodeInt32FixedLength(br, tagInterval);
   if (ok) {
     encryptionType = static_cast<EncryptionType>(v);
   }
@@ -560,23 +546,15 @@ bool Protocol::decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
 }
 
 bool Protocol::encodeFooter(char *dest, int64_t &off, int64_t max,
-                            int32_t checksum, const string &tag) {
-  if (tag.empty()) {
-    return encodeVarI64(dest, max, off, checksum);
-  }
-  return encodeString(dest, max, off, tag);
+                            int32_t checksum) {
+  return encodeVarI64(dest, max, off, checksum);
 }
 
 bool Protocol::decodeFooter(char *src, int64_t &off, int64_t max,
-                            int32_t &checksum, string &tag, bool isTag) {
+                            int32_t &checksum) {
   ByteRange br = makeByteRange(src, max, off);
   const ByteRange obr = br;
-  bool ok;
-  if (isTag) {
-    ok = decodeString(br, tag);
-  } else {
-    ok = decodeInt32(br, checksum);
-  }
+  bool ok = decodeInt32(br, checksum);
   off += offset(br, obr);
   return ok;
 }

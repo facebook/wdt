@@ -165,6 +165,10 @@ WDT_OPT(encryption_type, string,
         "supports aes128ctr (fastest but no integrity check) and "
         "aes128gcm (recommended, default). "
         "A value of none disables encryption (fastest but insecure)");
+WDT_OPT(encryption_tag_interval_bytes, int32,
+        "Encryption tag verification interval in bytes. A value of zero "
+        "disables incremental tag verification. In that case, tag only "
+        "gets verified at the end.");
 WDT_OPT(send_buffer_size, int32,
         "Send buffer size for sender sockets. If <= 0, buffer size is not set");
 WDT_OPT(receive_buffer_size, int32,

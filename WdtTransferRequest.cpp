@@ -279,7 +279,7 @@ const string WdtTransferRequest::DIRECTORY_PARAM{"dir"};
 const string WdtTransferRequest::PORTS_PARAM{"ports"};
 const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
 const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
-const string WdtTransferRequest::ENCRYPTION_PARAM{"enc"};
+const string WdtTransferRequest::ENCRYPTION_PARAM{"Enc"};
 const string WdtTransferRequest::NAMESPACE_PARAM{"ns"};
 const string WdtTransferRequest::DEST_IDENTIFIER_PARAM{"dstid"};
 const string WdtTransferRequest::DOWNLOAD_RESUMPTION_PARAM{"dr"};

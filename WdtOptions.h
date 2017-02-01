@@ -342,6 +342,13 @@ class WdtOptions {
   std::string encryption_type{encryptionTypeToStr(ENC_AES128_GCM)};
 
   /**
+   * Encryption tag verification interval in bytes. A value of zero disables
+   * incremental tag verification. In that case, tag only gets verified at the
+   * end.
+   */
+  int encryption_tag_interval_bytes{4 * 1024 * 1024};
+
+  /**
    * send buffer size for Sender. If < = 0, buffer size is not set
    */
   int send_buffer_size{0};
