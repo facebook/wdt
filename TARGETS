@@ -70,7 +70,7 @@ cpp_unittest(
   headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
   srcs = [ 'test/test_encdeci64_func.cpp', ],
   deps = [
-      ":testcommon",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -80,7 +80,7 @@ cpp_binary(
   headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
   srcs = [ 'test/test_encdeci64_perf.cpp', ],
   deps = [
-      ":testcommon",
+      ":wdtlib4tests",
       "@/folly:benchmark",
       "@/common/encode:coding",
   ],

@@ -10,6 +10,8 @@
 #include <folly/Conv.h>
 #include <string.h>
 
+DEFINE_int32(wdt_double_precision, 2, "Precision while printing double");
+
 namespace facebook {
 namespace wdt {
 std::string errorCodeToStr(ErrorCode code) {
