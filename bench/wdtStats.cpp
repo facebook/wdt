@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
   usage.append(google::ProgramInvocationShortName());
   usage.append(" [flags] < input > bigrams");
   google::SetUsageMessage(usage);
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
   MapOfBigramToCount map;
