@@ -33,9 +33,9 @@ const std::string OPTION_TYPE_FLAG = WDT_FLAG_STR(option_type);
 
 void overrideTest1(const std::string &optionType) {
   WdtOptions options;
-  google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), optionType.c_str());
-  google::SetCommandLineOption(NUM_PORTS_FLAG.c_str(), "4");
-  google::SetCommandLineOption(BLOCK_SIZE_FLAG.c_str(), "8");
+  gflags::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), optionType.c_str());
+  gflags::SetCommandLineOption(NUM_PORTS_FLAG.c_str(), "4");
+  gflags::SetCommandLineOption(BLOCK_SIZE_FLAG.c_str(), "8");
   WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(4, options.num_ports);
   EXPECT_EQ(8, options.block_size_mbytes);
@@ -43,9 +43,9 @@ void overrideTest1(const std::string &optionType) {
 
 void overrideTest2(const std::string &optionType) {
   WdtOptions options;
-  google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), optionType.c_str());
-  google::SetCommandLineOption(NUM_PORTS_FLAG.c_str(), "8");
-  google::SetCommandLineOption(BLOCK_SIZE_FLAG.c_str(), "16");
+  gflags::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), optionType.c_str());
+  gflags::SetCommandLineOption(NUM_PORTS_FLAG.c_str(), "8");
+  gflags::SetCommandLineOption(BLOCK_SIZE_FLAG.c_str(), "16");
   WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(8, options.num_ports);
   EXPECT_EQ(16, options.block_size_mbytes);
@@ -53,7 +53,7 @@ void overrideTest2(const std::string &optionType) {
 
 TEST(OptionType, FlashOptionTypeTest1) {
   WdtOptions options;
-  google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "flash");
+  gflags::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "flash");
   WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(8, options.num_ports);
   EXPECT_EQ(16, options.block_size_mbytes);
@@ -69,7 +69,7 @@ TEST(OptionType, FlashOptionTypeTest3) {
 
 TEST(OptionType, DiskOptionTypeTest1) {
   auto &options = WdtOptions::getMutable();
-  google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
+  gflags::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
   WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(3, options.num_ports);
   EXPECT_EQ(-1, options.block_size_mbytes);
@@ -77,7 +77,7 @@ TEST(OptionType, DiskOptionTypeTest1) {
 
 TEST(OptionType, DiskOptionTypeTest2) {
   auto &options = WdtOptions::getMutable();
-  google::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
+  gflags::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
   Wdt::initializeWdt("wdt");
   EXPECT_EQ(3, options.num_ports);
   EXPECT_EQ(-1, options.block_size_mbytes);
