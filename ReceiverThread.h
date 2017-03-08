@@ -275,6 +275,10 @@ class ReceiverThread : public WdtThread {
   /// verifies received blocks which are not already verified
   void markReceivedBlocksVerified();
 
+  /// checks whether heart-beat is enabled, and whether it is time to send
+  /// another heart-beat, and if yes, sends a heart-beat
+  void sendHeartBeat();
+
   /// Mapping from receiver states to state functions
   static const StateFunction stateMap_[];
 
