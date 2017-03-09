@@ -176,15 +176,15 @@ void sigUSR1Handler(int) {
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
-  google::SetArgv(argc, const_cast<const char **>(argv));
-  google::SetVersionString(Protocol::getFullVersion());
+  gflags::SetArgv(argc, const_cast<const char **>(argv));
+  gflags::SetVersionString(Protocol::getFullVersion());
   usage.assign("WDT Warp-speed Data Transfer. v ");
-  usage.append(google::VersionString());
+  usage.append(gflags::VersionString());
   usage.append(". Sample usage:\nTo transfer from srchost to desthost:\n\t");
   usage.append("ssh dsthost ");
-  usage.append(google::ProgramInvocationShortName());
+  usage.append(gflags::ProgramInvocationShortName());
   usage.append(" -directory destdir | ssh srchost ");
-  usage.append(google::ProgramInvocationShortName());
+  usage.append(gflags::ProgramInvocationShortName());
   usage.append(" -directory srcdir -");
   usage.append(
       "\nPassing - as the argument to wdt means start the sender and"
@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
       "\nconnection URL produced by the receiver, including encryption"
       " key, from stdin.");
   usage.append("\nUse --help to see all the options.");
-  google::SetUsageMessage(usage);
+  gflags::SetUsageMessage(usage);
   google::gflags_exitfunc = [](int code) {
     if (code == 0 || FLAGS_help) {
       // By default gflags exit 1 with --help and 0 for --version (good)

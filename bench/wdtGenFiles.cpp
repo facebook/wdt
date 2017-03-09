@@ -325,14 +325,14 @@ using std::string;
 int main(int argc, char **argv) {
   FLAGS_logtostderr = true;
   // gflags api is nicely inconsistent here
-  google::SetArgv(argc, const_cast<const char **>(argv));
-  google::SetVersionString(WDT_VERSION_STR);
+  gflags::SetArgv(argc, const_cast<const char **>(argv));
+  gflags::SetVersionString(WDT_VERSION_STR);
   string usage("Generates test files for wdt transfer benchmark. v");
-  usage.append(google::VersionString());
+  usage.append(gflags::VersionString());
   usage.append(". Sample usage:\n\t");
-  usage.append(google::ProgramInvocationShortName());
+  usage.append(gflags::ProgramInvocationShortName());
   usage.append(" [flags] < Bigrams > generated");
-  google::SetUsageMessage(usage);
+  gflags::SetUsageMessage(usage);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
