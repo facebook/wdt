@@ -158,7 +158,7 @@ void readManifest(std::istream &fin, WdtTransferRequest &req, bool dfltDirect) {
   req.disableDirectoryTraversal = true;
 }
 
-namespace google {
+namespace gflags {
 extern GFLAGS_DLL_DECL void (*gflags_exitfunc)(int);
 }
 
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
       " key, from stdin.");
   usage.append("\nUse --help to see all the options.");
   gflags::SetUsageMessage(usage);
-  google::gflags_exitfunc = [](int code) {
+  gflags::gflags_exitfunc = [](int code) {
     if (code == 0 || FLAGS_help) {
       // By default gflags exit 1 with --help and 0 for --version (good)
       // let's also exit(0) for --help to be like most gnu command line
