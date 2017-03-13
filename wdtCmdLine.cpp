@@ -158,7 +158,7 @@ void readManifest(std::istream &fin, WdtTransferRequest &req, bool dfltDirect) {
   req.disableDirectoryTraversal = true;
 }
 
-namespace gflags {
+namespace GFLAGS_NAMESPACE {
 extern GFLAGS_DLL_DECL void (*gflags_exitfunc)(int);
 }
 
@@ -176,15 +176,15 @@ void sigUSR1Handler(int) {
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
-  gflags::SetArgv(argc, const_cast<const char **>(argv));
-  gflags::SetVersionString(Protocol::getFullVersion());
+  GFLAGS_NAMESPACE::SetArgv(argc, const_cast<const char **>(argv));
+  GFLAGS_NAMESPACE::SetVersionString(Protocol::getFullVersion());
   usage.assign("WDT Warp-speed Data Transfer. v ");
-  usage.append(gflags::VersionString());
+  usage.append(GFLAGS_NAMESPACE::VersionString());
   usage.append(". Sample usage:\nTo transfer from srchost to desthost:\n\t");
   usage.append("ssh dsthost ");
-  usage.append(gflags::ProgramInvocationShortName());
+  usage.append(GFLAGS_NAMESPACE::ProgramInvocationShortName());
   usage.append(" -directory destdir | ssh srchost ");
-  usage.append(gflags::ProgramInvocationShortName());
+  usage.append(GFLAGS_NAMESPACE::ProgramInvocationShortName());
   usage.append(" -directory srcdir -");
   usage.append(
       "\nPassing - as the argument to wdt means start the sender and"
@@ -193,8 +193,8 @@ int main(int argc, char *argv[]) {
       "\nconnection URL produced by the receiver, including encryption"
       " key, from stdin.");
   usage.append("\nUse --help to see all the options.");
-  gflags::SetUsageMessage(usage);
-  gflags::gflags_exitfunc = [](int code) {
+  GFLAGS_NAMESPACE::SetUsageMessage(usage);
+  GFLAGS_NAMESPACE::gflags_exitfunc = [](int code) {
     if (code == 0 || FLAGS_help) {
       // By default gflags exit 1 with --help and 0 for --version (good)
       // let's also exit(0) for --help to be like most gnu command line
@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
     }
     badGflagFound = true;
   };
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   if (badGflagFound) {
     // will only work for receivers

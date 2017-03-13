@@ -113,7 +113,7 @@ TEST(BasicTest, ThrottlerWithoutReporting) {
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   int ret = RUN_ALL_TESTS();
   return ret;

@@ -147,7 +147,7 @@ BENCHMARK_MULTI(MtIncrement) {
 
 int main(int argc, char** argv) {
   FLAGS_logtostderr = true;
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   folly::runBenchmarks();
   return 0;

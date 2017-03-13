@@ -44,8 +44,8 @@ std::string getOptionNameFromFlagName(const std::string &flagName) {
 
 std::set<std::string> WdtFlags::getUserSpecifiedOptions() {
   std::set<std::string> userSpecifiedFlags;
-  std::vector<gflags::CommandLineFlagInfo> allFlags;
-  gflags::GetAllFlags(&allFlags);
+  std::vector<GFLAGS_NAMESPACE::CommandLineFlagInfo> allFlags;
+  GFLAGS_NAMESPACE::GetAllFlags(&allFlags);
   for (const auto &flag : allFlags) {
     if (!flag.is_default) {
       // is_default is false if the flag has been specified in the cmd line.
