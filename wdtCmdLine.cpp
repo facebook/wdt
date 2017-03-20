@@ -174,6 +174,10 @@ void sigUSR1Handler(int) {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef WDTFBINIT
+  WDTFBINIT
+#endif
+
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
   GFLAGS_NAMESPACE::SetArgv(argc, const_cast<const char **>(argv));
