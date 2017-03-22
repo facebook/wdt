@@ -35,6 +35,12 @@ struct WdtFileInfo {
   /// Whether read should be done using o_direct. If fd is set, this flag will
   /// be set automatically to match the fd open mode
   bool directReads{false};
+  /// File permission in decimal. When smaller than oct777 (dec512), the
+  /// permission will be passed during transfer.
+  int64_t permission{512};
+  /// Constructor for file info with name, size, odirect request and permission
+  WdtFileInfo(const std::string& name,
+              int64_t size, bool directReads, int64_t perm);
   /// Constructor for file info with name, size and odirect request
   WdtFileInfo(const std::string& name, int64_t size, bool directReads);
   /**

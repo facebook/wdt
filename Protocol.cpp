@@ -148,7 +148,8 @@ bool Protocol::encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
             encodeVarI64C(dest, umax, off, blockDetails.seqId) &&
             encodeVarI64C(dest, umax, off, blockDetails.dataSize) &&
             encodeVarI64C(dest, umax, off, blockDetails.offset) &&
-            encodeVarI64C(dest, umax, off, blockDetails.fileSize);
+            encodeVarI64C(dest, umax, off, blockDetails.fileSize) &&
+            encodeVarI64C(dest, umax, off, blockDetails.permission);
   if (ok && senderProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
     uint8_t flags = blockDetails.allocationStatus;
     if (off >= max) {
@@ -178,7 +179,8 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
             decodeInt64C(br, blockDetails.seqId) &&
             decodeInt64C(br, blockDetails.dataSize) &&
             decodeInt64C(br, blockDetails.offset) &&
-            decodeInt64C(br, blockDetails.fileSize);
+            decodeInt64C(br, blockDetails.fileSize) &&
+            decodeInt64C(br, blockDetails.permission);
   if (ok && receiverProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
     if (br.empty()) {
       WLOG(ERROR) << "Invalid (too short) input len " << max << " at offset "

@@ -33,6 +33,12 @@ WdtFileInfo::WdtFileInfo(const string &name, int64_t size, bool doDirectReads)
     : fileName(name), fileSize(size), directReads(doDirectReads) {
 }
 
+WdtFileInfo::WdtFileInfo(const string &name,
+                         int64_t size, bool doDirectReads, int64_t perm)
+    : WdtFileInfo(name, size, doDirectReads){
+  permission = perm;
+}
+
 WdtFileInfo::WdtFileInfo(int fd, int64_t size, const string &name)
     : WdtFileInfo(name, size, false) {
   this->fd = fd;
@@ -360,7 +366,9 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          WdtFileInfo fileInfo(newRelativePath, fileStat.st_size, directReads_);
+          int perm = fileStat.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+          WdtFileInfo fileInfo(newRelativePath,
+                               fileStat.st_size, directReads_, perm);
           createIntoQueue(newFullPath, fileInfo);
           continue;
         }
