@@ -49,7 +49,7 @@ void testEncryption(const EncryptionType encryptionType,
   EXPECT_TRUE(success);
   success = decryptor.decrypt(encryptedText, length, decryptedText);
   // EXPECT_EQ((encryptionType != ENC_AES128_GCM), success);
-  EXPECT_EQ(true, success);
+  EXPECT_TRUE(success);
   success = decryptor.finish(tag);
   // gcm does/should detect the error, not the others:
   EXPECT_EQ((encryptionType != ENC_AES128_GCM), success);
