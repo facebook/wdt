@@ -57,7 +57,7 @@ cpp_library(
 
 cpp_unittest(
   name = 'wdt_misc_tests',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/WdtMiscTests.cpp', ],
   deps = [
       ":wdtlib",
@@ -67,7 +67,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'test_encdeci64_func',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/test_encdeci64_func.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -77,7 +77,7 @@ cpp_unittest(
 
 cpp_binary(
   name = 'test_encdeci64_perf',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/test_encdeci64_perf.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -137,7 +137,7 @@ cpp_binary(
 
 cpp_unittest(
   name = 'protocol_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/ProtocolTest.cpp', ],
   deps = [
       ":wdtlib",
@@ -147,7 +147,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'encryption_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/EncryptionTest.cpp', ],
   deps = [
       ":wdtlib",
@@ -157,7 +157,7 @@ cpp_unittest(
 
 cpp_binary(
   name = 'option_type_test_long_flags',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     'test/OptionTypeTest.cpp',
   ],
@@ -170,7 +170,7 @@ cpp_binary(
 
 cpp_binary(
   name = 'option_type_test_short_flags',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     'test/OptionTypeTest.cpp',
   ],
@@ -201,7 +201,7 @@ custom_unittest(
 
 cpp_unittest(
   name = 'filereader_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/FileReaderTest.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -211,7 +211,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'threadscontroller_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/ThreadsControllerTest.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -221,7 +221,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'throttler_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/ThrottlerTest.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -231,7 +231,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'resource_controller_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/WdtResourceControllerTest.cpp', ],
   deps = [
       ":wdtlib",
@@ -241,7 +241,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'wdt_url_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/WdtUrlTest.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -251,7 +251,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'wdt_fd_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/FdTest.cpp', ],
   deps = [
       ":wdtlib",
@@ -543,7 +543,7 @@ wdt_sh_test("wdt_global_checkpoint_test",  tags = ['serialize', 'disabled'])
 
 cpp_library (
   name = "wdtlib_min",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     "util/WdtSocket.cpp",
     "util/ClientSocket.cpp",
@@ -589,7 +589,7 @@ cpp_library (
 
 cpp_library (
   name = "wdtlib",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     "util/WdtFlags.cpp",
     "Wdt.cpp",
@@ -602,7 +602,7 @@ cpp_library (
 
 cpp_library (
   name = "wdtlib_short_flags",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     "util/WdtFlags.cpp",
     "Wdt.cpp",
@@ -619,7 +619,7 @@ cpp_library (
 
 cpp_library (
     name = "testcommon",
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
     srcs = [
         "test/TestCommon.cpp"
         ],

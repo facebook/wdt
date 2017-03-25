@@ -13,7 +13,7 @@ export_file(
 
 cpp_library (
   name = "wdtbenchlib",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     "Bigram.cpp",
   ],
@@ -25,7 +25,7 @@ cpp_library (
 
 cpp_library (
   name = "wdtbenchlibopt",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   output_subdir = 'wblopt',
   srcs = [
     "Bigram.cpp",
@@ -69,7 +69,7 @@ cpp_binary(
 
 cpp_unittest(
     name = 'wdt_gen_test',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
     srcs = [ 'wdtGenTest.cpp', ],
     deps = [
         ":wdtbenchlib",
