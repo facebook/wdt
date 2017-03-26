@@ -139,7 +139,7 @@ if [ $DO_VERIFY -eq 1 ] ; then
     STATUS=$?
     if [ $STATUS -eq 0 ] ; then
       (cd $DIR/src ; ( find . -type f -printf %f%m\\n | sort ) > ../src.perm )
-      (cd $DIR/dest ; ( find . -type f -printf %f%m\\n | sort ) > ../dest.perm )
+      (cd $DIR/dst ; ( find . -type f -printf %f%m\\n | sort ) > ../dst.perm )
 
       (cd $DIR; diff -u src.perm dst.perm)
       STATUS=$?

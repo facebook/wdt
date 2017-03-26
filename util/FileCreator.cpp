@@ -58,7 +58,8 @@ int FileCreator::openAndSetSize(ThreadCtx &threadCtx,
   const bool doCreate = (blockDetails->allocationStatus == NOT_EXISTS);
   const bool isTooLarge = (blockDetails->allocationStatus == EXISTS_TOO_LARGE);
   if (doCreate) {
-    fd = createFile(threadCtx, blockDetails->fileName);
+    fd = createFile(threadCtx,
+                    blockDetails->fileName, blockDetails->permission);
   } else {
     fd = openExistingFile(threadCtx, blockDetails->fileName);
   }
@@ -197,7 +198,16 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
   return res;
 }
 
-int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
+int openWithPerm(const char *path, int oFlags, int perm) {
+  if (perm >= 512) {
+    // no permission specified
+    return open(path, oFlags, 0644);
+  }
+  return open(path, oFlags, perm);
+}
+
+int FileCreator::createFile(ThreadCtx &threadCtx,
+                            const string &relPathStr, int64_t permission) {
   CHECK(!relPathStr.empty());
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
@@ -255,7 +265,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
   int res;
   {
     PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
-    res = open(path.c_str(), openFlags, 0644);
+    res = openWithPerm(path.c_str(), openFlags, permission);
   }
   if (res < 0) {
     if (dir.empty()) {
@@ -276,7 +286,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
     }
     {
       PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
-      res = open(path.c_str(), openFlags, 0644);
+      res = openWithPerm(path.c_str(), openFlags, permission);
     }
     if (res < 0) {
       WPLOG(ERROR) << "failed creating file " << path;

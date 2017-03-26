@@ -108,7 +108,8 @@ class FileCreator {
    *
    * @return          file descriptor or -1 on error
    */
-  int createFile(ThreadCtx &threadCtx, const std::string &relPath);
+  int createFile(ThreadCtx &threadCtx,
+                 const std::string &relPath, int64_t permission);
   /**
    * Open existing file
    */

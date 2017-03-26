@@ -448,6 +448,7 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   metadata->fd = fileInfo.fd;
   metadata->directReads = fileInfo.directReads;
   metadata->size = fileInfo.fileSize;
+  metadata->permission = fileInfo.permission;
   if ((openFilesDuringDiscovery_ != 0) && (metadata->fd < 0)) {
     metadata->fd =
         FileUtil::openForRead(*threadCtx_, fullPath, metadata->directReads);
