@@ -268,6 +268,8 @@ class Protocol {
   static const int DELETE_CMD_VERSION;
   /// version from which we switched varint to better one
   static const int VARINT_CHANGE;
+  /// version from which file permission is kept during transfer
+  static const int KEEP_PERMISSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
