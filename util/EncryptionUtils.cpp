@@ -241,11 +241,9 @@ EncryptionParams EncryptionParams::generateEncryptionParams(
 
 bool AESBase::cloneCtx(EVP_CIPHER_CTX* ctxOut) const {
   WDT_CHECK(encryptionTypeToTagLen(type_));
-  EVP_CIPHER_CTX_init(ctxOut);
-  int status = EVP_CIPHER_CTX_copy(ctxOut, &evpCtx_);
+  int status = EVP_CIPHER_CTX_copy(ctxOut, evpCtx_.get());
   if (status != 1) {
     WLOG(ERROR) << "Cipher ctx copy failed " << status;
-    EVP_CIPHER_CTX_cleanup(ctxOut);
     return false;
   }
   return true;
@@ -262,9 +260,25 @@ const EVP_CIPHER* AESBase::getCipher(const EncryptionType encryptionType) {
   return nullptr;
 }
 
+EVP_CIPHER_CTX* createAndInitCtx() {
+  auto ctx = EVP_CIPHER_CTX_new();
+  EVP_CIPHER_CTX_init(ctx);
+  return ctx;
+}
+
+void cleanupAndDestroyCtx(EVP_CIPHER_CTX* ctx) {
+  EVP_CIPHER_CTX_cleanup(ctx);
+  EVP_CIPHER_CTX_free(ctx);
+}
+
 bool AESEncryptor::start(const EncryptionParams& encryptionData,
                          std::string& ivOut) {
   WDT_CHECK(!started_);
+
+  // reset the enc ctx
+  // To reuse the same ctx, we have to have different reset code for different
+  // openssl version. So, we will just create another ctx for simplification
+  evpCtx_.reset(createAndInitCtx());
 
   type_ = encryptionData.getType();
 
@@ -285,8 +299,6 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
     return false;
   }
 
-  EVP_CIPHER_CTX_init(&evpCtx_);
-
   const EVP_CIPHER* cipher = getCipher(type_);
   if (cipher == nullptr) {
     return false;
@@ -298,18 +310,18 @@ bool AESEncryptor::start(const EncryptionParams& encryptionData,
   // gcm only uses 96 out of the 128 bits of IV. Let's use all of it to
   // reduce chances of attacks on large data transfers.
   if (type_ == ENC_AES128_GCM) {
-    if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, nullptr, nullptr) != 1) {
+    if (EVP_EncryptInit_ex(evpCtx_.get(), cipher, nullptr, nullptr, nullptr) !=
+        1) {
       WLOG(ERROR) << "GCM First init error";
     }
-    if (EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_SET_IVLEN, ivOut.size(),
+    if (EVP_CIPHER_CTX_ctrl(evpCtx_.get(), EVP_CTRL_GCM_SET_IVLEN, ivOut.size(),
                             nullptr) != 1) {
       WLOG(ERROR) << "Encrypt Init ivlen set failed";
     }
   }
 
-  if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, keyPtr, ivPtr) != 1) {
+  if (EVP_EncryptInit_ex(evpCtx_.get(), cipher, nullptr, keyPtr, ivPtr) != 1) {
     WLOG(ERROR) << "Encrypt Init failed";
-    EVP_CIPHER_CTX_cleanup(&evpCtx_);
     return false;
   }
   started_ = true;
@@ -320,7 +332,7 @@ bool AESEncryptor::encrypt(const char* in, const int inLength, char* out) {
   WDT_CHECK(started_);
 
   int outLength;
-  if (EVP_EncryptUpdate(&evpCtx_, (uint8_t*)out, &outLength, (uint8_t*)in,
+  if (EVP_EncryptUpdate(evpCtx_.get(), (uint8_t*)out, &outLength, (uint8_t*)in,
                         inLength) != 1) {
     WLOG(ERROR) << "EncryptUpdate failed";
     return false;
@@ -330,21 +342,20 @@ bool AESEncryptor::encrypt(const char* in, const int inLength, char* out) {
 }
 
 /* static */
-bool AESEncryptor::finishInternal(EVP_CIPHER_CTX& ctx,
+bool AESEncryptor::finishInternal(EVP_CIPHER_CTX* ctx,
                                   const EncryptionType type,
                                   std::string& tagOut) {
   int outLength;
-  int status = EVP_EncryptFinal(&ctx, nullptr, &outLength);
+  int status = EVP_EncryptFinal(ctx, nullptr, &outLength);
   if (status != 1) {
     WLOG(ERROR) << "EncryptFinal failed";
-    EVP_CIPHER_CTX_cleanup(&ctx);
     return false;
   }
   WDT_CHECK_EQ(0, outLength);
   size_t tagSize = encryptionTypeToTagLen(type);
   if (tagSize) {
     tagOut.resize(tagSize);
-    status = EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_GET_TAG, tagOut.size(),
+    status = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, tagOut.size(),
                                  &(tagOut.front()));
     if (status != 1) {
       WLOG(ERROR) << "EncryptFinal Tag extraction error "
@@ -352,7 +363,6 @@ bool AESEncryptor::finishInternal(EVP_CIPHER_CTX& ctx,
       tagOut.clear();
     }
   }
-  EVP_CIPHER_CTX_cleanup(&ctx);
   return true;
 }
 
@@ -362,19 +372,19 @@ bool AESEncryptor::finish(std::string& tagOut) {
     return true;
   }
   started_ = false;
-  bool status = finishInternal(evpCtx_, type_, tagOut);
+  bool status = finishInternal(evpCtx_.get(), type_, tagOut);
   WLOG_IF(INFO, status) << "Encryption finish tag = "
                         << folly::humanify(tagOut);
   return status;
 }
 
 std::string AESEncryptor::computeCurrentTag() {
-  EVP_CIPHER_CTX ctx;
+  std::unique_ptr<EVP_CIPHER_CTX, CipherCtxDeleter> ctx{createAndInitCtx()};
   std::string tag;
-  if (!cloneCtx(&ctx)) {
+  if (!cloneCtx(ctx.get())) {
     return tag;
   }
-  finishInternal(ctx, type_, tag);
+  finishInternal(ctx.get(), type_, tag);
   return tag;
 }
 
@@ -386,6 +396,9 @@ AESEncryptor::~AESEncryptor() {
 bool AESDecryptor::start(const EncryptionParams& encryptionData,
                          const std::string& iv) {
   WDT_CHECK(!started_);
+
+  // reset the enc ctx
+  evpCtx_.reset(createAndInitCtx());
 
   type_ = encryptionData.getType();
 
@@ -403,7 +416,6 @@ bool AESDecryptor::start(const EncryptionParams& encryptionData,
 
   uint8_t* ivPtr = (uint8_t*)(&iv.front());
   uint8_t* keyPtr = (uint8_t*)(&key.front());
-  EVP_CIPHER_CTX_init(&evpCtx_);
 
   const EVP_CIPHER* cipher = getCipher(type_);
   if (cipher == nullptr) {
@@ -414,18 +426,18 @@ bool AESDecryptor::start(const EncryptionParams& encryptionData,
   WDT_CHECK_EQ(1, cipherBlockSize);
 
   if (type_ == ENC_AES128_GCM) {
-    if (EVP_EncryptInit_ex(&evpCtx_, cipher, nullptr, nullptr, nullptr) != 1) {
+    if (EVP_EncryptInit_ex(evpCtx_.get(), cipher, nullptr, nullptr, nullptr) !=
+        1) {
       WLOG(ERROR) << "GCM Decryptor First init error";
     }
-    if (EVP_CIPHER_CTX_ctrl(&evpCtx_, EVP_CTRL_GCM_SET_IVLEN, iv.size(),
+    if (EVP_CIPHER_CTX_ctrl(evpCtx_.get(), EVP_CTRL_GCM_SET_IVLEN, iv.size(),
                             nullptr) != 1) {
       WLOG(ERROR) << "Encrypt Init ivlen set failed";
     }
   }
 
-  if (EVP_DecryptInit_ex(&evpCtx_, cipher, nullptr, keyPtr, ivPtr) != 1) {
+  if (EVP_DecryptInit_ex(evpCtx_.get(), cipher, nullptr, keyPtr, ivPtr) != 1) {
     WLOG(ERROR) << "Decrypt Init failed";
-    EVP_CIPHER_CTX_cleanup(&evpCtx_);
     return false;
   }
   started_ = true;
@@ -436,7 +448,7 @@ bool AESDecryptor::decrypt(const char* in, const int inLength, char* out) {
   WDT_CHECK(started_);
 
   int outLength;
-  if (EVP_DecryptUpdate(&evpCtx_, (uint8_t*)out, &outLength, (uint8_t*)in,
+  if (EVP_DecryptUpdate(evpCtx_.get(), (uint8_t*)out, &outLength, (uint8_t*)in,
                         inLength) != 1) {
     WLOG(ERROR) << "DecryptUpdate failed";
     return false;
@@ -447,15 +459,16 @@ bool AESDecryptor::decrypt(const char* in, const int inLength, char* out) {
 
 bool AESDecryptor::verifyTag(const std::string& tag) {
   WDT_CHECK_EQ(ENC_AES128_GCM, type_);
-  EVP_CIPHER_CTX clonedCtx;
-  if (!cloneCtx(&clonedCtx)) {
+  std::unique_ptr<EVP_CIPHER_CTX, CipherCtxDeleter> clonedCtx{
+      createAndInitCtx()};
+  if (!cloneCtx(clonedCtx.get())) {
     return false;
   }
-  return finishInternal(clonedCtx, type_, tag);
+  return finishInternal(clonedCtx.get(), type_, tag);
 }
 
 /* static */
-bool AESDecryptor::finishInternal(EVP_CIPHER_CTX& ctx,
+bool AESDecryptor::finishInternal(EVP_CIPHER_CTX* ctx,
                                   const EncryptionType type,
                                   const std::string& tag) {
   int status;
@@ -463,22 +476,19 @@ bool AESDecryptor::finishInternal(EVP_CIPHER_CTX& ctx,
   if (tagSize) {
     if (tag.size() != tagSize) {
       WLOG(ERROR) << "Need tag for gcm mode " << folly::humanify(tag);
-      EVP_CIPHER_CTX_cleanup(&ctx);
       return false;
     }
     // EVP_CIPHER_CTX_ctrl takes a non const buffer. But, for set tag the buffer
     // will not be modified. So, it is safe to use const_cast here.
     char* tagBuf = const_cast<char*>(tag.data());
-    status =
-        EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_TAG, tag.size(), tagBuf);
+    status = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, tag.size(), tagBuf);
     if (status != 1) {
       WLOG(ERROR) << "Decrypt final tag set error " << folly::humanify(tag);
     }
   }
 
   int outLength = 0;
-  status = EVP_DecryptFinal(&ctx, nullptr, &outLength);
-  EVP_CIPHER_CTX_cleanup(&ctx);
+  status = EVP_DecryptFinal(ctx, nullptr, &outLength);
   if (status != 1) {
     WLOG(ERROR) << "DecryptFinal failed " << outLength;
     return false;
@@ -492,7 +502,7 @@ bool AESDecryptor::finish(const std::string& tag) {
     return true;
   }
   started_ = false;
-  bool status = finishInternal(evpCtx_, type_, tag);
+  bool status = finishInternal(evpCtx_.get(), type_, tag);
   WLOG_IF(INFO, status) << "Successful end of decryption with tag = "
                         << folly::humanify(tag);
   return status;

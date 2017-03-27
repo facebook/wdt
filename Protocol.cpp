@@ -12,8 +12,6 @@
 #include <wdt/WdtOptions.h>
 #include <wdt/util/SerializationUtil.h>
 
-#include <algorithm>
-
 namespace facebook {
 namespace wdt {
 
@@ -34,6 +32,7 @@ const int Protocol::ENCRYPTION_V1_VERSION = 23;
 const int Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION = 25;
 const int Protocol::DELETE_CMD_VERSION = 26;
 const int Protocol::VARINT_CHANGE = 27;
+const int Protocol::HEART_BEAT_VERSION = 29;
 const int Protocol::KEEP_PERMISSION = 30;
 
 /* All methods of Protocol class are static (functions) */
@@ -479,6 +478,9 @@ bool Protocol::encodeSettings(int senderProtocolVersion, char *dest,
     if (settings.blockModeDisabled) {
       flags |= (1 << 2);
     }
+    if (settings.enableHeartBeat) {
+      flags |= (1 << 3);
+    }
     if (off >= max) {
       return false;
     }
@@ -520,6 +522,7 @@ bool Protocol::decodeSettings(int protocolVersion, char *src, int64_t &off,
     settings.enableChecksum = flags & 1;
     settings.sendFileChunks = flags & (1 << 1);
     settings.blockModeDisabled = flags & (1 << 2);
+    settings.enableHeartBeat = flags & (1 << 3);
     br.pop_front();
   }
   off += offset(br, obr);

@@ -8,6 +8,7 @@
  */
 #pragma once
 
+#include <folly/Memory.h>
 #include <openssl/evp.h>
 #include <wdt/ErrorCodes.h>
 #include <string>
@@ -94,6 +95,13 @@ class EncryptionParams {
   std::string tag_;
 };
 
+EVP_CIPHER_CTX* createAndInitCtx();
+
+void cleanupAndDestroyCtx(EVP_CIPHER_CTX* ctx);
+
+using CipherCtxDeleter =
+    folly::static_function_deleter<EVP_CIPHER_CTX, &cleanupAndDestroyCtx>;
+
 /// base class to share code between encyptor and decryptor
 class AESBase {
  protected:
@@ -105,7 +113,7 @@ class AESBase {
   /// @return   cipher for a encryption type
   const EVP_CIPHER* getCipher(const EncryptionType encryptionType);
   EncryptionType type_{ENC_NONE};
-  EVP_CIPHER_CTX evpCtx_;
+  std::unique_ptr<EVP_CIPHER_CTX, CipherCtxDeleter> evpCtx_;
   bool started_{false};
 };
 
@@ -148,7 +156,7 @@ class AESEncryptor : public AESBase {
   virtual ~AESEncryptor();
 
  private:
-  static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
+  static bool finishInternal(EVP_CIPHER_CTX* ctx, EncryptionType type,
                              std::string& tagOut);
 };
 
@@ -191,7 +199,7 @@ class AESDecryptor : public AESBase {
   virtual ~AESDecryptor();
 
  private:
-  static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
+  static bool finishInternal(EVP_CIPHER_CTX* ctx, EncryptionType type,
                              const std::string& tag);
 };
 }

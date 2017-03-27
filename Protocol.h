@@ -236,6 +236,8 @@ struct Settings {
   bool sendFileChunks{0};
   /// whether block mode is disabled
   bool blockModeDisabled{false};
+  /// whether heart-beat is enabled
+  bool enableHeartBeat{false};
 };
 
 class Protocol {
@@ -268,6 +270,8 @@ class Protocol {
   static const int DELETE_CMD_VERSION;
   /// version from which we switched varint to better one
   static const int VARINT_CHANGE;
+  /// version from which heart-beat was introduced
+  static const int HEART_BEAT_VERSION;
   /// version from which file permission is kept during transfer
   static const int KEEP_PERMISSION;
 
@@ -290,6 +294,7 @@ class Protocol {
                // number of checkpoints for local checkpoint is 1, we can treat
                // 0x01 to be a separate cmd
     ENCRYPTION_CMD = 0x65,  // (e)ncryption
+    HEART_BEAT_CMD = 0x48,  // (H)eart-beat
   };
 
   // TODO: move the rest of those definitions closer to where they need to be

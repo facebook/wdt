@@ -49,7 +49,7 @@ void testEncryption(const EncryptionType encryptionType,
   EXPECT_TRUE(success);
   success = decryptor.decrypt(encryptedText, length, decryptedText);
   // EXPECT_EQ((encryptionType != ENC_AES128_GCM), success);
-  EXPECT_EQ(true, success);
+  EXPECT_TRUE(success);
   success = decryptor.finish(tag);
   // gcm does/should detect the error, not the others:
   EXPECT_EQ((encryptionType != ENC_AES128_GCM), success);
@@ -122,7 +122,7 @@ TEST(Encryption, SuperBasic) {
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   int ret = RUN_ALL_TESTS();
   return ret;
