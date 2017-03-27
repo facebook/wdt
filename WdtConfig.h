@@ -10,10 +10,10 @@
 #include <fcntl.h>
 
 #define WDT_VERSION_MAJOR 1
-#define WDT_VERSION_MINOR 29
-#define WDT_VERSION_BUILD 1703251
+#define WDT_VERSION_MINOR 30
+#define WDT_VERSION_BUILD 1703240
 // Add -fbcode to version str
-#define WDT_VERSION_STR "1.29.1703251-fbcode"
+#define WDT_VERSION_STR "1.30.1703240-fbcode"
 // Tie minor and proto version
 #define WDT_PROTOCOL_VERSION WDT_VERSION_MINOR
 

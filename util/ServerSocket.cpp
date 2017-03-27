@@ -19,8 +19,9 @@ using std::string;
 
 ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
                            const EncryptionParams &encryptionParams,
+                           int64_t ivChangeInterval,
                            Func &&tagVerificationSuccessCallback)
-    : WdtSocket(threadCtx, port, encryptionParams,
+    : WdtSocket(threadCtx, port, encryptionParams, ivChangeInterval,
                 std::move(tagVerificationSuccessCallback)),
       backlog_(backlog) {
   // for backward compatibility

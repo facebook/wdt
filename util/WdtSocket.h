@@ -19,7 +19,7 @@ using Func = std::function<void()>;
 class WdtSocket {
  public:
   WdtSocket(ThreadCtx &threadCtx, int port,
-            const EncryptionParams &encryptionParams,
+            const EncryptionParams &encryptionParams, int64_t ivChangeInterval,
             Func &&tagVerificationSuccessCallback);
 
   // making the object non-copyable and non-movable
@@ -86,6 +86,11 @@ class WdtSocket {
   ///           fails to get unacked bytes for this socket
   int getUnackedBytes() const;
 
+  void disableIvChange() {
+    WLOG(INFO) << "Disabling periodic encryption iv change";
+    ivChangeInterval_ = 0;
+  }
+
   virtual ~WdtSocket();
 
  protected:
@@ -107,6 +112,10 @@ class WdtSocket {
   // reads encryption tag. Returns empty string in case of failure.
   std::string readEncryptionTag();
 
+  // checks whether decryption iv has changed or not. If yes, it reads the new
+  // iv
+  bool checkAndChangeDecryptionIv();
+
   // reads from socket. Does not understand encryption
   int readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull);
 
@@ -120,6 +129,10 @@ class WdtSocket {
 
   // writes encryption tag. Returns status
   bool writeEncryptionTag();
+
+  // checks whether encryption iv needs to change, and if yes, changes it. This
+  // also sends the new iv
+  bool checkAndChangeEncryptionIv();
 
   // writes to socket. Does not understand encryption
   int writeInternal(const char *buf, int nbyte, int timeoutMs, bool retry);
@@ -157,13 +170,14 @@ class WdtSocket {
   ThreadCtx &threadCtx_;
 
   EncryptionParams encryptionParams_;
+  int64_t ivChangeInterval_{0};
 
   Func tagVerificationSuccessCallback_{nullptr};
 
   bool encryptionSettingsWritten_{false};
   bool encryptionSettingsRead_{false};
-  AESEncryptor encryptor_;
-  AESDecryptor decryptor_;
+  std::unique_ptr<AESEncryptor> encryptor_;
+  std::unique_ptr<AESDecryptor> decryptor_;
   /// buffer used to encrypt/decrypt
   char buf_[Protocol::kEncryptionCmdLen];
 
@@ -188,6 +202,10 @@ class WdtSocket {
   bool readsFinalized_{false};
 
  private:
+  void resetEncryptor();
+
+  void resetDecryptor();
+
   /// computes effective timeout depending on the network timeout and abort
   /// check interval
   int getEffectiveTimeout(int networkTimeout);

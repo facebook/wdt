@@ -182,3 +182,6 @@ WDT_OPT(fsync, bool,
         "If true, each file is fsync'ed after its last block is received");
 WDT_OPT(enable_heart_beat, bool,
         "If true, periodic heart-beat from receiver to sender is enabled.");
+WDT_OPT(iv_change_interval_mb, int32,
+        "Number of MBytes after which encryption iv is changed. A value of "
+        "0 disables iv change.");

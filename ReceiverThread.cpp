@@ -320,6 +320,11 @@ ReceiverState ReceiverThread::processSettingsCmd() {
     }
   }
 
+  if (threadProtocolVersion_ <
+      Protocol::PERIODIC_ENCRYPTION_IV_CHANGE_VERSION) {
+    socket_->disableIvChange();
+  }
+
   success = Protocol::decodeSettings(
       threadProtocolVersion_, buf_, off_,
       oldOffset_ + Protocol::kMaxVersion + Protocol::kMaxSettings, settings);
@@ -988,6 +993,7 @@ ErrorCode ReceiverThread::init() {
   };
   socket_ = std::make_unique<ServerSocket>(
       *threadCtx_, port_, wdtParent_->backlog_, encryptionData,
+      wdtParent_->transferRequest_.ivChangeInterval,
       std::move(tagVerificationSuccessCallback));
   int max_retries = options_.max_retries;
   for (int retries = 0; retries < max_retries; retries++) {

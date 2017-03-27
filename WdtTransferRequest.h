@@ -183,6 +183,9 @@ struct WdtTransferRequest {
   // and is requested from the sender
   bool downloadResumptionEnabled{false};
 
+  /// Number of GBytes after iv is changed
+  int64_t ivChangeInterval{0};
+
   /// Any error associated with this transfer request upon processing
   ErrorCode errorCode{OK};
 
@@ -235,6 +238,7 @@ struct WdtTransferRequest {
   const static std::string NAMESPACE_PARAM;
   const static std::string DEST_IDENTIFIER_PARAM;
   const static std::string DOWNLOAD_RESUMPTION_PARAM;
+  const static std::string IV_CHANGE_INTERVAL_PARAM;
 
   /// Get ports vector from startPort and numPorts
   static std::vector<int32_t> genPortsVector(int32_t startPort,
