@@ -566,14 +566,15 @@ bool DirectorySourceQueue::enqueueFiles() {
       return false;
     }
     string fullPath = rootDir_ + info.fileName;
+    struct stat fileStat;
+    if (stat(fullPath.c_str(), &fileStat) != 0) {
+      WPLOG(ERROR) << "stat failed on path " << fullPath;
+      return false;
+    }
     if (info.fileSize < 0) {
-      struct stat fileStat;
-      if (stat(fullPath.c_str(), &fileStat) != 0) {
-        WPLOG(ERROR) << "stat failed on path " << fullPath;
-        return false;
-      }
       info.fileSize = fileStat.st_size;
     }
+    info.permission = fileStat.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
     createIntoQueue(fullPath, info);
   }
   return true;

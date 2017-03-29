@@ -34,7 +34,7 @@ const int Protocol::ENCRYPTION_V1_VERSION = 23;
 const int Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION = 25;
 const int Protocol::DELETE_CMD_VERSION = 26;
 const int Protocol::VARINT_CHANGE = 27;
-const int Protocol::KEEP_PERMISSION = 30;
+const int Protocol::PRESERVE_PERMISSION = 31;
 
 /* All methods of Protocol class are static (functions) */
 
@@ -149,8 +149,8 @@ bool Protocol::encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
             encodeVarI64C(dest, umax, off, blockDetails.seqId) &&
             encodeVarI64C(dest, umax, off, blockDetails.dataSize) &&
             encodeVarI64C(dest, umax, off, blockDetails.offset) &&
-            encodeVarI64C(dest, umax, off, blockDetails.fileSize);
-  if (ok && senderProtocolVersion >= KEEP_PERMISSION) {
+            encodeVarI64C(dest, umax, off, (int64_t) blockDetails.fileSize);
+  if (ok && senderProtocolVersion >= PRESERVE_PERMISSION) {
     ok = encodeVarI64C(dest, umax, off, blockDetails.permission);
   }
   if (ok && senderProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
@@ -183,8 +183,10 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
             decodeInt64C(br, blockDetails.dataSize) &&
             decodeInt64C(br, blockDetails.offset) &&
             decodeInt64C(br, blockDetails.fileSize);
-  if (ok && receiverProtocolVersion >= KEEP_PERMISSION) {
-      ok = decodeInt64C(br, blockDetails.permission);
+  if (ok && receiverProtocolVersion >= PRESERVE_PERMISSION) {
+      int64_t perm;
+      ok = decodeInt64C(br, perm);
+      blockDetails.permission = (int32_t) perm;
   }
   if (ok && receiverProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
     if (br.empty()) {

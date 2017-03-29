@@ -218,8 +218,8 @@ struct BlockDetails {
   FileAllocationStatus allocationStatus{NOT_EXISTS};
   /// seq-id of previous transfer, only valid if there is a size mismatch
   int64_t prevSeqId{0};
-  /// file permission in decimal.
-  int64_t permission{512};
+  /// file permission
+  int32_t permission{0644};
 };
 
 /// structure representing settings cmd
@@ -269,7 +269,7 @@ class Protocol {
   /// version from which we switched varint to better one
   static const int VARINT_CHANGE;
   /// version from which file permission is kept during transfer
-  static const int KEEP_PERMISSION;
+  static const int PRESERVE_PERMISSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
@@ -297,10 +297,10 @@ class Protocol {
 
   /// Max size of sender or receiver id
   static constexpr int64_t kMaxTransferIdLength = 50;
-  /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 5
-  /// variants(seq-id, data-size, offset, file-size, permission), 1 byte for
-  /// flag, 10 bytes prev seq-id
-  static constexpr int64_t kMaxHeader = 1 + 2 + PATH_MAX + 5 * 10 + 1 + 10;
+  /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 4
+  /// variants(seq-id, data-size, offset, file-size), 2 byte for permission, 1
+  /// byte for flag, 10 bytes prev seq-id
+  static constexpr int64_t kMaxHeader = 1 + 2 + PATH_MAX + 4 * 10 + 2 + 1 + 10;
   /// min number of bytes that must be send to unblock receiver
   static constexpr int64_t kMinBufLength = 256;
   /// max size of done command encoding(1 byte for cmd, 1 for status, 10 for

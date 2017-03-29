@@ -198,14 +198,6 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
   return res;
 }
 
-int openWithPerm(const char *path, int oFlags, int perm) {
-  if (perm >= 512) {
-    // no permission specified
-    return open(path, oFlags, 0644);
-  }
-  return open(path, oFlags, perm);
-}
-
 int FileCreator::createFile(ThreadCtx &threadCtx,
                             const string &relPathStr, int64_t permission) {
   CHECK(!relPathStr.empty());
@@ -265,7 +257,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx,
   int res;
   {
     PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
-    res = openWithPerm(path.c_str(), openFlags, permission);
+    res = open(path.c_str(), openFlags, permission);
   }
   if (res < 0) {
     if (dir.empty()) {
@@ -286,7 +278,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx,
     }
     {
       PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
-      res = openWithPerm(path.c_str(), openFlags, permission);
+      res = open(path.c_str(), openFlags, permission);
     }
     if (res < 0) {
       WPLOG(ERROR) << "failed creating file " << path;
