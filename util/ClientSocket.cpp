@@ -24,8 +24,10 @@ using std::string;
 
 ClientSocket::ClientSocket(ThreadCtx &threadCtx, const string &dest,
                            const int port,
-                           const EncryptionParams &encryptionParams)
-    : WdtSocket(threadCtx, port, encryptionParams, nullptr), dest_(dest) {
+                           const EncryptionParams &encryptionParams,
+                           int64_t ivChangeInterval)
+    : WdtSocket(threadCtx, port, encryptionParams, ivChangeInterval, nullptr),
+      dest_(dest) {
   memset(&sa_, 0, sizeof(sa_));
   if (threadCtx_.getOptions().ipv6) {
     sa_.ai_family = AF_INET6;
@@ -173,10 +175,6 @@ ErrorCode ClientSocket::connect() {
 
 const std::string &ClientSocket::getPeerIp() const {
   return peerIp_;
-}
-
-std::string ClientSocket::computeCurEncryptionTag() {
-  return encryptor_.computeCurrentTag();
 }
 
 void ClientSocket::setSendBufferSize() {

@@ -275,6 +275,7 @@ int main(int argc, char *argv[]) {
           EncryptionParams(parseEncryptionType(options.encryption_type),
                            FLAGS_test_only_encryption_secret);
     }
+    reqPtr->ivChangeInterval = options.iv_change_interval_mb * kMbToB;
   } else {
     reqPtr = std::make_unique<WdtTransferRequest>(connectUrl);
     if (reqPtr->errorCode != OK) {

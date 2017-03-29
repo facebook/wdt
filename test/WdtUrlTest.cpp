@@ -359,7 +359,7 @@ TEST(TransferRequestTest, Encryption1) {
     WLOG(INFO) << "Url with e= " << ser;
     EXPECT_EQ(ser,
               "wdt://host1:123?Enc=1:464f4f62617235360001fffe"
-              "&num_ports=3&recpv=" +
+              "&iv_change_int=0&num_ports=3&recpv=" +
                   std::to_string(Protocol::protocol_version));
     WdtTransferRequest unser(ser);
     EXPECT_EQ(unser.errorCode, OK);

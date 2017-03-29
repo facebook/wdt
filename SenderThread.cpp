@@ -41,13 +41,22 @@ std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
   std::unique_ptr<ClientSocket> socket;
   const EncryptionParams &encryptionData =
       wdtParent_->transferRequest_.encryptionData;
+  int64_t ivChangeInterval = wdtParent_->transferRequest_.ivChangeInterval;
+  if (threadProtocolVersion_ <
+      Protocol::PERIODIC_ENCRYPTION_IV_CHANGE_VERSION) {
+    WTLOG(WARNING) << "Disabling periodic iv change for sender with version "
+                   << threadProtocolVersion_;
+    ivChangeInterval = 0;
+  }
   if (!wdtParent_->socketCreator_) {
     // socket creator not set, creating ClientSocket
-    socket = std::make_unique<ClientSocket>(
-        *threadCtx_, wdtParent_->getDestination(), port, encryptionData);
+    socket = std::make_unique<ClientSocket>(*threadCtx_,
+                                            wdtParent_->getDestination(), port,
+                                            encryptionData, ivChangeInterval);
   } else {
     socket = wdtParent_->socketCreator_->makeSocket(
-        *threadCtx_, wdtParent_->getDestination(), port, encryptionData);
+        *threadCtx_, wdtParent_->getDestination(), port, encryptionData,
+        ivChangeInterval);
   }
   double retryInterval = options_.sleep_millis;
   int maxRetries = options_.max_retries;

@@ -33,6 +33,7 @@ const int Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION = 25;
 const int Protocol::DELETE_CMD_VERSION = 26;
 const int Protocol::VARINT_CHANGE = 27;
 const int Protocol::HEART_BEAT_VERSION = 29;
+const int Protocol::PERIODIC_ENCRYPTION_IV_CHANGE_VERSION = 30;
 const int Protocol::PRESERVE_PERMISSION = 31;
 
 /* All methods of Protocol class are static (functions) */

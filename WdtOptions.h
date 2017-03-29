@@ -385,6 +385,12 @@ class WdtOptions {
   bool enable_heart_beat{true};
 
   /**
+   * Number of MBytes after which encryption iv is changed. A value of 0
+   * disables iv change.
+   */
+  int iv_change_interval_mb{32 * 1024};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;

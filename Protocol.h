@@ -272,6 +272,8 @@ class Protocol {
   static const int VARINT_CHANGE;
   /// version from which heart-beat was introduced
   static const int HEART_BEAT_VERSION;
+  /// version from which wdt started to change encryption iv periodically
+  static const int PERIODIC_ENCRYPTION_IV_CHANGE_VERSION;
   /// version from which file permission is preserved during transfer
   static const int PRESERVE_PERMISSION;
 

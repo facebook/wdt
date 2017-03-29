@@ -104,17 +104,22 @@ using CipherCtxDeleter =
 
 /// base class to share code between encyptor and decryptor
 class AESBase {
+ public:
+  int64_t getNumProcessed() const {
+    return numProcessed_;
+  }
+
  protected:
   /// evpCtx_ is copied into ctxOut
   /// @return     whether the cloning was successful
   bool cloneCtx(EVP_CIPHER_CTX* ctxOut) const;
 
- protected:
   /// @return   cipher for a encryption type
   const EVP_CIPHER* getCipher(const EncryptionType encryptionType);
   EncryptionType type_{ENC_NONE};
   std::unique_ptr<EVP_CIPHER_CTX, CipherCtxDeleter> evpCtx_;
   bool started_{false};
+  int64_t numProcessed_{0};
 };
 
 /// encryptor class

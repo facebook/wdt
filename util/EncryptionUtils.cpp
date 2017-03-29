@@ -338,6 +338,7 @@ bool AESEncryptor::encrypt(const char* in, const int inLength, char* out) {
     return false;
   }
   WDT_CHECK_EQ(inLength, outLength);
+  numProcessed_ += inLength;
   return true;
 }
 
@@ -454,6 +455,7 @@ bool AESDecryptor::decrypt(const char* in, const int inLength, char* out) {
     return false;
   }
   WDT_CHECK_EQ(inLength, outLength);
+  numProcessed_ += inLength;
   return true;
 }
 
