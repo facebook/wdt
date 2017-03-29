@@ -84,6 +84,7 @@ class SenderThread : public WdtThread {
     threadAbortChecker_ = std::make_unique<SocketAbortChecker>(this);
     threadCtx_->setAbortChecker(threadAbortChecker_.get());
     threadStats_.setId(folly::to<std::string>(threadIndex_));
+    isTty_ = isatty(STDERR_FILENO);
   }
 
   typedef SenderState (SenderThread::*StateFunction)();
@@ -276,8 +277,15 @@ class SenderThread : public WdtThread {
   TransferStats sendOneByteSource(const std::unique_ptr<ByteSource> &source,
                                   ErrorCode transferStatus);
 
+  /// checks to see if heart-beat is enabled, and if it is time to read
+  /// heart-beats, and if yes, reads heart-beats
+  ErrorCode readHeartBeats();
+
   /// mapping from sender states to state functions
   static const StateFunction stateMap_[];
+
+  /// whether stderr is tty
+  bool isTty_{false};
 
   /// Negotiated protocol of the sender thread
   int negotiatedProtocol_{-1};

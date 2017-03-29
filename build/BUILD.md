@@ -85,9 +85,7 @@ sudo make install
 ```
 # Install on Mac OS X
 
-__Install Xcode 6 and the command line tools__ (so
-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
-exists)
+Open the terminal application and type "git" or "make" to be prompted to install the developper command line tools.
 
 
 ## Using the contbuild script locally
@@ -102,35 +100,31 @@ CTEST_OUTPUT_ON_FAILURE=1 make test
 make install
 ```
 
-## Or manual/step by step
+## Or manual/step by step using brew
+
+__Install homebrew (http://brew.sh/)__
+
 
 __Install Cmake__
 
 ```
-git clone http://cmake.org/cmake.git
-cd cmake
-./bootstrap --prefix=/usr --parallel=16
-make -j && sudo make install
-cd ../
+brew install cmake
 ```
-__Install homebrew (http://brew.sh/)__
 
 __Install glog and gflags and boost__
 ```sh
-brew update
 brew install glog gflags boost
 ```
 __Install Double conversion__
 ```
-git clone https://github.com/floitsch/double-conversion.git
-cd double-conversion; cmake . ; make -j && sudo make install;
-cd ../
+brew install double-conversion
 ```
 
 __libcrypto from openssl-1.0.x__
 
 ```
-brew update openssl
+brew install openssl
+# note OPENSSL is /usr/local/opt/openssl for  /usr/local/Cellar/openssl/1.0.2k
 ```
 
 
@@ -151,12 +145,12 @@ cd wdt-mac
 ```
 Using Xcode:
 ```
-cmake ../wdt -G Xcode -DBUILD_TESTING=on
+cmake ../wdt -G Xcode -DBUILD_TESTING=on -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
 ```
 
 Using Unix makefiles:
 ```
-cmake ../wdt -G "Unix Makefiles" -DBUILD_TESTING=on
+cmake ../wdt -G "Unix Makefiles" -DBUILD_TESTING=on -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
 make -j
 CTEST_OUTPUT_ON_FAILURE=1 make test
 sudo make install

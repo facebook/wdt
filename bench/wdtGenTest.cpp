@@ -64,7 +64,7 @@ TEST(Bigram, ToString) {
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   //  if (FLAGS_benchmark) {
   //    folly::runBenchmarks();

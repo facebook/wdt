@@ -180,3 +180,5 @@ WDT_OPT(
 WDT_OPT(skip_fadvise, bool, "If true, fadvise is skipped after block write");
 WDT_OPT(fsync, bool,
         "If true, each file is fsync'ed after its last block is received");
+WDT_OPT(enable_heart_beat, bool,
+        "If true, periodic heart-beat from receiver to sender is enabled.");

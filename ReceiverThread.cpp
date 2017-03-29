@@ -339,6 +339,10 @@ ReceiverState ReceiverThread::processSettingsCmd() {
   senderReadTimeout_ = settings.readTimeoutMillis;
   senderWriteTimeout_ = settings.writeTimeoutMillis;
   isBlockMode_ = !settings.blockModeDisabled;
+  enableHeartBeat_ = settings.enableHeartBeat;
+  if (!enableHeartBeat_) {
+    WTLOG(INFO) << "Disabling heart-beat as sender does not support it";
+  }
   curConnectionVerified_ = true;
 
   // determine footer type
@@ -357,6 +361,25 @@ ReceiverState ReceiverThread::processSettingsCmd() {
   auto msgLen = off_ - oldOffset_;
   numRead_ -= msgLen;
   return READ_NEXT_CMD;
+}
+
+void ReceiverThread::sendHeartBeat() {
+  if (!enableHeartBeat_) {
+    return;
+  }
+  const auto now = Clock::now();
+  const int timeSinceLastHeartBeatMs = durationMillis(now - lastHeartBeatTime_);
+  const int heartBeatIntervalMs = (senderReadTimeout_ / kWaitTimeoutFactor);
+  if (timeSinceLastHeartBeatMs <= heartBeatIntervalMs) {
+    return;
+  }
+  lastHeartBeatTime_ = now;
+  // time to send a heart beat
+  char buf = Protocol::HEART_BEAT_CMD;
+  const int written = socket_->write(&buf, 1);
+  if (written != 1) {
+    WTLOG(WARNING) << "Failed to send heart-beat " << written;
+  }
 }
 
 /***PROCESS_FILE_CMD***/
@@ -392,6 +415,8 @@ ReceiverState ReceiverThread::processFileCmd() {
   int16_t headerLen = folly::loadUnaligned<int16_t>(buf_ + off_);
   headerLen = folly::Endian::little(headerLen);
   WVLOG(2) << "Processing FILE_CMD, header len " << headerLen;
+
+  sendHeartBeat();
 
   if (headerLen > numRead_) {
     int64_t end = oldOffset_ + numRead_;
@@ -451,6 +476,8 @@ ReceiverState ReceiverThread::processFileCmd() {
     }
   });
 
+  sendHeartBeat();
+
   // writer.open() deletes files if status == TO_BE_DELETED
   // therefore if !(!delete_extra_files && status == TO_BE_DELETED)
   // we should skip writer.open() call altogether
@@ -480,6 +507,9 @@ ReceiverState ReceiverThread::processFileCmd() {
     // on the network
     throttler->limit(*threadCtx_, toWrite + headerBytes);
   }
+
+  sendHeartBeat();
+
   ErrorCode code = ERROR;
   if (toWrite > 0) {
     code = writer.write(buf_ + off_, toWrite);
@@ -499,6 +529,9 @@ ReceiverState ReceiverThread::processFileCmd() {
       threadStats_.setLocalErrorCode(ABORT);
       return FINISH_WITH_ERROR;
     }
+
+    sendHeartBeat();
+
     int64_t nres = readAtMost(*socket_, buf_, bufSize_,
                               blockDetails.dataSize - writer.getTotalWritten());
     if (nres <= 0) {
@@ -513,6 +546,9 @@ ReceiverState ReceiverThread::processFileCmd() {
     if (footerType_ == CHECKSUM_FOOTER) {
       checksum = folly::crc32c((const uint8_t *)buf_, nres, checksum);
     }
+
+    sendHeartBeat();
+
     code = writer.write(buf_, nres);
     if (code != OK) {
       threadStats_.setLocalErrorCode(code);
@@ -552,6 +588,7 @@ ReceiverState ReceiverThread::processFileCmd() {
     numRead_ = off_ = 0;
   }
   if (footerType_ == CHECKSUM_FOOTER) {
+    sendHeartBeat();
     // have to read footer cmd
     oldOffset_ = off_;
     numRead_ = readAtLeast(*socket_, buf_ + off_, bufSize_ - off_,
