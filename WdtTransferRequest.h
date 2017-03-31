@@ -39,7 +39,7 @@ struct WdtFileInfo {
   int32_t permission;
   /// Constructor for file info with name, size, odirect request and permission
   WdtFileInfo(const std::string& name,
-              int64_t size, bool directReads, int64_t perm);
+              int64_t size, bool directReads, int32_t perm);
   /// Constructor for file info with name, size and odirect request
   WdtFileInfo(const std::string& name, int64_t size, bool directReads);
   /**

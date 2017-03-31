@@ -304,10 +304,10 @@ class Protocol {
 
   /// Max size of sender or receiver id
   static constexpr int64_t kMaxTransferIdLength = 50;
-  /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 4
-  /// variants(seq-id, data-size, offset, file-size), 2 byte for permission, 1
-  /// byte for flag, 10 bytes prev seq-id
-  static constexpr int64_t kMaxHeader = 1 + 2 + PATH_MAX + 4 * 10 + 2 + 1 + 10;
+  /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 5
+  /// variants(seq-id, data-size, offset, file-size, permission), 1 byte for
+  /// flag, 10 bytes prev seq-id
+  static constexpr int64_t kMaxHeader = 1 + 2 + PATH_MAX + 5 * 10 + 2 + 1 + 10;
   /// min number of bytes that must be send to unblock receiver
   static constexpr int64_t kMinBufLength = 256;
   /// max size of done command encoding(1 byte for cmd, 1 for status, 10 for

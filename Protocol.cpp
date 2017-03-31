@@ -149,7 +149,7 @@ bool Protocol::encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
             encodeVarI64C(dest, umax, off, blockDetails.seqId) &&
             encodeVarI64C(dest, umax, off, blockDetails.dataSize) &&
             encodeVarI64C(dest, umax, off, blockDetails.offset) &&
-            encodeVarI64C(dest, umax, off, (int64_t) blockDetails.fileSize);
+            encodeVarI64C(dest, umax, off, blockDetails.fileSize);
   if (ok && senderProtocolVersion >= PRESERVE_PERMISSION) {
     ok = encodeVarI64C(dest, umax, off, blockDetails.permission);
   }
@@ -184,9 +184,7 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
             decodeInt64C(br, blockDetails.offset) &&
             decodeInt64C(br, blockDetails.fileSize);
   if (ok && receiverProtocolVersion >= PRESERVE_PERMISSION) {
-      int64_t perm;
-      ok = decodeInt64C(br, perm);
-      blockDetails.permission = (int32_t) perm;
+      ok = decodeInt32C(br, blockDetails.permission);
   }
   if (ok && receiverProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
     if (br.empty()) {

@@ -34,7 +34,7 @@ WdtFileInfo::WdtFileInfo(const string &name, int64_t size, bool doDirectReads)
 }
 
 WdtFileInfo::WdtFileInfo(const string &name,
-                         int64_t size, bool doDirectReads, int64_t perm)
+                         int64_t size, bool doDirectReads, int32_t perm)
     : WdtFileInfo(name, size, doDirectReads){
   permission = perm;
 }
@@ -242,6 +242,11 @@ string DirectorySourceQueue::resolvePath(const string &path) {
   return result;
 }
 
+int getPermission(int mode) {
+  // set-user-ID bit | set-group-ID bit | sticky bit | owner | group | others
+  return mode & (S_ISUID | S_ISGID | S_ISVTX | S_IRWXU | S_IRWXG | S_IRWXO);
+}
+
 bool DirectorySourceQueue::explore() {
   WLOG(INFO) << "Exploring root dir " << rootDir_
              << " include_pattern : " << includePattern_
@@ -366,7 +371,7 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          int perm = fileStat.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+          const int perm = getPermission(fileStat.st_mode);
           WdtFileInfo fileInfo(newRelativePath,
                                fileStat.st_size, directReads_, perm);
           createIntoQueue(newFullPath, fileInfo);
@@ -574,7 +579,7 @@ bool DirectorySourceQueue::enqueueFiles() {
     if (info.fileSize < 0) {
       info.fileSize = fileStat.st_size;
     }
-    info.permission = fileStat.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+    info.permission = getPermission(fileStat.st_mode);
     createIntoQueue(fullPath, info);
   }
   return true;

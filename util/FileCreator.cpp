@@ -199,7 +199,7 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
 }
 
 int FileCreator::createFile(ThreadCtx &threadCtx,
-                            const string &relPathStr, int64_t permission) {
+                            const string &relPathStr, int32_t permission) {
   CHECK(!relPathStr.empty());
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
