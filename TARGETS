@@ -164,7 +164,7 @@ cpp_binary(
   deps = [
       ":wdtlib",
   ],
-  external_deps = [ ("gtest", None) ],
+  external_deps = [ ("googletest", None, "gtest") ],
   compiler_flags = wdt_compiler_flags,
 )
 
@@ -177,7 +177,7 @@ cpp_binary(
   deps = [
       ":wdtlib_short_flags",
   ],
-  external_deps = [ ("gtest", None) ],
+  external_deps = [ ("googletest", None, "gtest") ],
   output_subdir = 'short_flags',
   preprocessor_flags = [
     "-DSTANDALONE_APP"
@@ -623,7 +623,7 @@ cpp_library (
     srcs = [
         "test/TestCommon.cpp"
         ],
-  external_deps = [ ("gtest", None) ],
+  external_deps = [ ("googletest", None, "gtest") ],
   compiler_flags = wdt_compiler_flags,
 )
 
@@ -662,7 +662,7 @@ cpp_binary(
     deps = [
       ":wdtlib4tests",
     ],
-    external_deps = [ ("gtest", None) ],
+    external_deps = [ ("googletest", None, "gtest") ],
     output_subdir = 'test',
     compiler_flags = wdt_compiler_flags,
 )
