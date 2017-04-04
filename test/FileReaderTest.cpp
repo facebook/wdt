@@ -50,6 +50,18 @@ class RandomFile {
   int64_t getSize() const {
     return fileSize_;
   }
+  int32_t getPermission() {
+    if (permission_ == -1) {
+      struct stat fileStat;
+      if (stat(fileName_.c_str(), &fileStat) != 0) {
+        WLOG(ERROR) << "Error when calling stat()";
+        return -1;
+      }
+      permission_ = fileStat.st_mode & (S_ISUID | S_ISGID | S_ISVTX | S_IRWXU |
+                                        S_IRWXG | S_IRWXO);
+    }
+    return permission_;
+  }
   const string& getFileName() const {
     return fileName_;
   }
@@ -65,6 +77,7 @@ class RandomFile {
 
  private:
   int64_t fileSize_{-1};
+  int32_t permission_{-1};
   string fileName_;
   SourceMetaData* metaData_{nullptr};
 };
@@ -96,6 +109,10 @@ void testReadSize(int64_t fileSize, ByteSource& byteSource) {
     totalSizeRead += size;
   }
   EXPECT_EQ(totalSizeRead, fileSize);
+}
+
+void testReadPermission(int32_t permission, ByteSource& byteSource) {
+  EXPECT_EQ(permission, byteSource.getMetaData().permission);
 }
 
 void testFileRead(const WdtOptions& options, int64_t fileSize,
@@ -158,6 +175,7 @@ TEST(FileByteSource, FILEINFO_ODIRECT) {
   ThreadCtx threadCtx(options, true);
   auto byteSource = Q.getNextSource(&threadCtx, code);
   testReadSize(sizeToRead, *byteSource);
+  testReadPermission(file.getPermission(), *byteSource);
 }
 
 TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
@@ -191,6 +209,7 @@ TEST(FileByteSource, MULTIPLEFILES_ODIRECT) {
       break;
     }
     testReadSize(sizeToRead, *byteSource);
+    testReadPermission(randFiles[fileNumber].getPermission(), *byteSource);
     ++fileNumber;
   }
   EXPECT_EQ(fileNumber, numFiles);
@@ -219,6 +238,7 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
   Q.setFileInfo(files);
   Q.buildQueueSynchronously();
   ErrorCode code;
+  int fileNumber = 0;
   ThreadCtx threadCtx(options, true);
   while (true) {
     auto byteSource = Q.getNextSource(&threadCtx, code);
@@ -226,6 +246,8 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
       break;
     }
     testReadSize(sizeToRead, *byteSource);
+    testReadPermission(randFiles[fileNumber].getPermission(), *byteSource);
+    ++fileNumber;
   }
 }
 }
