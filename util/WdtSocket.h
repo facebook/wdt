@@ -114,7 +114,7 @@ class WdtSocket {
 
   // checks whether decryption iv has changed or not. If yes, it reads the new
   // iv
-  bool checkAndChangeDecryptionIv();
+  bool checkAndChangeDecryptionIv(const std::string &tag);
 
   // reads from socket. Does not understand encryption
   int readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull);

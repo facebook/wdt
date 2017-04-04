@@ -299,8 +299,8 @@ ReceiverState ReceiverThread::processSettingsCmd() {
     return FINISH_WITH_ERROR;
   }
   if (senderProtocolVersion != threadProtocolVersion_) {
-    WTLOG(ERROR) << "Receiver and sender protocol version mismatch "
-                 << senderProtocolVersion << " " << threadProtocolVersion_;
+    WTLOG(WARNING) << "Receiver and sender protocol version mismatch "
+                   << senderProtocolVersion << " " << threadProtocolVersion_;
     int negotiatedProtocol = Protocol::negotiateProtocol(
         senderProtocolVersion, threadProtocolVersion_);
     if (negotiatedProtocol == 0) {

@@ -167,7 +167,7 @@ int WdtSocket::writeInternal(const char *buf, int nbyte, int timeoutMs,
   return written;
 }
 
-bool WdtSocket::checkAndChangeDecryptionIv() {
+bool WdtSocket::checkAndChangeDecryptionIv(const std::string &tag) {
   if (ivChangeInterval_ == 0) {
     return true;
   }
@@ -185,12 +185,14 @@ bool WdtSocket::checkAndChangeDecryptionIv() {
   if (numRead != kAESBlockSize) {
     WLOG(ERROR) << "Unable to read encryption iv " << numRead << " "
                 << kAESBlockSize;
-    readErrorCode_ = ENCRYPTION_ERROR;
+    return false;
+  }
+  if (!decryptor_->finish(tag)) {
+    WLOG(ERROR) << "Failed to verify encryption tag";
     return false;
   }
   resetDecryptor();
   if (!decryptor_->start(encryptionParams_, iv)) {
-    readErrorCode_ = ENCRYPTION_ERROR;
     return false;
   }
   return true;
@@ -289,7 +291,10 @@ int WdtSocket::readAndDecryptWithTag(char *buf, int nbyte, int timeoutMs,
     if (tagVerificationSuccessCallback_ != nullptr) {
       tagVerificationSuccessCallback_();
     }
-    checkAndChangeDecryptionIv();
+    if (!checkAndChangeDecryptionIv(tag)) {
+      readErrorCode_ = ENCRYPTION_ERROR;
+      return -1;
+    }
   }
   // now try to read rest of the data
   const int ret =
@@ -400,7 +405,6 @@ bool WdtSocket::checkAndChangeEncryptionIv() {
   resetEncryptor();
   std::string iv;
   if (!encryptor_->start(encryptionParams_, iv)) {
-    writeErrorCode_ = ENCRYPTION_ERROR;
     return false;
   }
   WDT_CHECK_EQ(kAESBlockSize, iv.size());
@@ -461,7 +465,10 @@ int WdtSocket::encryptAndWriteWithTag(char *buf, int nbyte, int timeoutMs,
     if (!writeEncryptionTag()) {
       return -1;
     }
-    checkAndChangeEncryptionIv();
+    if (!checkAndChangeEncryptionIv()) {
+      writeErrorCode_ = ENCRYPTION_ERROR;
+      return -1;
+    }
   }
   // now try to write rest of the data
   const int remainingWrite = nbyte - written;
