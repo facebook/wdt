@@ -49,6 +49,15 @@ if [ -z "$WDT_TEST_SYMLINKS" ] ; then
 fi
 echo "WDT_TEST_SYMLINKS=$WDT_TEST_SYMLINKS"
 
+# Set WDT_TEST_PERMISSION:
+# to 1 : check if permissions match
+# to 0 : when "find -printf %m" does not work, i.e. on Mac
+if [ -z "$WDT_TEST_PERMISSION" ] ; then
+  WDT_TEST_PERMISSION=1
+  umask 0
+fi
+echo "WDT_TEST_PERMISSION=$WDT_TEST_PERMISSION"
+
 # Verbose / to debug failure:
 #WDTBIN="_bin/wdt/wdt -minloglevel 0 -v 99"
 # Normal:
@@ -96,6 +105,10 @@ do
                  -directory="$DIR/src" -filename="$base.$i" -gen_size_mb="$size"
     done
 done
+
+if [ $WDT_TEST_PERMISSION -eq 1 ]; then
+  chmod 01777 $DIR/src/inp.0009765625.1
+fi
 echo "done with setup"
 
 if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
@@ -137,7 +150,7 @@ if [ $DO_VERIFY -eq 1 ] ; then
     echo "Should be no diff"
     (cd $DIR; diff -u src.md5s dst.md5s)
     STATUS=$?
-    if [ $STATUS -eq 0 ] ; then
+    if [ $STATUS -eq 0 ] && [ $WDT_TEST_PERMISSION -eq 1 ]; then
       (cd $DIR/src ; ( find . -type f -printf %f%m\\n | sort ) > ../src.perm )
       (cd $DIR/dst ; ( find . -type f -printf %f%m\\n | sort ) > ../dst.perm )
 
