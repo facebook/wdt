@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/util/FileCreator.h>
 #include <wdt/ErrorCodes.h>
+#include <wdt/util/FileCreator.h>
 
 #include <fcntl.h>
 #include <folly/Conv.h>
@@ -58,8 +58,8 @@ int FileCreator::openAndSetSize(ThreadCtx &threadCtx,
   const bool doCreate = (blockDetails->allocationStatus == NOT_EXISTS);
   const bool isTooLarge = (blockDetails->allocationStatus == EXISTS_TOO_LARGE);
   if (doCreate) {
-    fd = createFile(threadCtx,
-                    blockDetails->fileName, blockDetails->permission);
+    fd =
+        createFile(threadCtx, blockDetails->fileName, blockDetails->permission);
   } else {
     fd = openExistingFile(threadCtx, blockDetails->fileName);
   }
@@ -198,8 +198,8 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
   return res;
 }
 
-int FileCreator::createFile(ThreadCtx &threadCtx,
-                            const string &relPathStr, int32_t permission) {
+int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr,
+                            int32_t permission) {
   CHECK(!relPathStr.empty());
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');

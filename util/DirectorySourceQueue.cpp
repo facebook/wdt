@@ -33,9 +33,9 @@ WdtFileInfo::WdtFileInfo(const string &name, int64_t size, bool doDirectReads)
     : fileName(name), fileSize(size), directReads(doDirectReads) {
 }
 
-WdtFileInfo::WdtFileInfo(const string &name,
-                         int64_t size, bool doDirectReads, int32_t perm)
-    : WdtFileInfo(name, size, doDirectReads){
+WdtFileInfo::WdtFileInfo(const string &name, int64_t size, bool doDirectReads,
+                         int32_t perm)
+    : WdtFileInfo(name, size, doDirectReads) {
   permission = perm;
 }
 
@@ -372,8 +372,8 @@ bool DirectorySourceQueue::explore() {
             continue;
           }
           const int perm = getPermission(fileStat.st_mode);
-          WdtFileInfo fileInfo(newRelativePath,
-                               fileStat.st_size, directReads_, perm);
+          WdtFileInfo fileInfo(newRelativePath, fileStat.st_size, directReads_,
+                               perm);
           createIntoQueue(newFullPath, fileInfo);
           continue;
         }

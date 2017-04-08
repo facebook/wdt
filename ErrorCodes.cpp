@@ -6,9 +6,9 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/ErrorCodes.h>
 #include <folly/Conv.h>
 #include <string.h>
+#include <wdt/ErrorCodes.h>
 
 DEFINE_int32(wdt_double_precision, 2, "Precision while printing double");
 

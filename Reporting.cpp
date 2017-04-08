@@ -6,9 +6,9 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/Reporting.h>
 #include <folly/String.h>
 #include <wdt/Protocol.h>
+#include <wdt/Reporting.h>
 #include <wdt/WdtOptions.h>
 
 #include <algorithm>

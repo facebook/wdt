@@ -38,9 +38,8 @@ void testHeader() {
                      // and permission
   BlockDetails nbd;
   int64_t noff = 0;
-  bool success =
-      Protocol::decodeHeader(Protocol::PRESERVE_PERMISSION, buf, noff,
-                             sizeof(buf), nbd);
+  bool success = Protocol::decodeHeader(Protocol::PRESERVE_PERMISSION, buf,
+                                        noff, sizeof(buf), nbd);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
   EXPECT_EQ(nbd.fileName, bd.fileName);
@@ -52,15 +51,15 @@ void testHeader() {
   EXPECT_EQ(nbd.permission, bd.permission);
   noff = 0;
   // exact size:
-  success = Protocol::decodeHeader(
-      Protocol::PRESERVE_PERMISSION, buf, noff, off, nbd);
+  success = Protocol::decodeHeader(Protocol::PRESERVE_PERMISSION, buf, noff,
+                                   off, nbd);
   EXPECT_TRUE(success);
 
   WLOG(INFO) << "error tests, expect errors";
   // too short
   noff = 0;
-  success = Protocol::decodeHeader(
-      Protocol::PRESERVE_PERMISSION, buf, noff, off - 1, nbd);
+  success = Protocol::decodeHeader(Protocol::PRESERVE_PERMISSION, buf, noff,
+                                   off - 1, nbd);
   EXPECT_FALSE(success);
 
   // Long size:
@@ -69,7 +68,7 @@ void testHeader() {
   bd.seqId = 5;
   bd.offset = 3;
   bd.fileSize = 128;
-  bd.permission = 511; // 777
+  bd.permission = 511;  // 777
   bd.allocationStatus = EXISTS_TOO_SMALL;
   bd.prevSeqId = 10;
 
@@ -80,9 +79,8 @@ void testHeader() {
             bd.fileName.size() + 1 + 1 + 6 + 1 + 2 + 1 + 1 +
                 2);  // 1 byte variant for id len and size
   noff = 0;
-  success =
-      Protocol::decodeHeader(Protocol::PRESERVE_PERMISSION, buf, noff,
-                             sizeof(buf), nbd);
+  success = Protocol::decodeHeader(Protocol::PRESERVE_PERMISSION, buf, noff,
+                                   sizeof(buf), nbd);
   EXPECT_TRUE(success);
   EXPECT_EQ(noff, off);
   EXPECT_EQ(nbd.fileName, bd.fileName);
@@ -96,8 +94,8 @@ void testHeader() {
   WLOG(INFO) << "got size of " << nbd.dataSize;
   // too short for size encoding:
   noff = 0;
-  success = Protocol::decodeHeader(
-      Protocol::PRESERVE_PERMISSION, buf, noff, off - 2, nbd);
+  success = Protocol::decodeHeader(Protocol::PRESERVE_PERMISSION, buf, noff,
+                                   off - 2, nbd);
   EXPECT_FALSE(success);
 }
 

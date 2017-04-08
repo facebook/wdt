@@ -57,8 +57,8 @@ class RandomFile {
         WLOG(ERROR) << "Error when calling stat()";
         return -1;
       }
-      permission_ = fileStat.st_mode & (S_ISUID | S_ISGID | S_ISVTX | S_IRWXU |
-                                        S_IRWXG | S_IRWXO);
+      permission_ = fileStat.st_mode &
+                    (S_ISUID | S_ISGID | S_ISVTX | S_IRWXU | S_IRWXG | S_IRWXO);
     }
     return permission_;
   }

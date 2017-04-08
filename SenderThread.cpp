@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/SenderThread.h>
 #include <folly/Bits.h>
 #include <folly/Checksum.h>
 #include <folly/Conv.h>
@@ -14,6 +13,7 @@
 #include <folly/String.h>
 #include <sys/stat.h>
 #include <wdt/Sender.h>
+#include <wdt/SenderThread.h>
 #include <wdt/util/ClientSocket.h>
 
 namespace facebook {
