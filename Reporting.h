@@ -30,6 +30,7 @@ namespace wdt {
 const double kMbToB = 1024 * 1024;
 const double kMicroToMilli = 1000;
 const double kMicroToSec = 1000 * 1000;
+const double kMilliToSec = 1000;
 
 typedef std::chrono::high_resolution_clock Clock;
 

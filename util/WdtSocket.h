@@ -86,6 +86,14 @@ class WdtSocket {
   ///           fails to get unacked bytes for this socket
   int getUnackedBytes() const;
 
+  int64_t getNumRead() const {
+    return totalRead_;
+  }
+
+  int64_t getNumWritten() const {
+    return totalWritten_;
+  }
+
   void disableIvChange() {
     WLOG(INFO) << "Disabling periodic encryption iv change";
     ivChangeInterval_ = 0;
