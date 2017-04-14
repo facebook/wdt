@@ -256,6 +256,7 @@ cpp_unittest(
   deps = [
       ":wdtlib",
       ":wdtlib4tests",
+      "@/folly:conv",
   ],
   compiler_flags = wdt_compiler_flags,
 )
