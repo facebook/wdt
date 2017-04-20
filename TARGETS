@@ -357,7 +357,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -371,7 +371,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -414,7 +414,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -428,7 +428,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -484,7 +484,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -498,7 +498,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
