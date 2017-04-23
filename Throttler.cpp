@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/ErrorCodes.h>
 #include <wdt/Throttler.h>
+#include <wdt/ErrorCodes.h>
 #include <wdt/WdtOptions.h>
 
 namespace facebook {
