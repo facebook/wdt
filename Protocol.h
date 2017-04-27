@@ -218,6 +218,8 @@ struct BlockDetails {
   FileAllocationStatus allocationStatus{NOT_EXISTS};
   /// seq-id of previous transfer, only valid if there is a size mismatch
   int64_t prevSeqId{0};
+  /// file permission
+  int32_t permission{0644};
 };
 
 /// structure representing settings cmd
@@ -272,6 +274,8 @@ class Protocol {
   static const int HEART_BEAT_VERSION;
   /// version from which wdt started to change encryption iv periodically
   static const int PERIODIC_ENCRYPTION_IV_CHANGE_VERSION;
+  /// version from which file permission is preserved during transfer
+  static const int PRESERVE_PERMISSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
@@ -300,10 +304,10 @@ class Protocol {
 
   /// Max size of sender or receiver id
   static constexpr int64_t kMaxTransferIdLength = 50;
-  /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 4
-  /// variants(seq-id, data-size, offset, file-size), 1 byte for flag, 10 bytes
-  /// prev seq-id
-  static constexpr int64_t kMaxHeader = 1 + 2 + PATH_MAX + 4 * 10 + 1 + 10;
+  /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 5
+  /// variants(seq-id, data-size, offset, file-size, permission), 1 byte for
+  /// flag, 10 bytes prev seq-id
+  static constexpr int64_t kMaxHeader = 1 + 2 + PATH_MAX + 5 * 10 + 2 + 1 + 10;
   /// min number of bytes that must be send to unblock receiver
   static constexpr int64_t kMinBufLength = 256;
   /// max size of done command encoding(1 byte for cmd, 1 for status, 10 for

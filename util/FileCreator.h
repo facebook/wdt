@@ -96,19 +96,20 @@ class FileCreator {
   int openAndSetSize(ThreadCtx &threadCtx, BlockDetails const *blockDetails);
 
   /**
-   * Create a file and open for writing, recursively create subdirs.
-   * Subdirs are only created once due to createdDirs_ cache, but
-   * if an open fails where we assumed the directory already exists
-   * based on cache, we try creating the dir and open again before
-   * failing. Will not overwrite existing files unless overwrite option
-   * is set.
+   * Create a file and open for writing with the given permission, recursively
+   * create subdirs. Subdirs are only created once due to createdDirs_ cache,
+   * but if an open fails where we assumed the directory already exists based on
+   * cache, we try creating the dir and open again before failing. Will not
+   * overwrite existing files unless overwrite option is set.
    *
    * @param threadCtx     context of the calling thread
    * @param relPath       path relative to root dir
+   * @param permission    permission to use for the file
    *
    * @return          file descriptor or -1 on error
    */
-  int createFile(ThreadCtx &threadCtx, const std::string &relPath);
+  int createFile(ThreadCtx &threadCtx,
+                 const std::string &relPath, int32_t permission);
   /**
    * Open existing file
    */
