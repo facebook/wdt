@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/Sender.h>
 #include <wdt/util/ThreadTransferHistory.h>
+#include <wdt/Sender.h>
 
 namespace facebook {
 namespace wdt {
