@@ -10,6 +10,7 @@
 
 #include <wdt/Wdt.h>
 
+#include <folly/Conv.h>
 #include <folly/Range.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>

@@ -117,6 +117,11 @@ bool decodeIntFixedLength(folly::ByteRange &br, T &res) {
   return true;
 }
 
+bool decodeInt16FixedLength(folly::ByteRange &br, int16_t &res) {
+  bool success = decodeIntFixedLength<int16_t>(br, res);
+  return success;
+}
+
 bool decodeInt32FixedLength(folly::ByteRange &br, int32_t &res) {
   return decodeIntFixedLength<int32_t>(br, res);
 }
@@ -136,6 +141,10 @@ bool encodeIntFixedLength(char *dest, int64_t sz, int64_t &off, const T val) {
   folly::storeUnaligned<T>(dest + off, folly::Endian::little(val));
   off += intLen;
   return true;
+}
+
+bool encodeInt16FixedLength(char *dest, int64_t sz, int64_t &off, int16_t val) {
+  return encodeIntFixedLength<int16_t>(dest, sz, off, val);
 }
 
 bool encodeInt32FixedLength(char *dest, int64_t sz, int64_t &off, int32_t val) {

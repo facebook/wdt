@@ -78,7 +78,7 @@ DIR=`mktemp -d --tmpdir=$BASEDIR`
 echo "Testing in $DIR"
 
 WDTBIN_OPTS="-enable_perf_stat_collection -ipv6 -start_port=$STARTING_PORT \
--avg_mbytes_per_sec=60 -max_mbytes_per_sec=65 -run_as_daemon=false \
+-avg_mbytes_per_sec=15 -max_mbytes_per_sec=20 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=495 -write_timeout_millis=495 \
 -progress_report_interval_millis=-1 -abort_check_interval_millis=100 \
 -treat_fewer_port_as_error -exit_on_bad_flags=false -skip_fadvise \
@@ -92,7 +92,7 @@ WDTBIN_CLIENT="$WDT_SENDER $WDTBIN_OPTS -destination $HOSTNAME \
 
 mkdir -p $DIR/src/dir1
 cp -R folly $DIR/src/dir1
-for ((i = 2; i <= 200; i++))
+for ((i = 2; i <= 50; i++))
 do
   mkdir $DIR/src/dir${i}
   cp -R $DIR/src/dir1 $DIR/src/dir${i}

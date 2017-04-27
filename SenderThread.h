@@ -7,6 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #pragma once
+#include <folly/Conv.h>
 #include <wdt/Sender.h>
 #include <wdt/WdtThread.h>
 #include <wdt/util/ClientSocket.h>

@@ -6,7 +6,7 @@ echo "if sending email later fails, you might need:"
 echo "sudo sed -ie 's#^\(mailhub\).*$#\1=localhost#' /etc/ssmtp/ssmtp.conf"
 echo "but that shouldn't be necessary anymore"
 set -x
-sudo yum install iproute-tc devtoolset-4-gcc-c++ automake autoconf boost-devel
+sudo yum install iproute-tc devtoolset-4-gcc-c++ automake autoconf boost-devel libtool
 export PATH=/opt/rh/devtoolset-4/root/bin:$PATH
 while sh -c "g++ --version | fgrep 4.8." ; do
   smcc add-services -e hhvm.oss $HOSTNAME:22
@@ -50,7 +50,7 @@ git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags/build; cd gflags/build; cmake -DCMAKE_INSTALL_PREFIX=$CDIR -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on .. && make -j 16 && make install)
 git clone https://github.com/google/glog.git
 echo "if this fails with aclocal error; run autoreconf"
-( cd glog && ./configure --with-gflags=$CDIR --prefix=$CDIR && make -j 16 && make install )
+( cd glog && ./configure --with-gflags=$CDIR --prefix=$CDIR && autoreconf -vfi && make -j 16 && make install )
 OPENSSL_VERSION=openssl-1.0.1u
 wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
 tar xfz $OPENSSL_VERSION.tar.gz
