@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
+#include <wdt/util/EncryptionUtils.h>
 #include <folly/Conv.h>
 #include <folly/SpinLock.h>
 #include <folly/String.h>            // for humanify
 #include <wdt/WdtTransferRequest.h>  // for to/fromHex utils
-#include <wdt/util/EncryptionUtils.h>
 
 #include <openssl/crypto.h>
 #include <openssl/rand.h>

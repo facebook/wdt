@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include <wdt/Reporting.h>
 #include <wdt/util/ClientSocket.h>
+#include <wdt/Reporting.h>
 
 #include <fcntl.h>
 #include <glog/logging.h>
