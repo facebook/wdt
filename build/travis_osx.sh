@@ -17,6 +17,7 @@ export PATH=/usr/local/opt/openssl/bin:$CMAKE_BIN_DIR:$HOME/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/opt/openssl/lib:$HOME/lib:$LD_LIBRARY_PATH
 export OPENSSL_ROOT_DIR=/usr/local/opt/openssl
 export CMAKE_PREFIX_PATH=$HOME
+export WDT_TEST_PERMISSION=0
 openssl version -a
 wget https://www.cmake.org/files/v3.6/$CMAKE_BASE.tar.gz
 tar xfz $CMAKE_BASE.tar.gz
