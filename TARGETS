@@ -84,7 +84,6 @@ cpp_binary(
       "@/folly:benchmark",
       "@/common/encode:coding",
   ],
-  compiler_flags = wdt_compiler_flags,
 )
 
 cpp_library (
