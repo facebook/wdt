@@ -218,6 +218,8 @@ struct BlockDetails {
   FileAllocationStatus allocationStatus{NOT_EXISTS};
   /// seq-id of previous transfer, only valid if there is a size mismatch
   int64_t prevSeqId{0};
+  /// file permission
+  int32_t permission{0644};
 };
 
 /// structure representing settings cmd
@@ -234,6 +236,8 @@ struct Settings {
   bool sendFileChunks{0};
   /// whether block mode is disabled
   bool blockModeDisabled{false};
+  /// whether heart-beat is enabled
+  bool enableHeartBeat{false};
 };
 
 class Protocol {
@@ -266,6 +270,12 @@ class Protocol {
   static const int DELETE_CMD_VERSION;
   /// version from which we switched varint to better one
   static const int VARINT_CHANGE;
+  /// version from which heart-beat was introduced
+  static const int HEART_BEAT_VERSION;
+  /// version from which wdt started to change encryption iv periodically
+  static const int PERIODIC_ENCRYPTION_IV_CHANGE_VERSION;
+  /// version from which file permission is preserved during transfer
+  static const int PRESERVE_PERMISSION;
 
   /// Both version, magic number and command byte
   enum CMD_MAGIC {
@@ -286,40 +296,43 @@ class Protocol {
                // number of checkpoints for local checkpoint is 1, we can treat
                // 0x01 to be a separate cmd
     ENCRYPTION_CMD = 0x65,  // (e)ncryption
+    HEART_BEAT_CMD = 0x48,  // (H)eart-beat
   };
 
   // TODO: move the rest of those definitions closer to where they need to be
   // correct, ie in cpp like kAbortLength and kChunksCmdLen
 
   /// Max size of sender or receiver id
-  static const int64_t kMaxTransferIdLength = 50;
-  /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 4
-  /// variants(seq-id, data-size, offset, file-size), 1 byte for flag, 10 bytes
-  /// prev seq-id
-  static const int64_t kMaxHeader = 1 + 2 + PATH_MAX + 4 * 10 + 1 + 10;
+  static constexpr int64_t kMaxTransferIdLength = 50;
+  /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 5
+  /// variants(seq-id, data-size, offset, file-size, permission), 1 byte for
+  /// flag, 10 bytes prev seq-id
+  static constexpr int64_t kMaxHeader = 1 + 2 + PATH_MAX + 5 * 10 + 2 + 1 + 10;
   /// min number of bytes that must be send to unblock receiver
-  static const int64_t kMinBufLength = 256;
+  static constexpr int64_t kMinBufLength = 256;
   /// max size of done command encoding(1 byte for cmd, 1 for status, 10 for
   /// number of blocks, 10 for number of bytes sent)
-  static const int64_t kMaxDone = 2 + 2 * 10;
+  static constexpr int64_t kMaxDone = 2 + 2 * 10;
   /// max length of the size cmd encoding
-  static const int64_t kMaxSize = 1 + 10;
+  static constexpr int64_t kMaxSize = 1 + 10;
   /// max size of settings command encoding
-  static const int64_t kMaxSettings = 1 + 3 * 10 + kMaxTransferIdLength + 1;
-  /// max length of the footer cmd encoding, 1 byte for gcm tag length, 16 byte
-  /// for tag
-  static const int64_t kMaxFooter = 1 + 1 + 16;
-  /// max size of chunks cmd
-  static const int64_t kChunksCmdLen;
+  static constexpr int64_t kMaxSettings = 1 + 3 * 10 + kMaxTransferIdLength + 1;
+  /// max length of the footer cmd encoding, 10 byte for checksum
+  static constexpr int64_t kMaxFooter = 1 + 10;
+  /// max size of chunks cmd(4 bytes for buffer size and 4 bytes for number of
+  /// files)
+  static constexpr int64_t kChunksCmdLen = 2 * sizeof(int64_t);
   /// max size of chunkInfo encoding length
-  static const int64_t kMaxChunkEncodeLen = 20;
-  /// abort cmd length
-  static const int64_t kAbortLength;
+  static constexpr int64_t kMaxChunkEncodeLen = 20;
+  /// abort cmd length(4 bytes for protocol, 1 byte for error-code and 8 bytes
+  /// for checkpoint)
+  static constexpr int64_t kAbortLength = sizeof(int32_t) + 1 + sizeof(int64_t);
   /// max size of version encoding
-  static const int64_t kMaxVersion = 10;
+  static constexpr int64_t kMaxVersion = 10;
   /// max size of encryption cmd(1 byte for cmd, 1 byte for
-  /// encryption type, rest for initialization vector)
-  static const int64_t kMaxEncryption = 1 + 1 + 1 + kAESBlockSize;
+  /// encryption type, rest for initialization vector and tag interval)
+  static constexpr int64_t kEncryptionCmdLen =
+      1 + 1 + 1 + kAESBlockSize + sizeof(int32_t);
 
   static_assert(kMinBufLength <= kMaxHeader && kMaxSettings <= kMaxHeader,
                 "Minimum buffer size is kMaxHeader. Header and Settings cmd "
@@ -409,14 +422,15 @@ class Protocol {
   /// @return false if there isn't enough room to encode
   static bool encodeEncryptionSettings(char *dest, int64_t &off, int64_t max,
                                        const EncryptionType encryptionType,
-                                       const std::string &iv);
+                                       const std::string &iv,
+                                       int32_t tagInterval);
 
   /// decodes from src+off and consumes/moves off but not past max
-  /// sets settings
+  /// sets encryption type, initializaion vector and tag interval
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
                                        EncryptionType &encryptionType,
-                                       std::string &iv);
+                                       std::string &iv, int32_t &tagInterval);
 
   /// encodes totalNumBytes into dest+off
   /// moves the off into dest pointer, not going past max
@@ -434,13 +448,13 @@ class Protocol {
   /// moves the off into dest pointer, not going past max
   /// @return false if there isn't enough room to encode
   static bool encodeFooter(char *dest, int64_t &off, int64_t max,
-                           int32_t checksum, const std::string &tag);
+                           int32_t checksum);
 
   /// decodes from src+off and consumes/moves off but not past max
   /// sets checksum or tag
   /// @return false if there isn't enough data in src+off to src+max
   static bool decodeFooter(char *src, int64_t &off, int64_t max,
-                           int32_t &checksum, std::string &tag, bool isTag);
+                           int32_t &checksum);
 
   /// encodes protocolVersion, errCode and checkpoint into dest+off
   /// moves the off into dest pointer

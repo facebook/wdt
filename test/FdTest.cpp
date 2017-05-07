@@ -10,6 +10,7 @@
 
 #include <wdt/Wdt.h>
 
+#include <folly/Conv.h>
 #include <folly/Range.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -100,7 +101,7 @@ TEST(DupSend, DuplicateSend) {
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   facebook::wdt::Wdt::initializeWdt("wdt");
   int ret = RUN_ALL_TESTS();

@@ -342,6 +342,13 @@ class WdtOptions {
   std::string encryption_type{encryptionTypeToStr(ENC_AES128_GCM)};
 
   /**
+   * Encryption tag verification interval in bytes. A value of zero disables
+   * incremental tag verification. In that case, tag only gets verified at the
+   * end.
+   */
+  int encryption_tag_interval_bytes{4 * 1024 * 1024};
+
+  /**
    * send buffer size for Sender. If < = 0, buffer size is not set
    */
   int send_buffer_size{0};
@@ -360,6 +367,28 @@ class WdtOptions {
    * If true, fadvise is skipped after block write
    */
   bool skip_fadvise{false};
+
+  /**
+   * If true, periodic heart-beats from receiver to sender is enabled.
+   * The heart-beat interval is determined by the socket read timeout of the
+   * sender.
+   * WDT senders streams data and only waits for a receiver response after
+   * all the blocks are sent. Because of the high socket buffer sizes, it might
+   * take a long time for receiver to process all the bytes sent. So, for slower
+   * threads, there is significant difference between the time receiver
+   * processes all the bytes and the time sender finishes sending all the bytes.
+   * So, the sender might time out while waiting for the response from receiver.
+   * This happens a lot more for disks because of the lower io throughput.
+   * To solve this, receiver sends heart-beats to signal that it is sill
+   * processing data, and sender waits will it is still getting heart-beats.
+   */
+  bool enable_heart_beat{true};
+
+  /**
+   * Number of MBytes after which encryption iv is changed. A value of 0
+   * disables iv change.
+   */
+  int iv_change_interval_mb{32 * 1024};
 
   /**
    * @return    whether files should be pre-allocated or not

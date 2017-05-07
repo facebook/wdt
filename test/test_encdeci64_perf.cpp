@@ -17,10 +17,9 @@
 #include <folly/Benchmark.h>
 #include "TestCommon.h"
 
-using std::string;
+using namespace facebook::wdt;
 
-namespace facebook {
-namespace wdt {
+using std::string;
 
 #ifdef EDI64_10
 #define EDI64_MAX 10
@@ -142,8 +141,6 @@ BENCHMARK_NAMED_PARAM(BM_encodeDecodeI64_vi_str, m100, -100);
 BENCHMARK_PARAM(BM_encodeDecodeI64_vi_str, 100);
 BENCHMARK_NAMED_PARAM(BM_encodeDecodeI64_vi_str, m10, -10);
 BENCHMARK_PARAM(BM_encodeDecodeI64_vi_str, 10);
-}
-}  // end of namespace facebook::wdt
 
 // -- main
 

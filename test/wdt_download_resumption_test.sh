@@ -125,7 +125,7 @@ SENDER_ID="123456"
 RECEIVER_ID="123456"
 
 WDTBIN_OPTS="-ipv6 -num_ports=$threads -full_reporting \
--max_mbytes_per_sec=90 -run_as_daemon=false \
+-max_mbytes_per_sec=25 -run_as_daemon=false \
 -full_reporting -read_timeout_millis=500 -write_timeout_millis=500 \
 -enable_download_resumption -treat_fewer_port_as_error \
 -resume_using_dir_tree=$RESUME_USING_DIR_TREE -enable_perf_stat_collection \
@@ -145,7 +145,7 @@ echo "Testing in $DIR"
 
 SRC_DIR=$DIR/src
 
-generateRandomFiles "$SRC_DIR" 16 # 16 Mb for smallest file
+generateRandomFiles "$SRC_DIR" 4 # 4 Mb for smallest file
 
 TEST_COUNT=0
 

@@ -5,7 +5,6 @@ cat <<EOF
     "alias": "wdt-opensource-linux",
     "command": "SandcastleUniversalCommand",
     "vcsType": "fbcode-fbsource",
-    "user": "ldemailly",
     "capabilities": {
         "vcs": "fbcode-fbsource",
         "type": "lego-linux",
@@ -35,11 +34,10 @@ cat <<EOF
     "alias": "wdt-opensource-mac",
     "command": "SandcastleUniversalCommand",
     "vcsType": "fbcode-fbsource",
-    "user": "ldemailly",
     "capabilities": {
         "vcs": "fbcode-fbsource",
         "type": "lego-mac",
-        "xcode": "stable"
+        "xcode": "xcode_8.3.1"
     },
     "args": {
         "name": "wdt-opensource-mac",

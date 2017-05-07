@@ -13,7 +13,6 @@
 
 #include <folly/Bits.h>
 #include <folly/Conv.h>
-#include <folly/ScopeGuard.h>
 
 #include <fcntl.h>
 #include <gflags/gflags.h>
@@ -190,6 +189,7 @@ const WdtTransferRequest &Receiver::init() {
     }
     transferRequest_.encryptionData.erase();
   }
+  transferRequest_.ivChangeInterval = options_.iv_change_interval_mb * kMbToB;
   if (options_.max_accept_retries <= 0) {
     WLOG(INFO) << "Max accept retries " << options_.max_accept_retries
                << ", will accept forever";

@@ -38,6 +38,7 @@ class WdtThread {
     buf_ = buffer->getData();
     bufSize_ = buffer->getSize();
     threadIndex_ = threadCtx_->getThreadIndex();
+    lastHeartBeatTime_ = Clock::now();
   }
   /// Starts a thread which runs the wdt functionality
   void startThread();
@@ -94,11 +95,15 @@ class WdtThread {
   /// Copy of the protocol version that might be changed
   int threadProtocolVersion_;
 
+  /// whether heart-beat is enabled
+  bool enableHeartBeat_{false};
+
+  Clock::time_point lastHeartBeatTime_;
+
   /// possible footer types
   enum FooterType {
     NO_FOOTER,
     CHECKSUM_FOOTER,
-    ENC_TAG_FOOTER,
   };
 
   FooterType footerType_{NO_FOOTER};

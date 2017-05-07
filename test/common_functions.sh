@@ -297,6 +297,7 @@ extendWdtOptions() {
     echo "enable_checksum $ENABLE_CHECKSUM"
     WDTBIN_OPTS+=" -enable_checksum=$ENABLE_CHECKSUM"
   fi
+  WDTBIN_OPTS+=" -iv_change_interval_mb=32"
 }
 
 # without the following line, wdt piped to tee effectively has exit status of

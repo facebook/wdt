@@ -8,6 +8,7 @@
  */
 #pragma once
 
+#include <folly/Memory.h>
 #include <openssl/evp.h>
 #include <wdt/ErrorCodes.h>
 #include <string>
@@ -94,19 +95,31 @@ class EncryptionParams {
   std::string tag_;
 };
 
+EVP_CIPHER_CTX* createAndInitCtx();
+
+void cleanupAndDestroyCtx(EVP_CIPHER_CTX* ctx);
+
+using CipherCtxDeleter =
+    folly::static_function_deleter<EVP_CIPHER_CTX, &cleanupAndDestroyCtx>;
+
 /// base class to share code between encyptor and decryptor
 class AESBase {
+ public:
+  int64_t getNumProcessed() const {
+    return numProcessed_;
+  }
+
  protected:
   /// evpCtx_ is copied into ctxOut
   /// @return     whether the cloning was successful
   bool cloneCtx(EVP_CIPHER_CTX* ctxOut) const;
 
- protected:
   /// @return   cipher for a encryption type
   const EVP_CIPHER* getCipher(const EncryptionType encryptionType);
   EncryptionType type_{ENC_NONE};
-  EVP_CIPHER_CTX evpCtx_;
+  std::unique_ptr<EVP_CIPHER_CTX, CipherCtxDeleter> evpCtx_;
   bool started_{false};
+  int64_t numProcessed_{0};
 };
 
 /// encryptor class
@@ -148,7 +161,7 @@ class AESEncryptor : public AESBase {
   virtual ~AESEncryptor();
 
  private:
-  static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
+  static bool finishInternal(EVP_CIPHER_CTX* ctx, EncryptionType type,
                              std::string& tagOut);
 };
 
@@ -184,24 +197,15 @@ class AESDecryptor : public AESBase {
    */
   bool finish(const std::string& tag);
 
-  /// saves current cipher context
-  bool saveContext();
-
-  /// verify whether the given tag matches previously saved context
+  /// verify whether the given tag matches current tag
   bool verifyTag(const std::string& tag);
 
   /// destructor
   virtual ~AESDecryptor();
 
  private:
-  static bool finishInternal(EVP_CIPHER_CTX& ctx, EncryptionType type,
+  static bool finishInternal(EVP_CIPHER_CTX* ctx, EncryptionType type,
                              const std::string& tag);
-
-  /// saved cipher ctx
-  EVP_CIPHER_CTX savedCtx_;
-
-  /// whether ctx has been saved
-  bool ctxSaved_{false};
 };
 }
 }  // End of namespaces

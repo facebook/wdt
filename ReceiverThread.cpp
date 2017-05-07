@@ -299,8 +299,8 @@ ReceiverState ReceiverThread::processSettingsCmd() {
     return FINISH_WITH_ERROR;
   }
   if (senderProtocolVersion != threadProtocolVersion_) {
-    WTLOG(ERROR) << "Receiver and sender protocol version mismatch "
-                 << senderProtocolVersion << " " << threadProtocolVersion_;
+    WTLOG(WARNING) << "Receiver and sender protocol version mismatch "
+                   << senderProtocolVersion << " " << threadProtocolVersion_;
     int negotiatedProtocol = Protocol::negotiateProtocol(
         senderProtocolVersion, threadProtocolVersion_);
     if (negotiatedProtocol == 0) {
@@ -318,6 +318,11 @@ ReceiverState ReceiverThread::processSettingsCmd() {
         return SEND_ABORT_CMD;
       }
     }
+  }
+
+  if (threadProtocolVersion_ <
+      Protocol::PERIODIC_ENCRYPTION_IV_CHANGE_VERSION) {
+    socket_->disableIvChange();
   }
 
   success = Protocol::decodeSettings(
@@ -339,20 +344,14 @@ ReceiverState ReceiverThread::processSettingsCmd() {
   senderReadTimeout_ = settings.readTimeoutMillis;
   senderWriteTimeout_ = settings.writeTimeoutMillis;
   isBlockMode_ = !settings.blockModeDisabled;
+  enableHeartBeat_ = settings.enableHeartBeat;
+  if (!enableHeartBeat_) {
+    WTLOG(INFO) << "Disabling heart-beat as sender does not support it";
+  }
   curConnectionVerified_ = true;
 
   // determine footer type
-  EncryptionType encryptionType = socket_->getEncryptionType();
-  if (threadProtocolVersion_ >=
-          Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION &&
-      encryptionTypeToTagLen(encryptionType)) {
-    if (settings.enableChecksum) {
-      WTLOG(ERROR) << "Checksum can not be enabled with gcm encryption";
-      threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
-      return FINISH_WITH_ERROR;
-    }
-    footerType_ = ENC_TAG_FOOTER;
-  } else if (settings.enableChecksum) {
+  if (settings.enableChecksum) {
     footerType_ = CHECKSUM_FOOTER;
   } else {
     footerType_ = NO_FOOTER;
@@ -367,6 +366,25 @@ ReceiverState ReceiverThread::processSettingsCmd() {
   auto msgLen = off_ - oldOffset_;
   numRead_ -= msgLen;
   return READ_NEXT_CMD;
+}
+
+void ReceiverThread::sendHeartBeat() {
+  if (!enableHeartBeat_) {
+    return;
+  }
+  const auto now = Clock::now();
+  const int timeSinceLastHeartBeatMs = durationMillis(now - lastHeartBeatTime_);
+  const int heartBeatIntervalMs = (senderReadTimeout_ / kWaitTimeoutFactor);
+  if (timeSinceLastHeartBeatMs <= heartBeatIntervalMs) {
+    return;
+  }
+  lastHeartBeatTime_ = now;
+  // time to send a heart beat
+  char buf = Protocol::HEART_BEAT_CMD;
+  const int written = socket_->write(&buf, 1);
+  if (written != 1) {
+    WTLOG(WARNING) << "Failed to send heart-beat " << written;
+  }
 }
 
 /***PROCESS_FILE_CMD***/
@@ -402,6 +420,8 @@ ReceiverState ReceiverThread::processFileCmd() {
   int16_t headerLen = folly::loadUnaligned<int16_t>(buf_ + off_);
   headerLen = folly::Endian::little(headerLen);
   WVLOG(2) << "Processing FILE_CMD, header len " << headerLen;
+
+  sendHeartBeat();
 
   if (headerLen > numRead_) {
     int64_t end = oldOffset_ + numRead_;
@@ -449,14 +469,19 @@ ReceiverState ReceiverThread::processFileCmd() {
             << " off_: " << off_ << " numRead_: " << numRead_;
   auto &fileCreator = wdtParent_->getFileCreator();
   FileWriter writer(*threadCtx_, &blockDetails, fileCreator.get());
+  const auto encryptionType = socket_->getEncryptionType();
   auto writtenGuard = folly::makeGuard([&] {
-    if (threadProtocolVersion_ >= Protocol::CHECKPOINT_OFFSET_VERSION &&
-        footerType_ == NO_FOOTER) {
+    if (!encryptionTypeToTagLen(encryptionType) && footerType_ == NO_FOOTER) {
+      // if encryption doesn't have tag verification and checksum verification
+      // is disabled, we can consider bytes received before connection break as
+      // valid
       checkpoint_.setLastBlockDetails(blockDetails.seqId, blockDetails.offset,
                                       writer.getTotalWritten());
       threadStats_.addEffectiveBytes(headerBytes, writer.getTotalWritten());
     }
   });
+
+  sendHeartBeat();
 
   // writer.open() deletes files if status == TO_BE_DELETED
   // therefore if !(!delete_extra_files && status == TO_BE_DELETED)
@@ -476,11 +501,6 @@ ReceiverState ReceiverThread::processFileCmd() {
   if (remainingData >= blockDetails.dataSize) {
     toWrite = blockDetails.dataSize;
   }
-  bool decryptorCtxSaved = false;
-  if (footerType_ == ENC_TAG_FOOTER && remainingData <= blockDetails.dataSize) {
-    decryptorCtxSaved = true;
-    socket_->saveDecryptorCtx(blockDetails.dataSize - remainingData);
-  }
   threadStats_.addDataBytes(toWrite);
   if (footerType_ == CHECKSUM_FOOTER) {
     checksum = folly::crc32c((const uint8_t *)(buf_ + off_), toWrite, checksum);
@@ -492,6 +512,9 @@ ReceiverState ReceiverThread::processFileCmd() {
     // on the network
     throttler->limit(*threadCtx_, toWrite + headerBytes);
   }
+
+  sendHeartBeat();
+
   ErrorCode code = ERROR;
   if (toWrite > 0) {
     code = writer.write(buf_ + off_, toWrite);
@@ -511,6 +534,9 @@ ReceiverState ReceiverThread::processFileCmd() {
       threadStats_.setLocalErrorCode(ABORT);
       return FINISH_WITH_ERROR;
     }
+
+    sendHeartBeat();
+
     int64_t nres = readAtMost(*socket_, buf_, bufSize_,
                               blockDetails.dataSize - writer.getTotalWritten());
     if (nres <= 0) {
@@ -525,6 +551,9 @@ ReceiverState ReceiverThread::processFileCmd() {
     if (footerType_ == CHECKSUM_FOOTER) {
       checksum = folly::crc32c((const uint8_t *)buf_, nres, checksum);
     }
+
+    sendHeartBeat();
+
     code = writer.write(buf_, nres);
     if (code != OK) {
       threadStats_.setLocalErrorCode(code);
@@ -563,7 +592,8 @@ ReceiverState ReceiverThread::processFileCmd() {
   } else {
     numRead_ = off_ = 0;
   }
-  if (footerType_ != NO_FOOTER) {
+  if (footerType_ == CHECKSUM_FOOTER) {
+    sendHeartBeat();
     // have to read footer cmd
     oldOffset_ = off_;
     numRead_ = readAtLeast(*socket_, buf_ + off_, bufSize_ - off_,
@@ -581,42 +611,30 @@ ReceiverState ReceiverThread::processFileCmd() {
       return FINISH_WITH_ERROR;
     }
     int32_t receivedChecksum;
-    std::string receivedTag;
     bool ok = Protocol::decodeFooter(
-        buf_, off_, oldOffset_ + Protocol::kMaxFooter, receivedChecksum,
-        receivedTag, (footerType_ == ENC_TAG_FOOTER));
+        buf_, off_, oldOffset_ + Protocol::kMaxFooter, receivedChecksum);
     if (!ok) {
       WTLOG(ERROR) << "Unable to decode footer cmd";
       threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
       return FINISH_WITH_ERROR;
     }
-    if (footerType_ == CHECKSUM_FOOTER) {
-      if (checksum != receivedChecksum) {
-        WTLOG(ERROR) << "Checksum mismatch " << checksum << " "
-                     << receivedChecksum << " port " << socket_->getPort()
-                     << " file " << blockDetails.fileName;
-        threadStats_.setLocalErrorCode(CHECKSUM_MISMATCH);
-        return ACCEPT_WITH_TIMEOUT;
-      }
-      markBlockVerified(blockDetails);
+    if (checksum != receivedChecksum) {
+      WTLOG(ERROR) << "Checksum mismatch " << checksum << " "
+                   << receivedChecksum << " port " << socket_->getPort()
+                   << " file " << blockDetails.fileName;
+      threadStats_.setLocalErrorCode(CHECKSUM_MISMATCH);
+      return ACCEPT_WITH_TIMEOUT;
     }
-    if (footerType_ == ENC_TAG_FOOTER) {
-      blocksWaitingVerification_.emplace_back(blockDetails);
-      if (decryptorCtxSaved) {
-        if (!socket_->verifyTag(receivedTag)) {
-          WTLOG(ERROR) << "GCM encryption tag mismatch "
-                       << folly::humanify(receivedTag) << " file "
-                       << blockDetails.fileName;
-          threadStats_.setLocalErrorCode(ENCRYPTION_ERROR);
-          return ACCEPT_WITH_TIMEOUT;
-        }
-        markReceivedBlocksVerified();
-      }
-    }
+    markBlockVerified(blockDetails);
     int64_t msgLen = off_ - oldOffset_;
     numRead_ -= msgLen;
   } else {
-    markBlockVerified(blockDetails);
+    WDT_CHECK(footerType_ == NO_FOOTER);
+    if (encryptionTypeToTagLen(encryptionType)) {
+      blocksWaitingVerification_.emplace_back(blockDetails);
+    } else {
+      markBlockVerified(blockDetails);
+    }
   }
   return READ_NEXT_CMD;
 }
@@ -854,9 +872,8 @@ ReceiverState ReceiverThread::sendDoneCmd() {
                  << errorCodeToStr(code);
     threadStats_.setLocalErrorCode(code);
     return ACCEPT_WITH_TIMEOUT;
-  } else if (footerType_ == ENC_TAG_FOOTER) {
-    markReceivedBlocksVerified();
   }
+  markReceivedBlocksVerified();
   threadStats_.setLocalErrorCode(socket_->closeConnection());
   WTLOG(INFO) << "got ack for DONE and logical eof. Transfer finished";
   return END;
@@ -971,8 +988,13 @@ int32_t ReceiverThread::getPort() const {
 ErrorCode ReceiverThread::init() {
   const EncryptionParams &encryptionData =
       wdtParent_->transferRequest_.encryptionData;
+  Func tagVerificationSuccessCallback = [this] {
+    this->markReceivedBlocksVerified();
+  };
   socket_ = std::make_unique<ServerSocket>(
-      *threadCtx_, port_, wdtParent_->backlog_, encryptionData);
+      *threadCtx_, port_, wdtParent_->backlog_, encryptionData,
+      wdtParent_->transferRequest_.ivChangeInterval,
+      std::move(tagVerificationSuccessCallback));
   int max_retries = options_.max_retries;
   for (int retries = 0; retries < max_retries; retries++) {
     if (socket_->listen() == OK) {

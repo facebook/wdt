@@ -101,6 +101,60 @@ bool decodeInt32C(ByteRange &br, int32_t &res32) {
   return true;
 }
 
+template <typename T>
+bool decodeIntFixedLength(folly::ByteRange &br, T &res) {
+  if (br.size() < sizeof(T)) {
+    WLOG(ERROR) << "Not enough to read to decode fixed length encoded int";
+    return false;
+  }
+  res = folly::loadUnaligned<T>(br.start());
+  res = folly::Endian::little(res);
+  br.advance(sizeof(T));
+  if (res < 0) {
+    WLOG(ERROR) << "negative int decoded " << res;
+    return false;
+  }
+  return true;
+}
+
+bool decodeInt16FixedLength(folly::ByteRange &br, int16_t &res) {
+  bool success = decodeIntFixedLength<int16_t>(br, res);
+  return success;
+}
+
+bool decodeInt32FixedLength(folly::ByteRange &br, int32_t &res) {
+  return decodeIntFixedLength<int32_t>(br, res);
+}
+
+bool decodeInt64FixedLength(folly::ByteRange &br, int64_t &res) {
+  return decodeIntFixedLength<int64_t>(br, res);
+}
+
+template <typename T>
+bool encodeIntFixedLength(char *dest, int64_t sz, int64_t &off, const T val) {
+  constexpr int intLen = sizeof(T);
+  if (off + intLen > sz) {
+    WLOG(ERROR) << "Not enough room to encode fixed length int " << val
+                << " off: " << off << " buffer size: " << sz;
+    return false;
+  }
+  folly::storeUnaligned<T>(dest + off, folly::Endian::little(val));
+  off += intLen;
+  return true;
+}
+
+bool encodeInt16FixedLength(char *dest, int64_t sz, int64_t &off, int16_t val) {
+  return encodeIntFixedLength<int16_t>(dest, sz, off, val);
+}
+
+bool encodeInt32FixedLength(char *dest, int64_t sz, int64_t &off, int32_t val) {
+  return encodeIntFixedLength<int32_t>(dest, sz, off, val);
+}
+
+bool encodeInt64FixedLength(char *dest, int64_t sz, int64_t &off, int64_t val) {
+  return encodeIntFixedLength<int64_t>(dest, sz, off, val);
+}
+
 bool encodeString(char *dest, int64_t sz, int64_t &off, const string &str) {
   if (!encodeVarU64(dest, sz, off, str.length())) {
     return false;

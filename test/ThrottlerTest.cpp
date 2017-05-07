@@ -1,5 +1,4 @@
 #include <wdt/Throttler.h>
-#include <wdt/test/TestCommon.h>
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>

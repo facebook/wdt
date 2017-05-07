@@ -35,6 +35,11 @@ struct WdtFileInfo {
   /// Whether read should be done using o_direct. If fd is set, this flag will
   /// be set automatically to match the fd open mode
   bool directReads{false};
+  /// File permission.
+  int32_t permission;
+  /// Constructor for file info with name, size, odirect request and permission
+  WdtFileInfo(const std::string& name,
+              int64_t size, bool directReads, int32_t perm);
   /// Constructor for file info with name, size and odirect request
   WdtFileInfo(const std::string& name, int64_t size, bool directReads);
   /**
@@ -183,6 +188,9 @@ struct WdtTransferRequest {
   // and is requested from the sender
   bool downloadResumptionEnabled{false};
 
+  /// Number of GBytes after iv is changed
+  int64_t ivChangeInterval{0};
+
   /// Any error associated with this transfer request upon processing
   ErrorCode errorCode{OK};
 
@@ -235,6 +243,7 @@ struct WdtTransferRequest {
   const static std::string NAMESPACE_PARAM;
   const static std::string DEST_IDENTIFIER_PARAM;
   const static std::string DOWNLOAD_RESUMPTION_PARAM;
+  const static std::string IV_CHANGE_INTERVAL_PARAM;
 
   /// Get ports vector from startPort and numPorts
   static std::vector<int32_t> genPortsVector(int32_t startPort,
