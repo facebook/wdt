@@ -137,13 +137,7 @@ if [ $DO_VERIFY -eq 1 ] ; then
     echo "Should be no diff"
     (cd $DIR; diff -u src.md5s dst.md5s)
     STATUS=$?
-    if [ $STATUS -eq 0 ] ; then
-      (cd $DIR/src ; ( find . -type f -printf %f%m\\n | sort ) > ../src.perm )
-      (cd $DIR/dst ; ( find . -type f -printf %f%m\\n | sort ) > ../dst.perm )
 
-      (cd $DIR; diff -u src.perm dst.perm)
-      STATUS=$?
-    fi
 
   if [ $WDT_TEST_SYMLINKS -eq 1 ]; then
     echo "Verifying for run with follow_symlinks"
@@ -156,9 +150,9 @@ if [ $DO_VERIFY -eq 1 ] ; then
         > ../src_symlinks.md5s )
     (cd $DIR/dst_symlinks ; ( find . -type f -print0 | xargs -0 $MD5SUM \
         | sort ) > ../dst_symlinks.md5s )
+
     echo "Should be no diff"
     (cd $DIR; diff -u src_symlinks.md5s dst_symlinks.md5s)
-
     SYMLINK_STATUS=$?
     if [ $STATUS -eq 0 ] ; then
       STATUS=$SYMLINK_STATUS

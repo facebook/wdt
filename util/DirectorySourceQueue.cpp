@@ -33,12 +33,6 @@ WdtFileInfo::WdtFileInfo(const string &name, int64_t size, bool doDirectReads)
     : fileName(name), fileSize(size), directReads(doDirectReads) {
 }
 
-WdtFileInfo::WdtFileInfo(const string &name,
-                         int64_t size, bool doDirectReads, int32_t perm)
-    : WdtFileInfo(name, size, doDirectReads){
-  permission = perm;
-}
-
 WdtFileInfo::WdtFileInfo(int fd, int64_t size, const string &name)
     : WdtFileInfo(name, size, false) {
   this->fd = fd;
@@ -242,11 +236,6 @@ string DirectorySourceQueue::resolvePath(const string &path) {
   return result;
 }
 
-int getPermission(int mode) {
-  // set-user-ID bit | set-group-ID bit | sticky bit | owner | group | others
-  return mode & (S_ISUID | S_ISGID | S_ISVTX | S_IRWXU | S_IRWXG | S_IRWXO);
-}
-
 bool DirectorySourceQueue::explore() {
   WLOG(INFO) << "Exploring root dir " << rootDir_
              << " include_pattern : " << includePattern_
@@ -371,9 +360,7 @@ bool DirectorySourceQueue::explore() {
               !std::regex_match(newRelativePath, includeRegex)) {
             continue;
           }
-          const int perm = getPermission(fileStat.st_mode);
-          WdtFileInfo fileInfo(newRelativePath,
-                               fileStat.st_size, directReads_, perm);
+          WdtFileInfo fileInfo(newRelativePath, fileStat.st_size, directReads_);
           createIntoQueue(newFullPath, fileInfo);
           continue;
         }
@@ -453,7 +440,6 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   metadata->fd = fileInfo.fd;
   metadata->directReads = fileInfo.directReads;
   metadata->size = fileInfo.fileSize;
-  metadata->permission = fileInfo.permission;
   if ((openFilesDuringDiscovery_ != 0) && (metadata->fd < 0)) {
     metadata->fd =
         FileUtil::openForRead(*threadCtx_, fullPath, metadata->directReads);
@@ -571,15 +557,14 @@ bool DirectorySourceQueue::enqueueFiles() {
       return false;
     }
     string fullPath = rootDir_ + info.fileName;
-    struct stat fileStat;
-    if (stat(fullPath.c_str(), &fileStat) != 0) {
-      WPLOG(ERROR) << "stat failed on path " << fullPath;
-      return false;
-    }
     if (info.fileSize < 0) {
+      struct stat fileStat;
+      if (stat(fullPath.c_str(), &fileStat) != 0) {
+        WPLOG(ERROR) << "stat failed on path " << fullPath;
+        return false;
+      }
       info.fileSize = fileStat.st_size;
     }
-    info.permission = getPermission(fileStat.st_mode);
     createIntoQueue(fullPath, info);
   }
   return true;

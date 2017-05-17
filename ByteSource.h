@@ -44,8 +44,6 @@ struct SourceMetaData {
   FileAllocationStatus allocationStatus{NOT_EXISTS};
   /// if there is a size mismatch, this is the previous sequence id
   int64_t prevSeqId{0};
-  /// file permission.
-  int32_t permission{0};
   /// If true, files are read using O_DIRECT or F_NOCACHE
   bool directReads{false};
   /// File descriptor. If this is not -1, then wdt uses this to read

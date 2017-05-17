@@ -34,7 +34,6 @@ const int Protocol::DELETE_CMD_VERSION = 26;
 const int Protocol::VARINT_CHANGE = 27;
 const int Protocol::HEART_BEAT_VERSION = 29;
 const int Protocol::PERIODIC_ENCRYPTION_IV_CHANGE_VERSION = 30;
-const int Protocol::PRESERVE_PERMISSION = 31;
 
 /* All methods of Protocol class are static (functions) */
 
@@ -150,9 +149,6 @@ bool Protocol::encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
             encodeVarI64C(dest, umax, off, blockDetails.dataSize) &&
             encodeVarI64C(dest, umax, off, blockDetails.offset) &&
             encodeVarI64C(dest, umax, off, blockDetails.fileSize);
-  if (ok && senderProtocolVersion >= PRESERVE_PERMISSION) {
-    ok = encodeVarI64C(dest, umax, off, blockDetails.permission);
-  }
   if (ok && senderProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
     uint8_t flags = blockDetails.allocationStatus;
     if (off >= max) {
@@ -183,9 +179,6 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
             decodeInt64C(br, blockDetails.dataSize) &&
             decodeInt64C(br, blockDetails.offset) &&
             decodeInt64C(br, blockDetails.fileSize);
-  if (ok && receiverProtocolVersion >= PRESERVE_PERMISSION) {
-      ok = decodeInt32C(br, blockDetails.permission);
-  }
   if (ok && receiverProtocolVersion >= HEADER_FLAG_AND_PREV_SEQ_ID_VERSION) {
     if (br.empty()) {
       WLOG(ERROR) << "Invalid (too short) input len " << max << " at offset "
