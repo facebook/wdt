@@ -37,7 +37,7 @@ cat <<EOF
     "capabilities": {
         "vcs": "fbcode-fbsource",
         "type": "lego-mac",
-        "xcode": "xcode_8.3.1"
+        "xcode": "xcode_8.3.2"
     },
     "args": {
         "name": "wdt-opensource-mac",
