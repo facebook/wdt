@@ -64,6 +64,7 @@ static void opensslThreadId(CRYPTO_THREADID* id) {
 }
 
 WdtCryptoIntializer::WdtCryptoIntializer() {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
   if (CRYPTO_get_locking_callback()) {
     WLOG(WARNING) << "Openssl crypto library already initialized";
     return;
@@ -81,9 +82,11 @@ WdtCryptoIntializer::WdtCryptoIntializer() {
     WLOG(INFO) << "Openssl id callback already set";
   }
   WLOG(INFO) << "Openssl library initialized";
+#endif
 }
 
 WdtCryptoIntializer::~WdtCryptoIntializer() {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
   WVLOG(1) << "Cleaning up openssl";
   if (CRYPTO_get_locking_callback() != opensslLock) {
     WLOG(WARNING) << "Openssl not initialized by wdt";
@@ -94,6 +97,7 @@ WdtCryptoIntializer::~WdtCryptoIntializer() {
     CRYPTO_THREADID_set_callback(nullptr);
   }
   delete[] s_opensslLocks;
+#endif
 }
 
 EncryptionType parseEncryptionType(const std::string& str) {
