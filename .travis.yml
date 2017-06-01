@@ -22,6 +22,7 @@ addons:
       - g++-4.9
       - clang-3.6
       - libboost-system1.55-dev
+      - libboost-filesystem1.55-dev
 #      - libssl-dev
 #      - openssl-1.0.1f
 
