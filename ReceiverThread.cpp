@@ -419,6 +419,12 @@ ReceiverState ReceiverThread::processFileCmd() {
   }
   int16_t headerLen = folly::loadUnaligned<int16_t>(buf_ + off_);
   headerLen = folly::Endian::little(headerLen);
+  if (headerLen <= 0) {
+    WTLOG(ERROR) << "Header length must be positive " << headerLen;
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
+    return FINISH_WITH_ERROR;
+  }
+
   WVLOG(2) << "Processing FILE_CMD, header len " << headerLen;
 
   sendHeartBeat();
@@ -439,9 +445,14 @@ ReceiverState ReceiverThread::processFileCmd() {
                                         numRead_ + oldOffset_, blockDetails);
   int64_t headerBytes = off_ - oldOffset_;
   // transferred header length must match decoded header length
-  WDT_CHECK_EQ(headerLen, headerBytes) << " " << blockDetails.fileName << " "
-                                       << blockDetails.seqId << " "
-                                       << threadProtocolVersion_;
+  if (headerLen != headerBytes) {
+    WTLOG(ERROR) << "Decoded header length: " << headerBytes
+                 << ", transferred header length: " << headerBytes
+                 << ", they should be equal.";
+    threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
+    return FINISH_WITH_ERROR;
+  }
+
   threadStats_.addHeaderBytes(headerBytes);
   threadStats_.addEffectiveBytes(headerBytes, 0);
   if (!success) {
