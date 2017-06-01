@@ -6,12 +6,12 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "TestCommon.h"
-
 #include <wdt/Wdt.h>
+#include <wdt/test/TestCommon.h>
 
 #include <folly/Conv.h>
 #include <folly/Range.h>
+#include <folly/ScopeGuard.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -25,24 +25,30 @@ namespace wdt {
 
 void basicTest(bool resumption) {
   auto &opts = WdtOptions::getMutable();
-  opts.skip_writes = true;
   opts.enable_download_resumption = false;
   // Tmpfile (deleted)
   FILE *tmp = tmpfile();
-  EXPECT_NE(tmp, nullptr);
-  // We keep the fd around
+  ASSERT_NE(tmp, nullptr);
+  SCOPE_EXIT { fclose(tmp); };
+  std::string contents = "foobar";
+  ASSERT_EQ(contents.size(), fwrite(contents.data(), 1, contents.size(), tmp));
+  ASSERT_EQ(0, fflush(tmp));
+
+  // Keep the fd around.
   int fd = fileno(tmp);
   WLOG(INFO) << "tmp file fd " << fd;
-  fclose(tmp);
-  std::string recvDir;
-  folly::toAppend("/tmp/wdtTest/recv", rand32(), &recvDir);
+
+  TemporaryDirectory tmpDir;
+  auto recvDir = tmpDir.dir();
+
   WdtTransferRequest req(/* start port */ 0, /* num ports */ 3, recvDir);
   Receiver r(req);
   req = r.init();
   EXPECT_EQ(OK, req.errorCode);
   EXPECT_EQ(OK, r.transferAsync());
   // Not even using the actual name (which we don't know)
-  req.fileInfo.push_back(WdtFileInfo(fd, 0, "notexisting23r4"));
+  std::string filename = "notexisting23r4";
+  req.fileInfo.push_back(WdtFileInfo(fd, contents.size(), filename));
   Sender s(req);
   // setWdtOptions not needed if change of option happens before sender cstror
   // but this indirectly tests that API (but need to manually see
@@ -53,10 +59,11 @@ void basicTest(bool resumption) {
   EXPECT_EQ(OK, req.errorCode);
   auto report = s.transfer();
   EXPECT_EQ(OK, report->getSummary().getErrorCode());
-  struct stat dirStat;
-  int sret = stat(recvDir.c_str(), &dirStat);
-  EXPECT_EQ(sret, -1);
-  EXPECT_EQ(errno, ENOENT);
+
+  struct stat recvStat;
+  int sret = stat((tmpDir.dir() + "/" + filename).c_str(), &recvStat);
+  ASSERT_EQ(sret, 0);
+  EXPECT_EQ(recvStat.st_size, contents.size());
 }
 
 TEST(FdTest, FdTestBasic) {

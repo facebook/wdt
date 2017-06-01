@@ -62,7 +62,7 @@ cpp_unittest(
   auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/WdtMiscTests.cpp', ],
   deps = [
-      ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -625,7 +625,13 @@ cpp_library (
     srcs = [
         "test/TestCommon.cpp"
         ],
-  external_deps = [ ("googletest", None, "gtest") ],
+    deps = [
+        ":wdtlib_min",
+    ],
+    external_deps = [
+        ("googletest", None, "gtest"),
+        ("boost", None, "boost_filesystem"),
+    ],
   compiler_flags = wdt_compiler_flags,
 )
 

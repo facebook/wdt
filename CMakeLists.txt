@@ -116,9 +116,9 @@ target_link_libraries(wdt wdt_min)
 
 
 
-# Folly uses boost system
+# Folly uses boost system and filesystem
 #set(Boost_USE_STATIC_LIBS on)
-find_package(Boost COMPONENTS system REQUIRED)
+find_package(Boost COMPONENTS system filesystem REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # We use std:: threads

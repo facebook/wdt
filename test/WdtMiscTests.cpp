@@ -6,9 +6,10 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  */
-#include "TestCommon.h"
 
 #include <wdt/Wdt.h>
+#include <wdt/test/TestCommon.h>
+
 #include <thread>
 
 using namespace std;
@@ -32,21 +33,14 @@ TEST(BasicTest, ReceiverAcceptTimeout) {
   EXPECT_EQ(CONN_ERROR, wdt.wdtSend(req));
 }
 
-// TODO: should move temp dir making etc to wdt test common or use
-// python or bash for this kind of test
 TEST(BasicTest, MultiWdtSender) {
-  // make sure root directory exists
-  mkdir("/tmp/wdtTest", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-  char baseDir[] = "/tmp/wdtTest/XXXXXX";
-  if (!mkdtemp(baseDir)) {
-    WPLOG(FATAL) << "unable to make " << baseDir;
-  }
+  TemporaryDirectory tmpDir;
+  auto baseDir = tmpDir.dir();
+
   LOG(INFO) << "Testing in " << baseDir;
-  string srcDir(baseDir);
-  srcDir.append("/src");
+  string srcDir = baseDir + "/src";
   string srcFile = "file1";
-  string targetDir(baseDir);
-  targetDir.append("/dst");
+  string targetDir = baseDir + "/dst";
   string srcFileFullPath = srcDir + "/" + srcFile;
 
   Wdt &wdt = Wdt::initializeWdt("unit test MultiWdtSender");
@@ -80,12 +74,6 @@ TEST(BasicTest, MultiWdtSender) {
   sender2Thread.join();
 
   EXPECT_EQ(OK, wdt.wdtReceiveFinish("foo"));
-  unlink(srcFileFullPath.c_str());
-  rmdir(srcDir.c_str());
-  string dstFile = targetDir + "/" + srcFile;
-  unlink(dstFile.c_str());
-  rmdir(targetDir.c_str());
-  rmdir(baseDir);
 }
 
 TEST(BasicTest, ThrottlerWithoutReporting) {
