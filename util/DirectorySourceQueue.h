@@ -303,7 +303,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<WdtFileInfo> fileInfo_;
 
-  /// protects initCalled_/initFinished_/sourceQueue_
+  /// protects initCalled_/initFinished_/sourceQueue_/failedSourceStats_
   mutable std::mutex mutex_;
 
   /// condition variable indicating sourceQueue_ is not empty

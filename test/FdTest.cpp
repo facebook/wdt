@@ -23,7 +23,7 @@ using namespace std;
 namespace facebook {
 namespace wdt {
 
-void basicTest(bool resumption) {
+void basicTest(bool resumption, bool nosize) {
   auto &opts = WdtOptions::getMutable();
   opts.enable_download_resumption = false;
   // Tmpfile (deleted)
@@ -48,7 +48,8 @@ void basicTest(bool resumption) {
   EXPECT_EQ(OK, r.transferAsync());
   // Not even using the actual name (which we don't know)
   std::string filename = "notexisting23r4";
-  req.fileInfo.push_back(WdtFileInfo(fd, contents.size(), filename));
+  req.fileInfo.push_back(
+      WdtFileInfo(fd, nosize ? -1 : contents.size(), filename));
   Sender s(req);
   // setWdtOptions not needed if change of option happens before sender cstror
   // but this indirectly tests that API (but need to manually see
@@ -58,20 +59,31 @@ void basicTest(bool resumption) {
   req = s.init();
   EXPECT_EQ(OK, req.errorCode);
   auto report = s.transfer();
-  EXPECT_EQ(OK, report->getSummary().getErrorCode());
 
-  struct stat recvStat;
-  int sret = stat((tmpDir.dir() + "/" + filename).c_str(), &recvStat);
-  ASSERT_EQ(sret, 0);
-  EXPECT_EQ(recvStat.st_size, contents.size());
+  if (!nosize) {
+    EXPECT_EQ(OK, report->getSummary().getErrorCode());
+
+    struct stat recvStat;
+    int sret = stat((tmpDir.dir() + "/" + filename).c_str(), &recvStat);
+    ASSERT_EQ(sret, 0);
+    EXPECT_EQ(recvStat.st_size, contents.size());
+  } else {
+    // If no size is passed and the file does not exist the transfer
+    // should fail.
+    EXPECT_EQ(BYTE_SOURCE_READ_ERROR, report->getSummary().getErrorCode());
+  }
 }
 
 TEST(FdTest, FdTestBasic) {
-  basicTest(false);
+  basicTest(false, false);
 }
 
 TEST(FdTest, FdTestBasicResumption) {
-  basicTest(true);
+  basicTest(true, false);
+}
+
+TEST(FdTest, FdTestNosize) {
+  basicTest(false, true);
 }
 
 TEST(DupSend, DuplicateSend) {

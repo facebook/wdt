@@ -561,6 +561,14 @@ bool DirectorySourceQueue::enqueueFiles() {
       struct stat fileStat;
       if (stat(fullPath.c_str(), &fileStat) != 0) {
         WPLOG(ERROR) << "stat failed on path " << fullPath;
+
+        TransferStats failedSourceStat(info.fileName);
+        failedSourceStat.setLocalErrorCode(BYTE_SOURCE_READ_ERROR);
+        {
+          std::unique_lock<std::mutex> lock(mutex_);
+          failedSourceStats_.emplace_back(std::move(failedSourceStat));
+        }
+
         return false;
       }
       info.fileSize = fileStat.st_size;
