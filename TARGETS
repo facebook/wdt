@@ -582,7 +582,7 @@ cpp_library (
     "@/folly:conv",
     "@/folly:spin_lock",
     "@/folly:r_w_spin_lock",
-    "@/folly:folly-sse42",
+    "@/folly:checksum",
 #    "@/folly:memory",
 
   ],
