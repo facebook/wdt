@@ -29,7 +29,7 @@ is buffered on both paths - keeping each subsystem busy while minimizing
 kernel to userspace switches.
 
 ## Terminology
-WDT uses "Mbytes" everywhere in its output as 1024*1024 bytes = 1048576 bytes
+WDT uses "Mbytes" everywhere in its output as 1024*1024 bytes = 1048576 bytes or a little over 1 megabyte
 (technically this should be the new mebibyte (MiB) standard but it felt
 Mbytes is be more in line with what other tools are using, clearer, easier
 to read and matching what a traditional "megabyte" used to mean in historical
