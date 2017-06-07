@@ -579,11 +579,11 @@ cpp_library (
     ":inc",
     ":stats",
     # Try hard to keep the folly depenencies minimum, think before adding:
-    "@/folly:conv",
-    "@/folly:spin_lock",
-    "@/folly:r_w_spin_lock",
     "@/folly:checksum",
-#    "@/folly:memory",
+    "@/folly:conv",
+    "@/folly:memory",
+    "@/folly:r_w_spin_lock",
+    "@/folly:spin_lock",
 
   ],
   external_deps = [ ("openssl", None, "crypto") ],
