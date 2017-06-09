@@ -24,7 +24,7 @@ class ClientSocket : public WdtSocket {
   /// @return   peer-ip of the connected socket
   const std::string &getPeerIp() const;
   /// shutdown() is now on WdtSocket as shutdownWrites()
-  virtual ~ClientSocket();
+  ~ClientSocket() override;
 
  protected:
   /// sets the send buffer size for this socket

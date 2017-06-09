@@ -25,7 +25,7 @@ class ServerSocket : public WdtSocket {
   ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
                const EncryptionParams &encryptionParams,
                int64_t ivChangeInterval, Func &&tagVerificationSuccessCallback);
-  virtual ~ServerSocket();
+  ~ServerSocket() override;
   /// Sets up listening socket (first wildcard type (ipv4 or ipv6 depending
   /// on flag)).
   ErrorCode listen();

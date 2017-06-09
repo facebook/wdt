@@ -45,7 +45,7 @@ class Sender : public WdtBase {
    * If the transfer has not finished, then it is aborted. finish() is called to
    * wait for threads to end.
    */
-  virtual ~Sender();
+  ~Sender() override;
 
   /**
    * Joins on the threads spawned by start. This has to
@@ -134,7 +134,7 @@ class Sender : public WdtBase {
     explicit QueueAbortChecker(Sender *sender) : sender_(sender) {
     }
 
-    bool shouldAbort() const {
+    bool shouldAbort() const override {
       return (sender_->getTransferStatus() == FINISHED);
     }
 

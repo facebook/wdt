@@ -28,23 +28,23 @@ class FileWriter : public Writer {
         fileCreator_(fileCreator) {
   }
 
-  virtual ~FileWriter() {
+  ~FileWriter() override {
     close();
   }
 
   /// @see Writer.h
-  virtual ErrorCode open() override;
+  ErrorCode open() override;
 
   /// @see Writer.h
-  virtual ErrorCode write(char *buf, int64_t size) override;
+  ErrorCode write(char *buf, int64_t size) override;
 
   /// @see Writer.h
-  virtual int64_t getTotalWritten() override {
+  int64_t getTotalWritten() override {
     return totalWritten_;
   }
 
   /// @see Writer.h
-  virtual void close() override;
+  void close() override;
 
  private:
   /**
