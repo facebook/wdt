@@ -26,7 +26,7 @@ class WdtAbortChecker : public IAbortChecker {
   explicit WdtAbortChecker(const std::atomic<bool> &abortTrigger)
       : abortTriggerPtr_(&abortTrigger) {
   }
-  bool shouldAbort() const {
+  bool shouldAbort() const override {
     return abortTriggerPtr_->load();
   }
 

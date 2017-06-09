@@ -241,7 +241,7 @@ class Histogram : public Counter {
    */
   explicit Histogram(int32_t scale = 1, double percentile1 = 85.0,
                      double percentile2 = 99.9, int64_t offset = 0);
-  ~Histogram();
+  ~Histogram() override;
 
   /**
    * record one value
@@ -468,7 +468,7 @@ class ThreadLocalSwapableNode : public SwapableNode {
     VLOG(100) << "new ThreadLocalSwapableNode " << this;
   }
 
-  ~ThreadLocalSwapableNode() {
+  ~ThreadLocalSwapableNode() override {
     VLOG(100) << "~ThreadLocalSwapableNode " << this;
   }
 
@@ -525,7 +525,7 @@ class ThreadLocalSwapableNode : public SwapableNode {
   }
 
   /// @see PeriodicCounters for details on how this is used.
-  virtual void process() {
+  void process() override {
     // If we have a callback function, give it the fully aggregated results.
     if (func_ != nullptr) {
       C merged;

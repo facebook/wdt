@@ -85,7 +85,7 @@ class Receiver : public WdtBase {
    * confirmation from wdt sender that the transfer is 'DONE'. Destructor also
    * internally calls finish() for every transfer if finish() wasn't called
    */
-  virtual ~Receiver();
+  ~Receiver() override;
 
  protected:
   friend class ReceiverThread;
