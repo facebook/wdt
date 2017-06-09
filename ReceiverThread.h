@@ -80,7 +80,7 @@ class ReceiverThread : public WdtThread {
   void reset() override;
 
   /// Destructor of Receiver thread
-  ~ReceiverThread();
+  ~ReceiverThread() override;
 
   /// Get the port this receiver thread is listening on
   int32_t getPort() const override;

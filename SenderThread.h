@@ -64,7 +64,7 @@ class SenderThread : public WdtThread {
         : threadPtr_(threadPtr) {
     }
 
-    bool shouldAbort() const {
+    bool shouldAbort() const override {
       return (threadPtr_->getThreadAbortCode() != OK);
     }
 
@@ -107,7 +107,7 @@ class SenderThread : public WdtThread {
   ErrorCode getThreadAbortCode();
 
   /// Destructor of the sender thread
-  ~SenderThread() {
+  ~SenderThread() override {
   }
 
  private:
