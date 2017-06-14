@@ -279,10 +279,11 @@ const string WdtTransferRequest::DIRECTORY_PARAM{"dir"};
 const string WdtTransferRequest::PORTS_PARAM{"ports"};
 const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
 const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
-const string WdtTransferRequest::ENCRYPTION_PARAM{"enc"};
+const string WdtTransferRequest::ENCRYPTION_PARAM{"Enc"};
 const string WdtTransferRequest::NAMESPACE_PARAM{"ns"};
 const string WdtTransferRequest::DEST_IDENTIFIER_PARAM{"dstid"};
 const string WdtTransferRequest::DOWNLOAD_RESUMPTION_PARAM{"dr"};
+const string WdtTransferRequest::IV_CHANGE_INTERVAL_PARAM{"iv_change_int"};
 
 WdtTransferRequest::WdtTransferRequest(int startPort, int numPorts,
                                        const string& directory) {
@@ -337,6 +338,21 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
       errorCode = URI_PARSE_ERROR;
     }
   }
+
+  const string ivChangeIntervalStr =
+      wdtUri.getQueryParam(IV_CHANGE_INTERVAL_PARAM);
+  if (ivChangeIntervalStr.empty()) {
+    WLOG(WARNING) << IV_CHANGE_INTERVAL_PARAM << " not specified in URI";
+  } else {
+    try {
+      ivChangeInterval = folly::to<int64_t>(ivChangeIntervalStr);
+    } catch (std::exception& e) {
+      WLOG(ERROR) << "Error parsing iv change interval " << ivChangeIntervalStr
+                  << " " << e.what();
+      errorCode = URI_PARSE_ERROR;
+    }
+  }
+
   string portsStr(wdtUri.getQueryParam(PORTS_PARAM));
   StringPiece portsList(portsStr);  // pointers into portsStr
   do {
@@ -414,6 +430,8 @@ string WdtTransferRequest::generateUrlInternal(bool genFull,
   wdtUri.setQueryParam(DEST_IDENTIFIER_PARAM, destIdentifier);
   wdtUri.setQueryParam(RECEIVER_PROTOCOL_VERSION_PARAM,
                        folly::to<string>(protocolVersion));
+  wdtUri.setQueryParam(IV_CHANGE_INTERVAL_PARAM,
+                       folly::to<string>(ivChangeInterval));
   if (downloadResumptionEnabled) {
     wdtUri.setQueryParam(DOWNLOAD_RESUMPTION_PARAM,
                          folly::to<string>(downloadResumptionEnabled));

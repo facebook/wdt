@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.2)
 # There is no C per se in WDT but if you use CXX only here many checks fail
 # Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
-project("WDT" LANGUAGES C CXX VERSION 1.27.1701241)
+project("WDT" LANGUAGES C CXX VERSION 1.30.1704260)
 
 # On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
 # WDT itself works fine with C++11 (gcc 4.8 for instance) but more recent folly
@@ -46,9 +46,9 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 # So hardcoding for now:
 #set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_CXX_FLAGS "-msse4.2")
-#set(CMAKE_CXX_FLAGS "-msse4.2 -Wextra -Wsign-compare -Wunused-variable")
-#set(CMAKE_CXX_FLAGS "-msse4.2 -Wextra -Wsign-compare -Wunused-variable -Wconversion -Wsign-conversion")
+set(CMAKE_CXX_FLAGS "-msse4.2 -mpclmul")
+#set(CMAKE_CXX_FLAGS "-msse4.2 -mpclmul -Wextra -Wsign-compare -Wunused-variable")
+#set(CMAKE_CXX_FLAGS "-msse4.2 -mpclmul -Wextra -Wsign-compare -Wunused-variable -Wconversion -Wsign-conversion")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "_bin/wdt")
 
 # Check that we have the Folly source tree
@@ -71,6 +71,7 @@ set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Checksum.cpp"
+"${FOLLY_SOURCE_DIR}/folly/detail/ChecksumDetail.cpp"
 "${FOLLY_SOURCE_DIR}/folly/ScopeGuard.cpp"
 )
 
@@ -115,9 +116,9 @@ target_link_libraries(wdt wdt_min)
 
 
 
-# Folly uses boost system
+# Folly uses boost system and filesystem
 #set(Boost_USE_STATIC_LIBS on)
-find_package(Boost COMPONENTS system REQUIRED)
+find_package(Boost COMPONENTS system filesystem REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # We use std:: threads

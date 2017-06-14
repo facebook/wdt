@@ -1,3 +1,5 @@
+# @nolint TODO(#18457353): https://fburl.com/auto-format-build-files
+
 import os
 
 wdt_compiler_flags = [
@@ -57,34 +59,33 @@ cpp_library(
 
 cpp_unittest(
   name = 'wdt_misc_tests',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/WdtMiscTests.cpp', ],
   deps = [
-      ":wdtlib",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
 
 cpp_unittest(
   name = 'test_encdeci64_func',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/test_encdeci64_func.cpp', ],
   deps = [
-      ":testcommon",
+      ":wdtlib4tests",
   ],
   compiler_flags = wdt_compiler_flags,
 )
 
 cpp_binary(
   name = 'test_encdeci64_perf',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/test_encdeci64_perf.cpp', ],
   deps = [
-      ":testcommon",
+      ":wdtlib4tests",
       "@/folly:benchmark",
       "@/common/encode:coding",
   ],
-  compiler_flags = wdt_compiler_flags,
 )
 
 cpp_library (
@@ -137,7 +138,7 @@ cpp_binary(
 
 cpp_unittest(
   name = 'protocol_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/ProtocolTest.cpp', ],
   deps = [
       ":wdtlib",
@@ -147,7 +148,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'encryption_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/EncryptionTest.cpp', ],
   deps = [
       ":wdtlib",
@@ -157,27 +158,27 @@ cpp_unittest(
 
 cpp_binary(
   name = 'option_type_test_long_flags',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     'test/OptionTypeTest.cpp',
   ],
   deps = [
       ":wdtlib",
   ],
-  external_deps = [ ("gtest", None) ],
+  external_deps = [ ("googletest", None, "gtest") ],
   compiler_flags = wdt_compiler_flags,
 )
 
 cpp_binary(
   name = 'option_type_test_short_flags',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     'test/OptionTypeTest.cpp',
   ],
   deps = [
       ":wdtlib_short_flags",
   ],
-  external_deps = [ ("gtest", None) ],
+  external_deps = [ ("googletest", None, "gtest") ],
   output_subdir = 'short_flags',
   preprocessor_flags = [
     "-DSTANDALONE_APP"
@@ -201,7 +202,7 @@ custom_unittest(
 
 cpp_unittest(
   name = 'filereader_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/FileReaderTest.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -211,7 +212,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'threadscontroller_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/ThreadsControllerTest.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -221,7 +222,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'throttler_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/ThrottlerTest.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -231,7 +232,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'resource_controller_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/WdtResourceControllerTest.cpp', ],
   deps = [
       ":wdtlib",
@@ -241,7 +242,7 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'wdt_url_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/WdtUrlTest.cpp', ],
   deps = [
       ":wdtlib4tests",
@@ -251,11 +252,12 @@ cpp_unittest(
 
 cpp_unittest(
   name = 'wdt_fd_test',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [ 'test/FdTest.cpp', ],
   deps = [
       ":wdtlib",
       ":wdtlib4tests",
+      "@/folly:conv",
   ],
   compiler_flags = wdt_compiler_flags,
 )
@@ -356,7 +358,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -370,7 +372,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -413,7 +415,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -427,7 +429,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -483,7 +485,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -497,7 +499,7 @@ custom_unittest(
       ':wdt',
   ],
   env = wdt_env,
-  tags = ['disabled'],
+  tags = ['disabled', 'extended'],
 )
 
 custom_unittest(
@@ -543,7 +545,7 @@ wdt_sh_test("wdt_global_checkpoint_test",  tags = ['serialize', 'disabled'])
 
 cpp_library (
   name = "wdtlib_min",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     "util/WdtSocket.cpp",
     "util/ClientSocket.cpp",
@@ -577,11 +579,11 @@ cpp_library (
     ":inc",
     ":stats",
     # Try hard to keep the folly depenencies minimum, think before adding:
+    "@/folly:checksum",
     "@/folly:conv",
-    "@/folly:spin_lock",
+    "@/folly:memory",
     "@/folly:r_w_spin_lock",
-    "@/folly:folly-sse42",
-#    "@/folly:memory",
+    "@/folly:spin_lock",
 
   ],
   external_deps = [ ("openssl", None, "crypto") ],
@@ -589,7 +591,7 @@ cpp_library (
 
 cpp_library (
   name = "wdtlib",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     "util/WdtFlags.cpp",
     "Wdt.cpp",
@@ -602,7 +604,7 @@ cpp_library (
 
 cpp_library (
   name = "wdtlib_short_flags",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
   srcs = [
     "util/WdtFlags.cpp",
     "Wdt.cpp",
@@ -619,11 +621,17 @@ cpp_library (
 
 cpp_library (
     name = "testcommon",
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
     srcs = [
         "test/TestCommon.cpp"
         ],
-  external_deps = [ ("gtest", None) ],
+    deps = [
+        ":wdtlib_min",
+    ],
+    external_deps = [
+        ("googletest", None, "gtest"),
+        ("boost", None, "boost_filesystem"),
+    ],
   compiler_flags = wdt_compiler_flags,
 )
 
@@ -639,7 +647,7 @@ cpp_library (
 
 cpp_binary(
     name= "wdt",
-    headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    auto_headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
       "wdtCmdLine.cpp",
     ],
@@ -654,7 +662,7 @@ cpp_binary(
 
 cpp_binary(
     name= "wdt_random_close",
-    headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    auto_headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
       "test/NetworkErrorSimulator.cpp",
       "wdtCmdLine.cpp",
@@ -662,7 +670,7 @@ cpp_binary(
     deps = [
       ":wdtlib4tests",
     ],
-    external_deps = [ ("gtest", None) ],
+    external_deps = [ ("googletest", None, "gtest") ],
     output_subdir = 'test',
     compiler_flags = wdt_compiler_flags,
 )

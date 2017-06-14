@@ -7,8 +7,15 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 
+#include <wdt/test/TestCommon.h>
+
+#include <stdlib.h>
+
 #include <mutex>
 #include <random>
+
+#include <boost/filesystem.hpp>
+#include <wdt/ErrorCodes.h>
 
 using namespace std;
 
@@ -24,6 +31,18 @@ uint64_t rand64() {
 
 uint32_t rand32() {
   return static_cast<uint32_t>(rand64());
+}
+
+TemporaryDirectory::TemporaryDirectory() {
+  char dir[] = "/tmp/wdtTest.XXXXXX";
+  if (!mkdtemp(dir)) {
+    WPLOG(FATAL) << "unable to make " << dir;
+  }
+  dir_ = dir;
+}
+
+TemporaryDirectory::~TemporaryDirectory() {
+  boost::filesystem::remove_all(dir_);
 }
 }
 }

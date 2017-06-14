@@ -122,7 +122,7 @@ class WdtNamespaceController : public WdtControllerBase {
   std::vector<std::string> releaseStaleReceivers();
 
   /// Destructor, clears the senders and receivers
-  virtual ~WdtNamespaceController() override;
+  ~WdtNamespaceController() override;
 
  private:
   /// Map of receivers associated with identifier
@@ -235,7 +235,7 @@ class WdtResourceController : public WdtControllerBase {
   static WdtResourceController *get();
 
   /// Destructor for the global resource controller
-  virtual ~WdtResourceController() override;
+  ~WdtResourceController() override;
 
   /// Default global namespace
   static const char *const kGlobalNamespace;

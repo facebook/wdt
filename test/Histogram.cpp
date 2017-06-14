@@ -24,7 +24,7 @@ DEFINE_double(percentile2, 99.9, "target percentile 2");
 
 int main(int argc, char** argv) {
   FLAGS_logtostderr = true;
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   int64_t v;
   facebook::wdt::Histogram h(FLAGS_divider, FLAGS_percentile1,

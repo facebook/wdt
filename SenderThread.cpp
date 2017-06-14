@@ -11,7 +11,6 @@
 #include <folly/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
-#include <folly/ScopeGuard.h>
 #include <folly/String.h>
 #include <sys/stat.h>
 #include <wdt/Sender.h>
@@ -42,13 +41,22 @@ std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
   std::unique_ptr<ClientSocket> socket;
   const EncryptionParams &encryptionData =
       wdtParent_->transferRequest_.encryptionData;
+  int64_t ivChangeInterval = wdtParent_->transferRequest_.ivChangeInterval;
+  if (threadProtocolVersion_ <
+      Protocol::PERIODIC_ENCRYPTION_IV_CHANGE_VERSION) {
+    WTLOG(WARNING) << "Disabling periodic iv change for sender with version "
+                   << threadProtocolVersion_;
+    ivChangeInterval = 0;
+  }
   if (!wdtParent_->socketCreator_) {
     // socket creator not set, creating ClientSocket
-    socket = std::make_unique<ClientSocket>(
-        *threadCtx_, wdtParent_->getDestination(), port, encryptionData);
+    socket = std::make_unique<ClientSocket>(*threadCtx_,
+                                            wdtParent_->getDestination(), port,
+                                            encryptionData, ivChangeInterval);
   } else {
     socket = wdtParent_->socketCreator_->makeSocket(
-        *threadCtx_, wdtParent_->getDestination(), port, encryptionData);
+        *threadCtx_, wdtParent_->getDestination(), port, encryptionData,
+        ivChangeInterval);
   }
   double retryInterval = options_.sleep_millis;
   int maxRetries = options_.max_retries;
@@ -195,6 +203,17 @@ SenderState SenderThread::sendSettings() {
   int64_t off = 0;
   buf_[off++] = Protocol::SETTINGS_CMD;
   bool sendFileChunks = wdtParent_->isSendFileChunks();
+  enableHeartBeat_ = false;
+  if (options_.enable_heart_beat) {
+    if (threadProtocolVersion_ < Protocol::HEART_BEAT_VERSION) {
+      WTLOG(INFO) << "Disabling heart beat because of the receiver version is "
+                  << threadProtocolVersion_;
+    } else {
+      enableHeartBeat_ = true;
+    }
+  }
+  enableHeartBeat_ = (threadProtocolVersion_ >= Protocol::HEART_BEAT_VERSION &&
+                      options_.enable_heart_beat);
   Settings settings;
   settings.readTimeoutMillis = readTimeoutMillis;
   settings.writeTimeoutMillis = writeTimeoutMillis;
@@ -202,6 +221,7 @@ SenderState SenderThread::sendSettings() {
   settings.enableChecksum = (footerType_ == CHECKSUM_FOOTER);
   settings.sendFileChunks = sendFileChunks;
   settings.blockModeDisabled = (options_.block_size_mbytes <= 0);
+  settings.enableHeartBeat = enableHeartBeat_;
   Protocol::encodeSettings(threadProtocolVersion_, buf_, off,
                            Protocol::kMaxSettings, settings);
   int64_t toWrite = sendFileChunks ? Protocol::kMinBufLength : off;
@@ -215,6 +235,41 @@ SenderState SenderThread::sendSettings() {
   return (sendFileChunks ? READ_FILE_CHUNKS : SEND_BLOCKS);
 }
 
+const int kHeartBeatReadTimeFactor = 10;
+
+ErrorCode SenderThread::readHeartBeats() {
+  if (!enableHeartBeat_) {
+    return OK;
+  }
+  const auto now = Clock::now();
+  const int timeSinceLastHeartBeatMs = durationMillis(now - lastHeartBeatTime_);
+  const int heartBeatIntervalMs =
+      (options_.read_timeout_millis * kHeartBeatReadTimeFactor);
+  if (timeSinceLastHeartBeatMs <= heartBeatIntervalMs) {
+    return OK;
+  }
+  lastHeartBeatTime_ = now;
+  // time to read heart-beats
+  const int numRead = socket_->read(buf_, bufSize_,
+                                    /* don't try to read all the data */ false);
+  if (numRead <= 0) {
+    WTLOG(ERROR) << "Failed to read heart-beat " << numRead;
+    return SOCKET_READ_ERROR;
+  }
+  for (int i = 0; i < numRead; i++) {
+    const char receivedCmd = buf_[i];
+    if (receivedCmd != Protocol::HEART_BEAT_CMD) {
+      WTLOG(ERROR) << "Received " << receivedCmd
+                   << " instead of heart-beat cmd";
+      return PROTOCOL_ERROR;
+    }
+  }
+  if (!isTty_) {
+    WTLOG(INFO) << "Received " << numRead << " heart-beats";
+  }
+  return OK;
+}
+
 SenderState SenderThread::sendBlocks() {
   WTVLOG(1) << "entered SEND_BLOCKS state";
   ThreadTransferHistory &transferHistory = getTransferHistory();
@@ -226,6 +281,9 @@ SenderState SenderThread::sendBlocks() {
   std::unique_ptr<ByteSource> source =
       dirQueue_->getNextSource(threadCtx_.get(), transferStatus);
   if (!source) {
+    // try to read any buffered heart-beats
+    readHeartBeats();
+
     return SEND_DONE_CMD;
   }
   WDT_CHECK(!source->hasError());
@@ -280,6 +338,7 @@ TransferStats SenderThread::sendOneByteSource(
     stats.incrFailedAttempts();
     return stats;
   }
+
   stats.addHeaderBytes(written);
   int64_t byteSourceHeaderBytes = written;
   int64_t throttlerInstanceBytes = byteSourceHeaderBytes;
@@ -288,6 +347,9 @@ TransferStats SenderThread::sendOneByteSource(
             << folly::humanify(std::string(headerBuf, off));
   int32_t checksum = 0;
   while (!source->finished()) {
+    // TODO: handle protocol errors from readHeartBeats
+    readHeartBeats();
+
     int64_t size;
     char *buffer = source->read(size);
     if (source->hasError()) {
@@ -355,13 +417,9 @@ TransferStats SenderThread::sendOneByteSource(
         << totalThrottlerBytes << " " << (actualSize + totalThrottlerBytes);
   }
   if (footerType_ != NO_FOOTER) {
-    std::string tag;
-    if (footerType_ == ENC_TAG_FOOTER) {
-      tag = socket_->computeCurEncryptionTag();
-    }
     off = 0;
     headerBuf[off++] = Protocol::FOOTER_CMD;
-    Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum, tag);
+    Protocol::encodeFooter(headerBuf, off, Protocol::kMaxFooter, checksum);
     int toWrite = off;
     written = socket_->write(headerBuf, toWrite);
     if (written != toWrite) {
@@ -647,6 +705,9 @@ SenderState SenderThread::readReceiverCmd() {
     WDT_CHECK_EQ(OK, errCode);
     return READ_RECEIVER_CMD;
   }
+  if (cmd == Protocol::HEART_BEAT_CMD) {
+    return READ_RECEIVER_CMD;
+  }
   WTLOG(ERROR) << "Read unexpected receiver cmd " << cmd << " port " << port_;
   threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
   return END;
@@ -872,15 +933,9 @@ SenderState SenderThread::processVersionMismatch() {
 }
 
 void SenderThread::setFooterType() {
-  // determine footer type to use
-  EncryptionType encryptionType =
-      wdtParent_->transferRequest_.encryptionData.getType();
-  int protocolVersion = wdtParent_->getProtocolVersion();
-  if (protocolVersion >= Protocol::INCREMENTAL_TAG_VERIFICATION_VERSION &&
-      encryptionTypeToTagLen(encryptionType)) {
-    footerType_ = ENC_TAG_FOOTER;
-  } else if (protocolVersion >= Protocol::CHECKSUM_VERSION &&
-             options_.enable_checksum) {
+  const int protocolVersion = wdtParent_->getProtocolVersion();
+  if (protocolVersion >= Protocol::CHECKSUM_VERSION &&
+      options_.enable_checksum) {
     footerType_ = CHECKSUM_FOOTER;
   } else {
     footerType_ = NO_FOOTER;

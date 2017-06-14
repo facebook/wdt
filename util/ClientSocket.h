@@ -18,14 +18,13 @@ namespace wdt {
 class ClientSocket : public WdtSocket {
  public:
   ClientSocket(ThreadCtx &threadCtx, const std::string &dest, int port,
-               const EncryptionParams &encryptionParams);
+               const EncryptionParams &encryptionParams,
+               int64_t ivChangeInterval);
   virtual ErrorCode connect();
   /// @return   peer-ip of the connected socket
   const std::string &getPeerIp() const;
-  /// @return   current encryptor tag
-  std::string computeCurEncryptionTag();
   /// shutdown() is now on WdtSocket as shutdownWrites()
-  virtual ~ClientSocket();
+  ~ClientSocket() override;
 
  protected:
   /// sets the send buffer size for this socket

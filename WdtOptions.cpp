@@ -42,7 +42,6 @@ void WdtOptions::modifyOptions(
                             msg)
     CHANGE_IF_NOT_SPECIFIED(resume_using_dir_tree, userSpecifiedOptions, true,
                             msg)
-    CHANGE_IF_NOT_SPECIFIED(skip_fadvise, userSpecifiedOptions, true, msg)
     return;
   }
   if (optionType != FLASH_OPTION_TYPE) {

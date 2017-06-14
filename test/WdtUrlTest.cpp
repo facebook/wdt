@@ -358,8 +358,8 @@ TEST(TransferRequestTest, Encryption1) {
     string ser = req.genWdtUrlWithSecret();
     WLOG(INFO) << "Url with e= " << ser;
     EXPECT_EQ(ser,
-              "wdt://host1:123?enc=1:464f4f62617235360001fffe"
-              "&num_ports=3&recpv=" +
+              "wdt://host1:123?Enc=1:464f4f62617235360001fffe"
+              "&iv_change_int=0&num_ports=3&recpv=" +
                   std::to_string(Protocol::protocol_version));
     WdtTransferRequest unser(ser);
     EXPECT_EQ(unser.errorCode, OK);
@@ -404,7 +404,7 @@ TEST(Wdt, WdtInstanceTest) {
 int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   int ret = RUN_ALL_TESTS();
   return ret;

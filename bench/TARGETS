@@ -1,95 +1,88 @@
 wdt_compiler_flags = [
-  "-Wextra",
-  "-Wsign-compare",
-  "-Wno-unused-parameter",
-  "-Wunused-variable",
+    "-Wextra",
+    "-Wsign-compare",
+    "-Wno-unused-parameter",
+    "-Wunused-variable",
     #"-Wconversion",
     #"-Wmaybe-uninitialized", not working because of D955599
 ]
 
 export_file(
-  name = 'book1.bigrams',
+    name = "book1.bigrams",
 )
 
-cpp_library (
-  name = "wdtbenchlib",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-  srcs = [
-    "Bigram.cpp",
-  ],
-  external_deps = [
-      ('glog', None, 'glog'),
-  ],
-  compiler_flags = wdt_compiler_flags,
+cpp_library(
+    name = "wdtbenchlib",
+    srcs = [
+        "Bigram.cpp",
+    ],
+    compiler_flags = wdt_compiler_flags,
+    external_deps = [
+        ("glog", None, "glog"),
+    ],
 )
 
-cpp_library (
-  name = "wdtbenchlibopt",
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-  output_subdir = 'wblopt',
-  srcs = [
-    "Bigram.cpp",
-  ],
-  external_deps = [
-      ('glog', None, 'glog'),
-  ],
-  compiler_flags = [ "-O3" ],
+cpp_library(
+    name = "wdtbenchlibopt",
+    srcs = [
+        "Bigram.cpp",
+    ],
+    compiler_flags = ["-O3"],
+    output_subdir = "wblopt",
+    external_deps = [
+        ("glog", None, "glog"),
+    ],
 )
-
 
 cpp_binary(
-    name= "wdt_gen_files",
-    headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    name = "wdt_gen_files",
     srcs = [
-      "wdtGenFiles.cpp",
+        "wdtGenFiles.cpp",
     ],
+    compiler_flags = ["-O3"],
+    preprocessor_flags = ["-Iwdt"],
     deps = [
         ":wdtbenchlibopt",
         "@/wdt:version",
     ],
-    preprocessor_flags = [ "-Iwdt" ],
-    compiler_flags = [ "-O3" ],
 )
 
 cpp_binary(
-    name= "wdt_gen_files_prof",
-    headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    output_subdir = 'wbprof',
+    name = "wdt_gen_files_prof",
     srcs = [
-      "wdtGenFiles.cpp",
+        "wdtGenFiles.cpp",
     ],
+    compiler_flags = wdt_compiler_flags,
+    output_subdir = "wbprof",
+    preprocessor_flags = ["-Iwdt"],
     deps = [
         ":wdtbenchlib",
-        "@/wdt:version",
         "@/common/base:profiler",
+        "@/wdt:version",
     ],
-    preprocessor_flags = [ "-Iwdt" ],
-    compiler_flags = wdt_compiler_flags,
 )
 
 cpp_unittest(
-    name = 'wdt_gen_test',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [ 'wdtGenTest.cpp', ],
+    name = "wdt_gen_test",
+    srcs = ["wdtGenTest.cpp"],
+    compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtbenchlib",
     ],
-    compiler_flags = wdt_compiler_flags,
 )
 
 cpp_binary(
-    name= "wdt_gen_stats",
-    headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    name = "wdt_gen_stats",
     srcs = [
-      "wdtStats.cpp",
+        "wdtStats.cpp",
     ],
+    compiler_flags = wdt_compiler_flags,
+    preprocessor_flags = ["-Iwdt"],
     deps = [
         ":wdtbenchlib",
-        "@/wdt:version"
+        "@/wdt:version",
     ],
     external_deps = [
-        ('glog', None, 'glog'),
+        ("glog", None, "glog"),
     ],
-    preprocessor_flags = [ "-Iwdt" ],
-    compiler_flags = wdt_compiler_flags,
 )

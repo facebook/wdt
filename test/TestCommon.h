@@ -15,5 +15,16 @@ namespace facebook {
 namespace wdt {
 uint32_t rand32();
 uint64_t rand64();
+
+class TemporaryDirectory {
+ public:
+  TemporaryDirectory();
+  ~TemporaryDirectory();
+
+  const std::string& dir() const { return dir_; }
+
+ private:
+  std::string dir_;
+};
 }
 }

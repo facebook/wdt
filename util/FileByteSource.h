@@ -50,62 +50,62 @@ class FileByteSource : public ByteSource {
   FileByteSource(SourceMetaData *metadata, int64_t size, int64_t offset);
 
   /// close file descriptor if still open
-  virtual ~FileByteSource() {
+  ~FileByteSource() override {
     this->close();
   }
 
   /// @return filepath
-  virtual const std::string &getIdentifier() const override {
+  const std::string &getIdentifier() const override {
     return metadata_->relPath;
   }
 
   /// @return size of file in bytes
-  virtual int64_t getSize() const override {
+  int64_t getSize() const override {
     return size_;
   }
 
   /// @return offset from which to start reading
-  virtual int64_t getOffset() const override {
+  int64_t getOffset() const override {
     return offset_;
   }
 
   /// @see ByteSource.h
-  virtual const SourceMetaData &getMetaData() const override {
+  const SourceMetaData &getMetaData() const override {
     return *metadata_;
   }
 
   /// @return true iff finished reading file successfully
-  virtual bool finished() const override {
+  bool finished() const override {
     return bytesRead_ == size_ && !hasError();
   }
 
   /// @return true iff there was an error reading file
-  virtual bool hasError() const override {
+  bool hasError() const override {
     return (metadata_->allocationStatus != TO_BE_DELETED) && (fd_ < 0);
   }
 
   /// @see ByteSource.h
-  virtual char *read(int64_t &size) override;
+  char *read(int64_t &size) override;
 
   /// @see ByteSource.h
-  virtual void advanceOffset(int64_t numBytes) override;
+  void advanceOffset(int64_t numBytes) override;
 
   /// @see ByteSource.h
-  virtual ErrorCode open(ThreadCtx *threadCtx) override;
+  ErrorCode open(ThreadCtx *threadCtx) override;
 
   /// close the source for reading
-  virtual void close() override;
+  void close() override;
 
   /**
    * @return transfer stats for the source. If the stats is moved by the
    *         caller, then this function can not be called again
    */
-  virtual TransferStats &getTransferStats() override {
+  TransferStats &getTransferStats() override {
     return transferStats_;
   }
 
   /// @param stats    Stats to be added
-  virtual void addTransferStats(const TransferStats &stats) override {
+  void addTransferStats(const TransferStats &stats) override {
     transferStats_ += stats;
   }
 

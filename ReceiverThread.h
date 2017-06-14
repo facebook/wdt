@@ -80,7 +80,7 @@ class ReceiverThread : public WdtThread {
   void reset() override;
 
   /// Destructor of Receiver thread
-  ~ReceiverThread();
+  ~ReceiverThread() override;
 
   /// Get the port this receiver thread is listening on
   int32_t getPort() const override;
@@ -274,6 +274,10 @@ class ReceiverThread : public WdtThread {
 
   /// verifies received blocks which are not already verified
   void markReceivedBlocksVerified();
+
+  /// checks whether heart-beat is enabled, and whether it is time to send
+  /// another heart-beat, and if yes, sends a heart-beat
+  void sendHeartBeat();
 
   /// Mapping from receiver states to state functions
   static const StateFunction stateMap_[];

@@ -44,8 +44,8 @@ std::string getOptionNameFromFlagName(const std::string &flagName) {
 
 std::set<std::string> WdtFlags::getUserSpecifiedOptions() {
   std::set<std::string> userSpecifiedFlags;
-  std::vector<google::CommandLineFlagInfo> allFlags;
-  google::GetAllFlags(&allFlags);
+  std::vector<GFLAGS_NAMESPACE::CommandLineFlagInfo> allFlags;
+  GFLAGS_NAMESPACE::GetAllFlags(&allFlags);
   for (const auto &flag : allFlags) {
     if (!flag.is_default) {
       // is_default is false if the flag has been specified in the cmd line.
@@ -60,7 +60,7 @@ std::set<std::string> WdtFlags::getUserSpecifiedOptions() {
 }
 
 void WdtFlags::initializeFromFlags(WdtOptions &options) {
-  WLOG(INFO) << "Running WDT " << Protocol::getFullVersion();
+  WVLOG(1) << "Running WDT " << Protocol::getFullVersion();
 #define ASSIGN_OPT
 #include "WdtFlags.cpp.inc"  //nolint
 #undef ASSIGN_OPT

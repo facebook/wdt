@@ -85,14 +85,14 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @return next FileByteSource to consume or nullptr when finished
    */
-  virtual std::unique_ptr<ByteSource> getNextSource(ThreadCtx *callerThreadCtx,
-                                                    ErrorCode &status) override;
+  std::unique_ptr<ByteSource> getNextSource(ThreadCtx *callerThreadCtx,
+                                            ErrorCode &status) override;
 
   /// @return         total number of files processed/enqueued
-  virtual int64_t getCount() const override;
+  int64_t getCount() const override;
 
   /// @return         total size of files processed/enqueued
-  virtual int64_t getTotalSize() const override;
+  int64_t getTotalSize() const override;
 
   /// @return         total number of blocks and status of the transfer
   std::pair<int64_t, ErrorCode> getNumBlocksAndStatus() const;
@@ -210,7 +210,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// @return   number of bytes previously sent
   int64_t getPreviouslySentBytes() const;
 
-  virtual ~DirectorySourceQueue();
+  ~DirectorySourceQueue() override;
 
   /// @return   discovered files metadata
   std::vector<SourceMetaData *> &getDiscoveredFilesMetaData();
@@ -303,7 +303,7 @@ class DirectorySourceQueue : public SourceQueue {
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<WdtFileInfo> fileInfo_;
 
-  /// protects initCalled_/initFinished_/sourceQueue_
+  /// protects initCalled_/initFinished_/sourceQueue_/failedSourceStats_
   mutable std::mutex mutex_;
 
   /// condition variable indicating sourceQueue_ is not empty

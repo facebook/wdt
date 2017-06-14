@@ -132,7 +132,7 @@ class WdtBase {
     explicit AbortChecker(WdtBase* wdtBase) : wdtBase_(wdtBase) {
     }
 
-    bool shouldAbort() const {
+    bool shouldAbort() const override {
       return wdtBase_->getCurAbortCode() != OK;
     }
 

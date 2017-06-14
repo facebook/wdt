@@ -18,8 +18,12 @@ namespace wdt {
 using std::string;
 
 ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
-                           const EncryptionParams &encryptionParams)
-    : WdtSocket(threadCtx, port, encryptionParams), backlog_(backlog) {
+                           const EncryptionParams &encryptionParams,
+                           int64_t ivChangeInterval,
+                           Func &&tagVerificationSuccessCallback)
+    : WdtSocket(threadCtx, port, encryptionParams, ivChangeInterval,
+                std::move(tagVerificationSuccessCallback)),
+      backlog_(backlog) {
   // for backward compatibility
   supportUnencryptedPeer_ = true;
 }
@@ -221,7 +225,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
     // reduced timeout
     int timeElapsed = durationMillis(Clock::now() - startTime);
     if (timeElapsed >= timeoutMillis) {
-      WVLOG(1) << "accept() timed out";
+      WVLOG(3) << "accept() timed out";
       return CONN_ERROR;
     }
     int pollTimeout = timeoutMillis - timeElapsed;
