@@ -90,8 +90,12 @@ Open the terminal application and type "git" or "make" to be prompted to install
 
 ## Using the contbuild script locally
 
+This is quite heavy handed (manual/brew steps are better) but should work because travis works
+
 ```sh
-source travis_osx.sh
+git clone https://github.com/facebook/wdt.git
+cd wdt
+source build/travis_osx.sh
 mkdir ../build && cd ../build
 cmake ../wdt -DBUILD_TESTING=1
 make -j

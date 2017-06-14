@@ -28,7 +28,7 @@ mkdir double-conversion-build
 git clone https://github.com/schuhschuh/gflags.git
 (mkdir gflags-build; cd gflags-build; cmake -DCMAKE_INSTALL_PREFIX=$HOME -DGFLAGS_NAMESPACE=google -DBUILD_SHARED_LIBS=on ../gflags && make -j 4 && make install)
 git clone https://github.com/google/glog.git
-( cd glog && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
+( cd glog && ./autogen.sh && ./configure --with-gflags=$HOME --prefix=$HOME && make -j 4 && make install )
 git clone https://github.com/facebook/folly.git
 pwd ; ls -l
 cd wdt
