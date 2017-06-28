@@ -567,10 +567,27 @@ ReceiverState ReceiverThread::processFileCmd() {
 
     code = writer.write(buf_, nres);
     if (code != OK) {
+      WTLOG(ERROR) << "failed to write to " << blockDetails.fileName;
       threadStats_.setLocalErrorCode(code);
       return SEND_ABORT_CMD;
     }
   }
+
+  // Sync the writer to disk and close it. We need to check for error code each
+  // time, otherwise we would move forward with corrupted files.
+  const ErrorCode syncCode = writer.sync();
+  if (syncCode != OK) {
+    WTLOG(ERROR) << "could not sync " << blockDetails.fileName << " to disk";
+    threadStats_.setLocalErrorCode(syncCode);
+    return SEND_ABORT_CMD;
+  }
+  const ErrorCode closeCode = writer.close();
+  if (closeCode != OK) {
+    WTLOG(ERROR) << "could not close " << blockDetails.fileName;
+    threadStats_.setLocalErrorCode(closeCode);
+    return SEND_ABORT_CMD;
+  }
+
   if (writer.getTotalWritten() != blockDetails.dataSize) {
     // This can only happen if there are transmission errors
     // Write errors to disk are already taken care of above

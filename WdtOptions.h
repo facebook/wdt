@@ -232,10 +232,11 @@ class WdtOptions {
 
   /**
    * If true, each file is fsync'ed after its last block is
-   * received. This is disabled by default because fsync can cause a
-   * significant performance hit on some filesystems.
+   * received.
+   * Note that this can cause some performance hit on some filesystems, however
+   * if you disable it there no correctness guarantee will be provided.
    */
-  bool fsync{false};
+  bool fsync{true};
 
   /**
    * Intervals in millis after which progress reporter updates current

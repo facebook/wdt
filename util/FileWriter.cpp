@@ -12,11 +12,21 @@
 #include <fcntl.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 
 namespace facebook {
 namespace wdt {
+
+FileWriter::~FileWriter() {
+  // Make sure that the file is closed but this should be a no-op as the
+  // caller should always call sync() and close() manually to check the error
+  // code.
+  if (!isClosed()) {
+    WLOG(ERROR ) << "File " << blockDetails_->fileName
+                 << " was not closed and needed to be closed in the dtor";
+    close();
+  }
+}
 
 ErrorCode FileWriter::open() {
   if (threadCtx_.getOptions().skip_writes) {
@@ -38,6 +48,7 @@ ErrorCode FileWriter::open() {
       WPLOG(ERROR) << "Unable to seek to " << blockDetails_->offset << " for "
                    << blockDetails_->fileName;
       close();
+      return FILE_WRITE_ERROR;
     }
   }
   if (fd_ == -1) {
@@ -47,14 +58,48 @@ ErrorCode FileWriter::open() {
   return OK;
 }
 
-void FileWriter::close() {
+ErrorCode FileWriter::sync() {
+  if (fd_ < 0) {
+    // File was either never opened or already closed
+    return OK;
+  }
+  const auto &options = threadCtx_.getOptions();
+  if (options.fsync || options.isLogBasedResumption()) {
+   if (::fsync(fd_) < 0) {
+     WPLOG(ERROR) << "Unable to fsync() fd " << fd_;
+     return FILE_WRITE_ERROR;
+   }
+  }
+#ifdef HAS_POSIX_FADVISE
+  if (!options.skip_fadvise) {
+    PerfStatCollector statCollector(threadCtx_, PerfStatReport::FADVISE);
+    if (posix_fadvise(fd_, blockDetails_->offset, blockDetails_->dataSize,
+                      POSIX_FADV_DONTNEED) != 0) {
+      WPLOG(ERROR) << "posix_fadvise failed for " << blockDetails_->fileName
+                   << " " << blockDetails_->offset << " "
+                   << blockDetails_->dataSize;
+      return FILE_WRITE_ERROR;
+    }
+  }
+#endif
+  return OK;
+}
+
+ErrorCode FileWriter::close() {
   if (fd_ >= 0) {
     PerfStatCollector statCollector(threadCtx_, PerfStatReport::FILE_CLOSE);
     if (::close(fd_) != 0) {
       WPLOG(ERROR) << "Unable to close fd " << fd_;
+      fd_ = -1;
+      return FILE_WRITE_ERROR;
     }
     fd_ = -1;
   }
+  return OK;
+}
+
+bool FileWriter::isClosed() {
+  return fd_ < 0;
 }
 
 ErrorCode FileWriter::write(char *buf, int64_t size) {
@@ -83,41 +128,20 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
     }
     WVLOG(1) << "Successfully written " << count << " bytes to fd " << fd_
              << " for file " << blockDetails_->fileName;
-    bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
-    if (finished && (options.isLogBasedResumption() || options.fsync)) {
-      PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC_STATS);
-      if (fsync(fd_) != 0) {
-        WPLOG(ERROR) << "fsync failed for " << blockDetails_->fileName
-                     << " offset " << blockDetails_->offset << " file-size "
-                     << blockDetails_->fileSize << " data-size "
-                     << blockDetails_->dataSize;
-        return FILE_WRITE_ERROR;
-      }
-      WVLOG(1) << "File " << blockDetails_->fileName << " fsync'ed";
-    } else {
-      syncFileRange(count, finished);
+    const bool finished = ((totalWritten_ + size) == blockDetails_->dataSize);
+    if (!syncFileRange(count, finished /*forced*/)) {
+      return FILE_WRITE_ERROR;
     }
-#ifdef HAS_POSIX_FADVISE
-    if (finished && !options.skip_fadvise) {
-      PerfStatCollector statCollector(threadCtx_, PerfStatReport::FADVISE);
-      if (posix_fadvise(fd_, blockDetails_->offset, blockDetails_->dataSize,
-                        POSIX_FADV_DONTNEED) != 0) {
-        WPLOG(ERROR) << "posix_fadvise failed for " << blockDetails_->fileName
-                     << " " << blockDetails_->offset << " "
-                     << blockDetails_->dataSize;
-      }
-    }
-#endif
   }
   totalWritten_ += size;
   return OK;
 }
 
-void FileWriter::syncFileRange(int64_t written, bool forced) {
+bool FileWriter::syncFileRange(int64_t written, bool forced) {
 #ifdef HAS_SYNC_FILE_RANGE
   const WdtOptions &options = threadCtx_.getOptions();
   if (options.disk_sync_interval_mb < 0) {
-    return;
+    return true;
   }
   const int64_t syncIntervalBytes = options.disk_sync_interval_mb * 1024 * 1024;
   writtenSinceLastSync_ += written;
@@ -126,7 +150,7 @@ void FileWriter::syncFileRange(int64_t written, bool forced) {
     WVLOG(1) << "skipping syncFileRange for " << blockDetails_->fileName
              << ". Data written " << written
              << " sync forced = " << std::boolalpha << forced;
-    return;
+    return true;
   }
   if (forced || writtenSinceLastSync_ > syncIntervalBytes) {
     // sync_file_range with flag SYNC_FILE_RANGE_WRITE is an asynchronous
@@ -138,11 +162,13 @@ void FileWriter::syncFileRange(int64_t written, bool forced) {
                                       PerfStatReport::SYNC_FILE_RANGE);
       status = sync_file_range(fd_, nextSyncOffset_, writtenSinceLastSync_,
                                SYNC_FILE_RANGE_WRITE);
+      // NOTE: it may be beneficial to have the option to do fadvise after each
+      // sync_file_range() call here.
     }
     if (status != 0) {
       WPLOG(ERROR) << "sync_file_range() failed for " << blockDetails_->fileName
                    << "fd " << fd_;
-      return;
+      return false;
     }
     WVLOG(1) << "file range [" << nextSyncOffset_ << " "
              << writtenSinceLastSync_ << "] synced for file "
@@ -151,6 +177,7 @@ void FileWriter::syncFileRange(int64_t written, bool forced) {
     writtenSinceLastSync_ = 0;
   }
 #endif
+  return true;
 }
 }
 }

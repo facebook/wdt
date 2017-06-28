@@ -28,9 +28,7 @@ class FileWriter : public Writer {
         fileCreator_(fileCreator) {
   }
 
-  ~FileWriter() override {
-    close();
-  }
+  ~FileWriter() override;
 
   /// @see Writer.h
   ErrorCode open() override;
@@ -44,7 +42,12 @@ class FileWriter : public Writer {
   }
 
   /// @see Writer.h
-  void close() override;
+  /// This method calls fsync() and posix_fadvise, except if options are set
+  /// to disable it.
+  ErrorCode sync() override;
+
+  /// @see Writer.h
+  ErrorCode close() override;
 
  private:
   /**
@@ -53,7 +56,12 @@ class FileWriter : public Writer {
    * @param written   number of bytes last written
    * @param forced    whether to force syncing or not
    */
-  void syncFileRange(int64_t written, bool forced);
+  bool syncFileRange(int64_t written, bool forced);
+
+  /**
+   * Return true if the file is already closed.
+   */
+  bool isClosed();
 
   ThreadCtx &threadCtx_;
 

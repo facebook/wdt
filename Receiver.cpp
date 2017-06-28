@@ -8,7 +8,6 @@
  */
 #include <wdt/Receiver.h>
 #include <wdt/util/EncryptionUtils.h>
-#include <wdt/util/FileWriter.h>
 #include <wdt/util/ServerSocket.h>
 
 #include <folly/Bits.h>

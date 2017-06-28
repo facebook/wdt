@@ -40,8 +40,11 @@ class Writer {
   /// @return   total number of bytes written
   virtual int64_t getTotalWritten() = 0;
 
+  /// sync data to disk
+  virtual ErrorCode sync() = 0;
+
   /// close the writer
-  virtual void close() = 0;
+  virtual ErrorCode close() = 0;
 };
 }
 }
