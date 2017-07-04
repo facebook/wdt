@@ -49,17 +49,19 @@ int32_t* initHistLookup() {
 static const int32_t* kVal2Bucket = initHistLookup();
 
 void Counter::record(int64_t v) {
-  int64_t newCount = ++count_;  // atomic_add(count_, 1);
-  // atomic_add(sum_, v);
+  int64_t newCount = ++count_;
   sum_ += v;
   if (newCount == 1) {
-    min_ = max_ = v;
+    realMin_ = min_ = max_ = v;
   }
-  // this can actually miss/revert the min/max (race condition)
-  // don't count 0 in the min - makes for a slightly more interesting min
+  // don't count 0s in the min - makes for a slightly more interesting min
   // in most cases
   if (v && ((min_ == 0) || (v < min_))) {
     min_ = v;
+  }
+  // real min (can be 0):
+  if (v < realMin_ ) {
+    realMin_ = v;
   }
   if (v > max_) {
     max_ = v;
@@ -176,7 +178,7 @@ double Histogram::calcPercentile(double percentile) const {
     return getMax();
   }
   if (percentile <= 0) {
-    return 0;
+    return getRealMin();
   }
   // Initial value of prev should in theory be offset_
   // but if the data is wrong (smaller than offset - eg 'negative') that
@@ -185,6 +187,7 @@ double Histogram::calcPercentile(double percentile) const {
   int64_t total = 0;
   const int64_t ctrTotal = getCount();
   const int64_t ctrMax = getMax();
+  const int64_t ctrMin = getRealMin();
   double prevPerc = 0;
   double perc = 0;
   bool found = false;
@@ -212,6 +215,10 @@ double Histogram::calcPercentile(double percentile) const {
     // covers the > ctrMax case
     cur = ctrMax;
     perc = 100.;  // can't be removed
+  }
+  // Fix up the min too to never return < min and increase low p accuracy
+  if (prev < ctrMin) {
+    prev = ctrMin;
   }
   return (prev + (percentile - prevPerc) * (cur - prev) / (perc - prevPerc));
 }
