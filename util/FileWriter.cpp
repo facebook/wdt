@@ -65,9 +65,10 @@ ErrorCode FileWriter::sync() {
   }
   const auto &options = threadCtx_.getOptions();
   if (options.fsync || options.isLogBasedResumption()) {
-   if (::fsync(fd_) < 0) {
-     WPLOG(ERROR) << "Unable to fsync() fd " << fd_;
-     return FILE_WRITE_ERROR;
+    PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC_STATS);
+    if (::fsync(fd_) < 0) {
+      WPLOG(ERROR) << "Unable to fsync() fd " << fd_;
+      return FILE_WRITE_ERROR;
    }
   }
 #ifdef HAS_POSIX_FADVISE
