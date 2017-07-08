@@ -94,7 +94,13 @@ TEST(StatsTest, HistogramPercentile) {
     std::cout << i << "% at " << h.calcPercentile(i) << std::endl;
   }
   EXPECT_EQ(501, h.getAverage());
+  EXPECT_EQ(1, h.calcPercentile(-1));
+  EXPECT_EQ(1, h.calcPercentile(0));
+  EXPECT_EQ(1.045, h.calcPercentile(0.1));
+  EXPECT_EQ(1.45, h.calcPercentile(1));
+  EXPECT_EQ(2.8, h.calcPercentile(4));
   EXPECT_EQ(10, h.calcPercentile(20));
+  EXPECT_EQ(250.25, h.calcPercentile(20.1));
   EXPECT_EQ(550, h.calcPercentile(50));
   EXPECT_EQ(775, h.calcPercentile(75));
   EXPECT_EQ(1000.5, h.calcPercentile(90));

@@ -145,6 +145,7 @@ class Counter : crashifcopied {
  public:
   explicit Counter(double printScale = 1.0)
       : count_(0),
+        realMin_(0),
         min_(0),
         max_(0),
         sum_(0),
@@ -161,6 +162,11 @@ class Counter : crashifcopied {
     return count_;
   }
 
+  // Includes 0s
+  inline int64_t getRealMin() const {
+    return realMin_;
+  }
+  // Excludes 0
   inline int64_t getMin() const {
     return min_;
   }
@@ -209,7 +215,7 @@ class Counter : crashifcopied {
   void merge(const Counter& c);
 
  private:
-  int64_t count_, min_, max_, sum_, sumOfSquares_;
+  int64_t count_, realMin_, min_, max_, sum_, sumOfSquares_;
   double printScale_;
 };
 
