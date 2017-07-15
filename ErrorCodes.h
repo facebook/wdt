@@ -77,7 +77,8 @@ namespace wdt {
   X(ENCRYPTION_ERROR)           /** Error related to encryption */             \
   X(ALREADY_EXISTS)             /** Create attempt for existing id */          \
   X(GLOBAL_CHECKPOINT_ABORT)    /** Abort due to global checkpoint */          \
-  X(INVALID_REQUEST) /** Request for creation of wdt object invalid */
+  X(INVALID_REQUEST) /** Request for creation of wdt object invalid */         \
+  X(SENDER_START_TIMED_OUT) /** Sender start timed out */
 
 enum ErrorCode {
 #define X(A) A,
