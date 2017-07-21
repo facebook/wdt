@@ -122,7 +122,7 @@ inline static int64_t atomic_get(vint64_t& data) {
  */
 class crashifcopied {
  public:
-  crashifcopied(const crashifcopied& c) {
+  crashifcopied(const crashifcopied& /*c*/) {
     CHECK(false);
   }
 

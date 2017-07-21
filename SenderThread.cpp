@@ -35,7 +35,8 @@ const SenderThread::StateFunction SenderThread::stateMap_[] = {
     &SenderThread::processAbortCmd, &SenderThread::processVersionMismatch};
 
 std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
-    const int port, IAbortChecker const *abortChecker, ErrorCode &errCode) {
+    const int port, IAbortChecker const * /*abortChecker*/,
+    ErrorCode &errCode) {
   auto startTime = Clock::now();
   int connectAttempts = 0;
   std::unique_ptr<ClientSocket> socket;

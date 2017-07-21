@@ -141,7 +141,7 @@ class ProbabilityTable {
       data_.push_back(value);
     }
   }
-  void seal(const ProbabilityTable &parent) {
+  void seal(const ProbabilityTable & /*parent*/) {
     size_ = data_.size();
     if (size_ > 0) {
       dist_.reset(new std::uniform_int_distribution<int>(0, size_ - 1));
