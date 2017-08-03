@@ -1,20 +1,20 @@
 include_defs("//common/defs/environment")
 
 wdt_compiler_flags = [
-  "-Wextra",
-  "-Wsign-compare",
-  "-Wno-unused-parameter",
-  "-Wunused-variable",
- # "-Wshorten-64-to-32",
- # "-Wconversion",
+    "-Wextra",
+    "-Wsign-compare",
+    "-Wno-unused-parameter",
+    "-Wunused-variable",
+    # "-Wshorten-64-to-32",
+    # "-Wconversion",
     #"-Wmaybe-uninitialized", not working because of D955599
     #"-Iwdt",
 ]
 
 wdt_env = {
-    'WDT_BINARY' : '$(location :wdt)',
-    'WDT_GEN_FILES' : '$(location @/wdt/bench:wdt_gen_files)',
-    'WDT_GEN_BIGRAMS' : '$(location @/wdt/bench:book1.bigrams)',
+    "WDT_BINARY": "$(location :wdt)",
+    "WDT_GEN_FILES": "$(location @/wdt/bench:wdt_gen_files)",
+    "WDT_GEN_BIGRAMS": "$(location @/wdt/bench:book1.bigrams)",
 }
 
 def wdt_test(test_name, ext, tags):
@@ -38,292 +38,300 @@ def wdt_sh_test(test_name, tags = []):
 def wdt_py_test(test_name, tags = []):
     wdt_test(test_name, ".py", tags)
 
-
-
 cpp_library(
-  name = 'version',
-  headers = [
-      "WdtConfig.h",
-  ],
-)
-
-cpp_library(
-  name = 'inc',
-  headers = [
-      "util/WdtFlags.cpp.inc",
-      "wdtCmdLine.cpp",
-  ],
-)
-
-cpp_unittest(
-  name = 'wdt_misc_tests',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/WdtMiscTests.cpp', ],
-  deps = [
-      ":wdtlib4tests",
-  ],
-  compiler_flags = wdt_compiler_flags,
-)
-
-cpp_unittest(
-  name = 'test_encdeci64_func',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/test_encdeci64_func.cpp', ],
-  deps = [
-      ":wdtlib4tests",
-  ],
-  compiler_flags = wdt_compiler_flags,
-)
-
-cpp_binary(
-  name = 'test_encdeci64_perf',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/test_encdeci64_perf.cpp', ],
-  deps = [
-      ":wdtlib4tests",
-      "@/folly:benchmark",
-      "@/common/encode:coding",
-  ],
-)
-
-cpp_library (
-  name = "stats",
-  headers = [ "util/Stats.h" ],
-  srcs = [
-        "util/Stats.cpp"
+    name = "version",
+    headers = [
+        "WdtConfig.h",
     ],
-  deps = [
-    "@/folly:thread_local",
-  ],
-  compiler_flags = wdt_compiler_flags,
 )
 
-
-cpp_unittest (
-  name = "stats_test",
-  srcs = [
-    "test/Stats_test.cpp",
-  ],
-  deps = [
-    ":wdtlib",
-  ],
+cpp_library(
+    name = "inc",
+    headers = [
+        "util/WdtFlags.cpp.inc",
+        "wdtCmdLine.cpp",
+    ],
 )
 
+cpp_unittest(
+    name = "wdt_misc_tests",
+    srcs = ["test/WdtMiscTests.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib4tests",
+    ],
+)
 
-cpp_benchmark (
-  name = "stats_benchmark",
-  srcs = [
-    "test/Stats_test_benchmark.cpp",
-  ],
-  deps = [
-    ":testcommon",
-    ":stats",
-    "@/folly:benchmark",
-    "@/folly:singleton",
-    "@/common/stats:stats",
-  ],
+cpp_unittest(
+    name = "test_encdeci64_func",
+    srcs = ["test/test_encdeci64_func.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib4tests",
+    ],
 )
 
 cpp_binary(
-    name = 'histogram',
-    srcs = [ 'test/Histogram.cpp', ],
+    name = "test_encdeci64_perf",
+    srcs = ["test/test_encdeci64_perf.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    deps = [
+        ":wdtlib4tests",
+        "@/common/encode:coding",
+        "@/folly:benchmark",
+    ],
+)
+
+cpp_library(
+    name = "stats",
+    srcs = [
+        "util/Stats.cpp",
+    ],
+    headers = ["util/Stats.h"],
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        "@/folly:thread_local",
+    ],
+)
+
+cpp_unittest(
+    name = "stats_test",
+    srcs = [
+        "test/Stats_test.cpp",
+    ],
+    deps = [
+        ":wdtlib",
+    ],
+)
+
+cpp_benchmark(
+    name = "stats_benchmark",
+    srcs = [
+        "test/Stats_test_benchmark.cpp",
+    ],
+    deps = [
+        ":stats",
+        ":testcommon",
+        "@/common/stats:stats",
+        "@/folly:benchmark",
+        "@/folly:singleton",
+    ],
+)
+
+cpp_binary(
+    name = "histogram",
+    srcs = ["test/Histogram.cpp"],
+    compiler_flags = wdt_compiler_flags,
     deps = [
         ":stats",
     ],
+)
+
+cpp_unittest(
+    name = "protocol_test",
+    srcs = ["test/ProtocolTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     compiler_flags = wdt_compiler_flags,
-)
-
-
-cpp_unittest(
-  name = 'protocol_test',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/ProtocolTest.cpp', ],
-  deps = [
-      ":wdtlib",
-  ],
-  compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib",
+    ],
 )
 
 cpp_unittest(
-  name = 'encryption_test',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/EncryptionTest.cpp', ],
-  deps = [
-      ":wdtlib",
-  ],
-  compiler_flags = wdt_compiler_flags,
+    name = "encryption_test",
+    srcs = ["test/EncryptionTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib",
+    ],
 )
 
 cpp_binary(
-  name = 'option_type_test_long_flags',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [
-    'test/OptionTypeTest.cpp',
-  ],
-  deps = [
-      ":wdtlib",
-  ],
-  external_deps = [ ("googletest", None, "gtest") ],
-  compiler_flags = wdt_compiler_flags,
+    name = "option_type_test_long_flags",
+    srcs = [
+        "test/OptionTypeTest.cpp",
+    ],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib",
+    ],
+    external_deps = [("googletest", None, "gtest")],
 )
 
 cpp_binary(
-  name = 'option_type_test_short_flags',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [
-    'test/OptionTypeTest.cpp',
-  ],
-  deps = [
-      ":wdtlib_short_flags",
-  ],
-  external_deps = [ ("googletest", None, "gtest") ],
-  output_subdir = 'short_flags',
-  preprocessor_flags = [
-    "-DSTANDALONE_APP"
-  ],
-  compiler_flags = wdt_compiler_flags,
+    name = "option_type_test_short_flags",
+    srcs = [
+        "test/OptionTypeTest.cpp",
+    ],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    output_subdir = "short_flags",
+    preprocessor_flags = [
+        "-DSTANDALONE_APP",
+    ],
+    deps = [
+        ":wdtlib_short_flags",
+    ],
+    external_deps = [("googletest", None, "gtest")],
 )
 
 custom_unittest(
-  name = 'option_type_test',
-  command = [
-      "wdt/test/wdt_option_type_test.sh",
-      '$(location :option_type_test_long_flags)',
-      '$(location :option_type_test_short_flags)',
-  ],
-  type = 'simple',
-  deps = [
-      ':option_type_test_long_flags',
-      ':option_type_test_short_flags',
-  ],
+    name = "option_type_test",
+    command = [
+        "wdt/test/wdt_option_type_test.sh",
+        "$(location :option_type_test_long_flags)",
+        "$(location :option_type_test_short_flags)",
+    ],
+    type = "simple",
+    deps = [
+        ":option_type_test_long_flags",
+        ":option_type_test_short_flags",
+    ],
 )
 
 cpp_unittest(
-  name = 'filereader_test',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/FileReaderTest.cpp', ],
-  deps = [
-      ":wdtlib4tests",
-  ],
-  compiler_flags = wdt_compiler_flags,
+    name = "filereader_test",
+    srcs = ["test/FileReaderTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib4tests",
+    ],
 )
 
 cpp_unittest(
-  name = 'threadscontroller_test',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/ThreadsControllerTest.cpp', ],
-  deps = [
-      ":wdtlib4tests",
-  ],
-  compiler_flags = wdt_compiler_flags,
+    name = "threadscontroller_test",
+    srcs = ["test/ThreadsControllerTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib4tests",
+    ],
 )
 
 cpp_unittest(
-  name = 'throttler_test',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/ThrottlerTest.cpp', ],
-  deps = [
-      ":wdtlib4tests",
-  ],
-  compiler_flags = wdt_compiler_flags,
+    name = "throttler_test",
+    srcs = ["test/ThrottlerTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib4tests",
+    ],
 )
 
 cpp_unittest(
-  name = 'resource_controller_test',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/WdtResourceControllerTest.cpp', ],
-  deps = [
-      ":wdtlib",
-  ],
-  compiler_flags = wdt_compiler_flags,
+    name = "resource_controller_test",
+    srcs = ["test/WdtResourceControllerTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib",
+    ],
 )
 
 cpp_unittest(
-  name = 'wdt_url_test',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/WdtUrlTest.cpp', ],
-  deps = [
-      ":wdtlib4tests",
-  ],
-  compiler_flags = wdt_compiler_flags,
+    name = "wdt_url_test",
+    srcs = ["test/WdtUrlTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib4tests",
+    ],
 )
 
 cpp_unittest(
-  name = 'wdt_fd_test',
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [ 'test/FdTest.cpp', ],
-  deps = [
-      ":wdtlib",
-      ":wdtlib4tests",
-      "@/folly:conv",
-  ],
-  compiler_flags = wdt_compiler_flags,
+    name = "wdt_fd_test",
+    srcs = ["test/FdTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib",
+        ":wdtlib4tests",
+        "@/folly:conv",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_rand_gen_test',
-  command = [
-      "wdt/test/wdt_rand_gen_test.sh",
-      '$(location :wdt_url_test)',
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt_url_test',
-  ],
+    name = "wdt_rand_gen_test",
+    command = [
+        "wdt/test/wdt_rand_gen_test.sh",
+        "$(location :wdt_url_test)",
+    ],
+    type = "simple",
+    deps = [
+        ":wdt_url_test",
+    ],
 )
 
-wdt_sh_test('receiver_throttler_ref_count_test')
+wdt_sh_test("receiver_throttler_ref_count_test")
 
-wdt_sh_test('wdt_error_codes_test', tags=['serialize'])
+wdt_sh_test(
+    "wdt_error_codes_test",
+    tags = ["serialize"],
+)
 
-wdt_sh_test('wdt_e2e_test', tags=['serialize'])
-
-
-custom_unittest(
-  name = 'wdte2e_simple',
-  command = [
-      "wdt/test/wdt_e2e_simple_test.sh",
-      "-d", "/dev/shm/wdtTest_" + os_getenv("USER")
-  ],
-  type = 'simple',
-  env = wdt_env,
-  deps = [
-      ':wdt',
-  ],
+wdt_sh_test(
+    "wdt_e2e_test",
+    tags = ["serialize"],
 )
 
 custom_unittest(
-  name = 'wdte2e_simple_odirect',
-  command = [
-      "wdt/test/wdt_e2e_simple_test.sh",
-      "-o", "true"
-  ],
-  type = 'simple',
-  env = wdt_env,
-  deps = [
-      ':wdt',
-  ],
-  tags = ['serialize'],
+    name = "wdte2e_simple",
+    command = [
+        "wdt/test/wdt_e2e_simple_test.sh",
+        "-d",
+        "/dev/shm/wdtTest_" + os_getenv("USER"),
+    ],
+    env = wdt_env,
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
-wdt_sh_test('wdt_stdin_test')
+custom_unittest(
+    name = "wdte2e_simple_odirect",
+    command = [
+        "wdt/test/wdt_e2e_simple_test.sh",
+        "-o",
+        "true",
+    ],
+    env = wdt_env,
+    tags = ["serialize"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
+)
 
-wdt_sh_test('wdt_lock_failfast')
+wdt_sh_test("wdt_stdin_test")
 
-wdt_sh_test('wdt_e2e_xfs_test')
+wdt_sh_test("wdt_lock_failfast")
 
-wdt_py_test('hostname_override_test')
+wdt_sh_test("wdt_e2e_xfs_test")
 
-wdt_py_test('disk_mode_large_file')
+wdt_py_test("hostname_override_test")
 
-wdt_py_test('wdt_file_list_test')
+wdt_py_test("disk_mode_large_file")
 
-wdt_py_test('wdt_overwrite_test')
+wdt_py_test("wdt_file_list_test")
 
-wdt_py_test('wdt_slow_receiver_test', tags = ['extended'])
+wdt_py_test("wdt_overwrite_test")
+
+wdt_py_test(
+    "wdt_slow_receiver_test",
+    tags = ["extended"],
+)
 
 # only disabled for sandcastle - this test is critical/important
-wdt_sh_test('wdt_network_test', tags  = ['disabled'])
+wdt_sh_test(
+    "wdt_network_test",
+    tags = ["disabled"],
+)
 
 def merge_dicts(x, y):
     z = x.copy()
@@ -331,201 +339,260 @@ def merge_dicts(x, y):
     return z
 
 custom_unittest(
-  name = 'wdt_network_script_open_during_disc',
-  command = [
-      "wdt/test/wdt_network_test.sh",
-      "-p", "25800",
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  tags = ['disabled'],
-  env = merge_dicts(wdt_env,
-                    {"EXTRA_WDT_OPTIONS" : "-open_files_during_discovery=750"}),
+    name = "wdt_network_script_open_during_disc",
+    command = [
+        "wdt/test/wdt_network_test.sh",
+        "-p",
+        "25800",
+    ],
+    env = merge_dicts(
+        wdt_env,
+        {"EXTRA_WDT_OPTIONS": "-open_files_during_discovery=750"},
+    ),
+    tags = ["disabled"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_network_script_protocol_negotiation_1',
-  command = [
-      "wdt/test/wdt_network_test.sh",
-      "-s", "10", "-p", "24100"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled', 'extended'],
+    name = "wdt_network_script_protocol_negotiation_1",
+    command = [
+        "wdt/test/wdt_network_test.sh",
+        "-s",
+        "10",
+        "-p",
+        "24100",
+    ],
+    env = wdt_env,
+    tags = [
+        "disabled",
+        "extended",
+    ],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_network_script_protocol_negotiation_2',
-  command = [
-      "wdt/test/wdt_network_test.sh",
-      "-r", "10", "-p", "24200"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled', 'extended'],
+    name = "wdt_network_script_protocol_negotiation_2",
+    command = [
+        "wdt/test/wdt_network_test.sh",
+        "-r",
+        "10",
+        "-p",
+        "24200",
+    ],
+    env = wdt_env,
+    tags = [
+        "disabled",
+        "extended",
+    ],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled'],
+    name = "wdt_download_resumption_test",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+    ],
+    env = wdt_env,
+    tags = ["disabled"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test_two_phases',
-  command = [
-      "/bin/env",
-      "TWO_PHASES=true",
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-p", "25050"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled'],
+    name = "wdt_download_resumption_test_two_phases",
+    command = [
+        "/bin/env",
+        "TWO_PHASES=true",
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-p",
+        "25050",
+    ],
+    env = wdt_env,
+    tags = ["disabled"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test_protcol_negotiation_1',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-s", "10", "-p", "25100"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled', 'extended'],
+    name = "wdt_download_resumption_test_protcol_negotiation_1",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-s",
+        "10",
+        "-p",
+        "25100",
+    ],
+    env = wdt_env,
+    tags = [
+        "disabled",
+        "extended",
+    ],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test_protcol_negotiation_2',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-r", "10", "-p", "25200"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled', 'extended'],
+    name = "wdt_download_resumption_test_protcol_negotiation_2",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-r",
+        "10",
+        "-p",
+        "25200",
+    ],
+    env = wdt_env,
+    tags = [
+        "disabled",
+        "extended",
+    ],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test_combination_2',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-c", "2", "-p", "25300"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled'],
+    name = "wdt_download_resumption_test_combination_2",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-c",
+        "2",
+        "-p",
+        "25300",
+    ],
+    env = wdt_env,
+    tags = ["disabled"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test_combination_3',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-c", "3", "-p", "25400"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled'],
+    name = "wdt_download_resumption_test_combination_3",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-c",
+        "3",
+        "-p",
+        "25400",
+    ],
+    env = wdt_env,
+    tags = ["disabled"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test_combination_4',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-c", "4", "-p", "25500"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled'],
+    name = "wdt_download_resumption_test_combination_4",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-c",
+        "4",
+        "-p",
+        "25500",
+    ],
+    env = wdt_env,
+    tags = ["disabled"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test_negotiation_3',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-s", "10", "-c", "3", "-p", "25600"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled', 'extended'],
+    name = "wdt_download_resumption_test_negotiation_3",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-s",
+        "10",
+        "-c",
+        "3",
+        "-p",
+        "25600",
+    ],
+    env = wdt_env,
+    tags = [
+        "disabled",
+        "extended",
+    ],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'wdt_download_resumption_test_negotiation_4',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-r", "10", "-c", "3", "-p", "25700"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled', 'extended'],
+    name = "wdt_download_resumption_test_negotiation_4",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-r",
+        "10",
+        "-c",
+        "3",
+        "-p",
+        "25700",
+    ],
+    env = wdt_env,
+    tags = [
+        "disabled",
+        "extended",
+    ],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'resumption_test_flash_deletion',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-d", "-p", "25750"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled'],
+    name = "resumption_test_flash_deletion",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-d",
+        "-p",
+        "25750",
+    ],
+    env = wdt_env,
+    tags = ["disabled"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 custom_unittest(
-  name = 'resumption_test_disk_deletion',
-  command = [
-      "wdt/test/wdt_download_resumption_test.sh",
-      "-d", "-c", "3", "-p", "25900"
-  ],
-  type = 'simple',
-  deps = [
-      ':wdt',
-  ],
-  env = wdt_env,
-  tags = ['disabled'],
+    name = "resumption_test_disk_deletion",
+    command = [
+        "wdt/test/wdt_download_resumption_test.sh",
+        "-d",
+        "-c",
+        "3",
+        "-p",
+        "25900",
+    ],
+    env = wdt_env,
+    tags = ["disabled"],
+    type = "simple",
+    deps = [
+        ":wdt",
+    ],
 )
 
 wdt_py_test("wdt_long_running_test")
@@ -538,91 +605,96 @@ wdt_py_test("wdt_bad_server_test")
 
 wdt_py_test("wdt_transfer_log_compaction_test")
 
-wdt_sh_test("wdt_global_checkpoint_test",  tags = ['serialize', 'disabled'])
-
-
-cpp_library (
-  name = "wdtlib_min",
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [
-    "util/WdtSocket.cpp",
-    "util/ClientSocket.cpp",
-    "util/ServerSocket.cpp",
-    "Protocol.cpp",
-    "util/FileByteSource.cpp",
-    "util/DirectorySourceQueue.cpp",
-    "util/EncryptionUtils.cpp",
-    "util/FileCreator.cpp",
-    "WdtThread.cpp",
-    "util/ThreadsController.cpp",
-    "util/ThreadTransferHistory.cpp",
-    "SenderThread.cpp",
-    "Sender.cpp",
-    "ReceiverThread.cpp",
-    "Receiver.cpp",
-    "Throttler.cpp",
-    "WdtOptions.cpp",
-    "WdtTransferRequest.cpp",
-    "Reporting.cpp",
-    "ErrorCodes.cpp",
-    "util/FileWriter.cpp",
-    "util/SerializationUtil.cpp",
-    "util/TransferLogManager.cpp",
-    "WdtBase.cpp",
-    "WdtResourceController.cpp",
-    "util/CommonImpl.cpp",
-  ],
-  compiler_flags = wdt_compiler_flags,
-  deps = [
-    ":inc",
-    ":stats",
-    # Try hard to keep the folly depenencies minimum, think before adding:
-    "@/folly:checksum",
-    "@/folly:conv",
-    "@/folly:memory",
-    "@/folly:rw_spin_lock",
-    "@/folly:spin_lock",
-
-  ],
-  external_deps = [ ("openssl", None, "crypto") ],
+wdt_sh_test(
+    "wdt_global_checkpoint_test",
+    tags = [
+        "serialize",
+        "disabled",
+    ],
 )
 
-cpp_library (
-  name = "wdtlib",
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [
-    "util/WdtFlags.cpp",
-    "Wdt.cpp",
-  ],
-  deps = [
-    ":wdtlib_min",
-  ],
-  compiler_flags = wdt_compiler_flags,
-)
-
-cpp_library (
-  name = "wdtlib_short_flags",
-  auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
-  srcs = [
-    "util/WdtFlags.cpp",
-    "Wdt.cpp",
-  ],
-  deps = [
-    ':wdtlib_min',
-  ],
-  compiler_flags = wdt_compiler_flags,
-  preprocessor_flags = [
-    "-DSTANDALONE_APP"
-  ],
-  output_subdir = 'short_flags',
-)
-
-cpp_library (
-    name = "testcommon",
-    auto_headers = AutoHeaders.RECURSIVE_GLOB, # https://fburl.com/424819295
+cpp_library(
+    name = "wdtlib_min",
     srcs = [
-        "test/TestCommon.cpp"
-        ],
+        "ErrorCodes.cpp",
+        "Protocol.cpp",
+        "Receiver.cpp",
+        "ReceiverThread.cpp",
+        "Reporting.cpp",
+        "Sender.cpp",
+        "SenderThread.cpp",
+        "Throttler.cpp",
+        "WdtBase.cpp",
+        "WdtOptions.cpp",
+        "WdtResourceController.cpp",
+        "WdtThread.cpp",
+        "WdtTransferRequest.cpp",
+        "util/ClientSocket.cpp",
+        "util/CommonImpl.cpp",
+        "util/DirectorySourceQueue.cpp",
+        "util/EncryptionUtils.cpp",
+        "util/FileByteSource.cpp",
+        "util/FileCreator.cpp",
+        "util/FileWriter.cpp",
+        "util/SerializationUtil.cpp",
+        "util/ServerSocket.cpp",
+        "util/ThreadTransferHistory.cpp",
+        "util/ThreadsController.cpp",
+        "util/TransferLogManager.cpp",
+        "util/WdtSocket.cpp",
+    ],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":inc",
+        ":stats",
+        # Try hard to keep the folly depenencies minimum, think before adding:
+        "@/folly:checksum",
+        "@/folly:conv",
+        "@/folly:memory",
+        "@/folly:rw_spin_lock",
+        "@/folly:spin_lock",
+    ],
+    external_deps = [("openssl", None, "crypto")],
+)
+
+cpp_library(
+    name = "wdtlib",
+    srcs = [
+        "Wdt.cpp",
+        "util/WdtFlags.cpp",
+    ],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":wdtlib_min",
+    ],
+)
+
+cpp_library(
+    name = "wdtlib_short_flags",
+    srcs = [
+        "Wdt.cpp",
+        "util/WdtFlags.cpp",
+    ],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
+    output_subdir = "short_flags",
+    preprocessor_flags = [
+        "-DSTANDALONE_APP",
+    ],
+    deps = [
+        ":wdtlib_min",
+    ],
+)
+
+cpp_library(
+    name = "testcommon",
+    srcs = [
+        "test/TestCommon.cpp",
+    ],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib_min",
     ],
@@ -630,45 +702,43 @@ cpp_library (
         ("googletest", None, "gtest"),
         ("boost", None, "boost_filesystem"),
     ],
-  compiler_flags = wdt_compiler_flags,
 )
 
-cpp_library (
-  name = "wdtlib4tests",
-  deps = [
-    ":testcommon",
-    ":wdtlib",
-  ],
-  compiler_flags = wdt_compiler_flags,
+cpp_library(
+    name = "wdtlib4tests",
+    compiler_flags = wdt_compiler_flags,
+    deps = [
+        ":testcommon",
+        ":wdtlib",
+    ],
 )
-
 
 cpp_binary(
-    name= "wdt",
-    auto_headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    name = "wdt",
     srcs = [
-      "wdtCmdLine.cpp",
+        "wdtCmdLine.cpp",
     ],
-    deps = [
-      ":wdtlib_short_flags",
-    ],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     compiler_flags = wdt_compiler_flags,
     preprocessor_flags = [
-      "-DSTANDALONE_APP"
+        "-DSTANDALONE_APP",
+    ],
+    deps = [
+        ":wdtlib_short_flags",
     ],
 )
 
 cpp_binary(
-    name= "wdt_random_close",
-    auto_headers= AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    name = "wdt_random_close",
     srcs = [
-      "test/NetworkErrorSimulator.cpp",
-      "wdtCmdLine.cpp",
+        "test/NetworkErrorSimulator.cpp",
+        "wdtCmdLine.cpp",
     ],
-    deps = [
-      ":wdtlib4tests",
-    ],
-    external_deps = [ ("googletest", None, "gtest") ],
-    output_subdir = 'test',
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     compiler_flags = wdt_compiler_flags,
+    output_subdir = "test",
+    deps = [
+        ":wdtlib4tests",
+    ],
+    external_deps = [("googletest", None, "gtest")],
 )
