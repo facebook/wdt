@@ -1,6 +1,4 @@
-# @nolint TODO(#18457353): https://fburl.com/auto-format-build-files
-
-import os
+include_defs("//common/defs/environment")
 
 wdt_compiler_flags = [
   "-Wextra",
@@ -285,7 +283,7 @@ custom_unittest(
   name = 'wdte2e_simple',
   command = [
       "wdt/test/wdt_e2e_simple_test.sh",
-      "-d", "/dev/shm/wdtTest_" + os.environ['USER']
+      "-d", "/dev/shm/wdtTest_" + os_getenv("USER")
   ],
   type = 'simple',
   env = wdt_env,
