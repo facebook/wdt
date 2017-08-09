@@ -178,7 +178,7 @@ bool WdtBase::hasStarted() {
 void WdtBase::configureThrottler() {
   WDT_CHECK(!throttler_);
   WVLOG(1) << "Configuring throttler options";
-  throttler_ = Throttler::makeThrottler(options_);
+  throttler_ = Throttler::makeThrottler(options_.getThrottlerOptions());
   if (throttler_) {
     WLOG(INFO) << "Enabling throttling " << *throttler_;
   } else {

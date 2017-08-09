@@ -13,6 +13,44 @@
 #include <thread>
 namespace facebook {
 namespace wdt {
+
+struct ThrottlerOptions {
+  /**
+   * Rate at which we would like to throttle,
+   * specifying this as < 0 makes it unlimited
+   */
+  double avg_rate_per_sec{-1};
+  /**
+   * Rate at which tokens will be generated in TB algorithm.
+   * When we lag behind, this will allow us to go faster,
+   * specify as < 0 to make it unlimited. Specify as 0
+   * for auto configuring.
+   * auto conf as (kPeakMultiplier * avgRatePerSec_)
+   * Find details in Throttler.cpp
+   */
+  double max_rate_per_sec{0};
+  /**
+   * Maximum bucket size of TB algorithm.
+   * This together with maxRatePerSec_ will
+   * make for maximum burst rate. If specified as 0 it is
+   * auto configured in Throttler.cpp
+   */
+  double throttler_bucket_limit{0};
+  /**
+   * Throttler logs statistics like average and max rate.
+   * This option specifies on how frequently should those
+   * be logged
+   */
+  int64_t throttler_log_time_millis{0};
+  /**
+   * Limit for single request. If the requested size is greater than this, the
+   * request is broken in chunks of this size and processed sequentially.
+   * This ensures that a thread asking for large amount of resource does not
+   * starve other threads asking for small amount of resource.
+   */
+  int64_t single_request_limit{1};
+};
+
 /**
  * Attempts to limit the rate in two ways.
  * 1. Limit average rate by calling averageThrottler()
@@ -27,17 +65,9 @@ namespace wdt {
  */
 class Throttler {
  public:
-  /// Utility method that makes throttler using the wdt options. It can return
-  /// nullptr if throttling is off
-  static std::shared_ptr<Throttler> makeThrottler(const WdtOptions& options);
-
-  /**
-   * Sometimes the options passed to throttler might not make sense so this
-   * method tries to auto configure them
-   */
-  static void configureOptions(double& avgRateBytesPerSec,
-                               double& peakRateBytesPerSec,
-                               double& bucketLimitBytes);
+  /// Utility method that makes throttler using options.
+  static std::shared_ptr<Throttler> makeThrottler(
+      const ThrottlerOptions& options);
 
   /**
    * Calls calculateSleep which is a thread safe method. Finds out the
@@ -53,24 +83,24 @@ class Throttler {
 
   /**
    * This is thread safe implementation of token bucket
-   * algorithm. Bucket is filled at the rate of bucketRateBytesPerSec_
-   * till the limit of bytesTokenBucketLimit_
+   * algorithm. Bucket is filled at the rate of bucketRatePerSec_
+   * till the limit of tokenBucketLimit_
    * There is no sleep, we just calculate how much to sleep.
    * This method also calls the averageThrottler inside
    * @param deltaProgress         Progress since the last limit call
    */
-  virtual double calculateSleep(double bytesTotalProgress,
+  virtual double calculateSleep(double totalProgress,
                                 const Clock::time_point& now);
 
   /// Provides anyone using this throttler instance to update the throttler
   /// rates. The rates might be configured to different values than what
   /// were passed.
-  virtual void setThrottlerRates(double& avgRateBytesPerSec,
-                                 double& bucketRateBytesPerSec,
-                                 double& bytesTokenBucketLimit);
+  virtual void setThrottlerRates(double& avgRatePerSec,
+                                 double& bucketRatePerSec,
+                                 double& tokenBucketLimit);
 
-  /// Utility method that set throttler rate using the wdt options
-  void setThrottlerRates(const WdtOptions& options);
+  /// Utility method that set throttler rate using options
+  void setThrottlerRates(const ThrottlerOptions& options);
 
   virtual ~Throttler() {
   }
@@ -82,14 +112,14 @@ class Throttler {
   /// Method to de-register the transfer and decrement the refCount_
   void endTransfer();
 
-  /// Get the average rate in bytes per sec
-  double getAvgRateBytesPerSec();
+  /// Get the average rate per sec
+  double getAvgRatePerSec();
 
-  /// Get the bucket rate in bytes per sec
-  double getPeakRateBytesPerSec();
+  /// Get the bucket rate per sec
+  double getPeakRatePerSec();
 
-  /// Get the bucket limit in bytes
-  double getBucketLimitBytes();
+  /// Get the bucket limit
+  double getBucketLimit();
 
   /// Get the throttler logging time period in millis
   int64_t getThrottlerLogTimeMillis();
@@ -97,36 +127,42 @@ class Throttler {
   /// Set the throttler logging time in millis
   void setThrottlerLogTimeMillis(int64_t throttlerLogTimeMillis);
 
-  /// Get the bytes processed till now
-  double getBytesProgress();
+  /// Get tokens processed till now
+  double getProgress();
 
   friend std::ostream& operator<<(std::ostream& stream,
                                   const Throttler& throttler);
 
  private:
   /**
-   * @param averageRateBytesPerSec    Average rate in progress/second
-   *                                  at which data should be transmitted
-   * @param peakRateBytesPerSec       Max burst rate allowed by the
+   * @param averageRatePerSec         Average rate at which tokens should be
+   *                                  consumed
+   * @param peakRatePerSec            Max burst rate allowed by the
    *                                  token bucket
-   * @param bucketLimitBytes          Max size of bucket, specify 0 for auto
+   * @param bucketLimit               Max size of bucket, specify 0 for auto
    *                                  configure. In auto mode, it will be twice
    *                                  the data you send in 1/4th of a second
    *                                  at the peak rate
    * @param singleRequestLimit        Internal limit to the maximum number of
-   *                                  bytes that can be throttled in one call.
-   *                                  If more bytes are requested to be
+   *                                  tokens that can be throttled in one call.
+   *                                  If more tokens are requested to be
    *                                  throttled, that requested gets broken down
    *                                  and it is treated as multiple throttle
    *                                  calls.
    */
-  Throttler(double avgRateBytesPerSec, double peakRateBytesPerSec,
-            double bucketLimitBytes, int64_t singleRequestLimit,
-            int64_t throttlerLogTimeMillis = 0);
+  Throttler(double avgRatePerSec, double peakRatePerSec, double bucketLimit,
+            int64_t singleRequestLimit, int64_t throttlerLogTimeMillis = 0);
+
+  /**
+   * Sometimes the options passed to throttler might not make sense so this
+   * method tries to auto configure them
+   */
+  static void configureOptions(double& avgRatePerSec, double& peakRatePerSec,
+                               double& bucketLimit);
 
   /**
    * This method is invoked repeatedly with the amount of progress made
-   * (e.g. number of bytes written) till now. If the total progress
+   * (e.g. number of tokens processed) till now. If the total progress
    * till now is over the allowed average progress then it returns the
    * time to sleep for the calling thread
    * @param now                       Pass in the current time stamp
@@ -160,25 +196,25 @@ class Throttler {
   Clock::time_point lastLogTime_;
   /// Instant progress in the time stats were logged last time
   double instantProgress_{0};
-  // Records the total progress in bytes till now
-  double bytesProgress_{0};
+  // Records the total progress in tokens till now
+  double progress_{0};
   /// Last time the token bucket was filled
   std::chrono::time_point<std::chrono::high_resolution_clock> lastFillTime_;
 
  protected:
   /// Number of tokens in the bucket
-  int64_t bytesTokenBucket_;
+  int64_t tokenBucket_;
   /// Controls the access across threads
   folly::SpinLock throttlerMutex_;
   /// Number of users of this throttler
   int64_t refCount_{0};
-  /// The average rate expected in bytes
-  double avgRateBytesPerSec_;
+  /// The average rate expected
+  double avgRatePerSec_;
   /// Limit on the max number of tokens
-  double bytesTokenBucketLimit_;
+  double tokenBucketLimit_;
   /// Rate at which bucket is filled
-  double bucketRateBytesPerSec_;
-  /// Max number of bytes that can be requested in a single call
+  double bucketRatePerSec_;
+  /// Max number of tokens that can be requested in a single call
   int64_t singleRequestLimit_;
   /// Interval between every print of throttler logs
   int64_t throttlerLogTimeMillis_;

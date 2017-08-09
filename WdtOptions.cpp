@@ -8,6 +8,7 @@
  */
 #include <wdt/WdtOptions.h>
 #include <glog/logging.h>
+#include <wdt/Throttler.h>
 
 namespace facebook {
 namespace wdt {
@@ -71,6 +72,17 @@ bool WdtOptions::isLogBasedResumption() const {
 
 bool WdtOptions::isDirectoryTreeBasedResumption() const {
   return enable_download_resumption && resume_using_dir_tree;
+}
+
+ThrottlerOptions WdtOptions::getThrottlerOptions() const {
+  ThrottlerOptions throttlerOptions;
+  throttlerOptions.avg_rate_per_sec = avg_mbytes_per_sec * kMbToB;
+  throttlerOptions.max_rate_per_sec = max_mbytes_per_sec * kMbToB;
+  throttlerOptions.throttler_bucket_limit = throttler_bucket_limit * kMbToB;
+  throttlerOptions.throttler_log_time_millis = throttler_log_time_millis;
+  // Expected request size equal to buffer size
+  throttlerOptions.single_request_limit = buffer_size;
+  return throttlerOptions;
 }
 
 /* static */

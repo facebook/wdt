@@ -16,6 +16,8 @@
 
 namespace facebook {
 namespace wdt {
+struct ThrottlerOptions;
+
 /**
  * A singleton class managing different options for WDT.
  * There will only be one instance of this class created
@@ -405,6 +407,11 @@ class WdtOptions {
    * @return    whether directory tree based resumption is enabled
    */
   bool isDirectoryTreeBasedResumption() const;
+
+  /**
+   * @return    throttler options
+   */
+  ThrottlerOptions getThrottlerOptions() const;
 
   // NOTE: any option added here should also be added to util/WdtFlags.cpp.inc
 

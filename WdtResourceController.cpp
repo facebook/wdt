@@ -278,7 +278,7 @@ WdtResourceController::WdtResourceController(const WdtOptions &options)
     : WdtControllerBase("_root controller_"), options_(options) {
   updateMaxSendersLimit(options.global_sender_limit);
   updateMaxReceiversLimit(options.global_receiver_limit);
-  throttler_ = Throttler::makeThrottler(options);
+  throttler_ = Throttler::makeThrottler(options.getThrottlerOptions());
 }
 
 WdtResourceController::WdtResourceController()
@@ -367,7 +367,7 @@ ErrorCode WdtResourceController::createSender(
     ++numSenders_;
   }
   // TODO: not thread safe reading from options_
-  throttler_->setThrottlerRates(options_);
+  throttler_->setThrottlerRates(options_.getThrottlerOptions());
   ErrorCode code =
       controller->createSender(wdtOperationRequest, identifier, sender);
   if (code != OK) {
@@ -427,7 +427,7 @@ ErrorCode WdtResourceController::createReceiver(
     ++numReceivers_;
   }
   // TODO: not thread safe reading from options_
-  throttler_->setThrottlerRates(options_);
+  throttler_->setThrottlerRates(options_.getThrottlerOptions());
   ErrorCode code =
       controller->createReceiver(wdtOperationRequest, identifier, receiver);
   if (code != OK) {
