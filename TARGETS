@@ -60,6 +60,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:thread_local",
     ],
 )
 
@@ -70,6 +71,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:thread_local",
     ],
 )
 
@@ -81,6 +83,7 @@ cpp_binary(
         ":wdtlib4tests",
         "@/common/encode:coding",
         "@/folly:benchmark",
+        "@/folly:thread_local",
     ],
 )
 
@@ -136,6 +139,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib",
+        "@/folly:thread_local",
     ],
 )
 
@@ -146,6 +150,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib",
+        "@/folly:thread_local",
     ],
 )
 
@@ -158,6 +163,7 @@ cpp_binary(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib",
+        "@/folly:thread_local",
     ],
     external_deps = [("googletest", None, "gtest")],
 )
@@ -175,6 +181,7 @@ cpp_binary(
     ],
     deps = [
         ":wdtlib_short_flags",
+        "@/folly:thread_local",
     ],
     external_deps = [("googletest", None, "gtest")],
 )
@@ -200,6 +207,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:thread_local",
     ],
 )
 
@@ -210,6 +218,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:thread_local",
     ],
 )
 
@@ -220,6 +229,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:thread_local",
     ],
 )
 
@@ -230,6 +240,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib",
+        "@/folly:thread_local",
     ],
 )
 
@@ -240,6 +251,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:thread_local",
     ],
 )
 
@@ -252,6 +264,7 @@ cpp_unittest(
         ":wdtlib",
         ":wdtlib4tests",
         "@/folly:conv",
+        "@/folly:thread_local",
     ],
 )
 
@@ -654,6 +667,7 @@ cpp_library(
         "@/folly:memory",
         "@/folly:rw_spin_lock",
         "@/folly:spin_lock",
+        "@/folly:thread_local",
     ],
     external_deps = [("openssl", None, "crypto")],
 )
@@ -668,6 +682,7 @@ cpp_library(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib_min",
+        "@/folly:thread_local",
     ],
 )
 
@@ -685,6 +700,7 @@ cpp_library(
     ],
     deps = [
         ":wdtlib_min",
+        "@/folly:thread_local",
     ],
 )
 
@@ -697,6 +713,7 @@ cpp_library(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib_min",
+        "@/folly:thread_local",
     ],
     external_deps = [
         ("googletest", None, "gtest"),
@@ -725,6 +742,7 @@ cpp_binary(
     ],
     deps = [
         ":wdtlib_short_flags",
+        "@/folly:thread_local",
     ],
 )
 
@@ -739,6 +757,7 @@ cpp_binary(
     output_subdir = "test",
     deps = [
         ":wdtlib4tests",
+        "@/folly:thread_local",
     ],
     external_deps = [("googletest", None, "gtest")],
 )
