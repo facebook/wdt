@@ -53,7 +53,11 @@ if [ -z "$REMOTEDIR" ] ; then
 fi
 
 FILENAME=`basename $SRCPATH`
-SIZE=`stat -L -c %s $SRCPATH`
+if [ 'Darwin' = `uname -s` ] ; then
+    SIZE=`stat -L -f %z $SRCPATH`
+else
+    SIZE=`stat -L -c %s $SRCPATH`
+fi
 if [ $? -ne 0 ] ; then
   echo "Error stating $SRCPATH. aborting."
   exit 1
