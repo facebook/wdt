@@ -35,7 +35,7 @@ static_assert(NUM_ENC_TYPES ==
               "must provide description for all encryption types");
 
 std::string encryptionTypeToStr(EncryptionType encryptionType) {
-  if (encryptionType < 0 || encryptionType >= NUM_ENC_TYPES) {
+  if (encryptionType >= NUM_ENC_TYPES) {
     WLOG(ERROR) << "Unknown encryption type " << encryptionType;
     return folly::to<std::string>(encryptionType);
   }
@@ -117,7 +117,7 @@ EncryptionType parseEncryptionType(const std::string& str) {
 EncryptionParams::EncryptionParams(EncryptionType type, const string& data)
     : type_(type), data_(data) {
   WLOG(INFO) << "New encryption params " << this << " " << getLogSafeString();
-  if (type_ < 0 || type_ >= NUM_ENC_TYPES) {
+  if (type_ >= NUM_ENC_TYPES) {
     WLOG(ERROR) << "Unsupported type " << type;
     erase();
   }
