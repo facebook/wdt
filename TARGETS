@@ -51,6 +51,7 @@ cpp_library(
         "util/WdtFlags.cpp.inc",
         "wdtCmdLine.cpp",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -63,6 +64,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -75,6 +77,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_binary(
@@ -88,6 +91,7 @@ cpp_binary(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_library(
@@ -133,6 +137,7 @@ cpp_binary(
     deps = [
         ":stats",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -145,6 +150,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -157,6 +163,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_binary(
@@ -171,7 +178,10 @@ cpp_binary(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
-    external_deps = [("googletest", None, "gtest")],
+    external_deps = [
+        ("googletest", None, "gtest"),
+        "gflags",
+    ],
 )
 
 cpp_binary(
@@ -190,7 +200,10 @@ cpp_binary(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
-    external_deps = [("googletest", None, "gtest")],
+    external_deps = [
+        ("googletest", None, "gtest"),
+        "gflags",
+    ],
 )
 
 custom_unittest(
@@ -217,6 +230,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -229,6 +243,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -241,6 +256,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -253,6 +269,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -265,6 +282,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_unittest(
@@ -279,6 +297,7 @@ cpp_unittest(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 custom_unittest(
@@ -683,7 +702,10 @@ cpp_library(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
-    external_deps = [("openssl", None, "crypto")],
+    external_deps = [
+        ("openssl", None, "crypto"),
+        "gflags",
+    ],
 )
 
 cpp_library(
@@ -699,6 +721,7 @@ cpp_library(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_library(
@@ -718,6 +741,7 @@ cpp_library(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_library(
@@ -735,6 +759,7 @@ cpp_library(
     external_deps = [
         ("googletest", None, "gtest"),
         ("boost", None, "boost_filesystem"),
+        "gflags",
     ],
 )
 
@@ -762,6 +787,7 @@ cpp_binary(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
+    external_deps = ["gflags"],
 )
 
 cpp_binary(
@@ -778,5 +804,8 @@ cpp_binary(
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
-    external_deps = [("googletest", None, "gtest")],
+    external_deps = [
+        ("googletest", None, "gtest"),
+        "gflags",
+    ],
 )
