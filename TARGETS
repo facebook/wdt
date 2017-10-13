@@ -694,7 +694,7 @@ cpp_library(
         ":inc",
         ":stats",
         # Try hard to keep the folly depenencies minimum, think before adding:
-        "@/folly:checksum",
+        "@/folly/hash:checksum",
         "@/folly:conv",
         "@/folly:memory",
         "@/folly:rw_spin_lock",

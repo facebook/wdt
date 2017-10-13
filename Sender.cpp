@@ -14,7 +14,7 @@
 #include <wdt/util/ClientSocket.h>
 
 #include <folly/Bits.h>
-#include <folly/Checksum.h>
+#include <folly/hash/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/ScopeGuard.h>
