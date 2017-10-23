@@ -198,7 +198,7 @@ configure_file(WdtConfig.h.in wdt/WdtConfig.h)
 
 # Malloc stuff  tied to not supporting weaksympbols
 if (NOT FOLLY_HAVE_WEAK_SYMBOLS)
-  list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/detail/MallocImpl.cpp")
+  list(APPEND FOLLY_CPP_SRC "${FOLLY_SOURCE_DIR}/folly/memory/detail/MallocImpl.cpp")
   message(STATUS "no weak symbols, adding MallocImpl to folly src")
 endif()
 # For missing __throw_logic_error:
