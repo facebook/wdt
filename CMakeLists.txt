@@ -74,6 +74,7 @@ set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/hash/Checksum.cpp"
 "${FOLLY_SOURCE_DIR}/folly/hash/detail/ChecksumDetail.cpp"
 "${FOLLY_SOURCE_DIR}/folly/hash/detail/Crc32cDetail.cpp"
+"${FOLLY_SOURCE_DIR}/folly/lang/ColdClass.cpp"
 "${FOLLY_SOURCE_DIR}/folly/ScopeGuard.cpp"
 )
 
