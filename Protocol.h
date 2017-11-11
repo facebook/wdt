@@ -299,7 +299,7 @@ class Protocol {
   // correct, ie in cpp like kAbortLength and kChunksCmdLen
 
   /// Max size of sender or receiver id
-  static constexpr int64_t kMaxTransferIdLength = 50;
+  static constexpr int64_t kMaxTransferIdLength = 1024;
   /// 1 byte for cmd, 2 bytes for file-name length, Max size of filename, 4
   /// variants(seq-id, data-size, offset, file-size), 1 byte for flag, 10 bytes
   /// prev seq-id
