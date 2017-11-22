@@ -270,6 +270,15 @@ vector<ReceiverPtr> WdtNamespaceController::getReceivers() const {
   return receivers;
 }
 
+vector<string> WdtNamespaceController::getSendersIds() const {
+  vector<string> senderIds;
+  GuardLock lock(controllerMutex_);
+  for (const auto &senderPair : sendersMap_) {
+    senderIds.push_back(senderPair.first);
+  }
+  return senderIds;
+}
+
 WdtNamespaceController::~WdtNamespaceController() {
   // release is done by parent shutdown
 }
@@ -579,6 +588,18 @@ vector<ReceiverPtr> WdtResourceController::getAllReceivers(
   return controller->getReceivers();
 }
 
+std::vector<std::string> WdtResourceController::getAllSendersIds(
+    const string &wdtNamespace) const {
+  vector<string> senderIds;
+  NamespaceControllerPtr controller = nullptr;
+  controller = getNamespaceController(wdtNamespace);
+  if (!controller) {
+    WLOG(ERROR) << "Couldn't find the controller for " << wdtNamespace;
+    return senderIds;
+  }
+  return controller->getSendersIds();
+}
+
 ErrorCode WdtResourceController::releaseStaleReceivers(
     const string &wdtNamespace, vector<string> &erasedIds) {
   NamespaceControllerPtr controller = nullptr;
@@ -687,5 +708,5 @@ void WdtResourceController::requireRegistration(bool strict) {
   strictRegistration_ = strict;
 }
 
-}  // end namespace
-}
+}  // namespace wdt
+}  // namespace facebook

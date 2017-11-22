@@ -115,6 +115,9 @@ class WdtNamespaceController : public WdtControllerBase {
   /// Get all receivers
   std::vector<ReceiverPtr> getReceivers() const;
 
+  // Get all senders ids
+  std::vector<std::string> getSendersIds() const;
+
   /// Clear the senders that are not active anymore
   std::vector<std::string> releaseStaleSenders();
 
@@ -210,6 +213,10 @@ class WdtResourceController : public WdtControllerBase {
   /// Get all senders in a namespace
   std::vector<SenderPtr> getAllSenders(const std::string &wdtNamespace) const;
 
+  /// Get all senders ids in a namespace
+  std::vector<std::string> getAllSendersIds(
+      const std::string &wdtNamespace) const;
+
   /// Get all receivers in a namespace
   std::vector<ReceiverPtr> getAllReceivers(
       const std::string &wdtNamespace) const;
@@ -281,5 +288,5 @@ class WdtResourceController : public WdtControllerBase {
   bool hasReceiverQuotaInternal(const std::shared_ptr<WdtNamespaceController>
                                     &controller = nullptr) const;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook
