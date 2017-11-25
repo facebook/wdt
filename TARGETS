@@ -61,6 +61,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -74,6 +75,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -88,6 +90,7 @@ cpp_binary(
         ":wdtlib4tests",
         "@/common/encode:coding",
         "@/folly:benchmark",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -147,6 +150,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -160,6 +164,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -175,6 +180,7 @@ cpp_binary(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -197,6 +203,7 @@ cpp_binary(
     ],
     deps = [
         ":wdtlib_short_flags",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -227,6 +234,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -240,6 +248,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -253,6 +262,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -266,6 +276,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -279,6 +290,7 @@ cpp_unittest(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib4tests",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -294,6 +306,7 @@ cpp_unittest(
         ":wdtlib",
         ":wdtlib4tests",
         "@/folly:conv",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -718,6 +731,7 @@ cpp_library(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib_min",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -738,6 +752,7 @@ cpp_library(
     ],
     deps = [
         ":wdtlib_min",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -753,6 +768,7 @@ cpp_library(
     compiler_flags = wdt_compiler_flags,
     deps = [
         ":wdtlib_min",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -784,6 +800,7 @@ cpp_binary(
     ],
     deps = [
         ":wdtlib_short_flags",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
@@ -801,6 +818,7 @@ cpp_binary(
     output_subdir = "test",
     deps = [
         ":wdtlib4tests",
+        "@/folly:spin_lock",
         "@/folly:synchronized",
         "@/folly:thread_local",
     ],
