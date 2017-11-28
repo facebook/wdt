@@ -1,5 +1,3 @@
-include_defs("//common/defs/environment")
-
 wdt_compiler_flags = [
     "-Wextra",
     "-Wsign-compare",
@@ -356,7 +354,7 @@ custom_unittest(
     command = [
         "wdt/test/wdt_e2e_simple_test.sh",
         "-d",
-        "/dev/shm/wdtTest_" + os_getenv("USER"),
+        "/dev/shm/wdtTest",
     ],
     env = wdt_env,
     type = "simple",
