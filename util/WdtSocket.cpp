@@ -1,5 +1,5 @@
 #include <wdt/util/WdtSocket.h>
-#include <folly/Bits.h>
+#include <folly/lang/Bits.h>
 #include <folly/String.h>  // for humanify
 #include <netdb.h>
 #include <sys/ioctl.h>

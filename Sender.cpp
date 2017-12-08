@@ -13,7 +13,7 @@
 
 #include <wdt/util/ClientSocket.h>
 
-#include <folly/Bits.h>
+#include <folly/lang/Bits.h>
 #include <folly/hash/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>

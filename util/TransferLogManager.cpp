@@ -11,7 +11,7 @@
 #include <wdt/util/SerializationUtil.h>
 
 #include <fcntl.h>
-#include <folly/Bits.h>
+#include <folly/lang/Bits.h>
 #include <folly/Conv.h>
 #include <folly/Range.h>
 

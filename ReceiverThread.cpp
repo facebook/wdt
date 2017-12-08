@@ -7,7 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/ReceiverThread.h>
-#include <folly/Bits.h>
+#include <folly/lang/Bits.h>
 #include <folly/hash/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>

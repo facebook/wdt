@@ -8,7 +8,7 @@
  */
 #include <wdt/util/SerializationUtil.h>
 
-#include <folly/Bits.h>
+#include <folly/lang/Bits.h>
 
 using folly::ByteRange;
 using std::string;

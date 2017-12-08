@@ -10,7 +10,7 @@
 #include <wdt/util/EncryptionUtils.h>
 #include <wdt/util/ServerSocket.h>
 
-#include <folly/Bits.h>
+#include <folly/lang/Bits.h>
 #include <folly/Conv.h>
 
 #include <fcntl.h>
