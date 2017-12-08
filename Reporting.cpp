@@ -139,22 +139,25 @@ TransferReport::TransferReport(
     summaryErrorCode =
         getMoreInterestingError(summaryErrorCode, sourceStat.getErrorCode());
   }
-  if (possiblyOk && atLeastOneOk) {
-    if (summaryErrorCode != OK) {
-      WLOG(WARNING) << "WDT successfully recovered from error "
-                    << errorCodeToStr(summaryErrorCode);
-    }
-    summaryErrorCode = OK;
-  }
-  setErrorCode(summaryErrorCode);
-
+  // Check that all bytes have been sent.
   if (summary_.getEffectiveDataBytes() != totalFileSize_) {
     // sender did not send all the bytes
     WLOG(INFO) << "Could not send all the bytes " << totalFileSize_ << " "
                << summary_.getEffectiveDataBytes();
-    WDT_CHECK(summaryErrorCode != OK)
-        << "BUG: All threads OK yet sized based error detected";
+    if (summaryErrorCode == OK) {
+      WLOG(ERROR) << "BUG: All threads OK yet sized based error detected";
+      summaryErrorCode = ERROR;
+    }
+  } else {
+    // See if the error is recoverable.
+    if (summaryErrorCode != OK && possiblyOk && atLeastOneOk) {
+      WLOG(WARNING) << "WDT successfully recovered from error "
+                    << errorCodeToStr(summaryErrorCode);
+      summaryErrorCode = OK;
+    }
   }
+  setErrorCode(summaryErrorCode);
+
   std::set<std::string> failedFilesSet;
   for (auto& stats : failedSourceStats_) {
     failedFilesSet.insert(stats.getId());
