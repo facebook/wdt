@@ -45,7 +45,10 @@ cpp_binary(
         ":wdtbenchlibopt",
         "@/wdt:version",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_binary(
@@ -61,7 +64,10 @@ cpp_binary(
         "@/common/base:profiler",
         "@/wdt:version",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -71,6 +77,7 @@ cpp_unittest(
     deps = [
         ":wdtbenchlib",
     ],
+    external_deps = ["glog"],
 )
 
 cpp_binary(

@@ -50,7 +50,10 @@ cpp_library(
         "wdtCmdLine.cpp",
     ],
     deps = ["@/folly:string"],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -70,7 +73,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -90,7 +96,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_binary(
@@ -111,7 +120,10 @@ cpp_binary(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_library(
@@ -124,6 +136,7 @@ cpp_library(
     deps = [
         "@/folly:thread_local",
     ],
+    external_deps = ["glog"],
 )
 
 cpp_unittest(
@@ -177,7 +190,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -197,7 +213,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_binary(
@@ -222,6 +241,7 @@ cpp_binary(
     external_deps = [
         ("googletest", None, "gtest"),
         "gflags",
+        "glog",
     ],
 )
 
@@ -251,6 +271,7 @@ cpp_binary(
     external_deps = [
         ("googletest", None, "gtest"),
         "gflags",
+        "glog",
     ],
 )
 
@@ -285,7 +306,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -305,7 +329,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -325,7 +352,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -345,7 +375,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -366,7 +399,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_unittest(
@@ -387,7 +423,10 @@ cpp_unittest(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 custom_unittest(
@@ -799,6 +838,7 @@ cpp_library(
     external_deps = [
         ("openssl", None, "crypto"),
         "gflags",
+        "glog",
     ],
 )
 
@@ -822,7 +862,10 @@ cpp_library(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_library(
@@ -849,7 +892,10 @@ cpp_library(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_library(
@@ -875,6 +921,7 @@ cpp_library(
         ("googletest", None, "gtest"),
         ("boost", None, "boost_filesystem"),
         "gflags",
+        "glog",
     ],
 )
 
@@ -910,7 +957,10 @@ cpp_binary(
         "@/folly:thread_local",
         "@/folly/lang:bits",
     ],
-    external_deps = ["gflags"],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
 )
 
 cpp_binary(
@@ -938,5 +988,6 @@ cpp_binary(
     external_deps = [
         ("googletest", None, "gtest"),
         "gflags",
+        "glog",
     ],
 )
