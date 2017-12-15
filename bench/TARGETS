@@ -18,7 +18,7 @@ cpp_library(
     ],
     compiler_flags = wdt_compiler_flags,
     external_deps = [
-        ("glog", None, "glog"),
+        "glog",
     ],
 )
 
@@ -30,7 +30,7 @@ cpp_library(
     compiler_flags = ["-O3"],
     output_subdir = "wblopt",
     external_deps = [
-        ("glog", None, "glog"),
+        "glog",
     ],
 )
 
@@ -85,7 +85,7 @@ cpp_binary(
         "@/wdt:version",
     ],
     external_deps = [
-        ("glog", None, "glog"),
+        "glog",
         "gflags",
     ],
 )
