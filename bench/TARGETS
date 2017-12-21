@@ -43,7 +43,7 @@ cpp_binary(
     preprocessor_flags = ["-Iwdt"],
     deps = [
         ":wdtbenchlibopt",
-        "@/wdt:version",
+        "//wdt:version",
     ],
     external_deps = [
         "gflags",
@@ -61,8 +61,8 @@ cpp_binary(
     preprocessor_flags = ["-Iwdt"],
     deps = [
         ":wdtbenchlib",
-        "@/common/base:profiler",
-        "@/wdt:version",
+        "//common/base:profiler",
+        "//wdt:version",
     ],
     external_deps = [
         "gflags",
@@ -89,7 +89,7 @@ cpp_binary(
     preprocessor_flags = ["-Iwdt"],
     deps = [
         ":wdtbenchlib",
-        "@/wdt:version",
+        "//wdt:version",
     ],
     external_deps = [
         "glog",
