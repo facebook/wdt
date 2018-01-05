@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include <folly/RWSpinLock.h>
+#include <folly/synchronization/RWSpinLock.h>
 #include <wdt/AbortChecker.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/Protocol.h>
