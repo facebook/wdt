@@ -136,7 +136,10 @@ cpp_library(
     deps = [
         "//folly:thread_local",
     ],
-    external_deps = ["glog"],
+    external_deps = [
+        "boost",
+        "glog",
+    ],
 )
 
 cpp_unittest(

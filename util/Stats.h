@@ -57,6 +57,8 @@
 #include <mutex>
 #include <thread>
 
+#include <boost/noncopyable.hpp>
+
 #include <folly/ThreadLocal.h>
 
 #include "glog/logging.h"
