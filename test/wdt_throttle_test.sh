@@ -1,3 +1,4 @@
+# shellcheck disable=SC2148
 # runs wdt with certain parameters for thread, average transfer rate, and peak rate
 # peak rate is just a multiplier over average rate here
 # This thread can be used by specifying a multiplier and the results of the
