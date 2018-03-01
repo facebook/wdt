@@ -179,7 +179,6 @@ set(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
 check_include_file_cxx(malloc.h FOLLY_HAVE_MALLOC_H)
 check_include_file_cxx(features.h FOLLY_HAVE_FEATURES_H)
 check_include_file_cxx(bits/c++config.h FOLLY_HAVE_BITS_CXXCONFIG_H)
-check_include_file_cxx(bits/functexcept.h FOLLY_HAVE_BITS_FUNCTEXCEPT_H)
 check_include_file_cxx(linux/sockios.h WDT_HAS_SOCKIOS_H)
 #check_function_exists(clock_gettime FOLLY_HAVE_CLOCK_GETTIME)
 check_cxx_source_compiles("#include <type_traits>
