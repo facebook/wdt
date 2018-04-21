@@ -10,6 +10,7 @@ cat <<EOF
         "type": "lego-linux",
         "os": "ubuntu_16.04"
     },
+    "priority": 3,
     "args": {
         "name": "wdt-opensource-linux",
         "oncall": "wdt",
@@ -38,6 +39,7 @@ cat <<EOF
         "vcs": "fbcode-fbsource",
         "type": "lego-mac",
     },
+    "priority": 3,
     "args": {
         "name": "wdt-opensource-mac",
         "oncall": "wdt",
