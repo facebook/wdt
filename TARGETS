@@ -160,6 +160,7 @@ cpp_benchmark(
     deps = [
         ":stats",
         ":testcommon",
+        "//common/stats:histogram_exporter",
         "//common/stats:stats",
         "//folly:benchmark",
         "//folly:singleton",
