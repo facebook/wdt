@@ -28,7 +28,6 @@ cpp_library(
         "Bigram.cpp",
     ],
     compiler_flags = ["-O3"],
-    output_subdir = "wblopt",
     external_deps = [
         "glog",
     ],
@@ -57,7 +56,6 @@ cpp_binary(
         "wdtGenFiles.cpp",
     ],
     compiler_flags = wdt_compiler_flags,
-    output_subdir = "wbprof",
     preprocessor_flags = ["-Iwdt"],
     deps = [
         ":wdtbenchlib",

@@ -256,7 +256,6 @@ cpp_binary(
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     compiler_flags = wdt_compiler_flags,
-    output_subdir = "short_flags",
     preprocessor_flags = [
         "-DSTANDALONE_APP",
     ],
@@ -880,7 +879,6 @@ cpp_library(
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     compiler_flags = wdt_compiler_flags,
-    output_subdir = "short_flags",
     preprocessor_flags = [
         "-DSTANDALONE_APP",
     ],
@@ -975,7 +973,6 @@ cpp_binary(
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     compiler_flags = wdt_compiler_flags,
-    output_subdir = "test",
     deps = [
         ":wdtlib4tests",
         "//folly:conv",
