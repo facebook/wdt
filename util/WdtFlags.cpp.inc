@@ -25,6 +25,7 @@ WDT_OPT(num_ports, int32, "Number of sockets");
 WDT_OPT(static_ports, bool, "Use static ports (start_port) or any free port");
 WDT_OPT(ipv6, bool, "prefers ipv6");
 WDT_OPT(ipv4, bool, "use ipv4 only, takes precedence over -ipv6");
+WDT_OPT(dscp, int32, "specify DSCP flag for the sockets used in transfers");
 WDT_OPT(ignore_open_errors, bool, "will continue despite open errors");
 WDT_OPT(two_phases, bool, "do directory discovery first/separately");
 WDT_OPT(follow_symlinks, bool,

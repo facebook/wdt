@@ -752,6 +752,26 @@ void WdtSocket::setSocketTimeouts() {
   }
 }
 
+void WdtSocket::setDscp(int dscp) {
+  if (dscp > 0) {
+    if (threadCtx_.getOptions().ipv6) {
+      int classval = dscp << 2;
+      if(setsockopt(fd_, IPPROTO_IPV6, IPV6_TCLASS, (char*)&classval,
+          sizeof(classval)) != 0) {
+        WPLOG(ERROR) << "Unable to set DSCP flag for " << port_ << " " << fd_;
+      }
+    }
+    if (threadCtx_.getOptions().ipv4) {
+      int ip_tos = dscp << 2;
+      if(setsockopt(fd_, IPPROTO_IP, IP_TOS, (char*)&ip_tos,
+          sizeof(ip_tos)) != 0) {
+        WPLOG(ERROR) << "Unable to set DSCP flag for " << port_ << " " << fd_;
+      }
+    }
+
+  }
+}
+
 /* static */
 bool WdtSocket::getNameInfo(const struct sockaddr *sa, socklen_t salen,
                             std::string &host, std::string &port) {

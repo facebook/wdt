@@ -170,6 +170,7 @@ ErrorCode ClientSocket::connect() {
     return CONN_ERROR_RETRYABLE;
   }
   setSocketTimeouts();
+  setDscp(threadCtx_.getOptions().dscp);
   return OK;
 }
 

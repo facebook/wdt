@@ -68,6 +68,12 @@ class WdtOptions {
    * Use ipv4, this takes precedence over ipv6
    */
   bool ipv4{false};
+
+  /**
+   * DSCP flag, see https://en.wikipedia.org/wiki/Differentiated_services.
+   */
+  int dscp{0};
+
   /**
    * Run wdt in a mode where the receiver doesn't
    * write anything to the disk

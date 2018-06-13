@@ -280,6 +280,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
       WVLOG(1) << "New connection, fd : " << fd_ << " from " << peerIp_ << " "
                << peerPort_;
       setSocketTimeouts();
+      setDscp(options.dscp);
       return OK;
     }
     lastCheckedPollIndex_ = (lastCheckedPollIndex_ + 1) % numFds;

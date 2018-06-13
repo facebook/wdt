@@ -159,6 +159,9 @@ class WdtSocket {
   /// sets read and write timeouts for the socket
   void setSocketTimeouts();
 
+  // manipulates DSCP Bits
+  void setDscp(int dscp);
+
   /**
    * Returns ip and port for a socket address
    *
