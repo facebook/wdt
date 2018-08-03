@@ -1,4 +1,7 @@
-wdt_compiler_flags = [
+load("@bazel_skylib//lib:dicts.bzl", "dicts")
+load(":defs.bzl", "WDT_ENV", "wdt_test", "wdt_py_test", "wdt_sh_test")
+
+WDT_COMPILER_FLAGS = [
     "-Wextra",
     "-Wsign-compare",
     "-Wno-unused-parameter",
@@ -8,33 +11,6 @@ wdt_compiler_flags = [
     #"-Wmaybe-uninitialized", not working because of D955599
     #"-Iwdt",
 ]
-
-wdt_env = {
-    "WDT_BINARY": "$(location :wdt)",
-    "WDT_GEN_FILES": "$(location //wdt/bench:wdt_gen_files)",
-    "WDT_GEN_BIGRAMS": "$(location //wdt/bench:book1.bigrams)",
-}
-
-def wdt_test(test_name, ext, tags):
-    custom_unittest(
-        name = test_name,
-        command = [
-            "wdt/test/" + test_name + ext
-        ],
-        type = 'simple',
-        env = wdt_env,
-        deps = [
-            ':wdt',
-            '//wdt/bench:wdt_gen_files'
-        ],
-        tags = tags
-    )
-
-def wdt_sh_test(test_name, tags = []):
-    wdt_test(test_name, ".sh", tags)
-
-def wdt_py_test(test_name, tags = []):
-    wdt_test(test_name, ".py", tags)
 
 cpp_library(
     name = "version",
@@ -60,7 +36,7 @@ cpp_unittest(
     name = "wdt_misc_tests",
     srcs = ["test/WdtMiscTests.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib4tests",
         "//folly:conv",
@@ -83,7 +59,7 @@ cpp_unittest(
     name = "test_encdeci64_func",
     srcs = ["test/test_encdeci64_func.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib4tests",
         "//folly:conv",
@@ -132,7 +108,7 @@ cpp_library(
         "util/Stats.cpp",
     ],
     headers = ["util/Stats.h"],
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         "//folly:thread_local",
     ],
@@ -169,7 +145,7 @@ cpp_benchmark(
 cpp_binary(
     name = "histogram",
     srcs = ["test/Histogram.cpp"],
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":stats",
     ],
@@ -180,7 +156,7 @@ cpp_unittest(
     name = "protocol_test",
     srcs = ["test/ProtocolTest.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib",
         "//folly:conv",
@@ -203,7 +179,7 @@ cpp_unittest(
     name = "encryption_test",
     srcs = ["test/EncryptionTest.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib",
         "//folly:conv",
@@ -228,7 +204,7 @@ cpp_binary(
         "test/OptionTypeTest.cpp",
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib",
         "//folly:conv",
@@ -254,7 +230,7 @@ cpp_binary(
         "test/OptionTypeTest.cpp",
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     preprocessor_flags = [
         "-DSTANDALONE_APP",
     ],
@@ -295,7 +271,7 @@ cpp_unittest(
     name = "filereader_test",
     srcs = ["test/FileReaderTest.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib4tests",
         "//folly:conv",
@@ -318,7 +294,7 @@ cpp_unittest(
     name = "threadscontroller_test",
     srcs = ["test/ThreadsControllerTest.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib4tests",
         "//folly:conv",
@@ -341,7 +317,7 @@ cpp_unittest(
     name = "throttler_test",
     srcs = ["test/ThrottlerTest.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib4tests",
         "//folly:conv",
@@ -364,7 +340,7 @@ cpp_unittest(
     name = "resource_controller_test",
     srcs = ["test/WdtResourceControllerTest.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib",
         "//folly:conv",
@@ -387,7 +363,7 @@ cpp_unittest(
     name = "wdt_url_test",
     srcs = ["test/WdtUrlTest.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib4tests",
         "//folly:conv",
@@ -411,7 +387,7 @@ cpp_unittest(
     name = "wdt_fd_test",
     srcs = ["test/FdTest.cpp"],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib",
         ":wdtlib4tests",
@@ -462,7 +438,7 @@ custom_unittest(
         "-d",
         "/dev/shm/wdtTest",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     type = "simple",
     deps = [
         ":wdt",
@@ -476,7 +452,7 @@ custom_unittest(
         "-o",
         "true",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = ["serialize"],
     type = "simple",
     deps = [
@@ -509,11 +485,6 @@ wdt_sh_test(
     tags = ["disabled"],
 )
 
-def merge_dicts(x, y):
-    z = x.copy()
-    z.update(y)
-    return z
-
 custom_unittest(
     name = "wdt_network_script_open_during_disc",
     command = [
@@ -521,8 +492,8 @@ custom_unittest(
         "-p",
         "25800",
     ],
-    env = merge_dicts(
-        wdt_env,
+    env = dicts.add(
+        WDT_ENV,
         {"EXTRA_WDT_OPTIONS": "-open_files_during_discovery=750"},
     ),
     tags = ["disabled"],
@@ -541,7 +512,7 @@ custom_unittest(
         "-p",
         "24100",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = [
         "disabled",
         "extended",
@@ -561,7 +532,7 @@ custom_unittest(
         "-p",
         "24200",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = [
         "disabled",
         "extended",
@@ -577,7 +548,7 @@ custom_unittest(
     command = [
         "wdt/test/wdt_download_resumption_test.sh",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = ["disabled"],
     type = "simple",
     deps = [
@@ -594,7 +565,7 @@ custom_unittest(
         "-p",
         "25050",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = ["disabled"],
     type = "simple",
     deps = [
@@ -611,7 +582,7 @@ custom_unittest(
         "-p",
         "25100",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = [
         "disabled",
         "extended",
@@ -631,7 +602,7 @@ custom_unittest(
         "-p",
         "25200",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = [
         "disabled",
         "extended",
@@ -651,7 +622,7 @@ custom_unittest(
         "-p",
         "25300",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = ["disabled"],
     type = "simple",
     deps = [
@@ -668,7 +639,7 @@ custom_unittest(
         "-p",
         "25400",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = ["disabled"],
     type = "simple",
     deps = [
@@ -685,7 +656,7 @@ custom_unittest(
         "-p",
         "25500",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = ["disabled"],
     type = "simple",
     deps = [
@@ -704,7 +675,7 @@ custom_unittest(
         "-p",
         "25600",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = [
         "disabled",
         "extended",
@@ -726,7 +697,7 @@ custom_unittest(
         "-p",
         "25700",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = [
         "disabled",
         "extended",
@@ -745,7 +716,7 @@ custom_unittest(
         "-p",
         "25750",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = ["disabled"],
     type = "simple",
     deps = [
@@ -763,7 +734,7 @@ custom_unittest(
         "-p",
         "25900",
     ],
-    env = wdt_env,
+    env = WDT_ENV,
     tags = ["disabled"],
     type = "simple",
     deps = [
@@ -820,7 +791,7 @@ cpp_library(
         "util/WdtSocket.cpp",
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":inc",
         ":stats",
@@ -851,7 +822,7 @@ cpp_library(
         "util/WdtFlags.cpp",
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib_min",
         "//folly:conv",
@@ -877,7 +848,7 @@ cpp_library(
         "util/WdtFlags.cpp",
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     preprocessor_flags = [
         "-DSTANDALONE_APP",
     ],
@@ -905,7 +876,7 @@ cpp_library(
         "test/TestCommon.cpp",
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib_min",
         "//folly:conv",
@@ -928,7 +899,7 @@ cpp_library(
 
 cpp_library(
     name = "wdtlib4tests",
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":testcommon",
         ":wdtlib",
@@ -941,7 +912,7 @@ cpp_binary(
         "wdtCmdLine.cpp",
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     preprocessor_flags = [
         "-DSTANDALONE_APP",
     ],
@@ -971,7 +942,7 @@ cpp_binary(
         "wdtCmdLine.cpp",
     ],
     auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    compiler_flags = wdt_compiler_flags,
+    compiler_flags = WDT_COMPILER_FLAGS,
     deps = [
         ":wdtlib4tests",
         "//folly:conv",
