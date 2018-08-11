@@ -13,7 +13,6 @@
 #cmakedefine FOLLY_HAVE_MALLOC_H 1
 #cmakedefine FOLLY_HAVE_FEATURES_H 1
 #cmakedefine FOLLY_HAVE_PTHREAD_ATFORK 1
-#cmakedefine FOLLY_HAVE_BITS_CXXCONFIG_H 1
 #cmakedefine FOLLY_USE_LIBCPP 1
 #cmakedefine FOLLY_HAVE_WEAK_SYMBOLS 1
 #cmakedefine FOLLY_HAVE_MEMRCHR 1
