@@ -1,3 +1,4 @@
+load("@fbcode_macros//build_defs:auto_headers.bzl", "AutoHeaders")
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load(":defs.bzl", "WDT_ENV", "wdt_test", "wdt_py_test", "wdt_sh_test")
 
