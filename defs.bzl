@@ -8,15 +8,15 @@ def wdt_test(test_name, ext, tags):
     custom_unittest(
         name = test_name,
         command = [
-            "wdt/test/" + test_name + ext
+            "wdt/test/" + test_name + ext,
         ],
-        type = 'simple',
         env = WDT_ENV,
+        tags = tags,
+        type = "simple",
         deps = [
-            ':wdt',
-            '//wdt/bench:wdt_gen_files'
+            ":wdt",
+            "//wdt/bench:wdt_gen_files",
         ],
-        tags = tags
     )
 
 def wdt_sh_test(test_name, tags = []):
