@@ -1,7 +1,7 @@
 WDT_ENV = {
     "WDT_BINARY": "$(location :wdt)",
-    "WDT_GEN_FILES": "$(location //wdt/bench:wdt_gen_files)",
     "WDT_GEN_BIGRAMS": "$(location //wdt/bench:book1.bigrams)",
+    "WDT_GEN_FILES": "$(location //wdt/bench:wdt_gen_files)",
 }
 
 def wdt_test(test_name, ext, tags):
