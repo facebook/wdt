@@ -94,7 +94,8 @@ class Sender : public WdtBase {
    public:
     virtual std::unique_ptr<IClientSocket> makeClientSocket(
         ThreadCtx &threadCtx, const std::string &dest, const int port,
-        const EncryptionParams &encryptionParams, int64_t ivChangeInterval) = 0;
+        const EncryptionParams &encryptionParams, int64_t ivChangeInterval,
+        bool tls) = 0;
 
     virtual ~ISocketCreator() = default;
   };

@@ -58,6 +58,7 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
     // encryption type valid only if error code is OK
     // TODO: verify whether all successful threads have same encryption types
     encryptionType_ = stats.encryptionType_;
+    tls_ = stats.getTls();
   }
   return *this;
 }

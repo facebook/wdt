@@ -60,6 +60,12 @@ class Wdt {
    * instance around.
    */
   static Wdt &getWdt(const std::string &appName);
+  /**
+   * TLS is unsupported for now
+   */
+  virtual bool isTlsEnabled() {
+    return false;
+  }
 
   /// High level APIs:
 

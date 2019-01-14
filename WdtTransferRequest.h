@@ -183,6 +183,9 @@ struct WdtTransferRequest {
   // and is requested from the sender
   bool downloadResumptionEnabled{false};
 
+  /// TLS is enabled on the receiver side
+  bool tls{false};
+
   /// Number of GBytes after iv is changed
   int64_t ivChangeInterval{0};
 
@@ -235,6 +238,7 @@ struct WdtTransferRequest {
   const static std::string NUM_PORTS_PARAM;
   /// Encryption parameters (proto:key for now, certificate,... potentially)
   const static std::string ENCRYPTION_PARAM;
+  const static std::string TLS_PARAM;
   const static std::string NAMESPACE_PARAM;
   const static std::string DEST_IDENTIFIER_PARAM;
   const static std::string DOWNLOAD_RESUMPTION_PARAM;

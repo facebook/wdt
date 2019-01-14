@@ -280,6 +280,7 @@ const string WdtTransferRequest::PORTS_PARAM{"ports"};
 const string WdtTransferRequest::START_PORT_PARAM{"start_port"};
 const string WdtTransferRequest::NUM_PORTS_PARAM{"num_ports"};
 const string WdtTransferRequest::ENCRYPTION_PARAM{"Enc"};
+const string WdtTransferRequest::TLS_PARAM{"tls"};
 const string WdtTransferRequest::NAMESPACE_PARAM{"ns"};
 const string WdtTransferRequest::DEST_IDENTIFIER_PARAM{"dstid"};
 const string WdtTransferRequest::DOWNLOAD_RESUMPTION_PARAM{"dr"};
@@ -314,6 +315,17 @@ WdtTransferRequest::WdtTransferRequest(const string& uriString) {
       errorCode = getMoreInterestingError(code, errorCode);
     }
   }
+
+  string tlsEnabled = wdtUri.getQueryParam(TLS_PARAM);
+  try {
+    if (!tlsEnabled.empty()) {
+      tls = folly::to<bool>(tlsEnabled);
+    }
+  } catch (std::exception& e) {
+    WLOG(ERROR) << "Error parsing tls " << tlsEnabled << " " << e.what();
+    errorCode = URI_PARSE_ERROR;
+  }
+
   string downloadResume = wdtUri.getQueryParam(DOWNLOAD_RESUMPTION_PARAM);
   try {
     if (!downloadResume.empty()) {
@@ -446,6 +458,7 @@ string WdtTransferRequest::generateUrlInternal(bool genFull,
                          forLogging ? encryptionData.getLogSafeString()
                                     : encryptionData.getUrlSafeString());
   }
+  wdtUri.setQueryParam(TLS_PARAM, folly::to<string>(tls));
   return wdtUri.generateUrl();
 }
 

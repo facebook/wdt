@@ -53,7 +53,7 @@ std::unique_ptr<IClientSocket> SenderThread::connectToReceiver(
     VLOG(3) << "Creating sender socket";
     socket = wdtParent_->socketCreator_->makeClientSocket(
         *threadCtx_, wdtParent_->getDestination(), port, encryptionData,
-        ivChangeInterval);
+        ivChangeInterval, wdtParent_->transferRequest_.tls);
   } else {
     // socket creator not set, creating ClientSocket
     VLOG(3) << "Creating sender socket";
@@ -979,6 +979,7 @@ void SenderThread::start() {
     state = (this->*stateMap_[state])();
   }
 
+  threadStats_.setTls(wdtParent_->transferRequest_.tls);
   EncryptionType encryptionType =
       (socket_ ? socket_->getEncryptionType() : ENC_NONE);
   threadStats_.setEncryptionType(encryptionType);

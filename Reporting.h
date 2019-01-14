@@ -96,6 +96,9 @@ class TransferStats {
   /// encryption type used
   EncryptionType encryptionType_{ENC_NONE};
 
+  /// is tls enabled?
+  bool tls_{false};
+
   /// mutex to support synchronized access
   std::unique_ptr<folly::RWSpinLock> mutex_{nullptr};
 
@@ -325,6 +328,16 @@ class TransferStats {
   EncryptionType getEncryptionType() const {
     folly::RWSpinLock::ReadHolder lock(mutex_.get());
     return encryptionType_;
+  }
+
+  void setTls(bool tls) {
+    folly::RWSpinLock::WriteHolder lock(mutex_.get());
+    tls_ = tls;
+  }
+
+  bool getTls() const {
+    folly::RWSpinLock::ReadHolder lock(mutex_.get());
+    return tls_;
   }
 
   TransferStats &operator+=(const TransferStats &stats);

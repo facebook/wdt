@@ -360,7 +360,7 @@ TEST(TransferRequestTest, Encryption1) {
     EXPECT_EQ(ser,
               "wdt://host1:123?Enc=1:464f4f62617235360001fffe"
               "&iv_change_int=0&num_ports=3&recpv=" +
-                  std::to_string(Protocol::protocol_version));
+                  std::to_string(Protocol::protocol_version) + "&tls=0");
     WdtTransferRequest unser(ser);
     EXPECT_EQ(unser.errorCode, OK);
     EXPECT_EQ(unser.encryptionData.getType(), ENC_AES128_CTR);

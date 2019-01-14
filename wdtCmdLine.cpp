@@ -276,6 +276,7 @@ int main(int argc, char *argv[]) {
                            FLAGS_test_only_encryption_secret);
     }
     reqPtr->ivChangeInterval = options.iv_change_interval_mb * kMbToB;
+    reqPtr->tls = wdt.isTlsEnabled();
   } else {
     reqPtr = std::make_unique<WdtTransferRequest>(connectUrl);
     if (reqPtr->errorCode != OK) {
