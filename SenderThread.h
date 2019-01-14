@@ -10,7 +10,7 @@
 #include <folly/Conv.h>
 #include <wdt/Sender.h>
 #include <wdt/WdtThread.h>
-#include <wdt/util/ClientSocket.h>
+#include <wdt/util/IClientSocket.h>
 #include <wdt/util/ThreadTransferHistory.h>
 #include <thread>
 
@@ -271,7 +271,7 @@ class SenderThread : public WdtThread {
   ErrorCode readAndVerifySpuriousCheckpoint();
 
   /// General utility used by sender threads to connect to receiver
-  std::unique_ptr<ClientSocket> connectToReceiver(
+  std::unique_ptr<IClientSocket> connectToReceiver(
       int port, IAbortChecker const *abortChecker, ErrorCode &errCode);
 
   /// Method responsible for sending one source to the destination
@@ -294,7 +294,7 @@ class SenderThread : public WdtThread {
   /// Pointer to client socket to maintain connection to the receiver
   /// Note: this must be deleted while still on the same thread it was created
   /// (for fbonly / btm / thrift / eventbase reasons)
-  std::unique_ptr<ClientSocket> socket_;
+  std::unique_ptr<IClientSocket> socket_;
 
   /// whether total file size has been sent to the receiver
   bool totalSizeSent_{false};

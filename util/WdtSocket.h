@@ -41,16 +41,16 @@ class WdtSocket {
 
   /// writes the tag/mac (for gcm) and shuts down the write half of the
   /// underlying socket
-  virtual ErrorCode shutdownWrites();
+  ErrorCode shutdownWrites();
 
   /// expect logical and physical end of stream: read the tag and finialize
-  virtual ErrorCode expectEndOfStream();
+  ErrorCode expectEndOfStream();
 
   /**
    * Normal closing of the current connection.
    * may return ENCRYPTION_ERROR if the stream is corrupt (gcm mode)
    */
-  virtual ErrorCode closeConnection();
+  ErrorCode closeConnection();
 
   /**
    * Close unexpectedly (will not read/write the checksum).
@@ -61,8 +61,12 @@ class WdtSocket {
   /// @return     current fd
   int getFd() const;
 
+  void setFd(int fd);
+
   /// @return     port
   int getPort() const;
+
+  void setPort(int port);
 
   /// @return     current encryption type
   EncryptionType getEncryptionType() const;
@@ -99,10 +103,72 @@ class WdtSocket {
     ivChangeInterval_ = 0;
   }
 
+  /// sets read and write timeouts for the socket
+  void setSocketTimeouts();
+
+  // manipulates DSCP Bits
+  void setDscp(int dscp);
+
+  ThreadCtx& getThreadCtx() {
+    return threadCtx_;
+  }
+
+  void enableUnencryptedPeerSupport() {
+    supportUnencryptedPeer_ = true;
+  }
+  /**
+   * Returns ip and port for a socket address
+   *
+   * @param sa      socket address
+   * @param salen   socket address length
+   * @param host    this is set to host name
+   * @param port    this is set to port
+   *
+   * @return        whether getnameinfo was successful or not
+   */
+  static bool getNameInfo(const struct sockaddr *sa, socklen_t salen,
+                          std::string &host, std::string &port);
+
   virtual ~WdtSocket();
 
- protected:
-  // TODO: doc would be nice... (for tryFull, retry...)
+ private:
+  void resetEncryptor();
+
+  void resetDecryptor();
+
+  /// computes effective timeout depending on the network timeout and abort
+  /// check interval
+  int getEffectiveTimeout(int networkTimeout);
+
+  /// @see ioWithAbortCheck
+  int64_t readWithAbortCheck(char *buf, int64_t nbyte, int timeoutMs,
+                             bool tryFull);
+  /// @see ioWithAbortCheck
+  int64_t writeWithAbortCheck(const char *buf, int64_t nbyte, int timeoutMs,
+                              bool tryFull);
+
+  /**
+   * Tries to read/write numBytes amount of data from fd. Also, checks for abort
+   * after every read/write call. Also, retries till the input timeout.
+   * Optionally, returns after first successful read/write call.
+   *
+   * @param readOrWrite   read/write
+   * @param fd            socket file descriptor
+   * @param tbuf          buffer
+   * @param numBytes      number of bytes to read/write
+   * @param abortChecker  abort checker callback
+   * @param timeoutMs     timeout in milliseconds
+   * @param tryFull       if true, this function tries to read complete data.
+   *                      Otherwise, this function returns after the first
+   *                      successful read/write. This is set to false for
+   *                      receiver pipelining.
+   *
+   * @return              in case of success number of bytes read/written, else
+   *                      returns -1
+   */
+  template <typename F, typename T>
+  int64_t ioWithAbortCheck(F readOrWrite, T tbuf, int64_t numBytes,
+                           int timeoutMs, bool tryFull);
 
   // computes next tag offset
   int computeNextTagOffset(int64_t totalProcessed, int64_t tagInterval);
@@ -156,25 +222,6 @@ class WdtSocket {
 
   ErrorCode finalizeReads(bool doTagIOs);
 
-  /// sets read and write timeouts for the socket
-  void setSocketTimeouts();
-
-  // manipulates DSCP Bits
-  void setDscp(int dscp);
-
-  /**
-   * Returns ip and port for a socket address
-   *
-   * @param sa      socket address
-   * @param salen   socket address length
-   * @param host    this is set to host name
-   * @param port    this is set to port
-   *
-   * @return        whether getnameinfo was successful or not
-   */
-  static bool getNameInfo(const struct sockaddr *sa, socklen_t salen,
-                          std::string &host, std::string &port);
-
   int port_{-1};
   int fd_{-1};
 
@@ -211,45 +258,6 @@ class WdtSocket {
   bool writesFinalized_{false};
   /// Have we already read the tag and completed decryption
   bool readsFinalized_{false};
-
- private:
-  void resetEncryptor();
-
-  void resetDecryptor();
-
-  /// computes effective timeout depending on the network timeout and abort
-  /// check interval
-  int getEffectiveTimeout(int networkTimeout);
-
-  /// @see ioWithAbortCheck
-  int64_t readWithAbortCheck(char *buf, int64_t nbyte, int timeoutMs,
-                             bool tryFull);
-  /// @see ioWithAbortCheck
-  int64_t writeWithAbortCheck(const char *buf, int64_t nbyte, int timeoutMs,
-                              bool tryFull);
-
-  /**
-   * Tries to read/write numBytes amount of data from fd. Also, checks for abort
-   * after every read/write call. Also, retries till the input timeout.
-   * Optionally, returns after first successful read/write call.
-   *
-   * @param readOrWrite   read/write
-   * @param fd            socket file descriptor
-   * @param tbuf          buffer
-   * @param numBytes      number of bytes to read/write
-   * @param abortChecker  abort checker callback
-   * @param timeoutMs     timeout in milliseconds
-   * @param tryFull       if true, this function tries to read complete data.
-   *                      Otherwise, this function returns after the first
-   *                      successful read/write. This is set to false for
-   *                      receiver pipelining.
-   *
-   * @return              in case of success number of bytes read/written, else
-   *                      returns -1
-   */
-  template <typename F, typename T>
-  int64_t ioWithAbortCheck(F readOrWrite, T tbuf, int64_t numBytes,
-                           int timeoutMs, bool tryFull);
 };
 }
 }

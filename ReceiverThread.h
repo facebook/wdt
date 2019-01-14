@@ -289,7 +289,7 @@ class ReceiverThread : public WdtThread {
    * Server socket object that provides functionality such as listen()
    * accept, read, write on the socket
    */
-  std::unique_ptr<ServerSocket> socket_{nullptr};
+  std::unique_ptr<IServerSocket> socket_{nullptr};
 
   /// Marks the number of bytes already read in the buffer
   int64_t numRead_{0};

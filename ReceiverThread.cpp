@@ -28,7 +28,7 @@ std::ostream &operator<<(std::ostream &os,
   return os;
 }
 
-int64_t readAtLeast(ServerSocket &s, char *buf, int64_t max, int64_t atLeast,
+int64_t readAtLeast(IServerSocket &s, char *buf, int64_t max, int64_t atLeast,
                     int64_t len) {
   WVLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
            << atLeast << " from " << s.getFd();
@@ -61,7 +61,7 @@ int64_t readAtLeast(ServerSocket &s, char *buf, int64_t max, int64_t atLeast,
   return len;
 }
 
-int64_t readAtMost(ServerSocket &s, char *buf, int64_t max, int64_t atMost) {
+int64_t readAtMost(IServerSocket &s, char *buf, int64_t max, int64_t atMost) {
   const int64_t target = atMost < max ? atMost : max;
   WVLOG(3) << "readAtMost target " << target;
   // because we want to process data as soon as it arrives, tryFull option for
@@ -1019,10 +1019,22 @@ ErrorCode ReceiverThread::init() {
   Func tagVerificationSuccessCallback = [this] {
     this->markReceivedBlocksVerified();
   };
-  socket_ = std::make_unique<ServerSocket>(
-      *threadCtx_, port_, wdtParent_->backlog_, encryptionData,
-      wdtParent_->transferRequest_.ivChangeInterval,
-      std::move(tagVerificationSuccessCallback));
+  if (wdtParent_->socketCreator_) {
+    socket_ = wdtParent_->socketCreator_->makeServerSocket(
+        *threadCtx_, port_, wdtParent_->backlog_, encryptionData,
+        wdtParent_->transferRequest_.ivChangeInterval,
+        std::move(tagVerificationSuccessCallback));
+  } else {
+    socket_ = std::make_unique<ServerSocket>(
+        *threadCtx_, port_, wdtParent_->backlog_, encryptionData,
+        wdtParent_->transferRequest_.ivChangeInterval,
+        std::move(tagVerificationSuccessCallback));
+  }
+
+  if (!socket_) {
+    return ERROR;
+  }
+
   int max_retries = options_.max_retries;
   for (int retries = 0; retries < max_retries; retries++) {
     if (socket_->listen() == OK) {

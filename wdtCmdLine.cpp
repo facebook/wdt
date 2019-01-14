@@ -310,6 +310,7 @@ int main(int argc, char *argv[]) {
       recOptions.enable_download_resumption = true;
       receiver.setRecoveryId(FLAGS_recovery_id);
     }
+    wdt.wdtSetReceiverSocketCreator(receiver);
     WdtTransferRequest augmentedReq = receiver.init();
     retCode = augmentedReq.errorCode;
     if (retCode == FEWER_PORTS) {

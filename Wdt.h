@@ -108,6 +108,8 @@ class Wdt {
   /// @return  sender identifier for a transfer request
   static std::string getSenderIdentifier(const WdtTransferRequest &req);
 
+  virtual void wdtSetReceiverSocketCreator(Receiver &/* unused */) {}
+
   /// Virtual Destructor (for class hierarchy)
   virtual ~Wdt() {
   }

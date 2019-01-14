@@ -11,7 +11,7 @@
 #include <wdt/ReceiverThread.h>
 #include <wdt/WdtBase.h>
 #include <wdt/util/FileCreator.h>
-#include <wdt/util/ServerSocket.h>
+#include <wdt/util/IServerSocket.h>
 #include <wdt/util/TransferLogManager.h>
 #include <chrono>
 #include <memory>
@@ -78,6 +78,24 @@ class Receiver : public WdtBase {
   /// @param acceptMode   acceptMode to use
   void setAcceptMode(AcceptMode acceptMode);
 
+  /// Interface to make socket
+  class ISocketCreator {
+   public:
+    virtual std::unique_ptr<IServerSocket> makeServerSocket(
+        ThreadCtx &threadCtx, int port, int backlog,
+        const EncryptionParams &encryptionParams, int64_t ivChangeInterval,
+        Func &&tagVerificationSuccessCallback) = 0;
+
+    virtual ~ISocketCreator() = default;
+  };
+
+  /**
+   * Sets socket creator
+   *
+   * @param socketCreator   socket-creator to be used
+   */
+  void setSocketCreator(ISocketCreator *socketCreator);
+
   /**
    * Destructor for the receiver. The destructor automatically cancels
    * any incomplete transfers that are going on. 'Incomplete transfer' is a
@@ -102,6 +120,9 @@ class Receiver : public WdtBase {
 
   /// Get file creator, used by receiver threads
   std::unique_ptr<FileCreator> &getFileCreator();
+
+  /// Socket creator used to optionally create different kind of server socket
+  ISocketCreator *socketCreator_{nullptr};
 
   /// Get the ref to transfer log manager
   TransferLogManager &getTransferLogManager();

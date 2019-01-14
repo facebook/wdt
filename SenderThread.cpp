@@ -14,7 +14,6 @@
 #include <folly/String.h>
 #include <sys/stat.h>
 #include <wdt/Sender.h>
-#include <wdt/util/ClientSocket.h>
 
 namespace facebook {
 namespace wdt {
@@ -34,12 +33,12 @@ const SenderThread::StateFunction SenderThread::stateMap_[] = {
     &SenderThread::processWaitCmd,  &SenderThread::processErrCmd,
     &SenderThread::processAbortCmd, &SenderThread::processVersionMismatch};
 
-std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
+std::unique_ptr<IClientSocket> SenderThread::connectToReceiver(
     const int port, IAbortChecker const * /*abortChecker*/,
     ErrorCode &errCode) {
   auto startTime = Clock::now();
   int connectAttempts = 0;
-  std::unique_ptr<ClientSocket> socket;
+  std::unique_ptr<IClientSocket> socket;
   const EncryptionParams &encryptionData =
       wdtParent_->transferRequest_.encryptionData;
   int64_t ivChangeInterval = wdtParent_->transferRequest_.ivChangeInterval;
@@ -49,16 +48,25 @@ std::unique_ptr<ClientSocket> SenderThread::connectToReceiver(
                    << threadProtocolVersion_;
     ivChangeInterval = 0;
   }
-  if (!wdtParent_->socketCreator_) {
+
+  if (wdtParent_->socketCreator_) {
+    VLOG(3) << "Creating sender socket";
+    socket = wdtParent_->socketCreator_->makeClientSocket(
+        *threadCtx_, wdtParent_->getDestination(), port, encryptionData,
+        ivChangeInterval);
+  } else {
     // socket creator not set, creating ClientSocket
+    VLOG(3) << "Creating sender socket";
     socket = std::make_unique<ClientSocket>(*threadCtx_,
                                             wdtParent_->getDestination(), port,
                                             encryptionData, ivChangeInterval);
-  } else {
-    socket = wdtParent_->socketCreator_->makeSocket(
-        *threadCtx_, wdtParent_->getDestination(), port, encryptionData,
-        ivChangeInterval);
   }
+
+  if (!socket) {
+    errCode = ERROR;
+    return nullptr;
+  }
+
   double retryInterval = options_.sleep_millis;
   int maxRetries = options_.max_retries;
   if (maxRetries < 1) {

@@ -49,6 +49,10 @@ Receiver::Receiver(int port, int numSockets, const std::string &destDir)
     : Receiver(WdtTransferRequest(port, numSockets, destDir)) {
 }
 
+void Receiver::setSocketCreator(Receiver::ISocketCreator *socketCreator) {
+    socketCreator_ = socketCreator;
+}
+
 void Receiver::traverseDestinationDir(
     std::vector<FileChunksInfo> &fileChunksInfo) {
   DirectorySourceQueue dirQueue(options_, getDirectory(),

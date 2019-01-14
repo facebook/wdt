@@ -92,12 +92,11 @@ class Sender : public WdtBase {
   /// Interface to make socket
   class ISocketCreator {
    public:
-    virtual std::unique_ptr<ClientSocket> makeSocket(
+    virtual std::unique_ptr<IClientSocket> makeClientSocket(
         ThreadCtx &threadCtx, const std::string &dest, const int port,
         const EncryptionParams &encryptionParams, int64_t ivChangeInterval) = 0;
 
-    virtual ~ISocketCreator() {
-    }
+    virtual ~ISocketCreator() = default;
   };
 
   /**

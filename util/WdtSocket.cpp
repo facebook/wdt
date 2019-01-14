@@ -687,8 +687,16 @@ int WdtSocket::getFd() const {
   return fd_;
 }
 
+void WdtSocket::setFd(int fd) {
+  fd_ = fd;
+}
+
 int WdtSocket::getPort() const {
   return port_;
+}
+
+void WdtSocket::setPort(int port) {
+  port_ = port;
 }
 
 EncryptionType WdtSocket::getEncryptionType() const {
