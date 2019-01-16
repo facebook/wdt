@@ -84,7 +84,7 @@ class Receiver : public WdtBase {
     virtual std::unique_ptr<IServerSocket> makeServerSocket(
         ThreadCtx &threadCtx, int port, int backlog,
         const EncryptionParams &encryptionParams, int64_t ivChangeInterval,
-        Func &&tagVerificationSuccessCallback) = 0;
+        Func &&tagVerificationSuccessCallback, bool tls) = 0;
 
     virtual ~ISocketCreator() = default;
   };

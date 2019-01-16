@@ -1023,7 +1023,8 @@ ErrorCode ReceiverThread::init() {
     socket_ = wdtParent_->socketCreator_->makeServerSocket(
         *threadCtx_, port_, wdtParent_->backlog_, encryptionData,
         wdtParent_->transferRequest_.ivChangeInterval,
-        std::move(tagVerificationSuccessCallback));
+        std::move(tagVerificationSuccessCallback),
+        wdtParent_->transferRequest_.tls);
   } else {
     socket_ = std::make_unique<ServerSocket>(
         *threadCtx_, port_, wdtParent_->backlog_, encryptionData,
