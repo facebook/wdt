@@ -31,7 +31,7 @@ cd $CDIR
 hg-clone-fbsource --sparse .hgsparse-fbcode --simple
 
 # open source part
-export https_proxy=http://fwdproxy.any:8080
+export https_proxy=http://fwdproxy:8080
 git clone https://cmake.org/cmake.git
 cd cmake
 ./bootstrap --prefix=$CDIR --parallel=16
