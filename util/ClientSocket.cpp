@@ -166,7 +166,7 @@ ErrorCode ClientSocket::connect() {
     sa_ = *info;
     break;
   }
-  if (fd < 0) {
+  if (socket_->getFd() < 0) {
     if (count > 1) {
       // Only log this if not redundant with log above (ie --ipv6=false)
       WLOG(INFO) << "Unable to connect to either of the " << count << " addrs";
