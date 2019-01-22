@@ -345,7 +345,8 @@ void ProgressReporter::logProgress(int64_t effectiveDataBytes, int progress,
              << averageThroughput << " Mbytes/s, Recent throughput "
              << currentThroughput << " Mbytes/s " << numDiscoveredFiles
              << " Files discovered "
-             << (fileDiscoveryFinished ? "(complete)" : "(incomplete)");
+             << (fileDiscoveryFinished ? "(complete)" : "(incomplete)")
+             << "; @logview-trait(ignore_task;1)";
 }
 
 const std::string PerfStatReport::statTypeDescription_[] = {
