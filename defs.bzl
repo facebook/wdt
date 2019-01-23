@@ -1,3 +1,5 @@
+load("@fbcode_macros//build_defs:custom_unittest.bzl", "custom_unittest")
+
 WDT_ENV = {
     "WDT_BINARY": "$(location :wdt)",
     "WDT_GEN_BIGRAMS": "$(location //wdt/bench:book1.bigrams)",
