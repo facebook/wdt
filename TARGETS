@@ -1,5 +1,10 @@
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load("@fbcode_macros//build_defs:auto_headers.bzl", "AutoHeaders")
+load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
+load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+load("@fbcode_macros//build_defs:custom_unittest.bzl", "custom_unittest")
 load(":defs.bzl", "WDT_ENV", "wdt_py_test", "wdt_sh_test")
 
 WDT_COMPILER_FLAGS = [
