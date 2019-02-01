@@ -24,7 +24,7 @@ TEST(ThrottlerTest, RATE_CHANGE) {
   WdtOptions options;
   options.avg_mbytes_per_sec = 50;
   std::shared_ptr<Throttler> throttler =
-      Throttler::makeThrottler(options.getThrottlerOptions());
+      std::make_shared<Throttler>(options.getThrottlerOptions());
   throttler->startTransfer();
 
   testThrottling(throttler, 50);
@@ -47,7 +47,7 @@ TEST(ThrottlerTest, FAIRNESS) {
   options.avg_mbytes_per_sec = 60;
   options.buffer_size = 256 * 1024;
   std::shared_ptr<Throttler> throttler =
-      Throttler::makeThrottler(options.getThrottlerOptions());
+      std::make_shared<Throttler>(options.getThrottlerOptions());
 
   const int numThread = 40;
   const int testDurationSec = 5;

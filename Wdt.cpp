@@ -53,6 +53,12 @@ Wdt::Wdt() {
   resourceController_ = std::make_unique<WdtResourceController>(options_);
 }
 
+Wdt::Wdt(std::shared_ptr<Throttler> throttler) {
+  WdtFlags::initializeFromFlags(options_);
+  resourceController_ =
+      std::make_unique<WdtResourceController>(options_, throttler);
+}
+
 std::string Wdt::getSenderIdentifier(const WdtTransferRequest &req) {
   if (req.destIdentifier.empty()) {
     return req.hostName;
@@ -223,5 +229,5 @@ void Wdt::releaseWdt(const std::string &appName) {
   }
   s_wdtMap.erase(it);
 }
-}
-}  // namespaces
+}  // namespace wdt
+}  // namespace facebook

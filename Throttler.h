@@ -69,6 +69,8 @@ class Throttler {
   static std::shared_ptr<Throttler> makeThrottler(
       const ThrottlerOptions& options);
 
+  explicit Throttler(const ThrottlerOptions& options);
+
   /**
    * Calls calculateSleep which is a thread safe method. Finds out the
    * time thread has to sleep and makes it sleep.
@@ -134,25 +136,6 @@ class Throttler {
                                   const Throttler& throttler);
 
  private:
-  /**
-   * @param averageRatePerSec         Average rate at which tokens should be
-   *                                  consumed
-   * @param peakRatePerSec            Max burst rate allowed by the
-   *                                  token bucket
-   * @param bucketLimit               Max size of bucket, specify 0 for auto
-   *                                  configure. In auto mode, it will be twice
-   *                                  the data you send in 1/4th of a second
-   *                                  at the peak rate
-   * @param singleRequestLimit        Internal limit to the maximum number of
-   *                                  tokens that can be throttled in one call.
-   *                                  If more tokens are requested to be
-   *                                  throttled, that requested gets broken down
-   *                                  and it is treated as multiple throttle
-   *                                  calls.
-   */
-  Throttler(double avgRatePerSec, double peakRatePerSec, double bucketLimit,
-            int64_t singleRequestLimit, int64_t throttlerLogTimeMillis = 0);
-
   /**
    * Sometimes the options passed to throttler might not make sense so this
    * method tries to auto configure them

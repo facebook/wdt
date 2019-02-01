@@ -150,6 +150,7 @@ class Wdt {
 
   /// Private constructor
   explicit Wdt();
+  explicit Wdt(std::shared_ptr<Throttler> throttler);
 
   /// Not copyable
   Wdt(const Wdt &) = delete;

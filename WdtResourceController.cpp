@@ -283,11 +283,18 @@ WdtNamespaceController::~WdtNamespaceController() {
   // release is done by parent shutdown
 }
 
-WdtResourceController::WdtResourceController(const WdtOptions &options)
+WdtResourceController::WdtResourceController(
+    const WdtOptions &options, std::shared_ptr<Throttler> throttler)
     : WdtControllerBase("_root controller_"), options_(options) {
   updateMaxSendersLimit(options.global_sender_limit);
   updateMaxReceiversLimit(options.global_receiver_limit);
-  throttler_ = Throttler::makeThrottler(options.getThrottlerOptions());
+  throttler_ = throttler;
+}
+
+WdtResourceController::WdtResourceController(const WdtOptions &options)
+    : WdtResourceController(
+          options,
+          std::make_shared<Throttler>(options.getThrottlerOptions())) {
 }
 
 WdtResourceController::WdtResourceController()

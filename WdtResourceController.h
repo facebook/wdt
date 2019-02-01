@@ -147,6 +147,8 @@ class WdtResourceController : public WdtControllerBase {
  public:
   /// resource controller should take the option as reference so that it can be
   /// changed later from the parent object
+  WdtResourceController(const WdtOptions &options,
+                        std::shared_ptr<Throttler> throttler);
   explicit WdtResourceController(const WdtOptions &options);
   WdtResourceController();
 

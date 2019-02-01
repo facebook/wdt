@@ -21,14 +21,7 @@ const double kTimeMultiplier = 0.25;
 
 std::shared_ptr<Throttler> Throttler::makeThrottler(
     const ThrottlerOptions& options) {
-  double avgRatePerSec = options.avg_rate_per_sec;
-  double peakRatePerSec = options.max_rate_per_sec;
-  double bucketLimit = options.throttler_bucket_limit;
-  int64_t singleRequestLimit = options.single_request_limit;
-  Throttler* throttler =
-      new Throttler(avgRatePerSec, peakRatePerSec, bucketLimit,
-                    singleRequestLimit, options.throttler_log_time_millis);
-  return std::shared_ptr<Throttler>(throttler);
+  return std::make_shared<Throttler>(options);
 }
 
 void Throttler::configureOptions(double& avgRatePerSec, double& peakRatePerSec,
@@ -46,11 +39,9 @@ void Throttler::configureOptions(double& avgRatePerSec, double& peakRatePerSec,
   }
 }
 
-Throttler::Throttler(double avgRatePerSec, double peakRatePerSec,
-                     double bucketLimit, int64_t singleRequestLimit,
-                     int64_t throttlerLogTimeMillis)
-    : avgRatePerSec_(avgRatePerSec) {
-  bucketRatePerSec_ = peakRatePerSec;
+Throttler::Throttler(const ThrottlerOptions& options)
+    : avgRatePerSec_(options.avg_rate_per_sec) {
+  bucketRatePerSec_ = options.max_rate_per_sec;
   tokenBucketLimit_ = kTimeMultiplier * kBucketMultiplier * bucketRatePerSec_;
   /* We keep the number of tokens generated as zero initially
    * It could be argued that we keep this filled when we created the
@@ -58,10 +49,10 @@ Throttler::Throttler(double avgRatePerSec, double peakRatePerSec,
    * that we will have enough number of tokens by the time we send the data
    */
   tokenBucket_ = 0;
-  if (bucketLimit > 0) {
-    tokenBucketLimit_ = bucketLimit;
+  if (options.throttler_bucket_limit > 0) {
+    tokenBucketLimit_ = options.throttler_bucket_limit;
   }
-  if (avgRatePerSec > 0) {
+  if (avgRatePerSec_ > 0) {
     WLOG(INFO) << "Average rate " << avgRatePerSec_;
   } else {
     WLOG(INFO) << "No average rate specified";
@@ -72,9 +63,9 @@ Throttler::Throttler(double avgRatePerSec, double peakRatePerSec,
   } else {
     WLOG(INFO) << "No peak rate specified";
   }
-  WDT_CHECK_GT(singleRequestLimit, 0);
-  singleRequestLimit_ = singleRequestLimit;
-  throttlerLogTimeMillis_ = throttlerLogTimeMillis;
+  WDT_CHECK_GT(options.single_request_limit, 0);
+  singleRequestLimit_ = options.single_request_limit;
+  throttlerLogTimeMillis_ = options.throttler_log_time_millis;
 }
 
 void Throttler::setThrottlerRates(double& avgRatePerSec,
