@@ -7,12 +7,12 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 #include <wdt/ReceiverThread.h>
-#include <folly/lang/Bits.h>
-#include <folly/hash/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/ScopeGuard.h>
 #include <folly/String.h>
+#include <folly/hash/Checksum.h>
+#include <folly/lang/Bits.h>
 #include <wdt/util/FileWriter.h>
 
 namespace facebook {
@@ -1064,5 +1064,5 @@ void ReceiverThread::reset() {
 
 ReceiverThread::~ReceiverThread() {
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -99,7 +99,8 @@ std::unique_ptr<IClientSocket> SenderThread::connectToReceiver(
     errCode = CONN_ERROR;
     return nullptr;
   }
-  ((connectAttempts > 1) ? WTLOG(WARNING) : WTLOG(INFO))
+
+  (connectAttempts > 1) ? WTLOG(WARNING) : WTLOG(INFO)
       << "Connection took " << connectAttempts << " attempt(s) and "
       << elapsedSecsConn << " seconds. port " << port;
   return socket;

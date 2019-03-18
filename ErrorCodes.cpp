@@ -11,6 +11,7 @@
 #include <string.h>
 
 DEFINE_int32(wdt_double_precision, 2, "Precision while printing double");
+DEFINE_bool(wdt_logging_enabled, true, "To enable/disable WDT logging.");
 
 namespace facebook {
 namespace wdt {

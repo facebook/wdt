@@ -17,18 +17,26 @@
 #define WDT_DOUBLE_FORMATTING \
   std::fixed << std::setprecision(FLAGS_wdt_double_precision)
 
+#define WDT_LOGGING_ENABLED FLAGS_wdt_logging_enabled
+
 DECLARE_int32(wdt_double_precision);
+DECLARE_bool(wdt_logging_enabled);
 
 namespace facebook {
 namespace wdt {
 
 // Call regular google log but prefix with wdt for easier extraction later
 #define WDT_LOG_PREFIX "wdt>\t"
-#define WLOG(X) LOG(X) << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
-#define WVLOG(X) VLOG(X) << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
-#define WPLOG(X) PLOG(X) << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
-#define WLOG_IF(X, Y) LOG_IF(X, Y) << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
-#define WVLOG_IF(X, Y) VLOG_IF(X, Y) << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
+#define WLOG(X) LOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << \
+WDT_DOUBLE_FORMATTING
+#define WVLOG(X) VLOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << \
+WDT_DOUBLE_FORMATTING
+#define WPLOG(X) PLOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << \
+WDT_DOUBLE_FORMATTING
+#define WLOG_IF(X, Y) LOG_IF(X, WDT_LOGGING_ENABLED && (Y)) << WDT_LOG_PREFIX \
+<< WDT_DOUBLE_FORMATTING
+#define WVLOG_IF(X, Y) VLOG_IF(X, WDT_LOGGING_ENABLED && (Y)) << \
+WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
 #define WTLOG(X) WLOG(X) << *this << " "
 #define WTVLOG(X) WVLOG(X) << *this << " "
 #define WTPLOG(X) WPLOG(X) << *this << " "
