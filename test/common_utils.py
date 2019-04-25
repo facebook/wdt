@@ -8,6 +8,7 @@ import errno
 import string
 import random
 import time
+import getpass
 
 
 def get_env(name):
@@ -233,7 +234,7 @@ def next_test():
 
 def create_test_directory(prefix):
     global root_dir, test_count, skip_tests, test_ids
-    user = os.environ['USER']
+    user = getpass.getuser()
     base_dir = prefix + "/wdtTest_" + user
     create_directory(base_dir)
     root_dir = tempfile.mkdtemp(dir=base_dir)
