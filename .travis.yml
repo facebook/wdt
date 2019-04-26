@@ -9,6 +9,9 @@ os:
 # Need >= xcode9 to build folly
 osx_image: xcode9.4
 
+# Need >= gcc 5 to build folly
+dist: xenial
+
 compiler:
   - clang
   - gcc
@@ -17,15 +20,10 @@ addons:
   apt:
     sources:
       - boost-latest
-      - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise-3.6
     packages:
-      - g++-4.9
-      - clang-3.6
-      - libboost-system1.55-dev
-      - libboost-filesystem1.55-dev
-#      - libssl-dev
-#      - openssl-1.0.1f
+      - libboost-system-dev
+      - libboost-filesystem-dev
+      - libssl-dev
 
 script:
   # Debug
