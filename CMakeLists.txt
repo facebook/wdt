@@ -32,7 +32,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 
 # somehow 'option' for this doesn't seeem to work/I don't know how to make it
-set(BUILD_SHARED_LIBS on CACHE Bool "build shared libs")
+set(BUILD_SHARED_LIBS on CACHE BOOL "build shared libs")
 
 # CMake default behavior should be to set rpath when needed (non system install)
 # it's not so let's set this for now:
@@ -52,7 +52,7 @@ set(CMAKE_CXX_FLAGS "-msse4.2 -mpclmul")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "_bin/wdt")
 
 # Check that we have the Folly source tree
-set(FOLLY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../folly" CACHE path
+set(FOLLY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../folly" CACHE PATH
     "Folly source tree (folly/Conv.h should be reachable from there")
 # Check for folly - TODO: this doesn't work well for relative paths
 # (because of relative to build dir vs relative to source tree for -I)
