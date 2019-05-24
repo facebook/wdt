@@ -16,7 +16,7 @@
 
 #include <wdt/util/Stats.h>
 
-#include "common/stats/ExportedHistogramMapImpl.h"
+#include <fb303/ExportedHistogramMapImpl.h>
 
 DEFINE_int32(num_threads, 8, "number of threads");
 DEFINE_double(print_interval, 1, "number of seconds in between 2 stats dump");
@@ -81,10 +81,10 @@ BENCHMARK_MULTI(MtPerHistogram) {
   return iters;
 }
 
-static stats::DynamicCounters dynamicCounters;
-static stats::DynamicStrings dynamicStrings;
-static stats::ExportedHistogram basehist(1000, 0, 10000);
-static stats::ExportedHistogramMapImpl ch(&dynamicCounters, &dynamicStrings,
+static fb303::DynamicCounters dynamicCounters;
+static fb303::DynamicStrings dynamicStrings;
+static fb303::ExportedHistogram basehist(1000, 0, 10000);
+static fb303::ExportedHistogramMapImpl ch(&dynamicCounters, &dynamicStrings,
                                           basehist);
 
 void runCommonHistTest(int iters) {
