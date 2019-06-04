@@ -104,7 +104,10 @@ class PerfStatCollector {
   ~PerfStatCollector() {
     if (threadCtx_.getOptions().enable_perf_stat_collection) {
       int64_t duration = durationMicros(Clock::now() - startTime_);
-      threadCtx_.getPerfReport().addPerfStat(statType_, duration);
+      if (duration >= 0) {
+        // If time goes back due to clock adjustment, ignore the sample.
+        threadCtx_.getPerfReport().addPerfStat(statType_, duration);
+      }
     }
   }
 
