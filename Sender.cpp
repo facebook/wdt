@@ -47,8 +47,6 @@ Sender::Sender(const WdtTransferRequest &transferRequest)
   WLOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   transferRequest_ = transferRequest;
 
-  progressReportIntervalMillis_ = options_.progress_report_interval_millis;
-
   if (getTransferId().empty()) {
     WLOG(WARNING) << "Sender without transferId... will likely fail to connect";
   }
@@ -92,11 +90,6 @@ Sender::~Sender() {
     abort(ABORTED_BY_APPLICATION);
   }
   finish();
-}
-
-void Sender::setProgressReportIntervalMillis(
-    const int progressReportIntervalMillis) {
-  progressReportIntervalMillis_ = progressReportIntervalMillis;
 }
 
 ProtoNegotiationStatus Sender::getNegotiationStatus() {
@@ -311,6 +304,7 @@ ErrorCode Sender::start() {
   WLOG(INFO) << "Client (sending) to " << getDestination() << ", Using ports [ "
              << transferRequest_.ports << "]";
   startTime_ = Clock::now();
+  progressReportIntervalMillis_ = options_.progress_report_interval_millis;
   downloadResumptionEnabled_ = (transferRequest_.downloadResumptionEnabled ||
                                 options_.enable_download_resumption);
   bool deleteExtraFiles = (transferRequest_.downloadResumptionEnabled ||

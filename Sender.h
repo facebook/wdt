@@ -78,14 +78,6 @@ class Sender : public WdtBase {
   /// @return     destination host-name
   const std::string &getDestination() const;
 
-  /**
-   * @param progressReportIntervalMillis_   interval(ms) between progress
-   *                                        reports. A value of 0 indicates no
-   *                                        progress reporting
-   * TODO: move to base
-   */
-  void setProgressReportIntervalMillis(const int progressReportIntervalMillis);
-
   /// @return    minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
 
@@ -176,7 +168,7 @@ class Sender : public WdtBase {
   /// Number of active threads, decremented every time a thread is finished
   int32_t numActiveThreads_{0};
   /// The interval at which the progress reporter should check for progress
-  int progressReportIntervalMillis_;
+  int progressReportIntervalMillis_{0};
   /// Socket creator used to optionally create different kinds of client socket
   ISocketCreator *socketCreator_{nullptr};
   /// Whether download resumption is enabled or not
