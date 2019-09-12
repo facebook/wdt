@@ -293,8 +293,15 @@ ErrorCode Sender::start() {
   dirQueue_->setOpenFilesDuringDiscovery(options_.open_files_during_discovery);
   dirQueue_->setDirectReads(options_.odirect_reads);
   if (!transferRequest_.fileInfo.empty() ||
+      transferRequest_.fileInfoGenerator ||
       transferRequest_.disableDirectoryTraversal) {
     dirQueue_->setFileInfo(transferRequest_.fileInfo);
+    if (transferRequest_.fileInfoGenerator) {
+      dirQueue_->setFileInfoGenerator([this]() {
+        dirQueue_->waitForPreviousTransfer();
+        return transferRequest_.fileInfoGenerator();
+      });
+    }
   }
   transferHistoryController_ =
       std::make_unique<TransferHistoryController>(*dirQueue_);

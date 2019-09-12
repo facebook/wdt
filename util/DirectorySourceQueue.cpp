@@ -87,7 +87,14 @@ void DirectorySourceQueue::setFileInfo(
   exploreDirectory_ = false;
 }
 
-const std::vector<WdtFileInfo> &DirectorySourceQueue::getFileInfo() const {
+void DirectorySourceQueue::setFileInfoGenerator(
+    WdtTransferRequest::FileInfoGenerator gen) {
+  fileInfoGenerator_ = std::move(gen);
+  exploreDirectory_ = false;
+}
+
+std::vector<WdtFileInfo> DirectorySourceQueue::getFileInfo() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   return fileInfo_;
 }
 
@@ -200,7 +207,19 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
   } else {
     WLOG(INFO) << "Using list of file info. Number of files "
                << fileInfo_.size();
-    res = enqueueFiles();
+    res = enqueueFiles(fileInfo_);
+
+    // also check if there is a generator to get more files
+    while (res && fileInfoGenerator_) {
+      auto files = fileInfoGenerator_();
+      if (!files) {
+        break;
+      }
+      res = enqueueFiles(*files);
+
+      std::lock_guard<std::mutex> lock(mutex_);
+      fileInfo_.insert(fileInfo_.end(), files->begin(), files->end());
+    }
   }
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -550,8 +569,8 @@ std::vector<string> &DirectorySourceQueue::getFailedDirectories() {
   return failedDirectories_;
 }
 
-bool DirectorySourceQueue::enqueueFiles() {
-  for (auto &info : fileInfo_) {
+bool DirectorySourceQueue::enqueueFiles(std::vector<WdtFileInfo>& fileInfo) {
+  for (auto &info : fileInfo) {
     if (threadCtx_->getAbortChecker()->shouldAbort()) {
       WLOG(ERROR) << "Directory transfer thread aborted";
       return false;
@@ -664,9 +683,13 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
   std::unique_ptr<ByteSource> source;
   while (true) {
     std::unique_lock<std::mutex> lock(mutex_);
+    numWaiters_++;
+    // notify if someone's waiting for previous batch to finish
+    conditionPrevTransfer_.notify_all();
     while (sourceQueue_.empty() && !initFinished_) {
       conditionNotEmpty_.wait(lock);
     }
+    numWaiters_--;
     if (!failedSourceStats_.empty() || !failedDirectories_.empty()) {
       status = ERROR;
     } else {
@@ -696,6 +719,13 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
     // vector
     lock.lock();
     failedSourceStats_.emplace_back(std::move(source->getTransferStats()));
+  }
+}
+
+void DirectorySourceQueue::waitForPreviousTransfer() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  while (!sourceQueue_.empty() || numWaiters_ < numClientThreads_) {
+    conditionPrevTransfer_.wait(lock);
   }
 }
 }

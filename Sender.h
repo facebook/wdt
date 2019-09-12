@@ -8,11 +8,14 @@
  */
 #pragma once
 
-#include <wdt/WdtBase.h>
-#include <wdt/util/ClientSocket.h>
 #include <chrono>
 #include <iostream>
 #include <memory>
+
+#include <gtest/gtest_prod.h>
+
+#include <wdt/WdtBase.h>
+#include <wdt/util/ClientSocket.h>
 
 namespace facebook {
 namespace wdt {
@@ -102,6 +105,7 @@ class Sender : public WdtBase {
  private:
   friend class SenderThread;
   friend class QueueAbortChecker;
+  FRIEND_TEST(SenderTest, FileInfoGenerator);
 
   /// Validate the transfer request
   ErrorCode validateTransferRequest() override;

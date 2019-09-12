@@ -830,6 +830,7 @@ cpp_library(
     ],
     external_deps = [
         ("openssl", None, "crypto"),
+        ("googletest", None, "gtest_headers"),
         "gflags",
         "glog",
     ],
@@ -983,6 +984,24 @@ cpp_binary(
     ],
     external_deps = [
         ("googletest", None, "gtest"),
+        "gflags",
+        "glog",
+    ],
+)
+
+cpp_unittest(
+    name = "wdt_sender_test",
+    srcs = ["test/SenderTest.cpp"],
+    auto_headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    compiler_flags = WDT_COMPILER_FLAGS,
+    deps = [
+        ":wdtlib",
+        "//folly:file_util",
+        "//folly:random",
+    ],
+    external_deps = [
+        ("googletest", None, "gtest"),
+        ("boost", None, "boost_filesystem"),
         "gflags",
         "glog",
     ],

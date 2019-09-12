@@ -158,11 +158,13 @@ class DirectorySourceQueue : public SourceQueue {
    */
   void setFileInfo(const std::vector<WdtFileInfo> &fileInfo);
 
+  void setFileInfoGenerator(WdtTransferRequest::FileInfoGenerator gen);
+
   /// @param blockSizeMbytes    block size in Mbytes
   void setBlockSizeMbytes(int64_t blockSizeMbytes);
 
   /// Get the file info in this directory queue
-  const std::vector<WdtFileInfo> &getFileInfo() const;
+  std::vector<WdtFileInfo> getFileInfo() const;
 
   /**
    * Sets whether to follow symlink or not
@@ -229,6 +231,15 @@ class DirectorySourceQueue : public SourceQueue {
    */
   bool setRootDir(const std::string &newRootDir);
 
+  /**
+   * Allows the caller to block until all the previous transfers have
+   * finished, before invoking fileInfoGenerator_ to get the next batch.
+   * NOTE: This uses numClientThreads_ to get the number of clients pulling
+   * from the queue and the size of queue to determine if transfers have
+   * finished.
+   */
+  void waitForPreviousTransfer();
+
  private:
   /**
    * Resolves a symlink.
@@ -248,7 +259,7 @@ class DirectorySourceQueue : public SourceQueue {
    * Stat the input files and populate queue
    * @return                true on success, false on error
    */
-  bool enqueueFiles();
+  bool enqueueFiles(std::vector<WdtFileInfo>& fileInfo);
 
   /**
    * initial creation from either explore or enqueue files, uses
@@ -303,11 +314,19 @@ class DirectorySourceQueue : public SourceQueue {
   /// List of files to enqueue instead of recursing over rootDir_.
   std::vector<WdtFileInfo> fileInfo_;
 
-  /// protects initCalled_/initFinished_/sourceQueue_/failedSourceStats_
+  /// A generator function to invoke to get more files to send
+  WdtTransferRequest::FileInfoGenerator fileInfoGenerator_;
+
+  /// protects
+  /// initCalled_/initFinished_/sourceQueue_/failedSourceStats_/numWaiters_
   mutable std::mutex mutex_;
 
   /// condition variable indicating sourceQueue_ is not empty
   mutable std::condition_variable conditionNotEmpty_;
+
+  /// condition variable indicating previous batch transfer has finished i.e.
+  /// queue is empty and all client threads are waiting.
+  mutable std::condition_variable conditionPrevTransfer_;
 
   /// Indicates whether init() has been called to prevent multiple calls
   bool initCalled_{false};
@@ -353,6 +372,11 @@ class DirectorySourceQueue : public SourceQueue {
                       std::vector<std::unique_ptr<ByteSource>>,
                       SourceComparator>
       sourceQueue_;
+
+  /**
+   * number of threads waiting on the queue
+   */
+  int64_t numWaiters_{0};
 
   /// Transfer stats for sources which are not transferred
   std::vector<TransferStats> failedSourceStats_;

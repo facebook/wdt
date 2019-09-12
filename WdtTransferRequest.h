@@ -10,6 +10,8 @@
 #include <wdt/ErrorCodes.h>
 #include <wdt/Protocol.h>
 #include <wdt/WdtOptions.h>
+#include <folly/Optional.h>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -175,6 +177,17 @@ struct WdtTransferRequest {
 
   /// Only used for the sender and when not using directory discovery
   std::vector<WdtFileInfo> fileInfo;
+
+  /// Only used for the sender and when not using directory discovery.
+  /// Sender repeatedly invokes this function to get list of files to
+  /// send and stops when the function return folly::none. File transfer
+  /// is done in batches. After intiating the transfer for a initial list of
+  /// files (either via fileInfo or a call to fileInfoGenerator), we wait
+  /// until transfer is complete before we read the next batch, if any, by
+  /// invoking fileInfoGenerator again.
+  using FileInfoGenerator =
+      std::function<folly::Optional<std::vector<WdtFileInfo>>()>;
+  FileInfoGenerator fileInfoGenerator{};
 
   /// Use fileInfo even if empty (don't use the directory exploring)
   bool disableDirectoryTraversal{false};
