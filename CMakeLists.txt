@@ -70,6 +70,7 @@ endif()
 set (FOLLY_CPP_SRC
 "${FOLLY_SOURCE_DIR}/folly/Conv.cpp"
 "${FOLLY_SOURCE_DIR}/folly/Demangle.cpp"
+"${FOLLY_SOURCE_DIR}/folly/lang/CString.cpp"
 "${FOLLY_SOURCE_DIR}/folly/hash/Checksum.cpp"
 "${FOLLY_SOURCE_DIR}/folly/hash/detail/ChecksumDetail.cpp"
 "${FOLLY_SOURCE_DIR}/folly/hash/detail/Crc32cDetail.cpp"
