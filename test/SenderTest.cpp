@@ -41,59 +41,77 @@ void createFile(const std::string& path, size_t size) {
 
 }  // namespace
 
-TEST(SenderTest, FileInfoGenerator) {
-  auto senderDir = createTmpDir();
-  auto receiverDir = createTmpDir();
+class SenderTests {
+ public:
+  static void runFileInfoGenTest(bool failReceiver) {
+    auto senderDir = createTmpDir();
+    auto receiverDir = createTmpDir();
 
-  // create 10 files
-  std::vector<WdtFileInfo> fileInfo;
-  std::vector<size_t> cumulativeSize;
-  cumulativeSize.push_back(0);
-  const size_t numFiles = 3;
-  const uint32_t maxFileSize = 1000000;
-  for (size_t i = 0; i < numFiles; i++) {
-    auto file = senderDir / std::to_string(i);
-    size_t fileSz = folly::Random::rand32() % maxFileSize;
-    createFile(file.c_str(), fileSz);
-    fileInfo.push_back({std::to_string(i), -1, false});
-    cumulativeSize.push_back(cumulativeSize.back() + fileSz);
-  }
-
-  auto receiver = std::make_unique<Receiver>(0, 3, receiverDir.c_str());
-  auto req = receiver->init();
-  receiver->transferAsync();
-
-  std::unique_ptr<Sender> sender;
-  size_t nextFile = 0;
-  req.disableDirectoryTraversal = true;
-  req.directory = senderDir.c_str();
-  req.fileInfo = std::vector<WdtFileInfo>{fileInfo[nextFile++]};
-  req.fileInfoGenerator = [&]() -> folly::Optional<std::vector<WdtFileInfo>> {
-    auto stats = sender->getGlobalTransferStats();
-    EXPECT_EQ(cumulativeSize[nextFile], stats.getDataBytes());
-    if (nextFile < fileInfo.size()) {
-      return std::vector<WdtFileInfo>{fileInfo[nextFile++]};
+    // create 10 files
+    std::vector<WdtFileInfo> fileInfo;
+    std::vector<size_t> cumulativeSize;
+    cumulativeSize.push_back(0);
+    const size_t numFiles = 3;
+    const uint32_t maxFileSize = 1000000;
+    for (size_t i = 0; i < numFiles; i++) {
+      auto file = senderDir / std::to_string(i);
+      size_t fileSz = folly::Random::rand32() % maxFileSize;
+      createFile(file.c_str(), fileSz);
+      fileInfo.push_back({std::to_string(i), -1, false});
+      cumulativeSize.push_back(cumulativeSize.back() + fileSz);
     }
-    return folly::none;
-  };
-  sender = std::make_unique<Sender>(req);
-  sender->transfer();
-  receiver->finish();
 
-  for (size_t i = 0; i < numFiles; i++) {
-    auto sentPath = senderDir / std::to_string(i);
-    std::string sent;
-    EXPECT_TRUE(folly::readFile(sentPath.c_str(), sent));
+    auto receiver = std::make_unique<Receiver>(0, 3, receiverDir.c_str());
+    auto req = receiver->init();
+    if (!failReceiver) {
+      receiver->transferAsync();
+    } else {
+      // this will call abort
+      receiver.reset();
+    }
 
-    auto recvPath = receiverDir / std::to_string(i);
-    std::string recv;
-    EXPECT_TRUE(folly::readFile(recvPath.c_str(), recv));
+    std::unique_ptr<Sender> sender;
+    size_t nextFile = 0;
+    req.disableDirectoryTraversal = true;
+    req.directory = senderDir.c_str();
+    req.fileInfo = std::vector<WdtFileInfo>{fileInfo[nextFile++]};
+    req.fileInfoGenerator = [&]() -> folly::Optional<std::vector<WdtFileInfo>> {
+      auto stats = sender->getGlobalTransferStats();
+      EXPECT_EQ(cumulativeSize[nextFile], stats.getDataBytes());
+      if (nextFile < fileInfo.size()) {
+        return std::vector<WdtFileInfo>{fileInfo[nextFile++]};
+      }
+      return folly::none;
+    };
+    sender = std::make_unique<Sender>(req);
+    sender->transfer();
 
-    EXPECT_EQ(sent, recv);
+    if (!failReceiver) {
+      receiver->finish();
+      for (size_t i = 0; i < numFiles; i++) {
+        auto sentPath = senderDir / std::to_string(i);
+        std::string sent;
+        EXPECT_TRUE(folly::readFile(sentPath.c_str(), sent));
+
+        auto recvPath = receiverDir / std::to_string(i);
+        std::string recv;
+        EXPECT_TRUE(folly::readFile(recvPath.c_str(), recv));
+
+        EXPECT_EQ(sent, recv);
+      }
+    }
+
+    boost::filesystem::remove_all(senderDir);
+    boost::filesystem::remove_all(receiverDir);
   }
+};
 
-  boost::filesystem::remove_all(senderDir);
-  boost::filesystem::remove_all(receiverDir);
+TEST(SenderTest, FileInfoGenerator) {
+  SenderTests::runFileInfoGenTest(false);
+}
+
+TEST(SenderTest, FileInfoGeneratorReceiverError) {
+  SenderTests::runFileInfoGenTest(true);
 }
 
 }  // namespace wdt

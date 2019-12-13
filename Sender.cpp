@@ -270,6 +270,24 @@ std::unique_ptr<TransferReport> Sender::transfer() {
   return finish();
 }
 
+folly::Optional<std::vector<WdtFileInfo>>
+Sender::getFilesFromFileInfoGenerator() {
+  auto runningThreads = [this]() {
+    return threadsController_->numRunningThreads();
+  };
+  dirQueue_->waitForPreviousTransfer(
+      std::chrono::milliseconds(options_.progress_report_interval_millis),
+      runningThreads);
+
+  const auto status = getTransferStatus();
+  if (status != ONGOING) {
+    WLOG(INFO) << "Terminating transafer since status isn't ONGOING. "
+               << "Status: " << status;
+    return folly::none;
+  }
+  return transferRequest_.fileInfoGenerator();
+}
+
 ErrorCode Sender::start() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -297,10 +315,8 @@ ErrorCode Sender::start() {
       transferRequest_.disableDirectoryTraversal) {
     dirQueue_->setFileInfo(transferRequest_.fileInfo);
     if (transferRequest_.fileInfoGenerator) {
-      dirQueue_->setFileInfoGenerator([this]() {
-        dirQueue_->waitForPreviousTransfer();
-        return transferRequest_.fileInfoGenerator();
-      });
+      dirQueue_->setFileInfoGenerator(
+          [this]() { return getFilesFromFileInfoGenerator(); });
     }
   }
   transferHistoryController_ =

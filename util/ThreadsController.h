@@ -328,6 +328,9 @@ class ThreadsController {
   /// Get the nunber of registered threads
   int getTotalThreads();
 
+  /// Get the number of threads with status RUNNING
+  int numRunningThreads();
+
   /// Reset the thread controller so that same instance can be used again
   void reset();
 

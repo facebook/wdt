@@ -267,5 +267,16 @@ void ThreadsController::setNumFunnels(int numFunnels) {
     funnelExecutors_.push_back(make_shared<Funnel>());
   }
 }
+
+int ThreadsController::numRunningThreads() {
+  GuardLock lock(controllerMutex_);
+  int ret = 0;
+  for (auto& p : threadStateMap_) {
+    if (p.second == RUNNING) {
+      ret++;
+    }
+  }
+  return ret;
+}
 }
 }

@@ -234,11 +234,16 @@ class DirectorySourceQueue : public SourceQueue {
   /**
    * Allows the caller to block until all the previous transfers have
    * finished, before invoking fileInfoGenerator_ to get the next batch.
-   * NOTE: This uses numClientThreads_ to get the number of clients pulling
+   * NOTE: This uses numActiveThreadsFn() to get the number of clients pulling
    * from the queue and the size of queue to determine if transfers have
    * finished.
+   *
+   * @param progressReportInterval      report progress every
+   *                                    progressReportInterval milliseconds.
+   * @param numActiveThreadsFn          Func to get number of active threads
    */
-  void waitForPreviousTransfer();
+  void waitForPreviousTransfer(std::chrono::milliseconds progressReportInterval,
+                               std::function<int64_t()> numActiveThreadsFn);
 
  private:
   /**

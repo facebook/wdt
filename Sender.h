@@ -105,7 +105,7 @@ class Sender : public WdtBase {
  private:
   friend class SenderThread;
   friend class QueueAbortChecker;
-  FRIEND_TEST(SenderTest, FileInfoGenerator);
+  friend class SenderTests;
 
   /// Validate the transfer request
   ErrorCode validateTransferRequest() override;
@@ -166,6 +166,12 @@ class Sender : public WdtBase {
   void reportProgress();
 
   void logPerfStats() const override;
+
+  /// Get the files from fileInfoGenerator if it's configured in transferRequest
+  /// Note: This call may block on DirectorySourceQueue::waitForPreviousTransfer
+  ///
+  /// @return     list of files or folly::none indicating no more files
+  folly::Optional<std::vector<WdtFileInfo>> getFilesFromFileInfoGenerator();
 
   /// Pointer to DirectorySourceQueue which reads the srcDir and the files
   std::unique_ptr<DirectorySourceQueue> dirQueue_;

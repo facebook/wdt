@@ -722,10 +722,32 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
   }
 }
 
-void DirectorySourceQueue::waitForPreviousTransfer() {
+void DirectorySourceQueue::waitForPreviousTransfer(
+    std::chrono::milliseconds progressReportInterval,
+    std::function<int64_t()> numActiveThreadsFn) {
+
+  // don't call into numActiveThreadsFn with lock held
+  int64_t numActiveThreads = numActiveThreadsFn();
+
   std::unique_lock<std::mutex> lock(mutex_);
-  while (!sourceQueue_.empty() || numWaiters_ < numClientThreads_) {
-    conditionPrevTransfer_.wait(lock);
+  while (!sourceQueue_.empty() || numWaiters_ < numActiveThreads) {
+    WLOG(INFO) << "Waiting for previous transfer."
+               << "; Queue Size: " << sourceQueue_.size()
+               << "; Active threads: " << numActiveThreads
+               << "; Num Waiters: " << numWaiters_;
+    conditionPrevTransfer_.wait_for(lock, progressReportInterval);
+
+    // Release lock while calling into abort checker or numActiveThreadsFn
+    lock.unlock();
+
+    if (threadCtx_->getAbortChecker()->shouldAbort()) {
+      WLOG(INFO) << "Aborting directory thread...";
+      break;
+    }
+    numActiveThreads = numActiveThreadsFn();
+
+    // re-acquire lock
+    lock.lock();
   }
 }
 }
