@@ -163,14 +163,29 @@ bool FileWriter::syncFileRange(int64_t written, bool forced) {
                                       PerfStatReport::SYNC_FILE_RANGE);
       status = sync_file_range(fd_, nextSyncOffset_, writtenSinceLastSync_,
                                SYNC_FILE_RANGE_WRITE);
-      // NOTE: it may be beneficial to have the option to do fadvise after each
-      // sync_file_range() call here.
     }
     if (status != 0) {
       WPLOG(ERROR) << "sync_file_range() failed for " << blockDetails_->fileName
                    << "fd " << fd_;
       return false;
     }
+#ifdef HAS_POSIX_FADVISE
+    int ret;
+    if (!options.skip_fadvise) {
+      {
+        PerfStatCollector statCollector(threadCtx_, PerfStatReport::FADVISE);
+        ret = posix_fadvise(fd_, nextSyncOffset_, writtenSinceLastSync_,
+                            POSIX_FADV_DONTNEED);
+      }
+      if (ret != 0) {
+        WPLOG(ERROR) << "posix_fadvise failed for "
+                     << blockDetails_->fileName
+                     << " " << nextSyncOffset_ << " "
+                     << writtenSinceLastSync_;
+        return FILE_WRITE_ERROR;
+      }
+    }
+#endif
     WVLOG(1) << "file range [" << nextSyncOffset_ << " "
              << writtenSinceLastSync_ << "] synced for file "
              << blockDetails_->fileName;
