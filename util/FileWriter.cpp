@@ -182,7 +182,7 @@ bool FileWriter::syncFileRange(int64_t written, bool forced) {
                      << blockDetails_->fileName
                      << " " << nextSyncOffset_ << " "
                      << writtenSinceLastSync_;
-        return FILE_WRITE_ERROR;
+        return false;
       }
     }
 #endif
