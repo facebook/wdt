@@ -86,7 +86,8 @@ WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
   X(ALREADY_EXISTS)             /** Create attempt for existing id */          \
   X(GLOBAL_CHECKPOINT_ABORT)    /** Abort due to global checkpoint */          \
   X(INVALID_REQUEST) /** Request for creation of wdt object invalid */         \
-  X(SENDER_START_TIMED_OUT) /** Sender start timed out */
+  X(SENDER_START_TIMED_OUT) /** Sender start timed out */                      \
+  X(AUTH_ERROR)             /** Authentication Error */                        \
 
 enum ErrorCode {
 #define X(A) A,
