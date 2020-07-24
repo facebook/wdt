@@ -204,7 +204,7 @@ Creates file and directories necessary for said file (mkdir -p like)
 
 * ReceiverThread.{h|cpp}
 
-Implements the funcionality of the receiver threads, responsible for listening on
+Implements the functionality of the receiver threads, responsible for listening on
 a port and receiving files over the network.
 
 * Receiver.{h|cpp}
