@@ -400,6 +400,11 @@ class WdtOptions {
   int iv_change_interval_mb{32 * 1024};
 
   /**
+   * Set O_CLOEXEC flag when open files.
+   */
+  bool close_on_exec{false};
+
+  /**
    * @return    whether files should be pre-allocated or not
    */
   bool shouldPreallocateFiles() const;
@@ -441,5 +446,5 @@ class WdtOptions {
  private:
   WdtOptions& operator=(const WdtOptions&) = default;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook
