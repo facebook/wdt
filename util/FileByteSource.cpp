@@ -25,6 +25,11 @@ int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
     openFlags |= O_DIRECT;
 #endif
   }
+  if (threadCtx.getOptions().close_on_exec) {
+#ifdef O_CLOEXEC
+    openFlags |= O_CLOEXEC;
+#endif
+  }
   int fd;
   {
     PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
@@ -193,5 +198,5 @@ void FileByteSource::close() {
   fd_ = -1;
   threadCtx_ = nullptr;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

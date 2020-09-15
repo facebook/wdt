@@ -184,6 +184,11 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
   const string path = getFullPath(relPathStr);
 
   int openFlags = O_WRONLY;
+  if (threadCtx.getOptions().close_on_exec) {
+#ifdef O_CLOEXEC
+    openFlags |= O_CLOEXEC;
+#endif
+  }
   int res;
   {
     PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
@@ -239,6 +244,11 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
     }
   }
   int openFlags = O_CREAT | O_WRONLY;
+  if (threadCtx.getOptions().close_on_exec) {
+#ifdef O_CLOEXEC
+    openFlags |= O_CLOEXEC;
+#endif
+  }
   // When doing download resumption we sometime open files that do already
   // exist and we need to overwrite them anyway (files which have been
   // discarded from the log for some reason)
@@ -339,5 +349,5 @@ void FileCreator::addTrailingSlash(string &path) {
     WVLOG(1) << "Added missing trailing / to " << path;
   }
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook
