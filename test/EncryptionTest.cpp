@@ -3,6 +3,8 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include <algorithm> // for std::find
+
 namespace facebook {
 namespace wdt {
 
