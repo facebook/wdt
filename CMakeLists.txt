@@ -247,46 +247,47 @@ install(PROGRAMS test/wcp.sh DESTINATION bin RENAME wcp)
 if (BUILD_TESTING)
 
   enable_testing()
+  include(ExternalProject)
+
+  # GTest
+  #  from https://github.com/google/googletest/tree/master/googletest
+  configure_file(CMakeLists.txt.in googletest-download/CMakeLists.txt)
+  execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download )
+  if(result)
+    message(FATAL_ERROR "CMake step for googletest failed: ${result}")
+  endif()
+  execute_process(COMMAND ${CMAKE_COMMAND} --build .
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download )
+  if(result)
+    message(FATAL_ERROR "Build step for googletest failed: ${result}")
+  endif()
+
+  # Prevent overriding the parent project's compiler/linker
+  # settings on Windows
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+  # Add googletest directly to our build. This defines
+  # the gtest and gtest_main targets.
+  add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
+                   ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
+                   EXCLUDE_FROM_ALL)
+
+  # The gtest/gtest_main targets carry header search path
+  # dependencies automatically when using CMake 2.8.11 or
+  # later. Otherwise we have to add them here ourselves.
+  if (CMAKE_VERSION VERSION_LESS 2.8.11)
+    include_directories("${gtest_SOURCE_DIR}/include")
+  endif()
 
   # Extra code that we use in tests
   add_library(wdt4tests_min
     test/TestCommon.cpp
   )
-
-  include(ExternalProject)
-
-  # GTest
-  set(GTEST_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/gtest")
-  externalproject_add(
-    gtest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    INSTALL_COMMAND "" # Disable install step
-    UPDATE_COMMAND "" # Doesn't change often
-    PREFIX "${GTEST_PREFIX}"
-    #CONFIGURE_COMMAND "" # skip
-    #BUILD_COMMAND "" # skip
-    LOG_DOWNLOAD ON
-    LOG_CONFIGURE ON
-    LOG_BUILD ON
-  )
-  # Specify include dir for gtest
-  externalproject_get_property(gtest SOURCE_DIR)
-  include_directories("${SOURCE_DIR}/googletest/include")
-
-  externalproject_get_property(gtest BINARY_DIR)
-
-  #  add_library(gmock_all STATIC EXCLUDE_FROM_ALL
-  #   ${GMOCK_PREFIX}/src/gmock/gtest/src/gtest-all.cc
-  #   ${GMOCK_PREFIX}/src/gmock/gmock-all.cc
-  #   ${GMOCK_PREFIX}/src/gmock/gmock_main.cc)
-
-  add_dependencies(wdt4tests_min gtest)
-
-  # ${BINARY_DIR}/libgtest.a works everywhere except xcode...
-# so ugly weird hack generating warnings about unknown dir for now:
   target_link_libraries(wdt4tests_min
-    #"-L ${BINARY_DIR}/googlemock/gtest -L ${BINARY_DIR}/Debug -lgtest"
-    "-L ${BINARY_DIR}/googlemock/gtest -lgtest"
+    gtest
     wdt_min
   )
 
@@ -311,9 +312,8 @@ if (BUILD_TESTING)
   add_library(wdtbenchtestslib
     bench/WdtGenTestUtils.cpp
   )
-  add_dependencies(wdtbenchtestslib gtest)
   target_link_libraries(wdtbenchtestslib
-    "-L ${BINARY_DIR}/googlemock/gtest -lgtest"
+    gtest
     wdtbenchlib
     ${CMAKE_THREAD_LIBS_INIT} # Must be last to avoid link errors
   )
