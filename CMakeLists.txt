@@ -196,7 +196,6 @@ check_function_exists(posix_fadvise HAS_POSIX_FADVISE)
 # C based check (which fail with the c++ setting thereafter...)
 check_function_exists(clock_gettime FOLLY_HAVE_CLOCK_GETTIME)
 # was: check_library_exists(rt clock_gettime "" FOLLY_HAVE_CLOCK_GETTIME)
-check_function_exists(memrchr FOLLY_HAVE_MEMRCHR)
 set(SAVE_CMRL ${CMAKE_REQUIRED_LIBRARIES}) #globals are evil/ugly
 set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 check_function_exists(pthread_atfork FOLLY_HAVE_PTHREAD_ATFORK)
