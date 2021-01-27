@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 
 # the test is similar to wdt_dl_resume_test1.py
 # we initiate a transfer and cancel it 2/3+ in flight

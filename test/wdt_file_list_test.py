@@ -1,5 +1,6 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 
+import os
 from common_utils import *
 
 
@@ -22,7 +23,7 @@ root_dir = create_test_directory("/tmp")
 src_dir = generate_random_files(256 * 1024)
 
 # generate file list
-file_list_in = open(os.path.join(root_dir, "file_list"), 'wb')
+file_list_in = open(os.path.join(root_dir, "file_list"), 'w')
 for root, dirs, files in os.walk(src_dir):
     for file in files:
         if file == "file0":

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 
 # the test ensures that when the receiver is with enable_download_resumption
 # this will also impose it on the sender as well as set of files is kept

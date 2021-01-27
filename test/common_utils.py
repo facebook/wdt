@@ -74,7 +74,8 @@ def run_command(cmd):
     p = subprocess.Popen(cmd,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
-                         shell=True)
+                         shell=True,
+                         universal_newlines=True)
     return p.communicate()
 
 # note globals in python can be read without being declared global (!!)
@@ -99,7 +100,7 @@ def get_gen_files():
 def get_wdt_version():
     bin = get_wdt_binary()
     dummy_cmd = bin + " --version"
-    dummy_process = subprocess.Popen(dummy_cmd.split(), stdout=subprocess.PIPE)
+    dummy_process = subprocess.Popen(dummy_cmd.split(), stdout=subprocess.PIPE, universal_newlines=True)
     protocol_string = dummy_process.stdout.readline().strip()
     print("Wdt " + bin + " version is " + protocol_string)
     return protocol_string.split()[4]
@@ -132,7 +133,8 @@ def start_receiver(extra_args):
     receiver_process = subprocess.Popen(
         receiver_cmd.split(),
         stdout=subprocess.PIPE,
-        stderr=open(server_log, 'w')
+        stderr=open(server_log, 'w'),
+        universal_newlines=True,
     )
     connection_url = receiver_process.stdout.readline().strip()
     if not connection_url:
@@ -307,9 +309,9 @@ def create_md5_for_directory(src_dir, md5_file_name):
             md5 = get_md5_for_file(full_path)
             lines.append("{0} {1}".format(md5, file))
     lines.sort()
-    md5_in = open(md5_file_name, 'wb')
-    for line in lines:
-        md5_in.write(line + "\n")
+    with open(md5_file_name, 'w') as md5_in:
+        for line in lines:
+            md5_in.write(line + "\n")
 
 
 def verify_transfer_success():

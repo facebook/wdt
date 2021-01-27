@@ -1,7 +1,8 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 
 from common_utils import *
 import re
+import subprocess
 
 # TODO: refactor more using common_utils
 
@@ -12,7 +13,8 @@ def testNegotiation(higher):
     print(receiver_cmd)
     receiver_process = subprocess.Popen(
         receiver_cmd.split(),
-        stdout=subprocess.PIPE
+        stdout=subprocess.PIPE,
+        universal_newlines=True
     )
 
     connection_url = receiver_process.stdout.readline().strip()

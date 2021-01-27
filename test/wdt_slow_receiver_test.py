@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 
 # In this test, the receiver is extremely slow. Sender should detect that and
 # wait for the receiver to finish. Read timeout for sender is small to trigger

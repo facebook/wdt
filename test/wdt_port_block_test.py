@@ -1,6 +1,8 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 
 import re
+import subprocess
+import time
 from threading import Thread
 from common_utils import *
 
@@ -14,7 +16,7 @@ def wait_for_receiver_finish(receiver_process):
     global receiver_end_time
     global receiver_status
     receiver_status = receiver_process.wait()
-    receiver_end_time = time.clock()
+    receiver_end_time = time.perf_counter()
 
 
 def test(resumption):
@@ -32,7 +34,8 @@ def test(resumption):
     print(receiver_cmd)
     receiver_process = subprocess.Popen(
         receiver_cmd.split(),
-        stdout=subprocess.PIPE
+        stdout=subprocess.PIPE,
+        universal_newlines=True
     )
 
     connection_url = receiver_process.stdout.readline().strip()
@@ -73,7 +76,7 @@ def test(resumption):
     print(sender_cmd)
     status = os.system(sender_cmd)
     status >>= 8
-    sender_end_time = time.clock()
+    sender_end_time = time.perf_counter()
 
     # wait for receiver finish
     thread.join()

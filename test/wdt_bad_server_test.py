@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 
 # In this test, a dummy python server is created which reads everything send to
 # it, but does not write anything back. When a WDT sender connects to it, it
