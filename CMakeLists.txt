@@ -119,6 +119,8 @@ Wdt.cpp
 )
 add_library(wdt ${WDT_FLAGS_RELATED_SRC})
 
+set_property(TARGET wdt PROPERTY VERSION ${PROJECT_VERSION})
+set_property(TARGET wdt_min PROPERTY VERSION ${PROJECT_VERSION})
 target_link_libraries(wdt wdt_min)
 
 
