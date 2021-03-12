@@ -16,7 +16,6 @@ namespace facebook {
 namespace wdt {
 
 using std::string;
-using facebook::wdt::encodeString;
 
 void testHeader() {
   BlockDetails bd;

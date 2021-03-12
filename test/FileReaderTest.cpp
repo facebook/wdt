@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <stdlib.h>
 #include <wdt/Wdt.h>
 #include <wdt/test/TestCommon.h>
 #include <fstream>

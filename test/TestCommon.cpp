@@ -9,7 +9,6 @@
 
 #include <wdt/test/TestCommon.h>
 
-#include <stdlib.h>
 
 #include <mutex>
 #include <random>
