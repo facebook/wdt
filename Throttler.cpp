@@ -74,7 +74,7 @@ void Throttler::setThrottlerRates(double& avgRatePerSec,
   // configureOptions will change the rates in case they don't make
   // sense
   configureOptions(avgRatePerSec, bucketRatePerSec, tokenBucketLimit);
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
 
   resetState();
 
@@ -144,7 +144,7 @@ void Throttler::sleep(double sleepTimeSecs) const {
 
 double Throttler::calculateSleep(double deltaProgress,
                                  const Clock::time_point& now) {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   if (refCount_ <= 0) {
     WLOG(ERROR) << "Using the throttler without registering the transfer";
     return -1;
@@ -186,7 +186,7 @@ void Throttler::printPeriodicLogs(const Clock::time_point& now,
    * made periodically.
    */
   std::chrono::duration<double> elapsedLogDuration;
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   instantProgress_ += deltaProgress;
   elapsedLogDuration = now - lastLogTime_;
   double elapsedLogSeconds = elapsedLogDuration.count();
@@ -227,7 +227,7 @@ double Throttler::averageThrottler(const Clock::time_point& now) {
 }
 
 void Throttler::startTransfer() {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   if (refCount_ == 0) {
     resetState();
   }
@@ -244,38 +244,38 @@ void Throttler::resetState() {
 }
 
 void Throttler::endTransfer() {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   WDT_CHECK(refCount_ > 0);
   refCount_--;
 }
 
 double Throttler::getProgress() {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   return progress_;
 }
 
 double Throttler::getAvgRatePerSec() {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   return avgRatePerSec_;
 }
 
 double Throttler::getPeakRatePerSec() {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   return bucketRatePerSec_;
 }
 
 double Throttler::getBucketLimit() {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   return tokenBucketLimit_;
 }
 
 int64_t Throttler::getThrottlerLogTimeMillis() {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   return throttlerLogTimeMillis_;
 }
 
 void Throttler::setThrottlerLogTimeMillis(int64_t throttlerLogTimeMillis) {
-  std::unique_lock lock(throttlerMutex_);
+  std::unique_lock<folly::SpinLock> lock(throttlerMutex_);
   throttlerLogTimeMillis_ = throttlerLogTimeMillis;
 }
 

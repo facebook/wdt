@@ -78,7 +78,7 @@ class FileCreator {
 
   /// clears allocation status map, called after end of each session
   void clearAllocationMap() {
-    std::unique_lock guard(lock_);
+    std::unique_lock<folly::SpinLock> guard(lock_);
     fileStatusMap_.clear();
   }
 

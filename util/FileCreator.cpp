@@ -95,7 +95,7 @@ int FileCreator::openForFirstBlock(ThreadCtx &threadCtx,
                                    BlockDetails const *blockDetails) {
   int fd = openAndSetSize(threadCtx, blockDetails);
   {
-    std::unique_lock guard(lock_);
+    std::unique_lock<folly::SpinLock> guard(lock_);
     auto it = fileStatusMap_.find(blockDetails->seqId);
     WDT_CHECK(it != fileStatusMap_.end());
     it->second = fd >= 0 ? ALLOCATED : FAILED;
@@ -110,7 +110,7 @@ bool FileCreator::waitForAllocationFinish(int allocatingThreadIndex,
   std::unique_lock<std::mutex> waitLock(allocationMutex_);
   while (true) {
     {
-      std::unique_lock guard(lock_);
+      std::unique_lock<folly::SpinLock> guard(lock_);
       auto it = fileStatusMap_.find(seqId);
       WDT_CHECK(it != fileStatusMap_.end());
       if (it->second == ALLOCATED) {
