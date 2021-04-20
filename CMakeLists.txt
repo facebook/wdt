@@ -24,11 +24,8 @@ cmake_minimum_required(VERSION 3.2)
 # Minor currently is also the protocol version - has to match with Protocol.cpp
 project("WDT" LANGUAGES C CXX VERSION 1.32.1910230)
 
-# On MacOS this requires the latest (master) CMake (and/or CMake 3.1.1/3.2)
-# WDT itself works fine with C++11 (gcc 4.8 for instance) but more recent folly
-# started to require C++14, so you can either get an older snapshot of folly
-# and set "11" below or use this:
-set(CMAKE_CXX_STANDARD 14)
+# WDT uses C++17 features per fdbc5432230290f86ff8ad89ab52d5b7fef232b4
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 
 # somehow 'option' for this doesn't seeem to work/I don't know how to make it
