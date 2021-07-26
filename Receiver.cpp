@@ -82,7 +82,7 @@ void Receiver::startNewGlobalSession(const std::string &peerIp) {
     // when the current session ends
     throttler_->startTransfer();
   }
-  startTime_ = Clock::now();
+  startTime_.store(Clock::now());
   if (options_.enable_download_resumption) {
     transferLogManager_->startThread();
     bool verifySuccessful = transferLogManager_->verifySenderIp(peerIp);
@@ -325,7 +325,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   auto totalSenderBytes = summary.getTotalSenderBytes();
   if (progressReporter_ && totalSenderBytes >= 0) {
     report->setTotalFileSize(totalSenderBytes);
-    report->setTotalTime(durationSeconds(Clock::now() - startTime_));
+    report->setTotalTime(durationSeconds(Clock::now() - startTime_.load()));
     progressReporter_->end(report);
   }
   logPerfStats();
@@ -407,7 +407,7 @@ void Receiver::progressTracker() {
         break;
       }
     }
-    double totalTime = durationSeconds(Clock::now() - startTime_);
+    double totalTime = durationSeconds(Clock::now() - startTime_.load());
     TransferStats globalStats;
     for (const auto &receiverThread : receiverThreads_) {
       globalStats += receiverThread->getTransferStats();

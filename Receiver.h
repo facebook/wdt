@@ -203,7 +203,7 @@ class Receiver : public WdtBase {
   std::vector<Checkpoint> checkpoints_;
 
   /// Start time of the session
-  std::chrono::time_point<Clock> startTime_;
+  std::atomic<std::chrono::time_point<Clock>> startTime_;
 
   /// already transferred file chunks
   std::vector<FileChunksInfo> fileChunksInfo_;
