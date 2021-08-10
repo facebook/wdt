@@ -10,7 +10,6 @@
 
 #include <fcntl.h>
 #include <folly/Conv.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 

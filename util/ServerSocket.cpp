@@ -14,7 +14,6 @@
 #include <algorithm>
 namespace facebook {
 namespace wdt {
-using std::string;
 
 ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
                            const EncryptionParams &encryptionParams,
