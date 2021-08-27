@@ -11,8 +11,6 @@
 #include <iostream>
 #include <memory>
 
-#include <gtest/gtest_prod.h>
-
 #include <wdt/WdtBase.h>
 #include <wdt/util/ClientSocket.h>
 
