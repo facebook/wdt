@@ -10,7 +10,6 @@
 
 #cmakedefine FOLLY_HAVE_CLOCK_GETTIME 1
 #cmakedefine FOLLY_HAVE_PTHREAD_ATFORK 1
-#cmakedefine FOLLY_USE_LIBCPP 1
 #cmakedefine FOLLY_HAVE_WEAK_SYMBOLS 1
 
 #define FOLLY_HAVE_PTHREAD 1
