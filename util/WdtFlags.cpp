@@ -12,7 +12,7 @@
 #include <glog/logging.h>
 #include <iostream>
 
-#include "WdtFlags.cpp.inc"
+#include "wdt/util/WdtFlags.cpp.inc"
 
 WDT_FLAG_DEFINITION(
     string, WDT_FLAG_SYM(option_type),

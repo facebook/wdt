@@ -8,7 +8,7 @@
 // #include <folly/Benchmark.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include "Bigram.h"
+#include "wdt/bench/Bigram.h"
 
 using std::string;
 

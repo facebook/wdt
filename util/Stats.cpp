@@ -12,7 +12,7 @@
 *      Author: ldemailly
 */
 
-#include "Stats.h"
+#include "wdt/util/Stats.h"
 
 #include <math.h>
 

@@ -14,7 +14,7 @@
 
 #include <common/encode/Coding.h>  // this won't work outside of fb
 #include <folly/Benchmark.h>
-#include "TestCommon.h"
+#include "wdt/test/TestCommon.h"
 
 using namespace facebook::wdt;
 

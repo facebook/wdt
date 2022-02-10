@@ -16,7 +16,7 @@
 #include <glog/logging.h>
 
 #include <wdt/WdtConfig.h>
-#include "Bigram.h"
+#include "wdt/bench/Bigram.h"
 
 DEFINE_bool(binary, false, "Binary format output");
 DEFINE_bool(wrap, false, "Consider last byte to wrap back to first");

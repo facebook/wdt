@@ -12,7 +12,7 @@
 */
 #include <wdt/util/SerializationUtil.h>
 
-#include "TestCommon.h"
+#include "wdt/test/TestCommon.h"
 
 using std::string;
 

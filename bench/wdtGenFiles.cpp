@@ -22,7 +22,7 @@
 #include <glog/logging.h>
 
 #include <wdt/WdtConfig.h>
-#include "Bigram.h"
+#include "wdt/bench/Bigram.h"
 
 /* Future "interface"/"features":
 
