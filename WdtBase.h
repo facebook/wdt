@@ -140,12 +140,13 @@ class WdtBase {
   };
 
  protected:
-  enum TransferStatus {
+  enum class TransferStatus {
     NOT_STARTED,     // threads not started
     ONGOING,         // transfer is ongoing
     FINISHED,        // last running thread finished
     THREADS_JOINED,  // threads joined
   };
+  friend std::ostream& operator<<(std::ostream& os, const WdtBase::TransferStatus& status);
 
   /// Validate the transfer request
   virtual ErrorCode validateTransferRequest();
@@ -178,7 +179,7 @@ class WdtBase {
   AbortChecker abortCheckerCallback_;
 
   /// current transfer status
-  TransferStatus transferStatus_{NOT_STARTED};
+  TransferStatus transferStatus_{TransferStatus::NOT_STARTED};
 
   /// Mutex which is shared between the parent thread, transferring threads and
   /// progress reporter thread
@@ -207,5 +208,26 @@ class WdtBase {
   /// Additional external source of check for abort requested
   std::shared_ptr<IAbortChecker> abortChecker_{nullptr};
 };
+
+inline std::ostream& operator<<(std::ostream& os, const WdtBase::TransferStatus& status)
+{
+  switch (status)
+  {
+    case WdtBase::TransferStatus::NOT_STARTED:
+    os << "NOT_STARTED";
+    break;
+    case WdtBase::TransferStatus::ONGOING:
+    os << "ONGOING";
+    break;
+    case WdtBase::TransferStatus::FINISHED:
+    os << "FINISHED";
+    break;
+    case WdtBase::TransferStatus::THREADS_JOINED:
+    os << "THREADS_JOINED";
+    break;
+  }
+  return os;
+}
+
 }
 }  // namespace facebook::wdt

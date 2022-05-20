@@ -27,7 +27,7 @@ void Sender::endCurTransfer() {
   WLOG(INFO) << "Last thread finished "
              << durationSeconds(endTime_ - startTime_) << " for transfer id "
              << getTransferId();
-  setTransferStatus(FINISHED);
+  setTransferStatus(TransferStatus::FINISHED);
   if (throttler_) {
     throttler_->endTransfer();
   }
@@ -84,7 +84,7 @@ const WdtTransferRequest &Sender::init() {
 
 Sender::~Sender() {
   TransferStatus status = getTransferStatus();
-  if (status == ONGOING) {
+  if (status == TransferStatus::ONGOING) {
     WLOG(WARNING) << "Sender being deleted. Forcefully aborting the transfer";
     abort(ABORTED_BY_APPLICATION);
   }
@@ -149,7 +149,7 @@ std::unique_ptr<TransferReport> Sender::getTransferReport() {
                                        fileDiscoveryFinished);
   TransferStatus status = getTransferStatus();
   ErrorCode errCode = transferReport->getSummary().getErrorCode();
-  if (status == NOT_STARTED && errCode == OK) {
+  if (status == TransferStatus::NOT_STARTED && errCode == OK) {
     WLOG(INFO) << "Transfer not started, setting the error code to ERROR";
     transferReport->setErrorCode(ERROR);
   }
@@ -172,12 +172,12 @@ std::unique_ptr<TransferReport> Sender::finish() {
   std::unique_lock<std::mutex> instanceLock(instanceManagementMutex_);
   WVLOG(1) << "Sender::finish()";
   TransferStatus status = getTransferStatus();
-  if (status == NOT_STARTED) {
+  if (status == TransferStatus::NOT_STARTED) {
     WLOG(WARNING) << "Even though transfer has not started, finish is called";
     // getTransferReport will set the error code to ERROR
     return getTransferReport();
   }
-  if (status == THREADS_JOINED) {
+  if (status == TransferStatus::THREADS_JOINED) {
     WVLOG(1) << "Threads have already been joined. Returning the"
              << " existing transfer report";
     return getTransferReport();
@@ -192,7 +192,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
     dirThread_.join();
   }
   WDT_CHECK(numActiveThreads_ == 0);
-  setTransferStatus(THREADS_JOINED);
+  setTransferStatus(TransferStatus::THREADS_JOINED);
   if (progressReportEnabled) {
     progressReporterThread_.join();
   }
@@ -279,7 +279,7 @@ Sender::getFilesFromFileInfoGenerator() {
       runningThreads);
 
   const auto status = getTransferStatus();
-  if (status != ONGOING) {
+  if (status != TransferStatus::ONGOING) {
     WLOG(INFO) << "Terminating transafer since status isn't ONGOING. "
                << "Status: " << status;
     return folly::none;
@@ -290,11 +290,11 @@ Sender::getFilesFromFileInfoGenerator() {
 ErrorCode Sender::start() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (transferStatus_ != NOT_STARTED) {
+    if (transferStatus_ != TransferStatus::NOT_STARTED) {
       WLOG(ERROR) << "duplicate start() call detected " << transferStatus_;
       return ALREADY_EXISTS;
     }
-    transferStatus_ = ONGOING;
+    transferStatus_ = TransferStatus::ONGOING;
   }
 
   // set up directory queue
@@ -437,7 +437,7 @@ void Sender::reportProgress() {
     {
       std::unique_lock<std::mutex> lock(mutex_);
       conditionFinished_.wait_for(lock, waitingTime);
-      if (transferStatus_ == THREADS_JOINED) {
+      if (transferStatus_ == TransferStatus::THREADS_JOINED) {
         break;
       }
     }

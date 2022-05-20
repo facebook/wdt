@@ -159,19 +159,19 @@ ErrorCode WdtBase::validateTransferRequest() {
 void WdtBase::setTransferStatus(TransferStatus transferStatus) {
   std::lock_guard<std::mutex> lock(mutex_);
   transferStatus_ = transferStatus;
-  if (transferStatus_ == THREADS_JOINED) {
+  if (transferStatus_ == TransferStatus::THREADS_JOINED) {
     conditionFinished_.notify_one();
   }
 }
 
 bool WdtBase::isStale() {
   TransferStatus status = getTransferStatus();
-  return (status == FINISHED || status == THREADS_JOINED);
+  return (status == TransferStatus::FINISHED || status == TransferStatus::THREADS_JOINED);
 }
 
 bool WdtBase::hasStarted() {
   TransferStatus status = getTransferStatus();
-  return (status != NOT_STARTED);
+  return (status != TransferStatus::NOT_STARTED);
 }
 
 void WdtBase::configureThrottler() {

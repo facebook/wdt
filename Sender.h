@@ -128,7 +128,7 @@ class Sender : public WdtBase {
     }
 
     bool shouldAbort() const override {
-      return (sender_->getTransferStatus() == FINISHED);
+      return (sender_->getTransferStatus() == TransferStatus::FINISHED);
     }
 
    private:
