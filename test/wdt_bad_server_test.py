@@ -51,7 +51,7 @@ read_timeout = 500
 # start a wdt sender
 sender_status = run_sender(
     "-read_timeout_millis={0}".format(read_timeout),
-    "wdt://[::1]:{0}?num_ports=1".format(port)
+    "wdt://[::1]:{0}?num_ports=1".format(port),
 )
 stop = True
 server_thread.join()

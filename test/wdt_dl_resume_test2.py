@@ -31,7 +31,9 @@ start_test("receiver -enable_download_resumption imposes it on sender")
 # first we measure how long it takes for a full transfer
 test_count = get_test_count()
 start_time = time.time()
-start_receiver("-num_ports=1 -avg_mbytes_per_sec=10 -enable_download_resumption -delete_extra_files=true")
+start_receiver(
+    "-num_ports=1 -avg_mbytes_per_sec=10 -enable_download_resumption -delete_extra_files=true"
+)
 run_sender("-avg_mbytes_per_sec=10 -block_size_mbytes=1")
 check_transfer_status()
 dur1 = time.time() - start_time
@@ -39,7 +41,9 @@ dur1 = time.time() - start_time
 # the transfer takes a small portion of the previous cycle runtime
 delete_one_dst_file()
 start_time = time.time()
-start_receiver("-num_ports=1 -avg_mbytes_per_sec=10 -enable_download_resumption -delete_extra_files=true")
+start_receiver(
+    "-num_ports=1 -avg_mbytes_per_sec=10 -enable_download_resumption -delete_extra_files=true"
+)
 run_sender("-avg_mbytes_per_sec=10 -block_size_mbytes=1")
 check_transfer_status()
 dur2 = time.time() - start_time
@@ -50,7 +54,9 @@ if dur1 < 12 * dur2:
 # the transfer takes less than 8% of the prev cycle
 rename_one_src_file()
 start_time = time.time()
-start_receiver("-num_ports=1 -avg_mbytes_per_sec=10 -enable_download_resumption -delete_extra_files=true")
+start_receiver(
+    "-num_ports=1 -avg_mbytes_per_sec=10 -enable_download_resumption -delete_extra_files=true"
+)
 run_sender("-avg_mbytes_per_sec=10 -block_size_mbytes=1")
 check_transfer_status()
 dur3 = time.time() - start_time

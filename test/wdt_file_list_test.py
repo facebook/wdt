@@ -23,7 +23,7 @@ root_dir = create_test_directory("/tmp")
 src_dir = generate_random_files(256 * 1024)
 
 # generate file list
-file_list_in = open(os.path.join(root_dir, "file_list"), 'w')
+file_list_in = open(os.path.join(root_dir, "file_list"), "w")
 for root, dirs, files in os.walk(src_dir):
     for file in files:
         if file == "file0":
@@ -34,7 +34,7 @@ for root, dirs, files in os.walk(src_dir):
             file_list_in.write("{0}\t{1}".format(file, 1025))
         else:
             file_list_in.write(file)
-        file_list_in.write('\n')
+        file_list_in.write("\n")
 file_list_in.close()
 print("Done with set-up")
 
@@ -49,15 +49,16 @@ run_test("file list with all open early", "-open_files_during_discovery -1")
 run_test("file list with 1 open early", "-open_files_during_discovery 1")
 run_test(
     "file list with open early and direct reads",
-    "-open_files_during_discovery -1 -odirect_reads"
+    "-open_files_during_discovery -1 -odirect_reads",
 )
 run_test(
     "failed transfer with open early and direct reads",
-    "-open_files_during_discovery -1 -odirect_reads", True
+    "-open_files_during_discovery -1 -odirect_reads",
+    True,
 )
 
 os.remove(os.path.join(src_dir, "file0"))
-open(os.path.join(src_dir, "file1"), 'a').truncate(1025)
+open(os.path.join(src_dir, "file1"), "a").truncate(1025)
 
 status = verify_transfer_success()
 exit(status)

@@ -22,10 +22,10 @@ def wait_for_receiver_finish(receiver_process):
 def test(resumption):
     global receiver_end_time
     global receiver_status
-    environment_variable_name = 'WDT_TEST_IPV6_CLIENT'
+    environment_variable_name = "WDT_TEST_IPV6_CLIENT"
     if (
-        environment_variable_name in os.environ and
-        os.environ[environment_variable_name] == "0"
+        environment_variable_name in os.environ
+        and os.environ[environment_variable_name] == "0"
     ):
         print("Test with ipv6 client is disabled in this system")
         return
@@ -33,9 +33,7 @@ def test(resumption):
     receiver_cmd = get_receiver_binary() + " -skip_writes -num_ports=1 -v 1"
     print(receiver_cmd)
     receiver_process = subprocess.Popen(
-        receiver_cmd.split(),
-        stdout=subprocess.PIPE,
-        universal_newlines=True
+        receiver_cmd.split(), stdout=subprocess.PIPE, universal_newlines=True
     )
 
     connection_url = receiver_process.stdout.readline().strip()
@@ -44,9 +42,9 @@ def test(resumption):
     # 1. wdt://localhost?ports=1,2,3,4
     # 2. wdt://localhost:1?num_ports=4
     # the second kind of url is another way of expressing the first one
-    url_match = re.search('\?(.*&)?ports=([0-9]+).*', connection_url)
+    url_match = re.search("\?(.*&)?ports=([0-9]+).*", connection_url)
     if not url_match:
-        url_match = re.search(':([0-9]+)(\?.*)', connection_url)
+        url_match = re.search(":([0-9]+)(\?.*)", connection_url)
         rest_of_url = url_match.group(2)
         port_to_block = url_match.group(1)
         start_port = ":" + port_to_block
@@ -67,10 +65,8 @@ def test(resumption):
         "(sleep 20 | nc -4 localhost {0}) &> /dev/null & "
         "sleep 1; {3} -directory wdt/ -ipv6 "
         "-num_ports=1 "
-        "-connection_url \"wdt://[::1]{1}{2}\""
-    ).format(
-        port_to_block, start_port, rest_of_url, get_sender_binary()
-    )
+        '-connection_url "wdt://[::1]{1}{2}"'
+    ).format(port_to_block, start_port, rest_of_url, get_sender_binary())
     if resumption:
         sender_cmd = sender_cmd + " -enable_download_resumption"
     print(sender_cmd)
@@ -96,12 +92,7 @@ def test(resumption):
             ).format(diff, max_allowed_diff)
         )
         exit(1)
-    print(
-        (
-            "Test passed - Sender and Receiver"
-            " end time diff {0} ms"
-        ).format(diff)
-    )
+    print(("Test passed - Sender and Receiver" " end time diff {0} ms").format(diff))
 
 
 print("Testing without download resumption")

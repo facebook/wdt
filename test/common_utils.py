@@ -1,19 +1,20 @@
-import os
-import hashlib
 import difflib
-import subprocess
-import shutil
-import tempfile
 import errno
-import string
-import random
-import time
 import getpass
+import hashlib
+import os
+import random
+import shutil
+import string
+import subprocess
+import tempfile
+import time
 
 
 def get_env(name):
     if name in os.environ:
         return os.environ[name]
+
 
 # Appease the linter gods:
 test_count = root_dir = wdt_binary = receiver_binary = sender_binary = None
@@ -22,9 +23,8 @@ sender_status = skip_tests = test_ids = None
 
 
 def set_binaries():
-    global wdt_binary, receiver_binary, sender_binary, \
-           gen_files_binary, gen_files_bigrams
-    binary = get_env('WDT_BINARY')
+    global wdt_binary, receiver_binary, sender_binary, gen_files_binary, gen_files_bigrams
+    binary = get_env("WDT_BINARY")
     if binary:
         wdt_binary = binary
         print("Set default binary from WDT_BINARY env var: " + wdt_binary)
@@ -32,19 +32,19 @@ def set_binaries():
         wdt_binary = "./buck-out/gen/wdt/wdt"
         if not os.path.exists(wdt_binary):
             wdt_binary = "./_bin/wdt/wdt"
-    sender = get_env('WDT_SENDER')
+    sender = get_env("WDT_SENDER")
     if sender:
         sender_binary = sender
         print("Set sender from WDT_SENDER env var: " + sender_binary)
     else:
         sender_binary = wdt_binary
-    receiver = get_env('WDT_RECEIVER')
+    receiver = get_env("WDT_RECEIVER")
     if receiver:
         receiver_binary = receiver
         print("Set receiver from WDT_RECEIVER env var: " + receiver_binary)
     else:
         receiver_binary = wdt_binary
-    gen_files = get_env('WDT_GEN_FILES')
+    gen_files = get_env("WDT_GEN_FILES")
     if gen_files:
         gen_files_binary = gen_files
         print("Set gen_files_binary from WDT_GEN_FILES env var: " + gen_files)
@@ -52,7 +52,7 @@ def set_binaries():
         gen_files_binary = "./buck-out/gen/wdt/bench/wdt_gen_files"
         if not os.path.exists(gen_files_binary):
             gen_files_binary = "./_bin/wdt/bench/wdt_gen_files"
-    bigrams = get_env('WDT_GEN_BIGRAMS')
+    bigrams = get_env("WDT_GEN_BIGRAMS")
     if bigrams:
         gen_files_bigrams = bigrams
         print("Set gen_files_bigrams from WDT_GEN_BIGRAMS env var: " + bigrams)
@@ -61,9 +61,16 @@ def set_binaries():
             os.path.dirname(__file__), "../bench/book1.bigrams"
         )
     print(
-        "Sender: " + sender_binary + " Receiver: " + receiver_binary +
-        " gen_files " + gen_files_binary + " bigrams " + gen_files_bigrams
+        "Sender: "
+        + sender_binary
+        + " Receiver: "
+        + receiver_binary
+        + " gen_files "
+        + gen_files_binary
+        + " bigrams "
+        + gen_files_bigrams
     )
+
 
 # sets the file global wdt/sender/receiver binary paths from env or _bin default
 set_binaries()
@@ -71,12 +78,15 @@ set_binaries()
 
 def run_command(cmd):
     print("Running %s" % cmd)
-    p = subprocess.Popen(cmd,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         shell=True,
-                         universal_newlines=True)
+    p = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+        universal_newlines=True,
+    )
     return p.communicate()
+
 
 # note globals in python can be read without being declared global (!!)
 def get_wdt_binary():
@@ -100,22 +110,24 @@ def get_gen_files():
 def get_wdt_version():
     bin = get_wdt_binary()
     dummy_cmd = bin + " --version"
-    dummy_process = subprocess.Popen(dummy_cmd.split(), stdout=subprocess.PIPE, universal_newlines=True)
+    dummy_process = subprocess.Popen(
+        dummy_cmd.split(), stdout=subprocess.PIPE, universal_newlines=True
+    )
     protocol_string = dummy_process.stdout.readline().strip()
     print("Wdt " + bin + " version is " + protocol_string)
     return protocol_string.split()[4]
 
 
 def extend_wdt_options(cmd):
-    extra_options = get_env('EXTRA_WDT_OPTIONS')
+    extra_options = get_env("EXTRA_WDT_OPTIONS")
     if extra_options:
         print("extra options " + extra_options)
         cmd = cmd + " " + extra_options
-    encryption_type = get_env('ENCRYPTION_TYPE')
+    encryption_type = get_env("ENCRYPTION_TYPE")
     if encryption_type:
         print("encryption_type " + encryption_type)
         cmd = cmd + " -encryption_type=" + encryption_type
-    enable_checksum = get_env('ENABLE_CHECKSUM')
+    enable_checksum = get_env("ENABLE_CHECKSUM")
     if enable_checksum:
         print("enable_checksum " + enable_checksum)
         cmd = cmd + " -enable_checksum=" + enable_checksum
@@ -133,7 +145,7 @@ def start_receiver(extra_args):
     receiver_process = subprocess.Popen(
         receiver_cmd.split(),
         stdout=subprocess.PIPE,
-        stderr=open(server_log, 'w'),
+        stderr=open(server_log, "w"),
         universal_newlines=True,
     )
     connection_url = receiver_process.stdout.readline().strip()
@@ -156,13 +168,16 @@ def run_sender(extra_args, url=""):
         sender_cmd, root_dir, url, extra_args
     )
     # TODO: fix this to not use tee, this is python...
-    sender_cmd = "bash -c \"set -o pipefail; " + sender_cmd \
-                + " 2>&1 | tee {0}/client{1}.log\"".format(root_dir, test_count)
+    sender_cmd = (
+        'bash -c "set -o pipefail; '
+        + sender_cmd
+        + ' 2>&1 | tee {0}/client{1}.log"'.format(root_dir, test_count)
+    )
     print("Sender: " + sender_cmd)
     # On unix return code of system is shifted by 8 bytes but lower bits are
     # set on signal too and sometimes it's not flipped so let's or it all
     sender_status = os.system(sender_cmd)
-    sender_status = (sender_status >> 8) | (sender_status & 0xff)
+    sender_status = (sender_status >> 8) | (sender_status & 0xFF)
     print("status for sender {0}".format(hex(sender_status)))
     return sender_status
 
@@ -175,8 +190,9 @@ def error(msg):
 
 def print_server_log():
     if server_log:
-        with open(server_log, 'r') as fin:
+        with open(server_log, "r") as fin:
             print(fin.read())
+
 
 def check_transfer_status(expect_failed=False, check_receiver=True):
     global receiver_status
@@ -195,15 +211,9 @@ def check_transfer_status(expect_failed=False, check_receiver=True):
         skip_tests.add(test_count)
     else:
         if sender_status != 0:
-            error(
-                "was expected to succeed but sender err {0}"
-                .format(sender_status)
-            )
+            error("was expected to succeed but sender err {0}".format(sender_status))
         if receiver_status != 0:
-            error(
-                "was expected to succeed but sender err {0}"
-                .format(sender_status)
-            )
+            error("was expected to succeed but sender err {0}".format(sender_status))
 
 
 def check_logs_for_errors(fail_errors):
@@ -269,16 +279,14 @@ def get_test_count():
 
 def generate_random_files(total_size):
     src_dir = get_source_dir()
-    print(
-        "Creating random files, size {0}, into {1}".format(total_size, src_dir)
-    )
+    print("Creating random files, size {0}, into {1}".format(total_size, src_dir))
     create_directory(src_dir)
     seed_size = int(total_size / 70)
     gen_files = get_gen_files()
     for i in range(0, 4):
         file_name = "sample{0}".format(i)
         cmd = "{0} -directory={1} -filename={2} -gen_size_mb={3}".format(
-            gen_files, src_dir, file_name, seed_size / 1024. / 1024.
+            gen_files, src_dir, file_name, seed_size / 1024.0 / 1024.0
         )
         status = os.system(cmd)
         if status:
@@ -287,7 +295,7 @@ def generate_random_files(total_size):
         file_name = "file{0}".format(i)
         status = os.system(
             "{0} -directory={1} -filename={2} -gen_size_mb={3}".format(
-                gen_files, src_dir, file_name, 4 * seed_size / 1024. / 1024.
+                gen_files, src_dir, file_name, 4 * seed_size / 1024.0 / 1024.0
             )
         )
         if status:
@@ -296,7 +304,7 @@ def generate_random_files(total_size):
 
 
 def get_md5_for_file(file_path):
-    return hashlib.md5(open(file_path, 'rb').read()).hexdigest()
+    return hashlib.md5(open(file_path, "rb").read()).hexdigest()
 
 
 def create_md5_for_directory(src_dir, md5_file_name):
@@ -309,7 +317,7 @@ def create_md5_for_directory(src_dir, md5_file_name):
             md5 = get_md5_for_file(full_path)
             lines.append("{0} {1}".format(md5, file))
     lines.sort()
-    with open(md5_file_name, 'w') as md5_in:
+    with open(md5_file_name, "w") as md5_in:
         for line in lines:
             md5_in.write(line + "\n")
 
@@ -330,14 +338,14 @@ def verify_transfer_success():
         diff = difflib.unified_diff(
             open(src_md5_path).readlines(), open(dst_md5_path).readlines()
         )
-        delta = ''.join(diff)
+        delta = "".join(diff)
         if not delta:
             print("Found no diff for test {0}".format(i))
             if search_in_logs(i, "PROTOCOL_ERROR"):
                 status = 1
         else:
             print(delta)
-            with open("{0}/server{1}.log".format(root_dir, i), 'r') as fin:
+            with open("{0}/server{1}.log".format(root_dir, i), "r") as fin:
                 print(fin.read())
             status = 1
     if status == 0:
@@ -367,4 +375,4 @@ def search_in_logs(i, str):
 
 
 def generate_encryption_key():
-    return ''.join(random.choice(string.lowercase) for i in range(16))
+    return "".join(random.choice(string.lowercase) for i in range(16))

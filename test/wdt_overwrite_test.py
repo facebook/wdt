@@ -32,9 +32,7 @@ if newmtime != mtime:
 
 mtime = newmtime
 
-run_test(
-    "with -overwrite should succeed", receiver_args + " -overwrite", sender_args
-)
+run_test("with -overwrite should succeed", receiver_args + " -overwrite", sender_args)
 
 newmtime = os.stat(fname).st_mtime
 if newmtime == mtime:
