@@ -28,7 +28,7 @@ WdtBase::~WdtBase() {
 }
 
 void WdtBase::abort(const ErrorCode abortCode) {
-  folly::RWSpinLock::WriteHolder guard(abortCodeLock_);
+  std::unique_lock guard(abortCodeLock_);
   if (abortCode == VERSION_MISMATCH && abortCode_ != OK) {
     // VERSION_MISMATCH is the lowest priority abort code. If the abort code is
     // anything other than OK, we should not override it
@@ -39,7 +39,7 @@ void WdtBase::abort(const ErrorCode abortCode) {
 }
 
 void WdtBase::clearAbort() {
-  folly::RWSpinLock::WriteHolder guard(abortCodeLock_);
+  std::unique_lock guard(abortCodeLock_);
   if (abortCode_ != VERSION_MISMATCH) {
     // We do no clear abort code unless it is VERSION_MISMATCH
     return;

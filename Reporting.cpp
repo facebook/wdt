@@ -396,7 +396,7 @@ const int32_t PerfStatReport::kHistogramBuckets[] = {
     20000, 30000, 40000, 50000, 75000, 100000};
 
 void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
-  folly::RWSpinLock::WriteHolder writeLock(mutex_);
+  std::unique_lock writeLock(mutex_);
 
   int64_t timeInMillis = timeInMicros / kMicroToMilli;
   if (timeInMicros >= networkTimeoutMillis_ * 750) {
@@ -413,7 +413,7 @@ void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
 }
 
 PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
-  folly::RWSpinLock::WriteHolder writeLock(mutex_);
+  std::unique_lock writeLock(mutex_);
   folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
 
   for (int i = 0; i < kNumTypes_; i++) {
