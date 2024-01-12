@@ -21,8 +21,8 @@ namespace wdt {
 const static int64_t kMaxEntriesToPrint = 10;
 
 TransferStats& TransferStats::operator+=(const TransferStats& stats) {
-  folly::RWSpinLock::WriteHolder writeLock(mutex_.get());
-  folly::RWSpinLock::ReadHolder readLock(stats.mutex_.get());
+  std::unique_lock writeLock(getUniqueLock());
+  std::shared_lock readLock(stats.getSharedLock());
   headerBytes_ += stats.headerBytes_;
   dataBytes_ += stats.dataBytes_;
   effectiveHeaderBytes_ += stats.effectiveHeaderBytes_;
@@ -63,7 +63,7 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
 }
 
 std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
-  folly::RWSpinLock::ReadHolder lock(stats.mutex_.get());
+  std::shared_lock lock(stats.getSharedLock());
   double headerOverhead = 100;
   double failureOverhead = 100;
 
