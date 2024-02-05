@@ -57,7 +57,7 @@ ErrorCode WdtBase::getCurAbortCode() const {
   if (abortChecker_ && abortChecker_->shouldAbort()) {
     return ABORTED_BY_APPLICATION;
   }
-  folly::RWSpinLock::ReadHolder guard(abortCodeLock_);
+  std::shared_lock guard(abortCodeLock_);
   // internal check:
   return abortCode_;
 }

@@ -414,7 +414,7 @@ void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
 
 PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
   std::unique_lock writeLock(mutex_);
-  folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
+  std::shared_lock readLock(statReport.mutex_);
 
   for (int i = 0; i < kNumTypes_; i++) {
     for (const auto& pair : statReport.perfStats_[i]) {
@@ -433,7 +433,7 @@ PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
 }
 
 std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
-  folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
+  std::shared_lock readLock(statReport.mutex_);
 
   os << "***** PERF STATS *****\n" << WDT_LOG_PREFIX;
   for (int i = 0; i < PerfStatReport::kNumTypes_; i++) {
