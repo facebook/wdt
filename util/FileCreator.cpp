@@ -190,7 +190,7 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
   int res;
   {
     PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
-    res = open(path.c_str(), openFlags, 0644);
+    res = open(path.c_str(), openFlags, 0666);
   }
   if (res < 0) {
     WPLOG(ERROR) << "failed opening file " << path;
@@ -263,7 +263,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
   int res;
   {
     PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
-    res = open(path.c_str(), openFlags, 0644);
+    res = open(path.c_str(), openFlags, 0666);
   }
   if (res < 0) {
     if (dir.empty()) {
@@ -284,7 +284,7 @@ int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
     }
     {
       PerfStatCollector statCollector(threadCtx, PerfStatReport::FILE_OPEN);
-      res = open(path.c_str(), openFlags, 0644);
+      res = open(path.c_str(), openFlags, 0666);
     }
     if (res < 0) {
       WPLOG(ERROR) << "failed creating file " << path;
