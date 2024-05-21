@@ -45,59 +45,13 @@ size_t encryptionTypeToTagLen(EncryptionType type) {
   return (type == ENC_AES128_GCM) ? kAESBlockSize : 0;
 }
 
-static int s_numOpensslLocks = 0;
-static folly::SpinLock* s_opensslLocks{nullptr};
-static void opensslLock(int mode, int type, const char* file, int line) {
-  WDT_CHECK_LT(type, s_numOpensslLocks);
-  if (mode & CRYPTO_LOCK) {
-    s_opensslLocks[type].lock();
-    WVLOG(3) << "Lock requested for " << type << " " << file << " " << line;
-    return;
-  }
-  WVLOG(3) << "unlock requested for " << type << " " << file << " " << line;
-  s_opensslLocks[type].unlock();
-}
-
-static void opensslThreadId(CRYPTO_THREADID* id) {
-  CRYPTO_THREADID_set_numeric(id, (unsigned long)pthread_self());
-}
-
 WdtCryptoIntializer::WdtCryptoIntializer() {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-  if (CRYPTO_get_locking_callback()) {
-    WLOG(WARNING) << "Openssl crypto library already initialized";
-    return;
-  }
-  s_numOpensslLocks = CRYPTO_num_locks();
-  s_opensslLocks = new folly::SpinLock[s_numOpensslLocks];
-  if (!s_opensslLocks) {
-    WLOG(ERROR) << "Unable to allocate openssl locks " << s_numOpensslLocks;
-    return;
-  }
-  CRYPTO_set_locking_callback(opensslLock);
-  if (!CRYPTO_THREADID_get_callback()) {
-    CRYPTO_THREADID_set_callback(opensslThreadId);
-  } else {
-    WLOG(INFO) << "Openssl id callback already set";
-  }
-  WLOG(INFO) << "Openssl library initialized";
+#error "OpenSSL version too old, need to update"
 #endif
 }
 
-WdtCryptoIntializer::~WdtCryptoIntializer() {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-  WVLOG(1) << "Cleaning up openssl";
-  if (CRYPTO_get_locking_callback() != opensslLock) {
-    WLOG(WARNING) << "Openssl not initialized by wdt";
-    return;
-  }
-  CRYPTO_set_locking_callback(nullptr);
-  if (CRYPTO_THREADID_get_callback() == opensslThreadId) {
-    CRYPTO_THREADID_set_callback(nullptr);
-  }
-  delete[] s_opensslLocks;
-#endif
-}
+WdtCryptoIntializer::~WdtCryptoIntializer() = default;
 
 EncryptionType parseEncryptionType(const std::string& str) {
   if (str == kEncryptionTypeDescriptions[ENC_AES128_GCM]) {
