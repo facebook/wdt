@@ -76,6 +76,7 @@ if (NOT WDT_USE_SYSTEM_FOLLY)
   "${FOLLY_SOURCE_DIR}/folly/hash/detail/Crc32cDetail.cpp"
   "${FOLLY_SOURCE_DIR}/folly/hash/detail/Crc32CombineDetail.cpp"
   "${FOLLY_SOURCE_DIR}/folly/ScopeGuard.cpp"
+  "${FOLLY_SOURCE_DIR}/folly/detail/SplitStringSimd.cpp"
   )
 endif()
 

@@ -21,8 +21,8 @@ namespace wdt {
 const static int64_t kMaxEntriesToPrint = 10;
 
 TransferStats& TransferStats::operator+=(const TransferStats& stats) {
-  folly::RWSpinLock::WriteHolder writeLock(mutex_.get());
-  folly::RWSpinLock::ReadHolder readLock(stats.mutex_.get());
+  std::unique_lock writeLock(getUniqueLock());
+  std::shared_lock readLock(stats.getSharedLock());
   headerBytes_ += stats.headerBytes_;
   dataBytes_ += stats.dataBytes_;
   effectiveHeaderBytes_ += stats.effectiveHeaderBytes_;
@@ -63,7 +63,7 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
 }
 
 std::ostream& operator<<(std::ostream& os, const TransferStats& stats) {
-  folly::RWSpinLock::ReadHolder lock(stats.mutex_.get());
+  std::shared_lock lock(stats.getSharedLock());
   double headerOverhead = 100;
   double failureOverhead = 100;
 
@@ -396,7 +396,7 @@ const int32_t PerfStatReport::kHistogramBuckets[] = {
     20000, 30000, 40000, 50000, 75000, 100000};
 
 void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
-  folly::RWSpinLock::WriteHolder writeLock(mutex_);
+  std::unique_lock writeLock(mutex_);
 
   int64_t timeInMillis = timeInMicros / kMicroToMilli;
   if (timeInMicros >= networkTimeoutMillis_ * 750) {
@@ -413,8 +413,8 @@ void PerfStatReport::addPerfStat(StatType statType, int64_t timeInMicros) {
 }
 
 PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
-  folly::RWSpinLock::WriteHolder writeLock(mutex_);
-  folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
+  std::unique_lock writeLock(mutex_);
+  std::shared_lock readLock(statReport.mutex_);
 
   for (int i = 0; i < kNumTypes_; i++) {
     for (const auto& pair : statReport.perfStats_[i]) {
@@ -433,7 +433,7 @@ PerfStatReport& PerfStatReport::operator+=(const PerfStatReport& statReport) {
 }
 
 std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
-  folly::RWSpinLock::ReadHolder readLock(statReport.mutex_);
+  std::shared_lock readLock(statReport.mutex_);
 
   os << "***** PERF STATS *****\n" << WDT_LOG_PREFIX;
   for (int i = 0; i < PerfStatReport::kNumTypes_; i++) {

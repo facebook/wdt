@@ -62,15 +62,15 @@ ErrorCode ClientSocket::connect() {
   for (struct addrinfo *info = infoList; info != nullptr;
        info = info->ai_next) {
     ++count;
-    std::string host, port;
-    WdtSocket::getNameInfo(info->ai_addr, info->ai_addrlen, host, port);
-    WVLOG(2) << "will connect to " << host << " " << port;
+    std::string host, port_2;
+    WdtSocket::getNameInfo(info->ai_addr, info->ai_addrlen, host, port_2);
+    WVLOG(2) << "will connect to " << host << " " << port_2;
     fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd == -1) {
-      WPLOG(WARNING) << "Error making socket for port " << port;
+      WPLOG(WARNING) << "Error making socket for port_2 " << port_2;
       continue;
     }
-    WVLOG(1) << "new socket " << fd << " for port " << port;
+    WVLOG(1) << "new socket " << fd << " for port_2 " << port_2;
     socket_->setFd(fd);
 
     setSendBufferSize();
@@ -80,7 +80,7 @@ ErrorCode ClientSocket::connect() {
     sockArg |= O_NONBLOCK;
     res = fcntl(fd, F_SETFL, sockArg);
     if (res < 0) {
-      WPLOG(ERROR) << "Failed to make the socket non-blocking " << port
+      WPLOG(ERROR) << "Failed to make the socket non-blocking " << port_2
                    << " sock " << sockArg << " res " << res;
       closeConnection();
       continue;
@@ -88,7 +88,7 @@ ErrorCode ClientSocket::connect() {
 
     if (::connect(fd, info->ai_addr, info->ai_addrlen) != 0) {
       if (errno != EINPROGRESS) {
-        WPLOG(INFO) << "Error connecting on " << host << " " << port;
+        WPLOG(INFO) << "Error connecting on " << host << " " << port_2;
         closeConnection();
         continue;
       }
@@ -98,7 +98,7 @@ ErrorCode ClientSocket::connect() {
       while (true) {
         // check for abort
         if (threadCtx_.getAbortChecker()->shouldAbort()) {
-          WLOG(ERROR) << "Transfer aborted during connect " << port << " "
+          WLOG(ERROR) << "Transfer aborted during connect " << port_2 << " "
                       << fd;
           closeConnection();
           return ABORT;
@@ -110,7 +110,7 @@ ErrorCode ClientSocket::connect() {
         // abort check interval. This allows us to check for abort regularly.
         int timeElapsed = durationMillis(Clock::now() - startTime);
         if (timeElapsed >= connectTimeout) {
-          WVLOG(1) << "connect() timed out" << host << " " << port;
+          WVLOG(1) << "connect() timed out" << host << " " << port_2;
           closeConnection();
           return CONN_ERROR_RETRYABLE;
         }
@@ -121,14 +121,14 @@ ErrorCode ClientSocket::connect() {
 
         if ((res = poll(pollFds, 1, pollTimeout)) <= 0) {
           if (errno == EINTR) {
-            WVLOG(1) << "poll() call interrupted. retrying... " << port;
+            WVLOG(1) << "poll() call interrupted. retrying... " << port_2;
             continue;
           }
           if (res == 0) {
-            WVLOG(1) << "poll() timed out " << host << " " << port;
+            WVLOG(1) << "poll() timed out " << host << " " << port_2;
             continue;
           }
-          WPLOG(ERROR) << "poll() failed " << host << " " << port << " " << fd;
+          WPLOG(ERROR) << "poll() failed " << host << " " << port_2 << " " << fd;
           closeConnection();
           return CONN_ERROR;
         }
@@ -144,7 +144,7 @@ ErrorCode ClientSocket::connect() {
         continue;
       }
       if (connectResult != 0) {
-        WLOG(WARNING) << "connect did not succeed on " << host << " " << port
+        WLOG(WARNING) << "connect did not succeed on " << host << " " << port_2
                       << " : " << strerrorStr(connectResult);
         closeConnection();
         continue;
@@ -156,7 +156,7 @@ ErrorCode ClientSocket::connect() {
     sockArg &= (~O_NONBLOCK);
     res = fcntl(fd, F_SETFL, sockArg);
     if (res == -1) {
-      WPLOG(ERROR) << "Could not make the socket blocking " << port;
+      WPLOG(ERROR) << "Could not make the socket blocking " << port_2;
       closeConnection();
       continue;
     }
