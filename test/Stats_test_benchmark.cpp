@@ -95,7 +95,7 @@ void runCommonHistTest(int iters) {
 
 BENCHMARK_MULTI(MtExpHistMap) {
   int iters = 1000000;  // 1M (a lot slower than above)
-  ch.addHistogram("foo");
+  ch.addHistogram("foo", basehist);
   forkjoin(FLAGS_num_threads, runCommonHistTest, iters);
   BENCHMARK_SUSPEND {
     std::cout << "exported hist count:" << ch.getHistogram("foo")->count(0)
