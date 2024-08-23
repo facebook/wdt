@@ -54,7 +54,7 @@ DEFINE_string(transfer_id, "",
               " the sender if not set explicitly");
 DEFINE_int32(
     protocol_version, 0,
-    "Protocol version to use, this is used to simulate protocol negotiation");
+    "facebook::wdt::Protocol version to use, this is used to simulate protocol negotiation");
 
 DEFINE_string(connection_url, "",
               "Provide the connection string to connect to receiver"
@@ -91,8 +91,6 @@ DEFINE_string(dest_id, "",
 
 DECLARE_bool(help);
 
-using namespace facebook::wdt;
-
 // TODO: move this to some util and/or delete
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
@@ -103,14 +101,14 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
 std::mutex abortMutex;
 std::condition_variable abortCondVar;
 bool isAbortCancelled = false;
-std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
+std::shared_ptr<facebook::wdt::WdtAbortChecker> setupAbortChecker() {
   int abortSeconds = FLAGS_abort_after_seconds;
   if (abortSeconds <= 0) {
     return nullptr;
   }
   WLOG(INFO) << "Setting up abort " << abortSeconds << " seconds.";
   static std::atomic<bool> abortTrigger{false};
-  auto res = std::make_shared<WdtAbortChecker>(abortTrigger);
+  auto res = std::make_shared<facebook::wdt::WdtAbortChecker>(abortTrigger);
   auto lambda = [=] {
     WLOG(INFO) << "Will abort in " << abortSeconds << " seconds.";
     std::unique_lock<std::mutex> lk(abortMutex);
@@ -129,7 +127,7 @@ std::shared_ptr<WdtAbortChecker> setupAbortChecker() {
   return res;
 }
 
-void setAbortChecker(WdtBase &senderOrReceiver) {
+void setAbortChecker(facebook::wdt::WdtBase &senderOrReceiver) {
   senderOrReceiver.setAbortChecker(setupAbortChecker());
 }
 
@@ -142,7 +140,7 @@ void cancelAbort() {
   std::this_thread::yield();
 }
 
-void readManifest(std::istream &fin, WdtTransferRequest &req, bool dfltDirect) {
+void readManifest(std::istream &fin, facebook::wdt::WdtTransferRequest &req, bool dfltDirect) {
   std::string line;
   while (std::getline(fin, line)) {
     std::vector<std::string> fields;
@@ -169,7 +167,7 @@ void printUsage() {
 }
 
 void sigUSR1Handler(int) {
-  ReportPerfSignalSubscriber::notify();
+  facebook::wdt::ReportPerfSignalSubscriber::notify();
 }
 
 int main(int argc, char *argv[]) {
@@ -180,7 +178,7 @@ int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
   GFLAGS_NAMESPACE::SetArgv(argc, const_cast<const char **>(argv));
-  GFLAGS_NAMESPACE::SetVersionString(Protocol::getFullVersion());
+  GFLAGS_NAMESPACE::SetVersionString(facebook::wdt::Protocol::getFullVersion());
   usage.assign("WDT Warp-speed Data Transfer. v ");
   usage.append(GFLAGS_NAMESPACE::VersionString());
   usage.append(". Sample usage:\nTo transfer from srchost to desthost:\n\t");
@@ -234,59 +232,59 @@ int main(int argc, char *argv[]) {
     if (connectUrl.empty()) {
       WLOG(ERROR)
           << "Sender unable to read connection url from stdin - exiting";
-      return URI_PARSE_ERROR;
+      return facebook::wdt::URI_PARSE_ERROR;
     }
   } else {
     connectUrl = FLAGS_connection_url;
   }
 
   // Might be a sub class (fbonly wdtCmdLine.cpp)
-  Wdt &wdt = WDTCLASS::initializeWdt(FLAGS_app_name);
+  facebook::wdt::Wdt &wdt = facebook::wdt::WDTCLASS::initializeWdt(FLAGS_app_name);
   if (FLAGS_print_options) {
     wdt.printWdtOptions(std::cout);
     return 0;
   }
-  WdtOptions &options = wdt.getWdtOptions();
+  facebook::wdt::WdtOptions &options = wdt.getWdtOptions();
 
-  ErrorCode retCode = OK;
+  facebook::wdt::ErrorCode retCode = facebook::wdt::OK;
 
   // Odd ball case of log parsing
   if (FLAGS_parse_transfer_log) {
     // Log parsing mode
     options.enable_download_resumption = true;
-    TransferLogManager transferLogManager(options, FLAGS_directory);
+    facebook::wdt::TransferLogManager transferLogManager(options, FLAGS_directory);
     transferLogManager.openLog();
     bool success = transferLogManager.parseAndPrint();
     WLOG_IF(ERROR, !success) << "Transfer log parsing failed";
     transferLogManager.closeLog();
-    return success ? OK : ERROR;
+    return success ? facebook::wdt::OK : facebook::wdt::ERROR;
   }
 
   // General case : Sender or Receiver
-  std::unique_ptr<WdtTransferRequest> reqPtr;
+  std::unique_ptr<facebook::wdt::WdtTransferRequest> reqPtr;
   if (connectUrl.empty()) {
-    reqPtr = std::make_unique<WdtTransferRequest>(
+    reqPtr = std::make_unique<facebook::wdt::WdtTransferRequest>(
         options.start_port, options.num_ports, FLAGS_directory);
     reqPtr->hostName = FLAGS_destination;
     reqPtr->transferId = FLAGS_transfer_id;
     if (!FLAGS_test_only_encryption_secret.empty()) {
       reqPtr->encryptionData =
-          EncryptionParams(parseEncryptionType(options.encryption_type),
+          facebook::wdt::EncryptionParams(facebook::wdt::parseEncryptionType(options.encryption_type),
                            FLAGS_test_only_encryption_secret);
     }
-    reqPtr->ivChangeInterval = options.iv_change_interval_mb * kMbToB;
+    reqPtr->ivChangeInterval = options.iv_change_interval_mb * facebook::wdt::kMbToB;
     reqPtr->tls = wdt.isTlsEnabled();
   } else {
-    reqPtr = std::make_unique<WdtTransferRequest>(connectUrl);
-    if (reqPtr->errorCode != OK) {
+    reqPtr = std::make_unique<facebook::wdt::WdtTransferRequest>(connectUrl);
+    if (reqPtr->errorCode != facebook::wdt::OK) {
       WLOG(ERROR) << "Invalid url \"" << connectUrl
                   << "\" : " << errorCodeToStr(reqPtr->errorCode);
-      return ERROR;
+      return facebook::wdt::ERROR;
     }
     reqPtr->directory = FLAGS_directory;
     WLOG(INFO) << "Parsed url as " << reqPtr->getLogSafeString();
   }
-  WdtTransferRequest &req = *reqPtr;
+  facebook::wdt::WdtTransferRequest &req = *reqPtr;
   req.wdtNamespace = FLAGS_namespace;
   if (!FLAGS_dest_id.empty()) {
     req.destIdentifier = FLAGS_dest_id;
@@ -298,8 +296,8 @@ int main(int argc, char *argv[]) {
     reqPtr->hostName = FLAGS_hostname;
   }
   if (FLAGS_destination.empty() && connectUrl.empty()) {
-    Receiver receiver(req);
-    WdtOptions &recOptions = receiver.getWdtOptions();
+    facebook::wdt::Receiver receiver(req);
+    facebook::wdt::WdtOptions &recOptions = receiver.getWdtOptions();
     if (FLAGS_run_as_daemon) {
       // Backward compatible with static ports, you can still get dynamic
       // daemon ports using -start_port 0 like before
@@ -311,15 +309,15 @@ int main(int argc, char *argv[]) {
       receiver.setRecoveryId(FLAGS_recovery_id);
     }
     wdt.wdtSetReceiverSocketCreator(receiver);
-    WdtTransferRequest augmentedReq = receiver.init();
+    facebook::wdt::WdtTransferRequest augmentedReq = receiver.init();
     retCode = augmentedReq.errorCode;
-    if (retCode == FEWER_PORTS) {
+    if (retCode == facebook::wdt::FEWER_PORTS) {
       if (FLAGS_treat_fewer_port_as_error) {
         WLOG(ERROR) << "Receiver could not bind to all the ports";
-        return FEWER_PORTS;
+        return facebook::wdt::FEWER_PORTS;
       }
-      retCode = OK;
-    } else if (augmentedReq.errorCode != OK) {
+      retCode = facebook::wdt::OK;
+    } else if (augmentedReq.errorCode != facebook::wdt::OK) {
       WLOG(ERROR) << "Error setting up receiver " << errorCodeToStr(retCode);
       return retCode;
     }
@@ -345,8 +343,8 @@ int main(int argc, char *argv[]) {
     setAbortChecker(receiver);
     if (!FLAGS_run_as_daemon) {
       retCode = receiver.transferAsync();
-      if (retCode == OK) {
-        std::unique_ptr<TransferReport> report = receiver.finish();
+      if (retCode == facebook::wdt::OK) {
+        std::unique_ptr<facebook::wdt::TransferReport> report = receiver.finish();
         retCode = report->getSummary().getErrorCode();
       }
     } else {
@@ -374,7 +372,7 @@ int main(int argc, char *argv[]) {
     retCode = wdt.wdtSend(req, setupAbortChecker());
   }
   cancelAbort();
-  if (retCode == OK) {
+  if (retCode == facebook::wdt::OK) {
     WLOG(INFO) << "Returning with OK exit code";
   } else {
     WLOG(ERROR) << "Returning with code " << retCode << " "
