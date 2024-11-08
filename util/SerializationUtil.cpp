@@ -5,9 +5,8 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/SerializationUtil.h>
-
 #include <folly/lang/Bits.h>
+#include <wdt/util/SerializationUtil.h>
 
 using folly::ByteRange;
 using std::string;
@@ -185,5 +184,5 @@ bool decodeString(ByteRange &br, string &str) {
   br.advance(strLen);
   return true;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

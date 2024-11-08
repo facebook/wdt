@@ -5,14 +5,14 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Receiver.h>
-#include <wdt/Wdt.h>
-#include <wdt/WdtResourceController.h>
-
 #include <folly/String.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <signal.h>
+#include <wdt/Receiver.h>
+#include <wdt/Wdt.h>
+#include <wdt/WdtResourceController.h>
+
 #include <chrono>
 #include <fstream>
 #include <future>
@@ -52,9 +52,9 @@ DEFINE_bool(parse_transfer_log, false,
 DEFINE_string(transfer_id, "",
               "Transfer id. Receiver will generate one to be used (via URL) on"
               " the sender if not set explicitly");
-DEFINE_int32(
-    protocol_version, 0,
-    "facebook::wdt::Protocol version to use, this is used to simulate protocol negotiation");
+DEFINE_int32(protocol_version, 0,
+             "facebook::wdt::Protocol version to use, this is used to simulate "
+             "protocol negotiation");
 
 DEFINE_string(connection_url, "",
               "Provide the connection string to connect to receiver"
@@ -140,7 +140,8 @@ void cancelAbort() {
   std::this_thread::yield();
 }
 
-void readManifest(std::istream &fin, facebook::wdt::WdtTransferRequest &req, bool dfltDirect) {
+void readManifest(std::istream &fin, facebook::wdt::WdtTransferRequest &req,
+                  bool dfltDirect) {
   std::string line;
   while (std::getline(fin, line)) {
     std::vector<std::string> fields;
@@ -239,7 +240,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Might be a sub class (fbonly wdtCmdLine.cpp)
-  facebook::wdt::Wdt &wdt = facebook::wdt::WDTCLASS::initializeWdt(FLAGS_app_name);
+  facebook::wdt::Wdt &wdt =
+      facebook::wdt::WDTCLASS::initializeWdt(FLAGS_app_name);
   if (FLAGS_print_options) {
     wdt.printWdtOptions(std::cout);
     return 0;
@@ -252,7 +254,8 @@ int main(int argc, char *argv[]) {
   if (FLAGS_parse_transfer_log) {
     // Log parsing mode
     options.enable_download_resumption = true;
-    facebook::wdt::TransferLogManager transferLogManager(options, FLAGS_directory);
+    facebook::wdt::TransferLogManager transferLogManager(options,
+                                                         FLAGS_directory);
     transferLogManager.openLog();
     bool success = transferLogManager.parseAndPrint();
     WLOG_IF(ERROR, !success) << "Transfer log parsing failed";
@@ -268,11 +271,12 @@ int main(int argc, char *argv[]) {
     reqPtr->hostName = FLAGS_destination;
     reqPtr->transferId = FLAGS_transfer_id;
     if (!FLAGS_test_only_encryption_secret.empty()) {
-      reqPtr->encryptionData =
-          facebook::wdt::EncryptionParams(facebook::wdt::parseEncryptionType(options.encryption_type),
-                           FLAGS_test_only_encryption_secret);
+      reqPtr->encryptionData = facebook::wdt::EncryptionParams(
+          facebook::wdt::parseEncryptionType(options.encryption_type),
+          FLAGS_test_only_encryption_secret);
     }
-    reqPtr->ivChangeInterval = options.iv_change_interval_mb * facebook::wdt::kMbToB;
+    reqPtr->ivChangeInterval =
+        options.iv_change_interval_mb * facebook::wdt::kMbToB;
     reqPtr->tls = wdt.isTlsEnabled();
   } else {
     reqPtr = std::make_unique<facebook::wdt::WdtTransferRequest>(connectUrl);
@@ -344,7 +348,8 @@ int main(int argc, char *argv[]) {
     if (!FLAGS_run_as_daemon) {
       retCode = receiver.transferAsync();
       if (retCode == facebook::wdt::OK) {
-        std::unique_ptr<facebook::wdt::TransferReport> report = receiver.finish();
+        std::unique_ptr<facebook::wdt::TransferReport> report =
+            receiver.finish();
         retCode = report->getSummary().getErrorCode();
       }
     } else {

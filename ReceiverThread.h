@@ -334,5 +334,5 @@ class ReceiverThread : public WdtThread {
   /// list of received blocks which have not yet been verified
   std::vector<BlockDetails> blocksWaitingVerification_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -115,5 +115,5 @@ class ByteSource {
   virtual void addTransferStats(const TransferStats &stats) = 0;
 };
 
-}  // end namespaces
-}
+}  // namespace wdt
+}  // namespace facebook

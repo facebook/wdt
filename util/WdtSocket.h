@@ -5,6 +5,7 @@
 #include <wdt/Protocol.h>
 #include <wdt/util/CommonImpl.h>
 #include <wdt/util/EncryptionUtils.h>
+
 #include <memory>
 
 namespace facebook {
@@ -109,7 +110,7 @@ class WdtSocket {
   // manipulates DSCP Bits
   void setDscp(int dscp);
 
-  ThreadCtx& getThreadCtx() {
+  ThreadCtx &getThreadCtx() {
     return threadCtx_;
   }
 
@@ -259,5 +260,5 @@ class WdtSocket {
   /// Have we already read the tag and completed decryption
   bool readsFinalized_{false};
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -7,12 +7,12 @@
  */
 #pragma once
 
-#include <wdt/ErrorCodes.h>
-#include <wdt/util/EncryptionUtils.h>
-
 #include <folly/Range.h>
 #include <limits.h>
 #include <stddef.h>
+#include <wdt/ErrorCodes.h>
+#include <wdt/util/EncryptionUtils.h>
+
 #include <string>
 #include <vector>
 
@@ -517,5 +517,5 @@ class Protocol {
       char *src, int64_t &off, int64_t dataSize,
       std::vector<FileChunksInfo> &fileChunksInfoList);
 };
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

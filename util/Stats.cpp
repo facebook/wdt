@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 /*
-* Stats.cpp
-*
-*  Created on: Oct 18, 2011
-*      Author: ldemailly
-*/
+ * Stats.cpp
+ *
+ *  Created on: Oct 18, 2011
+ *      Author: ldemailly
+ */
 
 #include "wdt/util/Stats.h"
 
@@ -59,7 +59,7 @@ void Counter::record(int64_t v) {
     min_ = v;
   }
   // real min (can be 0):
-  if (v < realMin_ ) {
+  if (v < realMin_) {
     realMin_ = v;
   }
   if (v > max_) {
@@ -288,5 +288,5 @@ void Histogram::reset() {
   Counter::reset();
   memset((void*)hdata_, 0, sizeof(hdata_));
 }
-}
-} /* namespace facebook::wormhole */
+}  // namespace wdt
+}  // namespace facebook

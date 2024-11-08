@@ -18,6 +18,7 @@
 #include <wdt/util/DirectorySourceQueue.h>
 #include <wdt/util/EncryptionUtils.h>
 #include <wdt/util/ThreadsController.h>
+
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -146,7 +147,8 @@ class WdtBase {
     FINISHED,        // last running thread finished
     THREADS_JOINED,  // threads joined
   };
-  friend std::ostream& operator<<(std::ostream& os, const WdtBase::TransferStatus& status);
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const WdtBase::TransferStatus& status);
 
   /// Validate the transfer request
   virtual ErrorCode validateTransferRequest();
@@ -209,25 +211,24 @@ class WdtBase {
   std::shared_ptr<IAbortChecker> abortChecker_{nullptr};
 };
 
-inline std::ostream& operator<<(std::ostream& os, const WdtBase::TransferStatus& status)
-{
-  switch (status)
-  {
+inline std::ostream& operator<<(std::ostream& os,
+                                const WdtBase::TransferStatus& status) {
+  switch (status) {
     case WdtBase::TransferStatus::NOT_STARTED:
-    os << "NOT_STARTED";
-    break;
+      os << "NOT_STARTED";
+      break;
     case WdtBase::TransferStatus::ONGOING:
-    os << "ONGOING";
-    break;
+      os << "ONGOING";
+      break;
     case WdtBase::TransferStatus::FINISHED:
-    os << "FINISHED";
-    break;
+      os << "FINISHED";
+      break;
     case WdtBase::TransferStatus::THREADS_JOINED:
-    os << "THREADS_JOINED";
-    break;
+      os << "THREADS_JOINED";
+      break;
   }
   return os;
 }
 
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

@@ -5,9 +5,9 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Reporting.h>
 #include <folly/String.h>
 #include <wdt/Protocol.h>
+#include <wdt/Reporting.h>
 #include <wdt/WdtOptions.h>
 
 #include <algorithm>
@@ -34,18 +34,18 @@ TransferStats& TransferStats::operator+=(const TransferStats& stats) {
     numBlocksSend_ = stats.numBlocksSend_;
   } else if (stats.numBlocksSend_ != -1 &&
              numBlocksSend_ != stats.numBlocksSend_) {
-    WLOG_IF(ERROR, localErrCode_ == OK) << "Mismatch in the numBlocksSend "
-                                        << numBlocksSend_ << " "
-                                        << stats.numBlocksSend_;
+    WLOG_IF(ERROR, localErrCode_ == OK)
+        << "Mismatch in the numBlocksSend " << numBlocksSend_ << " "
+        << stats.numBlocksSend_;
     localErrCode_ = ERROR;
   }
   if (totalSenderBytes_ == -1) {
     totalSenderBytes_ = stats.totalSenderBytes_;
   } else if (stats.totalSenderBytes_ != -1 &&
              totalSenderBytes_ != stats.totalSenderBytes_) {
-    WLOG_IF(ERROR, localErrCode_ == OK) << "Mismatch in the total sender bytes "
-                                        << totalSenderBytes_ << " "
-                                        << stats.totalSenderBytes_;
+    WLOG_IF(ERROR, localErrCode_ == OK)
+        << "Mismatch in the total sender bytes " << totalSenderBytes_ << " "
+        << stats.totalSenderBytes_;
     localErrCode_ = ERROR;
   }
   localErrCode_ = getMoreInterestingError(localErrCode_, stats.localErrCode_);
@@ -452,9 +452,8 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
        << " Min " << min << " Max " << max << " Avg " << avg << " ";
 
     // One extra bucket for values extending beyond last bucket
-    int numBuckets = 1 +
-                     sizeof(PerfStatReport::kHistogramBuckets) /
-                         sizeof(PerfStatReport::kHistogramBuckets[0]);
+    int numBuckets = 1 + sizeof(PerfStatReport::kHistogramBuckets) /
+                             sizeof(PerfStatReport::kHistogramBuckets[0]);
     std::vector<int64_t> buckets(numBuckets);
 
     auto& perfStatMap = statReport.perfStats_[i];
@@ -508,5 +507,5 @@ std::ostream& operator<<(std::ostream& os, const PerfStatReport& statReport) {
   }
   return os;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

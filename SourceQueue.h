@@ -7,9 +7,9 @@
  */
 #pragma once
 
-#include <memory>
-
 #include <wdt/ByteSource.h>
+
+#include <memory>
 
 namespace facebook {
 namespace wdt {
@@ -51,5 +51,5 @@ class SourceQueue {
   /// @return         total size of files processed/enqueued
   virtual int64_t getTotalSize() const = 0;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -10,12 +10,12 @@
  * cat * | wdt_gen_stats -wrap -binary > bigrams
  *
  */
-#include <algorithm>
-
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-
 #include <wdt/WdtConfig.h>
+
+#include <algorithm>
+
 #include "wdt/bench/Bigram.h"
 
 DEFINE_bool(binary, false, "Binary format output");

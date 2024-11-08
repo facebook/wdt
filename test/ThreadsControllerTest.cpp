@@ -5,11 +5,11 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 #include <wdt/test/TestCommon.h>
 #include <wdt/util/ThreadsController.h>
 
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 #include <chrono>
 #include <mutex>
 #include <thread>
@@ -118,5 +118,5 @@ TEST(ThreadsController, ExecutOnceFunc) {
   threadUtil.joinThreads();
   EXPECT_EQ(result, 2);
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -9,6 +9,7 @@
 #include <folly/SpinLock.h>
 #include <glog/logging.h>
 #include <wdt/util/CommonImpl.h>
+
 #include <thread>
 namespace facebook {
 namespace wdt {
@@ -201,5 +202,5 @@ class Throttler {
   /// Interval between every print of throttler logs
   int64_t throttlerLogTimeMillis_;
 };
-}
-}  // facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

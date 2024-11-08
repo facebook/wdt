@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <wdt/WdtConfig.h>
 #include <wdt/util/EncryptionUtils.h>
+
 #include <cstdint>
 #include <set>
 #include <string>

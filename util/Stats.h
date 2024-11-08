@@ -6,59 +6,58 @@
  * LICENSE file in the root directory of this source tree.
  */
 /*
-* Stats.h
-*
-* Lockless, threadsafe, efficient semi log periodic histogram/stats.
-*
-* Originally written for wormhole but now opensource as part of WDT
-*
-* This file is performance sensitive - for any change make sure :
-* (print interval set at 1ms to check that there is no contention between
-* the printing thread and the others)
-* With opt build, sends the stats to stderr as benchmark now prints to stdout:
-*
-* ./buck-out/gen/wdt/stats_benchmark -bm_regex="MtPer" \
-*   -print_interval=0.001 -minloglevel=3 -num_threads=6 2> /tmp/out
-*
-*  2016 results:  on Intel(R) Xeon(R) CPU E5-2660 0 @ 2.20GHz - 6 threads:
-*  MtPerHistogram   1 thread (no concurrency/best case:)  12.40ns   80.64M,
-*  6 threads: 12.78ns   78.24,  12 threads:     13.04ns   76.67M
-*  so it scales linearly
-*
-*  Old 2011 results:
-*  gives above 45M/s (on 8 core Xeon L5410  @ 2.33GHz):
-*  BM_mt_per_histogram                 400000000  8.432 s   21.08 ns  45.24 M
-*  and above 80M/s (on 32 htcores Xeon(R) CPU E5-2660 0 @ 2.20GHz):
-*  BM_mt_per_histogram                 400000000  4.644 s   11.61 ns  82.14 M
-*  should also scale up to # thread equal to number of real cores,
-*  ie 16 for the above
-*
-*  and make sure that despite resetting every millisecond we do get:
-*  awk -F,   '($1 ~ /[<>]/) {sum+=$4} END {print "sum is", sum}' /tmp/out
-*  gives (for -num_threads=12):
-*  sum is 4800000000
-*  (12 threads doing 400M each -> 4.8B should be found in the histograms)
-*  and /tmp/out should be large (~3 Mbytes)
-*
-* ps: could be even faster if templating the divider as this is the most
-*     expensive part
-*
-*  Created on: Oct 18, 2011
-*      Author: ldemailly
-*/
+ * Stats.h
+ *
+ * Lockless, threadsafe, efficient semi log periodic histogram/stats.
+ *
+ * Originally written for wormhole but now opensource as part of WDT
+ *
+ * This file is performance sensitive - for any change make sure :
+ * (print interval set at 1ms to check that there is no contention between
+ * the printing thread and the others)
+ * With opt build, sends the stats to stderr as benchmark now prints to stdout:
+ *
+ * ./buck-out/gen/wdt/stats_benchmark -bm_regex="MtPer" \
+ *   -print_interval=0.001 -minloglevel=3 -num_threads=6 2> /tmp/out
+ *
+ *  2016 results:  on Intel(R) Xeon(R) CPU E5-2660 0 @ 2.20GHz - 6 threads:
+ *  MtPerHistogram   1 thread (no concurrency/best case:)  12.40ns   80.64M,
+ *  6 threads: 12.78ns   78.24,  12 threads:     13.04ns   76.67M
+ *  so it scales linearly
+ *
+ *  Old 2011 results:
+ *  gives above 45M/s (on 8 core Xeon L5410  @ 2.33GHz):
+ *  BM_mt_per_histogram                 400000000  8.432 s   21.08 ns  45.24 M
+ *  and above 80M/s (on 32 htcores Xeon(R) CPU E5-2660 0 @ 2.20GHz):
+ *  BM_mt_per_histogram                 400000000  4.644 s   11.61 ns  82.14 M
+ *  should also scale up to # thread equal to number of real cores,
+ *  ie 16 for the above
+ *
+ *  and make sure that despite resetting every millisecond we do get:
+ *  awk -F,   '($1 ~ /[<>]/) {sum+=$4} END {print "sum is", sum}' /tmp/out
+ *  gives (for -num_threads=12):
+ *  sum is 4800000000
+ *  (12 threads doing 400M each -> 4.8B should be found in the histograms)
+ *  and /tmp/out should be large (~3 Mbytes)
+ *
+ * ps: could be even faster if templating the divider as this is the most
+ *     expensive part
+ *
+ *  Created on: Oct 18, 2011
+ *      Author: ldemailly
+ */
 #ifndef STATS_H_
 #define STATS_H_
 
+#include <folly/ThreadLocal.h>
 #include <sys/types.h>
+
+#include <boost/noncopyable.hpp>
 #include <cmath>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
 #include <thread>
-
-#include <boost/noncopyable.hpp>
-
-#include <folly/ThreadLocal.h>
 
 #include "glog/logging.h"
 
@@ -621,7 +620,7 @@ class PeriodicCounters : private boost::noncopyable {
   std::condition_variable cv_;
   std::thread thread_;
 };
-}
-} /* namespace facebook::wormhole */
+}  // namespace wdt
+}  // namespace facebook
 
 #endif /* STATS_H_ */

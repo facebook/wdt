@@ -7,6 +7,7 @@
  */
 #include <wdt/WdtBase.h>
 #include <wdt/WdtTransferRequest.h>
+
 #include <random>
 using namespace std;
 
@@ -166,7 +167,8 @@ void WdtBase::setTransferStatus(TransferStatus transferStatus) {
 
 bool WdtBase::isStale() {
   TransferStatus status = getTransferStatus();
-  return (status == TransferStatus::FINISHED || status == TransferStatus::THREADS_JOINED);
+  return (status == TransferStatus::FINISHED ||
+          status == TransferStatus::THREADS_JOINED);
 }
 
 bool WdtBase::hasStarted() {
@@ -196,5 +198,5 @@ string WdtBase::generateTransferId() {
   WVLOG(1) << "Generated a transfer id " << transferId;
   return transferId;
 }
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

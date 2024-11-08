@@ -7,12 +7,12 @@
  */
 #pragma once
 
+#include <wdt/WdtBase.h>
+#include <wdt/util/ClientSocket.h>
+
 #include <chrono>
 #include <iostream>
 #include <memory>
-
-#include <wdt/WdtBase.h>
-#include <wdt/util/ClientSocket.h>
 
 namespace facebook {
 namespace wdt {
@@ -218,5 +218,5 @@ class Sender : public WdtBase {
   /// Transfer history controller for the sender threads
   std::unique_ptr<TransferHistoryController> transferHistoryController_;
 };
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

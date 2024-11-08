@@ -8,6 +8,7 @@
 #pragma once
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 
 namespace facebook {
@@ -20,10 +21,12 @@ class TemporaryDirectory {
   TemporaryDirectory();
   ~TemporaryDirectory();
 
-  const std::string& dir() const { return dir_; }
+  const std::string& dir() const {
+    return dir_;
+  }
 
  private:
   std::string dir_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

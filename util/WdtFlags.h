@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 #pragma once
+#include <wdt/WdtOptions.h>
+
 #include <ostream>
 #include <set>
-
-#include <wdt/WdtOptions.h>
 
 namespace facebook {
 namespace wdt {
@@ -26,5 +26,5 @@ class WdtFlags {
 
   static std::set<std::string> getUserSpecifiedOptions();
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

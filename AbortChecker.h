@@ -33,5 +33,5 @@ class WdtAbortChecker : public IAbortChecker {
   std::atomic<bool> const *abortTriggerPtr_;
 };
 
-}  // end namespaces
-}
+}  // namespace wdt
+}  // namespace facebook

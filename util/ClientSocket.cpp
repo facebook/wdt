@@ -5,16 +5,14 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/ClientSocket.h>
-#include <wdt/Reporting.h>
-
 #include <fcntl.h>
+#include <folly/Conv.h>
+#include <folly/ScopeGuard.h>
 #include <glog/logging.h>
 #include <poll.h>
 #include <sys/socket.h>
-
-#include <folly/Conv.h>
-#include <folly/ScopeGuard.h>
+#include <wdt/Reporting.h>
+#include <wdt/util/ClientSocket.h>
 
 namespace facebook {
 namespace wdt {
@@ -41,8 +39,7 @@ ClientSocket::ClientSocket(ThreadCtx &threadCtx, const string &dest,
 ErrorCode ClientSocket::connect() {
   auto fd = socket_->getFd();
   auto port = socket_->getPort();
-  WDT_CHECK(fd < 0) << "Previous connection not closed " << fd << " "
-                     << port;
+  WDT_CHECK(fd < 0) << "Previous connection not closed " << fd << " " << port;
   // Lookup
   struct addrinfo *infoList = nullptr;
   auto guard = folly::makeGuard([&] {
@@ -128,7 +125,8 @@ ErrorCode ClientSocket::connect() {
             WVLOG(1) << "poll() timed out " << host << " " << port_2;
             continue;
           }
-          WPLOG(ERROR) << "poll() failed " << host << " " << port_2 << " " << fd;
+          WPLOG(ERROR) << "poll() failed " << host << " " << port_2 << " "
+                       << fd;
           closeConnection();
           return CONN_ERROR;
         }
@@ -200,5 +198,5 @@ void ClientSocket::setSendBufferSize() {
 
 ClientSocket::~ClientSocket() {
 }
-}
-}  // end namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

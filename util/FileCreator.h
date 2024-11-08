@@ -7,13 +7,13 @@
  */
 #pragma once
 
+#include <folly/SpinLock.h>
+#include <glog/logging.h>
 #include <wdt/Protocol.h>
 #include <wdt/WdtConfig.h>
 #include <wdt/util/CommonImpl.h>
 #include <wdt/util/TransferLogManager.h>
 
-#include <folly/SpinLock.h>
-#include <glog/logging.h>
 #include <condition_variable>
 #include <map>
 #include <mutex>
@@ -194,5 +194,5 @@ class FileCreator {
   // Set to prevent creating files
   bool skipWrites_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

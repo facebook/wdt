@@ -1,7 +1,7 @@
-#include <wdt/Throttler.h>
-
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <wdt/Throttler.h>
+
 #include <chrono>
 
 namespace facebook {
@@ -90,5 +90,5 @@ TEST(ThrottlerTest, FAIRNESS) {
             << maxThroughput << ", fairness " << fairness;
   EXPECT_LT(fairness, 2.2);
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

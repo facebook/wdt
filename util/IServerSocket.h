@@ -7,10 +7,10 @@
  */
 #pragma once
 
+#include <netdb.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/util/EncryptionUtils.h>
 
-#include <netdb.h>
 #include <string>
 
 namespace facebook {
@@ -47,15 +47,15 @@ class IServerSocket {
    */
   virtual int read(char *buf, int nbyte, bool tryFull = true) = 0;
   /**
-  * Tries to read nbyte data with a specific timeout and periodically checks
-  * for abort
-  */
+   * Tries to read nbyte data with a specific timeout and periodically checks
+   * for abort
+   */
   virtual int readWithTimeout(char *buf, int nbyte, int timeoutMs,
                               bool tryFull) = 0;
   /**
-  * tries to write nbyte data, if retry is true, socket tries
-  * to write as long as it makes some progress within a write timeout
-  */
+   * tries to write nbyte data, if retry is true, socket tries
+   * to write as long as it makes some progress within a write timeout
+   */
   virtual int write(char *buf, int nbyte, bool retry = false) = 0;
 
   virtual ErrorCode shutdownWrites() = 0;

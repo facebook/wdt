@@ -5,8 +5,8 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/ThreadsController.h>
 #include <wdt/WdtOptions.h>
+#include <wdt/util/ThreadsController.h>
 
 using namespace std;
 
@@ -270,12 +270,12 @@ void ThreadsController::setNumFunnels(int numFunnels) {
 int ThreadsController::numRunningThreads() {
   GuardLock lock(controllerMutex_);
   int ret = 0;
-  for (auto& p : threadStateMap_) {
+  for (auto &p : threadStateMap_) {
     if (p.second == RUNNING) {
       ret++;
     }
   }
   return ret;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

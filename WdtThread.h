@@ -12,6 +12,7 @@
 #include <wdt/util/CommonImpl.h>
 #include <wdt/util/ThreadsController.h>
 #include <wdt/util/WdtSocket.h>
+
 #include <memory>
 #include <thread>
 
@@ -116,5 +117,5 @@ class WdtThread {
   /// Pointer to the std::thread executing the transfer
   std::unique_ptr<std::thread> threadPtr_{nullptr};
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

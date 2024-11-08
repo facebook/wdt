@@ -5,12 +5,12 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/FileByteSource.h>
-
 #include <fcntl.h>
 #include <glog/logging.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <wdt/util/FileByteSource.h>
+
 #include <algorithm>
 namespace facebook {
 namespace wdt {
@@ -38,8 +38,8 @@ int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
     if (isDirectReads) {
 #ifndef O_DIRECT
 #ifdef F_NOCACHE
-      WVLOG(1) << "O_DIRECT not found, using F_NOCACHE instead "
-               << "for " << filename;
+      WVLOG(1) << "O_DIRECT not found, using F_NOCACHE instead " << "for "
+               << filename;
       int ret = fcntl(fd, F_NOCACHE, 1);
       if (ret) {
         WPLOG(ERROR) << "Not able to set F_NOCACHE";

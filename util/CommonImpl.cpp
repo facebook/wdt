@@ -93,5 +93,5 @@ void ThreadCtx::setAbortChecker(IAbortChecker const* abortChecker) {
 const IAbortChecker* ThreadCtx::getAbortChecker() const {
   return abortChecker_;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -5,8 +5,8 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/ThreadTransferHistory.h>
 #include <wdt/Sender.h>
+#include <wdt/util/ThreadTransferHistory.h>
 
 namespace facebook {
 namespace wdt {
@@ -282,5 +282,5 @@ void TransferHistoryController::handleGlobalCheckpoint(
   WVLOG(1) << "received global checkpoint " << checkpoint;
   it->second->setGlobalCheckpoint(checkpoint);
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

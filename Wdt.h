@@ -17,6 +17,7 @@
 #include <wdt/WdtBase.h>
 #include <wdt/WdtResourceController.h>
 #include <wdt/util/EncryptionUtils.h>
+
 #include <ostream>
 
 namespace facebook {
@@ -113,7 +114,8 @@ class Wdt {
   /// @return  sender identifier for a transfer request
   static std::string getSenderIdentifier(const WdtTransferRequest &req);
 
-  virtual void wdtSetReceiverSocketCreator(Receiver &/* unused */) {}
+  virtual void wdtSetReceiverSocketCreator(Receiver & /* unused */) {
+  }
 
   /// Virtual Destructor (for class hierarchy)
   virtual ~Wdt() {
@@ -155,5 +157,5 @@ class Wdt {
   Wdt(const Wdt &) = delete;
   Wdt &operator=(const Wdt &) = delete;
 };
-}
-}  // namespaces
+}  // namespace wdt
+}  // namespace facebook

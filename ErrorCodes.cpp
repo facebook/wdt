@@ -5,9 +5,9 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/ErrorCodes.h>
 #include <folly/Conv.h>
 #include <string.h>
+#include <wdt/ErrorCodes.h>
 
 DEFINE_int32(wdt_double_precision, 2, "Precision while printing double");
 DEFINE_bool(wdt_logging_enabled, true, "To enable/disable WDT logging.");
@@ -39,5 +39,5 @@ std::string strerrorStr(int errnum) {
   result.assign(res);
   return result;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

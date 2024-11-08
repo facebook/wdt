@@ -5,8 +5,8 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Throttler.h>
 #include <wdt/ErrorCodes.h>
+#include <wdt/Throttler.h>
 #include <wdt/WdtOptions.h>
 
 namespace facebook {
@@ -197,9 +197,9 @@ void Throttler::printPeriodicLogs(const Clock::time_point& now,
     std::chrono::duration<double> elapsedAvgDuration = now - startTime_;
     double elapsedAvgSeconds = elapsedAvgDuration.count();
     double avgRatePerSec = progress_ / elapsedAvgSeconds;
-    WLOG(INFO) << "Throttler:Transfer_Rates::"
-               << " " << elapsedAvgSeconds << " " << avgRatePerSec << " "
-               << instantRatePerSec << " " << deltaProgress;
+    WLOG(INFO) << "Throttler:Transfer_Rates::" << " " << elapsedAvgSeconds
+               << " " << avgRatePerSec << " " << instantRatePerSec << " "
+               << deltaProgress;
   }
 }
 
@@ -285,5 +285,5 @@ std::ostream& operator<<(std::ostream& stream, const Throttler& throttler) {
          << ", throttlerLogTimeMillis: " << throttler.throttlerLogTimeMillis_;
   return stream;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

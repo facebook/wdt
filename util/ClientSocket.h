@@ -9,8 +9,9 @@
 
 #include <netdb.h>
 #include <wdt/ErrorCodes.h>
-#include <wdt/util/WdtSocket.h>
 #include <wdt/util/IClientSocket.h>
+#include <wdt/util/WdtSocket.h>
+
 #include <string>
 
 namespace facebook {
@@ -24,7 +25,7 @@ class ClientSocket : public IClientSocket {
   /// @return   peer-ip of the connected socket
   const std::string &getPeerIp() const override;
   /// shutdown() is now on WdtSocket as shutdownWrites()
-  virtual ~ClientSocket () override;
+  virtual ~ClientSocket() override;
 
   /// tries to read nbyte data and periodically checks for abort
   int read(char *buf, int nbyte, bool tryFull = true) override {
@@ -34,7 +35,7 @@ class ClientSocket : public IClientSocket {
   /// tries to read nbyte data with a specific and periodically checks for abort
   int readWithTimeout(char *buf, int nbyte, int timeoutMs,
                       bool tryFull = true) override {
-    return socket_->readWithTimeout(buf, nbyte, timeoutMs,tryFull);
+    return socket_->readWithTimeout(buf, nbyte, timeoutMs, tryFull);
   }
 
   /// tries to write nbyte data and periodically checks for abort, if retry is
@@ -121,5 +122,5 @@ class ClientSocket : public IClientSocket {
   std::unique_ptr<WdtSocket> socket_{nullptr};
   ThreadCtx &threadCtx_;
 };
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

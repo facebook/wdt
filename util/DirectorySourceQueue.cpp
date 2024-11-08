@@ -5,18 +5,17 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/DirectorySourceQueue.h>
-
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <wdt/Protocol.h>
+#include <wdt/util/DirectorySourceQueue.h>
+
 #include <algorithm>
+#include <regex>
 #include <set>
 #include <utility>
-
-#include <fcntl.h>
-#include <regex>
 
 // NOTE: this should remain standalone code and not use WdtOptions directly
 // also note this is used not just by the Sender but also by the receiver
@@ -104,8 +103,8 @@ void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   }
 }
 
-std::vector<SourceMetaData *>
-    &DirectorySourceQueue::getDiscoveredFilesMetaData() {
+std::vector<SourceMetaData *> &
+DirectorySourceQueue::getDiscoveredFilesMetaData() {
   return sharedFileData_;
 }
 
@@ -568,7 +567,7 @@ std::vector<string> &DirectorySourceQueue::getFailedDirectories() {
   return failedDirectories_;
 }
 
-bool DirectorySourceQueue::enqueueFiles(std::vector<WdtFileInfo>& fileInfo) {
+bool DirectorySourceQueue::enqueueFiles(std::vector<WdtFileInfo> &fileInfo) {
   for (auto &info : fileInfo) {
     if (threadCtx_->getAbortChecker()->shouldAbort()) {
       WLOG(ERROR) << "Directory transfer thread aborted";
@@ -724,7 +723,6 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
 void DirectorySourceQueue::waitForPreviousTransfer(
     std::chrono::milliseconds progressReportInterval,
     std::function<int64_t()> numActiveThreadsFn) {
-
   // don't call into numActiveThreadsFn with lock held
   int64_t numActiveThreads = numActiveThreadsFn();
 
@@ -749,5 +747,5 @@ void DirectorySourceQueue::waitForPreviousTransfer(
     lock.lock();
   }
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

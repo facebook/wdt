@@ -12,13 +12,12 @@
  *      Author: ldemailly
  */
 
+#include <gtest/gtest.h>
+#include <wdt/util/Stats.h>
+
 #include <cmath>
 #include <iostream>
 #include <sstream>
-
-#include <gtest/gtest.h>
-
-#include <wdt/util/Stats.h>
 
 using std::ostringstream;
 
@@ -213,7 +212,7 @@ TEST(StatsTest, HistogramPercentile64BitDiv) {
   EXPECT_EQ(4000000000, h.calcPercentile(100));
 }
 
-}  // namespace wormhole
+}  // namespace wdt
 }  // namespace facebook
 
 int main(int argc, char** argv) {

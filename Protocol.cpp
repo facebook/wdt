@@ -5,17 +5,16 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Protocol.h>
-
 #include <wdt/ErrorCodes.h>
+#include <wdt/Protocol.h>
 #include <wdt/WdtOptions.h>
 #include <wdt/util/SerializationUtil.h>
 
 namespace facebook {
 namespace wdt {
 
-using std::string;
 using folly::ByteRange;
+using std::string;
 
 const int Protocol::protocol_version = WDT_PROTOCOL_VERSION;
 
@@ -561,5 +560,5 @@ bool Protocol::decodeFooter(char *src, int64_t &off, int64_t max,
   off += offset(br, obr);
   return ok;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

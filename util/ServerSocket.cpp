@@ -5,12 +5,13 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/ServerSocket.h>
 #include <fcntl.h>
 #include <folly/Conv.h>
 #include <glog/logging.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <wdt/util/ServerSocket.h>
+
 #include <algorithm>
 namespace facebook {
 namespace wdt {
@@ -20,9 +21,9 @@ ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
                            int64_t ivChangeInterval,
                            Func &&tagVerificationSuccessCallback)
     : threadCtx_(threadCtx), backlog_(backlog) {
-  socket_ = std::make_unique<WdtSocket>(threadCtx, port, encryptionParams,
-                                    ivChangeInterval,
-                                    std::move(tagVerificationSuccessCallback));
+  socket_ = std::make_unique<WdtSocket>(
+      threadCtx, port, encryptionParams, ivChangeInterval,
+      std::move(tagVerificationSuccessCallback));
   // for backward compatibility
   socket_->enableUnencryptedPeerSupport();
 }
@@ -68,8 +69,7 @@ int ServerSocket::listenInternal(struct addrinfo *info,
   int optval = 1;
   if (setsockopt(listeningFd, SOL_SOCKET, SO_REUSEADDR, &optval,
                  sizeof(optval)) != 0) {
-    WPLOG(ERROR) << "Unable to set SO_REUSEADDR option " << host << " "
-                 << port;
+    WPLOG(ERROR) << "Unable to set SO_REUSEADDR option " << host << " " << port;
   }
   if (info->ai_family == AF_INET6) {
     // for ipv6 address, turn on ipv6 only flag
@@ -286,8 +286,8 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
         WPLOG(ERROR) << "accept error";
         return CONN_ERROR;
       }
-      WdtSocket::getNameInfo((struct sockaddr *)&addr, addrLen,
-                             peerIp_, peerPort_);
+      WdtSocket::getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_,
+                             peerPort_);
       WVLOG(1) << "New connection, fd : " << fd << " from " << peerIp_ << " "
                << peerPort_;
       socket_->setFd(fd);
@@ -331,5 +331,5 @@ std::string ServerSocket::getPeerPort() const {
 int ServerSocket::getBackLog() const {
   return backlog_;
 }
-}
-}  // end namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

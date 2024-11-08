@@ -9,6 +9,7 @@
 
 #include <wdt/ErrorCodes.h>
 #include <wdt/util/EncryptionUtils.h>
+
 #include <string>
 
 namespace facebook {

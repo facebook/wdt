@@ -6,7 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 #include <assert.h>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <time.h>
+#include <unistd.h>
+#include <wdt/WdtConfig.h>
+
 #include <array>
 #include <fstream>
 #include <future>
@@ -16,12 +21,6 @@
 #include <random>
 #include <vector>
 
-#include <unistd.h>
-
-#include <gflags/gflags.h>
-#include <glog/logging.h>
-
-#include <wdt/WdtConfig.h>
 #include "wdt/bench/Bigram.h"
 
 /* Future "interface"/"features":

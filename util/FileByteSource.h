@@ -8,7 +8,6 @@
 #pragma once
 
 #include <unistd.h>
-
 #include <wdt/ByteSource.h>
 #include <wdt/util/CommonImpl.h>
 
@@ -135,5 +134,5 @@ class FileByteSource : public ByteSource {
   /// transfer stats
   TransferStats transferStats_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -5,14 +5,14 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/SenderThread.h>
-#include <folly/lang/Bits.h>
-#include <folly/hash/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/String.h>
+#include <folly/hash/Checksum.h>
+#include <folly/lang/Bits.h>
 #include <sys/stat.h>
 #include <wdt/Sender.h>
+#include <wdt/SenderThread.h>
 
 namespace facebook {
 namespace wdt {
@@ -99,9 +99,10 @@ std::unique_ptr<IClientSocket> SenderThread::connectToReceiver(
     return nullptr;
   }
 
-  (connectAttempts > 1) ? WTLOG(WARNING) : WTLOG(INFO)
-      << "Connection took " << connectAttempts << " attempt(s) and "
-      << elapsedSecsConn << " seconds. port " << port;
+  (connectAttempts > 1) ? WTLOG(WARNING)
+                        : WTLOG(INFO) << "Connection took " << connectAttempts
+                                      << " attempt(s) and " << elapsedSecsConn
+                                      << " seconds. port " << port;
   return socket;
 }
 
@@ -846,10 +847,10 @@ SenderState SenderThread::processAbortCmd() {
                         checkpoint);
   threadStats_.setRemoteErrorCode(remoteError);
   std::string failedFileName = transferHistory.getSourceId(checkpoint);
-  WTLOG(WARNING) << "Received abort on "
-                 << " remote protocol version " << negotiatedProtocol
-                 << " remote error code " << errorCodeToStr(remoteError)
-                 << " file " << failedFileName << " checkpoint " << checkpoint;
+  WTLOG(WARNING) << "Received abort on " << " remote protocol version "
+                 << negotiatedProtocol << " remote error code "
+                 << errorCodeToStr(remoteError) << " file " << failedFileName
+                 << " checkpoint " << checkpoint;
   wdtParent_->abort(remoteError);
   if (remoteError == VERSION_MISMATCH) {
     if (Protocol::negotiateProtocol(
@@ -1027,5 +1028,5 @@ ErrorCode SenderThread::getThreadAbortCode() {
   }
   return OK;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -8,6 +8,7 @@
 #pragma once
 #include <wdt/ErrorCodes.h>
 #include <wdt/WdtThread.h>
+
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -373,5 +374,5 @@ class ThreadsController {
   /// Vector of barriers, can be read/modified by get/set barrier methods
   std::vector<std::shared_ptr<Barrier>> barriers_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

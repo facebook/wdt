@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 /**
-* Functional tests for varint encoding/decoding
-*
-* @author ldemailly
-*/
+ * Functional tests for varint encoding/decoding
+ *
+ * @author ldemailly
+ */
 #include <wdt/util/SerializationUtil.h>
 
 #include "wdt/test/TestCommon.h"
@@ -173,8 +173,8 @@ TEST(encDecI64, encodeDecodeI64SmallRange) {
     prevB = b;
   }
 }
-}
-}  // end of namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook
 // -- main
 
 int main(int argc, char** argv) {

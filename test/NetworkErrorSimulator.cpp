@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <wdt/WdtOptions.h>
 #include <wdt/test/TestCommon.h>
+
 #include <thread>
 
 namespace facebook {
@@ -35,5 +36,5 @@ void simulateNetworkError() {
     }
   }
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -9,6 +9,7 @@
 
 #include <folly/Range.h>
 #include <wdt/ErrorCodes.h>
+
 #include <string>
 
 namespace facebook {
@@ -239,5 +240,5 @@ inline bool decodeVarI64(const char *data, size_t datalen, int64_t &pos,
   }
   return ok;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

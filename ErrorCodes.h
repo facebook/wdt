@@ -10,6 +10,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <wdt/WdtConfig.h>
+
 #include <iomanip>
 #include <string>
 
@@ -26,16 +27,18 @@ namespace wdt {
 
 // Call regular google log but prefix with wdt for easier extraction later
 #define WDT_LOG_PREFIX "wdt>\t"
-#define WLOG(X) LOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << \
-WDT_DOUBLE_FORMATTING
-#define WVLOG(X) VLOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << \
-WDT_DOUBLE_FORMATTING
-#define WPLOG(X) PLOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << \
-WDT_DOUBLE_FORMATTING
-#define WLOG_IF(X, Y) LOG_IF(X, WDT_LOGGING_ENABLED && (Y)) << WDT_LOG_PREFIX \
-<< WDT_DOUBLE_FORMATTING
-#define WVLOG_IF(X, Y) VLOG_IF(X, WDT_LOGGING_ENABLED && (Y)) << \
-WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
+#define WLOG(X) \
+  LOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
+#define WVLOG(X) \
+  VLOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
+#define WPLOG(X) \
+  PLOG_IF(X, WDT_LOGGING_ENABLED) << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
+#define WLOG_IF(X, Y)                   \
+  LOG_IF(X, WDT_LOGGING_ENABLED && (Y)) \
+      << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
+#define WVLOG_IF(X, Y)                   \
+  VLOG_IF(X, WDT_LOGGING_ENABLED && (Y)) \
+      << WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
 #define WTLOG(X) WLOG(X) << *this << " "
 #define WTVLOG(X) WVLOG(X) << *this << " "
 #define WTPLOG(X) WPLOG(X) << *this << " "
@@ -84,9 +87,9 @@ WDT_LOG_PREFIX << WDT_DOUBLE_FORMATTING
   X(ENCRYPTION_ERROR)           /** Error related to encryption */             \
   X(ALREADY_EXISTS)             /** Create attempt for existing id */          \
   X(GLOBAL_CHECKPOINT_ABORT)    /** Abort due to global checkpoint */          \
-  X(INVALID_REQUEST) /** Request for creation of wdt object invalid */         \
+  X(INVALID_REQUEST)        /** Request for creation of wdt object invalid */  \
   X(SENDER_START_TIMED_OUT) /** Sender start timed out */                      \
-  X(AUTH_ERROR)             /** Authentication Error */                        \
+  X(AUTH_ERROR)             /** Authentication Error */
 
 enum ErrorCode {
 #define X(A) A,
@@ -118,6 +121,6 @@ ErrorCode getMoreInterestingError(ErrorCode err1, ErrorCode err2);
  * (similar to folly::errnoStr() but without pulling in all the dependencies)
  */
 std::string strerrorStr(int errnum);
-}
-}
+}  // namespace wdt
+}  // namespace facebook
 #undef ERRORS

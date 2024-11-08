@@ -9,6 +9,11 @@
 
 #include <dirent.h>
 #include <glog/logging.h>
+#include <wdt/Protocol.h>
+#include <wdt/SourceQueue.h>
+#include <wdt/WdtTransferRequest.h>
+#include <wdt/util/FileByteSource.h>
+
 #include <algorithm>
 #include <condition_variable>
 #include <mutex>
@@ -17,11 +22,6 @@
 #include <thread>
 #include <unordered_map>
 #include <utility>
-
-#include <wdt/Protocol.h>
-#include <wdt/SourceQueue.h>
-#include <wdt/WdtTransferRequest.h>
-#include <wdt/util/FileByteSource.h>
 
 namespace facebook {
 namespace wdt {
@@ -263,7 +263,7 @@ class DirectorySourceQueue : public SourceQueue {
    * Stat the input files and populate queue
    * @return                true on success, false on error
    */
-  bool enqueueFiles(std::vector<WdtFileInfo>& fileInfo);
+  bool enqueueFiles(std::vector<WdtFileInfo> &fileInfo);
 
   /**
    * initial creation from either explore or enqueue files, uses
@@ -445,5 +445,5 @@ class DirectorySourceQueue : public SourceQueue {
   /// delete extra files in the receiver side
   bool deleteFiles_{false};
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 #include <wdt/Wdt.h>
 #include <wdt/test/TestCommon.h>
+
 #include <fstream>
 
 namespace facebook {
@@ -226,8 +227,8 @@ TEST(FileByteSource, MULTIPLEFILES_REGULAR) {
     testReadSize(sizeToRead, *byteSource);
   }
 }
-}
-}  // namespaces
+}  // namespace wdt
+}  // namespace facebook
 
 int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;

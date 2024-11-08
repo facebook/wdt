@@ -292,8 +292,7 @@ WdtResourceController::WdtResourceController(
 
 WdtResourceController::WdtResourceController(const WdtOptions &options)
     : WdtResourceController(
-          options,
-          std::make_shared<Throttler>(options.getThrottlerOptions())) {
+          options, std::make_shared<Throttler>(options.getThrottlerOptions())) {
 }
 
 WdtResourceController::WdtResourceController()
@@ -345,9 +344,9 @@ bool WdtResourceController::hasSenderQuotaInternal(
     const std::shared_ptr<WdtNamespaceController> &controller) const {
   GuardLock lock(controllerMutex_);
   if ((numSenders_ >= maxNumSenders_) && (maxNumSenders_ > 0)) {
-    WLOG(WARNING) << "Exceeded quota on max senders. "
-                  << "Max num senders " << maxNumSenders_ << " and we have "
-                  << numSenders_ << " existing senders";
+    WLOG(WARNING) << "Exceeded quota on max senders. " << "Max num senders "
+                  << maxNumSenders_ << " and we have " << numSenders_
+                  << " existing senders";
     return false;
   }
   if (controller && !controller->hasSenderQuota()) {
@@ -407,9 +406,9 @@ bool WdtResourceController::hasReceiverQuotaInternal(
     const std::shared_ptr<WdtNamespaceController> &controller) const {
   GuardLock lock(controllerMutex_);
   if ((numReceivers_ >= maxNumReceivers_) && (maxNumReceivers_ > 0)) {
-    WLOG(WARNING) << "Exceeded quota on max receivers. "
-                  << "Max num receivers " << maxNumReceivers_ << " and we have "
-                  << numReceivers_ << " existing receivers";
+    WLOG(WARNING) << "Exceeded quota on max receivers. " << "Max num receivers "
+                  << maxNumReceivers_ << " and we have " << numReceivers_
+                  << " existing receivers";
     return false;
   }
   if (controller && !controller->hasReceiverQuota()) {

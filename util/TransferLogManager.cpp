@@ -5,18 +5,16 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/TransferLogManager.h>
-
-#include <wdt/util/SerializationUtil.h>
-
 #include <fcntl.h>
-#include <folly/lang/Bits.h>
 #include <folly/Conv.h>
 #include <folly/Range.h>
-
+#include <folly/lang/Bits.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <wdt/Reporting.h>
+#include <wdt/util/SerializationUtil.h>
+#include <wdt/util/TransferLogManager.h>
+
 #include <ctime>
 #include <iomanip>
 
@@ -1117,5 +1115,5 @@ ErrorCode LogParser::parseLog(int fd, string &senderIp,
   }
   return status;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

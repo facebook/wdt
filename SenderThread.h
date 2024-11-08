@@ -11,6 +11,7 @@
 #include <wdt/WdtThread.h>
 #include <wdt/util/IClientSocket.h>
 #include <wdt/util/ThreadTransferHistory.h>
+
 #include <thread>
 
 namespace facebook {
@@ -310,5 +311,5 @@ class SenderThread : public WdtThread {
   /// Thread history controller shared across all threads
   TransferHistoryController *transferHistoryController_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

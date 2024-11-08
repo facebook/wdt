@@ -10,6 +10,7 @@
 #include <folly/Memory.h>
 #include <openssl/evp.h>
 #include <wdt/ErrorCodes.h>
+
 #include <string>
 
 namespace facebook {
@@ -206,5 +207,5 @@ class AESDecryptor : public AESBase {
   static bool finishInternal(EVP_CIPHER_CTX* ctx, EncryptionType type,
                              const std::string& tag);
 };
-}
-}  // End of namespaces
+}  // namespace wdt
+}  // namespace facebook

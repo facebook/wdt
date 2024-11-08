@@ -6,10 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 #pragma once
+#include <folly/Optional.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/Protocol.h>
 #include <wdt/WdtOptions.h>
-#include <folly/Optional.h>
+
 #include <functional>
 #include <map>
 #include <memory>
@@ -267,5 +268,5 @@ struct WdtTransferRequest {
    */
   std::string generateUrlInternal(bool genFull, bool forLogging) const;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

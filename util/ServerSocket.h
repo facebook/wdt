@@ -7,11 +7,11 @@
  */
 #pragma once
 
-#include <wdt/ErrorCodes.h>
-#include <wdt/util/WdtSocket.h>
-#include <wdt/util/IServerSocket.h>
-
 #include <netdb.h>
+#include <wdt/ErrorCodes.h>
+#include <wdt/util/IServerSocket.h>
+#include <wdt/util/WdtSocket.h>
+
 #include <string>
 #include <vector>
 
@@ -167,5 +167,5 @@ class ServerSocket : public IServerSocket {
                                    const std::string &host,
                                    addrInfoList &infoList);
 };
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

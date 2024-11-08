@@ -5,9 +5,9 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/WdtOptions.h>
 #include <glog/logging.h>
 #include <wdt/Throttler.h>
+#include <wdt/WdtOptions.h>
 
 namespace facebook {
 namespace wdt {
@@ -97,5 +97,5 @@ WdtOptions& WdtOptions::getMutable() {
 void WdtOptions::copyInto(const WdtOptions& src) {
   *this = src;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

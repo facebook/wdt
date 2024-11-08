@@ -7,9 +7,9 @@
  */
 #pragma once
 
-#include <atomic>
-
 #include <wdt/Reporting.h>
+
+#include <atomic>
 
 namespace facebook {
 namespace wdt {
@@ -151,5 +151,5 @@ std::atomic<uint64_t> SignalSubscriber<Tag>::globalEpoch_ = {};
 
 struct ReportPerfTag {};
 typedef SignalSubscriber<ReportPerfTag> ReportPerfSignalSubscriber;
-}
-}
+}  // namespace wdt
+}  // namespace facebook

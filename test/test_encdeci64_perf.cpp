@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 /**
-* Performance benchmark/tests for varint encoding/decoding
-*
-* @author ldemailly
-*/
-#include <wdt/util/SerializationUtil.h>
-
+ * Performance benchmark/tests for varint encoding/decoding
+ *
+ * @author ldemailly
+ */
 #include <common/encode/Coding.h>  // this won't work outside of fb
 #include <folly/Benchmark.h>
+#include <wdt/util/SerializationUtil.h>
+
 #include "wdt/test/TestCommon.h"
 
 using namespace facebook::wdt;

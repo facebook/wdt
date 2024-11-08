@@ -5,11 +5,10 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Wdt.h>
-#include <wdt/util/SerializationUtil.h>
-
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <wdt/Wdt.h>
+#include <wdt/util/SerializationUtil.h>
 
 namespace facebook {
 namespace wdt {
@@ -215,8 +214,8 @@ TEST(Protocol, Simple_Settings) {
 TEST(Protocol, FileChunksInfo) {
   testFileChunksInfo();
 }
-}
-}  // namespaces
+}  // namespace wdt
+}  // namespace facebook
 
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;

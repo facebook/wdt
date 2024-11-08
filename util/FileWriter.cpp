@@ -5,13 +5,12 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/FileWriter.h>
-#include <wdt/util/CommonImpl.h>
-
 #include <fcntl.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <sys/types.h>
+#include <wdt/util/CommonImpl.h>
+#include <wdt/util/FileWriter.h>
 
 namespace facebook {
 namespace wdt {
@@ -21,8 +20,8 @@ FileWriter::~FileWriter() {
   // caller should always call sync() and close() manually to check the error
   // code.
   if (!isClosed()) {
-    WLOG(ERROR ) << "File " << blockDetails_->fileName
-                 << " was not closed and needed to be closed in the dtor";
+    WLOG(ERROR) << "File " << blockDetails_->fileName
+                << " was not closed and needed to be closed in the dtor";
     close();
   }
 }
@@ -68,7 +67,7 @@ ErrorCode FileWriter::sync() {
     if (::fsync(fd_) < 0) {
       WPLOG(ERROR) << "Unable to fsync() fd " << fd_;
       return FILE_WRITE_ERROR;
-   }
+    }
   }
 #ifdef HAS_POSIX_FADVISE
   if (!options.skip_fadvise) {
@@ -177,10 +176,8 @@ bool FileWriter::syncFileRange(int64_t written, bool forced) {
                             POSIX_FADV_DONTNEED);
       }
       if (ret != 0) {
-        WPLOG(ERROR) << "posix_fadvise failed for "
-                     << blockDetails_->fileName
-                     << " " << nextSyncOffset_ << " "
-                     << writtenSinceLastSync_;
+        WPLOG(ERROR) << "posix_fadvise failed for " << blockDetails_->fileName
+                     << " " << nextSyncOffset_ << " " << writtenSinceLastSync_;
         return false;
       }
     }
@@ -194,5 +191,5 @@ bool FileWriter::syncFileRange(int64_t written, bool forced) {
 #endif
   return true;
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

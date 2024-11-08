@@ -54,5 +54,5 @@ WdtThread::~WdtThread() {
     finish();
   }
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

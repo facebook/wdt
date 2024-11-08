@@ -8,14 +8,12 @@
  *  Created on: Oct 18, 2011
  *      Author: ldemailly
  */
-#include <iostream>
-
+#include <fb303/ExportedHistogramMapImpl.h>
 #include <folly/Benchmark.h>
 #include <folly/Singleton.h>
-
 #include <wdt/util/Stats.h>
 
-#include <fb303/ExportedHistogramMapImpl.h>
+#include <iostream>
 
 DEFINE_int32(num_threads, 8, "number of threads");
 DEFINE_double(print_interval, 1, "number of seconds in between 2 stats dump");
@@ -141,7 +139,7 @@ BENCHMARK_MULTI(MtIncrement) {
 }
 #endif
 
-}  // namespace wormhole
+}  // namespace wdt
 }  // namespace facebook
 
 int main(int argc, char** argv) {

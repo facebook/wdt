@@ -5,19 +5,18 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Receiver.h>
-#include <wdt/util/EncryptionUtils.h>
-#include <wdt/util/ServerSocket.h>
-
-#include <folly/lang/Bits.h>
-#include <folly/Conv.h>
-
 #include <fcntl.h>
+#include <folly/Conv.h>
+#include <folly/lang/Bits.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <wdt/Receiver.h>
+#include <wdt/util/EncryptionUtils.h>
+#include <wdt/util/ServerSocket.h>
+
 #include <thread>
 
 namespace facebook {
@@ -49,7 +48,7 @@ Receiver::Receiver(int port, int numSockets, const std::string &destDir)
 }
 
 void Receiver::setSocketCreator(Receiver::ISocketCreator *socketCreator) {
-    socketCreator_ = socketCreator;
+  socketCreator_ = socketCreator;
 }
 
 void Receiver::traverseDestinationDir(
@@ -560,5 +559,5 @@ void Receiver::fixAndCloseTransferLog(bool transferSuccess) {
     transferLogManager_->unlink();
   }
 }
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

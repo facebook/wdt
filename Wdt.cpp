@@ -1,7 +1,6 @@
 #include <wdt/Wdt.h>
 #include <wdt/util/WdtFlags.h>
 
-
 namespace facebook {
 namespace wdt {
 

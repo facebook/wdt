@@ -12,6 +12,7 @@
 #include <wdt/util/FileCreator.h>
 #include <wdt/util/IServerSocket.h>
 #include <wdt/util/TransferLogManager.h>
+
 #include <chrono>
 #include <memory>
 #include <string>
@@ -216,5 +217,5 @@ class Receiver : public WdtBase {
 
   AcceptMode acceptMode_{ACCEPT_WITH_RETRIES};
 };
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

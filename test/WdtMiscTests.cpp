@@ -95,8 +95,8 @@ TEST(BasicTest, ThrottlerWithoutReporting) {
   EXPECT_GT(durationMs, 1900);
   EXPECT_LT(durationMs, 2200);
 }
-}
-}  // namespace end
+}  // namespace wdt
+}  // namespace facebook
 
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;

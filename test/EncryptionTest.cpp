@@ -1,9 +1,8 @@
-#include <wdt/util/EncryptionUtils.h>
-
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <wdt/util/EncryptionUtils.h>
 
-#include <algorithm> // for std::find
+#include <algorithm>  // for std::find
 
 namespace facebook {
 namespace wdt {
@@ -118,8 +117,8 @@ TEST(Encryption, SuperBasic) {
     EXPECT_EQ(text2, text3);  // paranoia
   }
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook
 
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;

@@ -5,17 +5,16 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <algorithm>
-
-#include <boost/filesystem.hpp>
 #include <folly/FileUtil.h>
 #include <folly/Random.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-
 #include <wdt/Receiver.h>
 #include <wdt/Sender.h>
 #include <wdt/Wdt.h>
+
+#include <algorithm>
+#include <boost/filesystem.hpp>
 
 namespace facebook {
 namespace wdt {
@@ -116,7 +115,7 @@ TEST(SenderTest, FileInfoGeneratorReceiverError) {
 }  // namespace wdt
 }  // namespace facebook
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);

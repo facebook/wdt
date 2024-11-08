@@ -5,14 +5,12 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Wdt.h>
-#include <wdt/test/TestCommon.h>
-
+#include <folly/String.h>  // for humanify
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-
-#include <folly/String.h>  // for humanify
+#include <wdt/Wdt.h>
+#include <wdt/test/TestCommon.h>
 
 using namespace std;
 
@@ -397,8 +395,8 @@ TEST(Wdt, WdtInstanceTest) {
   EXPECT_EQ(&wdt2, &wdt3);
   EXPECT_NE(&wdt1, &wdt4);
 }
-}
-}  // namespace end
+}  // namespace wdt
+}  // namespace facebook
 
 int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;

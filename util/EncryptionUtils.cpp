@@ -5,16 +5,14 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/util/EncryptionUtils.h>
 #include <folly/Conv.h>
 #include <folly/SpinLock.h>
-#include <folly/String.h>            // for humanify
-#include <wdt/WdtTransferRequest.h>  // for to/fromHex utils
-
+#include <folly/String.h>  // for humanify
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
-
-#include <string.h>  // for memset
+#include <string.h>                  // for memset
+#include <wdt/WdtTransferRequest.h>  // for to/fromHex utils
+#include <wdt/util/EncryptionUtils.h>
 
 namespace facebook {
 namespace wdt {
@@ -28,9 +26,8 @@ static_assert(NUM_ENC_TYPES <= 16, "need to change encoding for types");
 const char* const kEncryptionTypeDescriptions[] = {"none", "aes128ctr",
                                                    "aes128gcm"};
 
-static_assert(NUM_ENC_TYPES ==
-                  sizeof(kEncryptionTypeDescriptions) /
-                      sizeof(kEncryptionTypeDescriptions[0]),
+static_assert(NUM_ENC_TYPES == sizeof(kEncryptionTypeDescriptions) /
+                                   sizeof(kEncryptionTypeDescriptions[0]),
               "must provide description for all encryption types");
 
 std::string encryptionTypeToStr(EncryptionType encryptionType) {
@@ -471,5 +468,5 @@ AESDecryptor::~AESDecryptor() {
   std::string tag;
   finish(tag);
 }
-}
-}  // end of namespaces
+}  // namespace wdt
+}  // namespace facebook

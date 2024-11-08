@@ -5,19 +5,16 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Sender.h>
-
-#include <wdt/SenderThread.h>
-#include <wdt/Throttler.h>
-
-#include <wdt/util/ClientSocket.h>
-
-#include <folly/lang/Bits.h>
-#include <folly/hash/Checksum.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/ScopeGuard.h>
 #include <folly/String.h>
+#include <folly/hash/Checksum.h>
+#include <folly/lang/Bits.h>
+#include <wdt/Sender.h>
+#include <wdt/SenderThread.h>
+#include <wdt/Throttler.h>
+#include <wdt/util/ClientSocket.h>
 
 namespace facebook {
 namespace wdt {
@@ -475,5 +472,5 @@ void Sender::logPerfStats() const {
   report += dirQueue_->getPerfReport();
   WLOG(INFO) << report;
 }
-}
-}  // namespace facebook::wdt
+}  // namespace wdt
+}  // namespace facebook

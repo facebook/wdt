@@ -5,9 +5,6 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/Wdt.h>
-#include <wdt/test/TestCommon.h>
-
 #include <folly/Conv.h>
 #include <folly/Range.h>
 #include <folly/ScopeGuard.h>
@@ -16,6 +13,8 @@
 #include <gtest/gtest.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <wdt/Wdt.h>
+#include <wdt/test/TestCommon.h>
 
 using namespace std;
 
@@ -28,7 +27,9 @@ void basicTest(bool resumption, bool nosize) {
   // Tmpfile (deleted)
   FILE *tmp = tmpfile();
   ASSERT_NE(tmp, nullptr);
-  SCOPE_EXIT { fclose(tmp); };
+  SCOPE_EXIT {
+    fclose(tmp);
+  };
   std::string contents = "foobar";
   ASSERT_EQ(contents.size(), fwrite(contents.data(), 1, contents.size(), tmp));
   ASSERT_EQ(0, fflush(tmp));
@@ -113,8 +114,8 @@ TEST(DupSend, DuplicateSend) {
   auto report = s.finish();
   EXPECT_EQ(OK, report->getSummary().getErrorCode());
 }
-}
-}  // namespace end
+}  // namespace wdt
+}  // namespace facebook
 
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;

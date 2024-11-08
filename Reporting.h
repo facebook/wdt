@@ -7,6 +7,7 @@
  */
 #pragma once
 
+#include <folly/synchronization/RWSpinLock.h>
 #include <wdt/AbortChecker.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/WdtOptions.h>
@@ -20,8 +21,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <folly/synchronization/RWSpinLock.h>
 
 namespace facebook {
 namespace wdt {
@@ -600,5 +599,5 @@ class PerfStatReport {
   /// mutex to support synchronized access
   mutable folly::RWSpinLock mutex_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

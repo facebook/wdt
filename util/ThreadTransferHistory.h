@@ -10,6 +10,7 @@
 #include <wdt/Protocol.h>
 #include <wdt/Reporting.h>
 #include <wdt/util/DirectorySourceQueue.h>
+
 #include <vector>
 
 namespace facebook {
@@ -165,5 +166,5 @@ class TransferHistoryController {
   std::unordered_map<int32_t, std::unique_ptr<ThreadTransferHistory>>
       threadHistoriesMap_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

@@ -379,5 +379,5 @@ class LogParser {
   /// set of invalid seq-ids
   std::set<int64_t> invalidSeqIds_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

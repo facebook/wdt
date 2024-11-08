@@ -82,5 +82,5 @@ class FileWriter : public Writer {
   /// reference to file creator
   FileCreator *fileCreator_;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook

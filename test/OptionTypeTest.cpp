@@ -5,13 +5,12 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 #include <wdt/Wdt.h>
 #include <wdt/WdtOptions.h>
 #include <wdt/util/WdtFlags.h>
 #include <wdt/util/WdtFlagsMacros.h>
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 /*
  * Tests in this file can not be run in the same process. That is because we
@@ -91,8 +90,8 @@ TEST(OptionType, DiskOptionTypeTest3) {
 TEST(OptionType, DiskOptionTypeTest4) {
   overrideTest2("disk");
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook
 
 int main(int argc, char *argv[]) {
   FLAGS_logtostderr = true;

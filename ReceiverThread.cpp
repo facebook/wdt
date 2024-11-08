@@ -5,13 +5,13 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <wdt/ReceiverThread.h>
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/ScopeGuard.h>
 #include <folly/String.h>
 #include <folly/hash/Checksum.h>
 #include <folly/lang/Bits.h>
+#include <wdt/ReceiverThread.h>
 #include <wdt/util/FileWriter.h>
 
 namespace facebook {
@@ -455,9 +455,8 @@ ReceiverState ReceiverThread::processFileCmd() {
   threadStats_.addHeaderBytes(headerBytes);
   threadStats_.addEffectiveBytes(headerBytes, 0);
   if (!success) {
-    WTLOG(ERROR) << "Error decoding at"
-                 << " ooff:" << oldOffset_ << " off_: " << off_
-                 << " numRead_: " << numRead_;
+    WTLOG(ERROR) << "Error decoding at" << " ooff:" << oldOffset_
+                 << " off_: " << off_ << " numRead_: " << numRead_;
     threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }
@@ -692,8 +691,8 @@ void ReceiverThread::markReceivedBlocksVerified() {
 ReceiverState ReceiverThread::processDoneCmd() {
   WTVLOG(1) << "entered PROCESS_DONE_CMD state";
   if (numRead_ != Protocol::kMinBufLength) {
-    WTLOG(ERROR) << "Unexpected state for done command"
-                 << " off_: " << off_ << " numRead_: " << numRead_;
+    WTLOG(ERROR) << "Unexpected state for done command" << " off_: " << off_
+                 << " numRead_: " << numRead_;
     threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return FINISH_WITH_ERROR;
   }

@@ -7,12 +7,11 @@
  * of patent right can be found in the PATENTS file in the same directory.
  */
 
-#include <wdt/test/TestCommon.h>
-#include <wdt/util/FileWriter.h>
-#include <wdt/Wdt.h>
-
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <wdt/Wdt.h>
+#include <wdt/test/TestCommon.h>
+#include <wdt/util/FileWriter.h>
 
 #include <string_view>
 
@@ -22,7 +21,7 @@ constexpr std::string_view kRandomFileName = "random_file";
 constexpr std::string_view kRootDir = "/tmp/wdt.text";
 const int kNumThreads = 1;
 
-}
+}  // namespace
 
 namespace facebook {
 namespace wdt {
@@ -34,21 +33,22 @@ bool canSupportODirect() {
   return false;
 }
 
-void basicTest(WdtOptions& opts) {
+void basicTest(WdtOptions &opts) {
   auto &thread_ctx = ThreadCtx(opts, false);
   auto &xfer_log_manager = TransferLogManager(opts, kRootDir);
 
   // Existing File
   BlockDetails block_details = {
-    .fileName = kRandomFileName,
-    .seqId = 2,
-    .fileSize = 4 * (2 << 22), // 16M file
-    .offset = 0,
-    .dataSize = 2 << 12 , // 4 kB blocks
-    .allocationStatus = EXISTS_CORRECT_SIZE,
+      .fileName = kRandomFileName,
+      .seqId = 2,
+      .fileSize = 4 * (2 << 22),  // 16M file
+      .offset = 0,
+      .dataSize = 2 << 12,  // 4 kB blocks
+      .allocationStatus = EXISTS_CORRECT_SIZE,
   };
 
-  FileCreator f_creator = FileCreator(kRootDir, kNumRhreads, xfer_log_manager, false);
+  FileCreator f_creator =
+      FileCreator(kRootDir, kNumRhreads, xfer_log_manager, false);
   FileWriter f_writer = FileWriter(thread_ctx, &block_details, &f_creator);
 
   // Random data to write to file.
@@ -85,8 +85,8 @@ TEST(FileWriterTest, ODirectWriteTest) {
   opts.odirect_reads = true;
   basicTest(opts);
 }
-} // namespace wdt
-} // namespace facebook
+}  // namespace wdt
+}  // namespace facebook
 
 int main(int argc, char **argv) {
   FLAGS_logtostderr = true;

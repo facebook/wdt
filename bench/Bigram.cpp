@@ -13,6 +13,7 @@
  */
 
 #include "wdt/bench/Bigram.h"
+
 #include <glog/logging.h>
 
 /// Utility functions

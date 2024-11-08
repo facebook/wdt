@@ -6,14 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <wdt/ErrorCodes.h>
 #include <wdt/test/TestCommon.h>
 
-
+#include <boost/filesystem.hpp>
 #include <mutex>
 #include <random>
-
-#include <boost/filesystem.hpp>
-#include <wdt/ErrorCodes.h>
 
 using namespace std;
 
@@ -42,5 +40,5 @@ TemporaryDirectory::TemporaryDirectory() {
 TemporaryDirectory::~TemporaryDirectory() {
   boost::filesystem::remove_all(dir_);
 }
-}
-}
+}  // namespace wdt
+}  // namespace facebook

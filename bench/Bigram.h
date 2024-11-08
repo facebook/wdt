@@ -68,7 +68,7 @@ struct hash<Bigram> {
     return ((k[0] << 1) | k[1]);
   }
 };
-}
+}  // namespace std
 /// Handy types
 typedef std::unordered_map<Bigram, uint32_t> MapOfBigramToCount;
 typedef std::pair<Bigram, uint32_t> PairBigramCount;

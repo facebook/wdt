@@ -45,5 +45,5 @@ class Writer {
   /// close the writer
   virtual ErrorCode close() = 0;
 };
-}
-}
+}  // namespace wdt
+}  // namespace facebook
