@@ -37,7 +37,7 @@ cat <<EOF
     "vcsType": "fbcode-fbsource",
     "capabilities": {
         "vcs": "fbcode-fbsource",
-        "type": "lego-mac",
+        "type": "ios-arm",
     },
     "priority": 3,
     "args": {
