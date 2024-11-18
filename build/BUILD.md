@@ -47,6 +47,10 @@ if you can find a binary distrubution for your variant of linux:__
 sudo apt-get install libgoogle-glog-dev libboost-system-dev \
 libdouble-conversion-dev libjemalloc-dev
 ```
+__OpenSSL__
+```
+sudo apt-get install libssl-dev
+```
 
 __Otherwise, Build double-conversion, gflags and glog from source__
 
