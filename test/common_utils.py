@@ -23,7 +23,12 @@ sender_status = skip_tests = test_ids = None
 
 
 def set_binaries():
-    global wdt_binary, receiver_binary, sender_binary, gen_files_binary, gen_files_bigrams
+    global \
+        wdt_binary, \
+        receiver_binary, \
+        sender_binary, \
+        gen_files_binary, \
+        gen_files_bigrams
     binary = get_env("WDT_BINARY")
     if binary:
         wdt_binary = binary

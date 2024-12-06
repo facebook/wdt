@@ -7,7 +7,8 @@ def run_test(test_name, connection_url):
     start_test(test_name)
     run_sender("", connection_url)
     check_transfer_status(
-        False, False  # not expected to fail  # don't check/wait on receiver
+        False,
+        False,  # not expected to fail  # don't check/wait on receiver
     )
 
 
