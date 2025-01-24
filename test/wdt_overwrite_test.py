@@ -18,7 +18,7 @@ f = open(fname, "w")
 f.write("existing data")
 f.close()
 mtime = os.stat(fname).st_mtime
-print("mtime is {0}".format(mtime))
+print(f"mtime is {mtime}")
 
 test_count = 1
 
@@ -28,7 +28,7 @@ receiver_args = sender_args
 run_test("default - should fail", receiver_args, sender_args, True)
 newmtime = os.stat(fname).st_mtime
 if newmtime != mtime:
-    error("file shouldn't have changed {0} -> {1}".format(mtime, newmtime))
+    error(f"file shouldn't have changed {mtime} -> {newmtime}")
 
 mtime = newmtime
 
@@ -36,7 +36,7 @@ run_test("with -overwrite should succeed", receiver_args + " -overwrite", sender
 
 newmtime = os.stat(fname).st_mtime
 if newmtime == mtime:
-    error("file should have changed from {0}".format(mtime))
+    error(f"file should have changed from {mtime}")
 
 # md5sums checks and cleanup
 exit(verify_transfer_success())

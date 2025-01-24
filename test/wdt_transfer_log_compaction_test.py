@@ -6,7 +6,7 @@ import os
 
 def verify_log_parse_ok(log_dir):
     bin = get_wdt_binary()
-    parse_cmd = "%s -parse_transfer_log -directory %s" % (bin, log_dir)
+    parse_cmd = "{} -parse_transfer_log -directory {}".format(bin, log_dir)
     stdout, stderr = run_command(parse_cmd)
     ok_str = "Transfer log parsing finished OK"
 
@@ -39,7 +39,11 @@ def test_enable_transfer_log_compaction():
 
     # get transfer log size
     uncompacted_log_size = os.path.getsize(transfer_log_path)
-    print("Uncompacted log (%s) size is %s" % (transfer_log_path, uncompacted_log_size))
+    print(
+        "Uncompacted log ({}) size is {}".format(
+            transfer_log_path, uncompacted_log_size
+        )
+    )
 
     # enable transfer log compaction
     start_receiver(

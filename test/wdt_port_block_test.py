@@ -42,9 +42,9 @@ def test(resumption):
     # 1. wdt://localhost?ports=1,2,3,4
     # 2. wdt://localhost:1?num_ports=4
     # the second kind of url is another way of expressing the first one
-    url_match = re.search("\?(.*&)?ports=([0-9]+).*", connection_url)
+    url_match = re.search(r"\?(.*&)?ports=([0-9]+).*", connection_url)
     if not url_match:
-        url_match = re.search(":([0-9]+)(\?.*)", connection_url)
+        url_match = re.search(r":([0-9]+)(\?.*)", connection_url)
         rest_of_url = url_match.group(2)
         port_to_block = url_match.group(1)
         start_port = ":" + port_to_block
@@ -79,7 +79,7 @@ def test(resumption):
     status |= receiver_status
 
     if status != 0:
-        print("Test failed, exiting with {0}".format(status))
+        print(f"Test failed, exiting with {status}")
         exit(status)
 
     diff = abs(sender_end_time - receiver_end_time) * 1000
@@ -87,12 +87,12 @@ def test(resumption):
     if diff > max_allowed_diff:
         print(
             (
-                "Sender and Receiver end time difference {0} is more than "
-                "allowed diff {1}"
+                "Sender and Receiver end time difference {} is more than "
+                "allowed diff {}"
             ).format(diff, max_allowed_diff)
         )
         exit(1)
-    print(("Test passed - Sender and Receiver" " end time diff {0} ms").format(diff))
+    print(("Test passed - Sender and Receiver" " end time diff {} ms").format(diff))
 
 
 print("Testing without download resumption")

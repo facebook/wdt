@@ -7,12 +7,12 @@ create_test_directory("/dev/shm")
 src_dir = get_source_dir()
 create_directory(src_dir)
 gen_files = get_gen_files()
-cmd = "{0} -directory={1} -filename=testLarge1 -gen_size_mb={2}".format(
+cmd = "{} -directory={} -filename=testLarge1 -gen_size_mb={}".format(
     gen_files, src_dir, 7 * 1024
 )
 status = os.system(cmd)
 if status:
-    error("Failure generating data running {0}:{1}".format(cmd, status))
+    error(f"Failure generating data running {cmd}:{status}")
 
 # test(s)
 start_test("large 7Gb file and disk mode")

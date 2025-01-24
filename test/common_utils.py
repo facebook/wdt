@@ -107,7 +107,7 @@ def get_receiver_binary():
 
 
 def get_gen_files():
-    return "{0} -stats_source={1} -seed_with_time".format(
+    return "{} -stats_source={} -seed_with_time".format(
         gen_files_binary, gen_files_bigrams
     )
 
@@ -142,11 +142,11 @@ def extend_wdt_options(cmd):
 def start_receiver(extra_args):
     global connection_url, receiver_process, server_log
     receiver_cmd = extend_wdt_options(receiver_binary)
-    receiver_cmd = "{0} -directory {1}/dst{2} {3}".format(
+    receiver_cmd = "{} -directory {}/dst{} {}".format(
         receiver_cmd, root_dir, test_count, extra_args
     )
     print("Receiver: " + receiver_cmd)
-    server_log = "{0}/server{1}.log".format(root_dir, test_count)
+    server_log = f"{root_dir}/server{test_count}.log"
     receiver_process = subprocess.Popen(
         receiver_cmd.split(),
         stdout=subprocess.PIPE,
@@ -169,33 +169,33 @@ def run_sender(extra_args, url=""):
     if not url:
         url = connection_url
     sender_cmd = extend_wdt_options(sender_binary)
-    sender_cmd = "{0} -directory {1}/src -connection_url '{2}' {3}".format(
+    sender_cmd = "{} -directory {}/src -connection_url '{}' {}".format(
         sender_cmd, root_dir, url, extra_args
     )
     # TODO: fix this to not use tee, this is python...
     sender_cmd = (
         'bash -c "set -o pipefail; '
         + sender_cmd
-        + ' 2>&1 | tee {0}/client{1}.log"'.format(root_dir, test_count)
+        + f' 2>&1 | tee {root_dir}/client{test_count}.log"'
     )
     print("Sender: " + sender_cmd)
     # On unix return code of system is shifted by 8 bytes but lower bits are
     # set on signal too and sometimes it's not flipped so let's or it all
     sender_status = os.system(sender_cmd)
     sender_status = (sender_status >> 8) | (sender_status & 0xFF)
-    print("status for sender {0}".format(hex(sender_status)))
+    print(f"status for sender {hex(sender_status)}")
     return sender_status
 
 
 def error(msg):
     print_server_log()
-    print("FAILING Test #{0} ({1}) {2}".format(test_count, test_name, msg))
+    print(f"FAILING Test #{test_count} ({test_name}) {msg}")
     exit(1)
 
 
 def print_server_log():
     if server_log:
-        with open(server_log, "r") as fin:
+        with open(server_log) as fin:
             print(fin.read())
 
 
@@ -203,7 +203,7 @@ def check_transfer_status(expect_failed=False, check_receiver=True):
     global receiver_status
     if check_receiver:
         receiver_status = receiver_process.wait()
-        print("status for receiver {0}".format(receiver_status))
+        print(f"status for receiver {receiver_status}")
     else:
         # hacky way to not change code below for rare case we don't care about
         # receiver
@@ -216,22 +216,22 @@ def check_transfer_status(expect_failed=False, check_receiver=True):
         skip_tests.add(test_count)
     else:
         if sender_status != 0:
-            error("was expected to succeed but sender err {0}".format(sender_status))
+            error(f"was expected to succeed but sender err {sender_status}")
         if receiver_status != 0:
-            error("was expected to succeed but sender err {0}".format(sender_status))
+            error(f"was expected to succeed but sender err {sender_status}")
 
 
 def check_logs_for_errors(fail_errors):
-    log_file = "%s/server%s.log" % (root_dir, test_count)
+    log_file = "{}/server{}.log".format(root_dir, test_count)
     server_log_contents = open(log_file).read()
-    log_file = "%s/client%s.log" % (root_dir, test_count)
+    log_file = "{}/client{}.log".format(root_dir, test_count)
     client_log_contents = open(log_file).read()
 
     for fail_error in fail_errors:
         if fail_error in server_log_contents:
-            error("%s found in logs %s" % (fail_error, log_file))
+            error("{} found in logs {}".format(fail_error, log_file))
         if fail_error in client_log_contents:
-            error("%s found in logs %s" % (fail_error, log_file))
+            error("{} found in logs {}".format(fail_error, log_file))
 
 
 def create_directory(root_dir):
@@ -255,7 +255,7 @@ def create_test_directory(prefix):
     base_dir = prefix + "/wdtTest_" + user
     create_directory(base_dir)
     root_dir = tempfile.mkdtemp(dir=base_dir)
-    print("Testing in {0}".format(root_dir))
+    print(f"Testing in {root_dir}")
     test_count = 0
     skip_tests = set()
     test_ids = set()
@@ -267,7 +267,7 @@ def start_test(name):
     test_count = test_count + 1
     test_ids.add(test_count)
     test_name = name
-    print("Test #{0}: {1}".format(test_count, name))
+    print(f"Test #{test_count}: {name}")
 
 
 def get_source_dir():
@@ -275,7 +275,7 @@ def get_source_dir():
 
 
 def get_dest_dir():
-    return os.path.join(root_dir, "dst{0}".format(test_count))
+    return os.path.join(root_dir, f"dst{test_count}")
 
 
 def get_test_count():
@@ -284,22 +284,22 @@ def get_test_count():
 
 def generate_random_files(total_size):
     src_dir = get_source_dir()
-    print("Creating random files, size {0}, into {1}".format(total_size, src_dir))
+    print(f"Creating random files, size {total_size}, into {src_dir}")
     create_directory(src_dir)
     seed_size = int(total_size / 70)
     gen_files = get_gen_files()
     for i in range(0, 4):
-        file_name = "sample{0}".format(i)
-        cmd = "{0} -directory={1} -filename={2} -gen_size_mb={3}".format(
+        file_name = f"sample{i}"
+        cmd = "{} -directory={} -filename={} -gen_size_mb={}".format(
             gen_files, src_dir, file_name, seed_size / 1024.0 / 1024.0
         )
         status = os.system(cmd)
         if status:
-            error("Failure generating data running {0}:{1}".format(cmd, status))
+            error(f"Failure generating data running {cmd}:{status}")
     for i in range(0, 16):
-        file_name = "file{0}".format(i)
+        file_name = f"file{i}"
         status = os.system(
-            "{0} -directory={1} -filename={2} -gen_size_mb={3}".format(
+            "{} -directory={} -filename={} -gen_size_mb={}".format(
                 gen_files, src_dir, file_name, 4 * seed_size / 1024.0 / 1024.0
             )
         )
@@ -320,7 +320,7 @@ def create_md5_for_directory(src_dir, md5_file_name):
                 continue
             full_path = os.path.join(root, file)
             md5 = get_md5_for_file(full_path)
-            lines.append("{0} {1}".format(md5, file))
+            lines.append(f"{md5} {file}")
     lines.sort()
     with open(md5_file_name, "w") as md5_in:
         for line in lines:
@@ -335,22 +335,22 @@ def verify_transfer_success():
         if i in skip_tests:
             print("Skipping verification of test %s" % (i))
             continue
-        print("Verifying correctness for test {0}".format(i))
+        print(f"Verifying correctness for test {i}")
         print("Should be no diff")
-        dst_dir = os.path.join(root_dir, "dst{0}".format(i))
-        dst_md5_path = os.path.join(root_dir, "dst{0}.md5".format(i))
+        dst_dir = os.path.join(root_dir, f"dst{i}")
+        dst_md5_path = os.path.join(root_dir, f"dst{i}.md5")
         create_md5_for_directory(dst_dir, dst_md5_path)
         diff = difflib.unified_diff(
             open(src_md5_path).readlines(), open(dst_md5_path).readlines()
         )
         delta = "".join(diff)
         if not delta:
-            print("Found no diff for test {0}".format(i))
+            print(f"Found no diff for test {i}")
             if search_in_logs(i, "PROTOCOL_ERROR"):
                 status = 1
         else:
             print(delta)
-            with open("{0}/server{1}.log".format(root_dir, i), "r") as fin:
+            with open(f"{root_dir}/server{i}.log") as fin:
                 print(fin.read())
             status = 1
     if status == 0:
@@ -368,13 +368,13 @@ def good_run():
 
 def search_in_logs(i, str):
     found = False
-    client_log = "{0}/client{1}.log".format(root_dir, i)
-    server_log = "{0}/server{1}.log".format(root_dir, i)
+    client_log = f"{root_dir}/client{i}.log"
+    server_log = f"{root_dir}/server{i}.log"
     if str in open(client_log).read():
-        print("Found {0} in {1}".format(str, client_log))
+        print(f"Found {str} in {client_log}")
         found = True
     if str in open(server_log).read():
-        print("Found {0} in {1}".format(str, server_log))
+        print(f"Found {str} in {server_log}")
         found = True
     return found
 

@@ -9,7 +9,7 @@ def run_test(name, sender_extra_flags, fail_transfer=False):
     connection_url = start_receiver(wdt_receiver_arg)
     if fail_transfer is True:
         connection_url += "&id=blah1234"
-    sender_arg = "{0} -manifest {1}/file_list {2}".format(
+    sender_arg = "{} -manifest {}/file_list {}".format(
         wdt_sender_arg, root_dir, sender_extra_flags
     )
     run_sender(sender_arg, connection_url)
@@ -31,7 +31,7 @@ for root, dirs, files in os.walk(src_dir):
             continue
         if file == "file1":
             # add a size for file1
-            file_list_in.write("{0}\t{1}".format(file, 1025))
+            file_list_in.write(f"{file}\t{1025}")
         else:
             file_list_in.write(file)
         file_list_in.write("\n")
