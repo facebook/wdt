@@ -486,7 +486,7 @@ void WdtTransferRequest::serializePorts(WdtUri& wdtUri) const {
 }
 
 string WdtTransferRequest::getSerializedPortsList() const {
-  string portsList = "";
+  string portsList;
   for (size_t i = 0; i < ports.size(); i++) {
     if (i != 0) {
       folly::toAppend(",", &portsList);
