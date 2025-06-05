@@ -9,12 +9,9 @@
 #include <folly/Memory.h>
 #include <folly/ScopeGuard.h>
 #include <folly/String.h>
-#include <folly/hash/Checksum.h>
-#include <folly/lang/Bits.h>
 #include <wdt/Sender.h>
 #include <wdt/SenderThread.h>
 #include <wdt/Throttler.h>
-#include <wdt/util/ClientSocket.h>
 
 namespace facebook {
 namespace wdt {

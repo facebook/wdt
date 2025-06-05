@@ -7,7 +7,6 @@
  */
 #include <wdt/ErrorCodes.h>
 #include <wdt/Throttler.h>
-#include <wdt/WdtOptions.h>
 
 namespace facebook {
 namespace wdt {

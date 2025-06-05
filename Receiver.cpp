@@ -5,17 +5,12 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <fcntl.h>
 #include <folly/Conv.h>
-#include <folly/lang/Bits.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <wdt/Receiver.h>
 #include <wdt/util/EncryptionUtils.h>
-#include <wdt/util/ServerSocket.h>
 
 #include <thread>
 
