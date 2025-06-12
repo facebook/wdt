@@ -317,19 +317,16 @@ ErrorCode TransferLogManager::checkLog() {
     WPLOG(ERROR) << "CORRUPTION! Can't stat log file " << fullLogName
                  << " (deleted under us)";
     exit(TRANSFER_LOG_ACQUIRE_ERROR);
-    return ERROR;
   }
   if (fstat(fd_, &stat2)) {
     WPLOG(ERROR) << "Unable to stat log by fd " << fd_;
     exit(TRANSFER_LOG_ACQUIRE_ERROR);
-    return ERROR;
   }
   if (stat1.st_ino != stat2.st_ino) {
     WLOG(ERROR) << "CORRUPTION! log file " << fullLogName << " changed "
                 << " old/open fd inode " << stat2.st_ino << " on fs "
                 << stat1.st_ino;
     exit(TRANSFER_LOG_ACQUIRE_ERROR);
-    return ERROR;
   }
   WLOG(INFO) << fullLogName << " still ok with " << stat1.st_ino;
   return OK;
