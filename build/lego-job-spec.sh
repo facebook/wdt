@@ -37,7 +37,7 @@ cat <<EOF
     "vcsType": "fbcode-fbsource",
     "capabilities": {
         "vcs": "fbcode-fbsource",
-        "type": "ios-arm",
+        "type": "macrx",
     },
     "priority": 3,
     "args": {
