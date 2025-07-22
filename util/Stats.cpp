@@ -23,12 +23,8 @@
 namespace facebook {
 namespace wdt {
 
-/*static*/
-const size_t Histogram::kLastIndex;  // storage placeholder- value is from .h
-constexpr int32_t Histogram::kHistogramBuckets[];  // buckets, values are in .h
-
-static const int32_t kFirstValue = Histogram::kHistogramBuckets[0];
-static const int32_t kLastValue =
+static constexpr int32_t kFirstValue = Histogram::kHistogramBuckets[0];
+static constexpr int32_t kLastValue =
     Histogram::kHistogramBuckets[Histogram::kLastIndex - 1];
 
 int32_t* initHistLookup() {

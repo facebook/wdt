@@ -333,7 +333,7 @@ class Histogram : public Counter {
   /** constant with the index of the last data bucket (1 more bucket than
    * the histograms as we need a bucket for > than last entry in the list)
    */
-  static const size_t kLastIndex =
+  static constexpr size_t kLastIndex =
       sizeof(kHistogramBuckets) / sizeof(kHistogramBuckets[0]);
 
  private:
