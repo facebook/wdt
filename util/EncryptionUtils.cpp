@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 #include <folly/Conv.h>
-#include <folly/SpinLock.h>
 #include <folly/String.h>  // for humanify
 #include <openssl/crypto.h>
 #include <openssl/rand.h>

@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <folly/Conv.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <wdt/ErrorCodes.h>
 #include <wdt/util/FileCreator.h>
 

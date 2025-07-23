@@ -18,7 +18,6 @@
 
 #include <fstream>
 #include <iomanip>
-#include <sstream>
 
 namespace facebook {
 namespace wdt {

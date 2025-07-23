@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <sys/types.h>
 #include <wdt/util/CommonImpl.h>
 #include <wdt/util/FileWriter.h>
 

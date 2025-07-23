@@ -7,8 +7,6 @@
  */
 #include <fcntl.h>
 #include <glog/logging.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <wdt/util/FileByteSource.h>
 
 #include <algorithm>
