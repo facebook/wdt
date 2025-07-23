@@ -7,7 +7,6 @@
  */
 #include <wdt/ErrorCodes.h>
 #include <wdt/Protocol.h>
-#include <wdt/WdtOptions.h>
 #include <wdt/util/SerializationUtil.h>
 
 namespace facebook {
