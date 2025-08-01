@@ -23,8 +23,8 @@ class WdtResourceControllerTest : public WdtResourceController {
   const string hostName = "localhost";
   const string directory = "/tmp/wdt_resoure_controller_test";
   const int numFiles = 10;
-  typedef shared_ptr<Sender> SenderPtr;
-  typedef shared_ptr<Receiver> ReceiverPtr;
+  using SenderPtr = shared_ptr<Sender>;
+  using ReceiverPtr = shared_ptr<Receiver>;
   WdtResourceControllerTest() : WdtResourceController() {
   }
   void AddObjectsWithNoLimitsTest();
