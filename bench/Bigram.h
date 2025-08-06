@@ -70,5 +70,5 @@ struct hash<Bigram> {
 };
 }  // namespace std
 /// Handy types
-typedef std::unordered_map<Bigram, uint32_t> MapOfBigramToCount;
-typedef std::pair<Bigram, uint32_t> PairBigramCount;
+using MapOfBigramToCount = std::unordered_map<Bigram, uint32_t>;
+using PairBigramCount = std::pair<Bigram, uint32_t>;

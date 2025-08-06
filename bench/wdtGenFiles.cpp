@@ -77,7 +77,7 @@ std::ostream &operator<<(std::ostream &os, const ProbabilityTable<T> &t) {
 // typedef std::mt19937 RndEngine;
 // typedef std::ranlux48 RndEngine;
 // This seems to be the fastest one:
-typedef std::minstd_rand RndEngine;
+using RndEngine = std::minstd_rand;
 
 static std::shared_ptr<RndEngine> createRandomGenerator(int offset) {
   std::shared_ptr<RndEngine> gen = std::make_shared<RndEngine>();
@@ -171,7 +171,7 @@ class ProbabilityTable {
                                   const ProbabilityTable<A> &t);
 };
 
-typedef ProbabilityTable<Bigram> PTB;
+using PTB = ProbabilityTable<Bigram>;
 
 class SentenceGen {
  public:
