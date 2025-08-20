@@ -16,14 +16,13 @@
 
 #include <math.h>
 
-#include <fstream>
-#include <iomanip>
+#include <ostream>
 
 namespace facebook {
 namespace wdt {
 
-static constexpr int32_t kFirstValue = Histogram::kHistogramBuckets[0];
-static constexpr int32_t kLastValue =
+constexpr int32_t kFirstValue = Histogram::kHistogramBuckets[0];
+constexpr int32_t kLastValue =
     Histogram::kHistogramBuckets[Histogram::kLastIndex - 1];
 
 int32_t* initHistLookup() {
