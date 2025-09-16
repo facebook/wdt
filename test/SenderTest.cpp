@@ -55,7 +55,7 @@ class SenderTests {
       auto file = senderDir / std::to_string(i);
       size_t fileSz = folly::Random::rand32() % maxFileSize;
       createFile(file.c_str(), fileSz);
-      fileInfo.push_back({std::to_string(i), -1, false});
+      fileInfo.emplace_back(std::to_string(i), -1, false);
       cumulativeSize.push_back(cumulativeSize.back() + fileSz);
     }
 

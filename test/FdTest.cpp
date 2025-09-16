@@ -47,8 +47,7 @@ void basicTest(bool resumption, bool nosize) {
   EXPECT_EQ(OK, r.transferAsync());
   // Not even using the actual name (which we don't know)
   std::string filename = "notexisting23r4";
-  req.fileInfo.push_back(
-      WdtFileInfo(fd, nosize ? -1 : contents.size(), filename));
+  req.fileInfo.emplace_back(fd, nosize ? -1 : contents.size(), filename);
   Sender s(req);
   // setWdtOptions not needed if change of option happens before sender cstror
   // but this indirectly tests that API (but need to manually see
@@ -102,7 +101,7 @@ TEST(DupSend, DuplicateSend) {
   EXPECT_EQ(OK, req.errorCode);
   EXPECT_EQ(OK, r.transferAsync());
   // Not even using the actual name (which we don't know)
-  req.fileInfo.push_back(WdtFileInfo(fd, 0, "notexisting23r4"));
+  req.fileInfo.emplace_back(fd, 0, "notexisting23r4");
   Sender s(req);
   req = s.init();
   EXPECT_EQ(OK, req.errorCode);
