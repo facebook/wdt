@@ -314,7 +314,7 @@ void deserialize(std::vector<PairBigramCount> &statsData, std::istream &sin) {
     }
     uint32_t count = 0;
     sin.read(reinterpret_cast<char *>(&count), sizeof(count));
-    statsData.push_back(PairBigramCount(b, count));
+    statsData.emplace_back(b, count);
   }
 }
 
@@ -378,7 +378,7 @@ int main(int argc, char **argv) {
   threads.reserve(numThreads);
   SentenceGen sg(statsData);
   for (int i = numThreads; i--;) {
-    threads.push_back(std::thread([targetSzPerThread, blockSz, fd, i, &sg] {
+    threads.emplace_back([targetSzPerThread, blockSz, fd, i, &sg] {
       std::shared_ptr<RndEngine> rndEngine = createRandomGenerator(i);
       size_t targetSz = targetSzPerThread;
       size_t toWrite = blockSz;
@@ -404,7 +404,7 @@ int main(int argc, char **argv) {
         }
         sg.generate(*rndEngine, res, toWrite, previous);
       }
-    }));
+    });
   }
   for (int i = numThreads; i--;) {
     threads[i].join();
