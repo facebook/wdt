@@ -60,6 +60,10 @@ class RandomFile {
       delete metaData_;
     }
   }
+  RandomFile(const RandomFile&) = delete;
+  RandomFile& operator=(const RandomFile&) = delete;
+  RandomFile(RandomFile&&) = default;
+  RandomFile& operator=(RandomFile&&) = default;
 
  private:
   int64_t fileSize_{-1};
