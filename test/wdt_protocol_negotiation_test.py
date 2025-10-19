@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-from common_utils import *
 import re
 import subprocess
+
+from common_utils import get_receiver_binary, get_sender_binary, os
 
 # TODO: refactor more using common_utils
 
