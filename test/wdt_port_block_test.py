@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import os
 import re
 import subprocess
 import time
 from threading import Thread
-from common_utils import *
+
+from common_utils import get_receiver_binary, get_sender_binary
 
 # Todo: refactor using more of common_utils
 
