@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 
-from common_utils import *
+from common_utils import (
+    check_transfer_status,
+    create_test_directory,
+    error,
+    generate_random_files,
+    get_receiver_process,
+    get_wdt_version,
+    good_run,
+    run_sender,
+    start_receiver,
+    start_test,
+)
 
 
 def run_test(test_name, connection_url):
