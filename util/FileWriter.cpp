@@ -60,7 +60,7 @@ ErrorCode FileWriter::sync() {
     // File was either never opened or already closed
     return OK;
   }
-  const auto &options = threadCtx_.getOptions();
+  const auto& options = threadCtx_.getOptions();
   if (options.fsync || options.isLogBasedResumption()) {
     PerfStatCollector statCollector(threadCtx_, PerfStatReport::FSYNC_STATS);
     if (::fsync(fd_) < 0) {
@@ -100,9 +100,9 @@ bool FileWriter::isClosed() {
   return fd_ < 0;
 }
 
-ErrorCode FileWriter::write(char *buf, int64_t size) {
+ErrorCode FileWriter::write(char* buf, int64_t size) {
   WDT_CHECK_NE(TO_BE_DELETED, blockDetails_->allocationStatus);
-  auto &options = threadCtx_.getOptions();
+  auto& options = threadCtx_.getOptions();
   if (!options.skip_writes) {
     int64_t count = 0;
     while (count < size) {
@@ -137,7 +137,7 @@ ErrorCode FileWriter::write(char *buf, int64_t size) {
 
 bool FileWriter::syncFileRange(int64_t written, bool forced) {
 #ifdef HAS_SYNC_FILE_RANGE
-  const WdtOptions &options = threadCtx_.getOptions();
+  const WdtOptions& options = threadCtx_.getOptions();
   if (options.disk_sync_interval_mb < 0) {
     return true;
   }

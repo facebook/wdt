@@ -25,7 +25,7 @@ void simulateNetworkError() {
 
   while (true) {
     usleep(kSimulatorSleepDurationMillis * 1000);
-    auto &options = facebook::wdt::WdtOptions::getMutable();
+    auto& options = facebook::wdt::WdtOptions::getMutable();
 
     int fd = 3 + rand32() % (2 * options.num_ports + 1);
     // close the chosen socket

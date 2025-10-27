@@ -50,7 +50,7 @@ int Protocol::negotiateProtocol(int requestedProtocolVersion,
   return std::min<int>(curProtocolVersion, requestedProtocolVersion);
 }
 
-std::ostream &operator<<(std::ostream &os, const Checkpoint &checkpoint) {
+std::ostream& operator<<(std::ostream& os, const Checkpoint& checkpoint) {
   os << "checkpoint-port: " << checkpoint.port
      << " num-blocks: " << checkpoint.numBlocks
      << " seq-id: " << checkpoint.lastBlockSeqId
@@ -61,13 +61,13 @@ std::ostream &operator<<(std::ostream &os, const Checkpoint &checkpoint) {
 
 int64_t FileChunksInfo::getTotalChunkSize() const {
   int64_t totalChunkSize = 0;
-  for (const auto &chunk : chunks_) {
+  for (const auto& chunk : chunks_) {
     totalChunkSize += chunk.size();
   }
   return totalChunkSize;
 }
 
-void FileChunksInfo::addChunk(const Interval &chunk) {
+void FileChunksInfo::addChunk(const Interval& chunk) {
   chunks_.emplace_back(chunk);
 }
 
@@ -94,7 +94,7 @@ void FileChunksInfo::mergeChunks() {
 std::vector<Interval> FileChunksInfo::getRemainingChunks(int64_t curFileSize) {
   std::vector<Interval> remainingChunks;
   int64_t curStart = 0;
-  for (const auto &chunk : chunks_) {
+  for (const auto& chunk : chunks_) {
     if (chunk.start_ > curStart) {
       remainingChunks.emplace_back(curStart, chunk.start_);
     }
@@ -106,13 +106,13 @@ std::vector<Interval> FileChunksInfo::getRemainingChunks(int64_t curFileSize) {
   return remainingChunks;
 }
 
-std::ostream &operator<<(std::ostream &os,
-                         FileChunksInfo const &fileChunksInfo) {
+std::ostream& operator<<(std::ostream& os,
+                         FileChunksInfo const& fileChunksInfo) {
   os << "name " << fileChunksInfo.getFileName() << " seqId "
      << fileChunksInfo.getSeqId() << " file-size "
      << fileChunksInfo.getFileSize() << " number of chunks "
      << fileChunksInfo.getChunks().size();
-  for (const auto &chunk : fileChunksInfo.getChunks()) {
+  for (const auto& chunk : fileChunksInfo.getChunks()) {
     os << " (" << chunk.start_ << ", " << chunk.end_ << ") ";
   }
   return os;
@@ -136,9 +136,9 @@ int Protocol::getMaxLocalCheckpointLength(int protocolVersion) {
   return length;
 }
 
-bool Protocol::encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
+bool Protocol::encodeHeader(int senderProtocolVersion, char* dest, int64_t& off,
                             const int64_t max,
-                            const BlockDetails &blockDetails) {
+                            const BlockDetails& blockDetails) {
   WDT_CHECK_GE(max, 0);
   const size_t umax = static_cast<size_t>(max);  // we made sure it's not < 0
   bool ok = encodeString(dest, max, off, blockDetails.fileName) &&
@@ -165,9 +165,9 @@ bool Protocol::encodeHeader(int senderProtocolVersion, char *dest, int64_t &off,
   return ok;
 }
 
-bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
-                            int64_t &off, const int64_t max,
-                            BlockDetails &blockDetails) {
+bool Protocol::decodeHeader(int receiverProtocolVersion, char* src,
+                            int64_t& off, const int64_t max,
+                            BlockDetails& blockDetails) {
   ByteRange br = makeByteRange(src, max, off);  // will check for off>0 max>0
   const ByteRange obr = br;
 
@@ -195,13 +195,13 @@ bool Protocol::decodeHeader(int receiverProtocolVersion, char *src,
   return ok;
 }
 
-bool Protocol::encodeCheckpoints(int protocolVersion, char *dest, int64_t &off,
+bool Protocol::encodeCheckpoints(int protocolVersion, char* dest, int64_t& off,
                                  int64_t max,
-                                 const std::vector<Checkpoint> &checkpoints) {
+                                 const std::vector<Checkpoint>& checkpoints) {
   WDT_CHECK_GE(max, 0);
   const size_t umax = static_cast<size_t>(max);
   bool ok = encodeVarU64(dest, umax, off, checkpoints.size());
-  for (const auto &checkpoint : checkpoints) {
+  for (const auto& checkpoint : checkpoints) {
     if (!ok) {
       break;
     }
@@ -221,9 +221,9 @@ bool Protocol::encodeCheckpoints(int protocolVersion, char *dest, int64_t &off,
   return ok;
 }
 
-bool Protocol::decodeCheckpoints(int protocolVersion, char *src, int64_t &off,
+bool Protocol::decodeCheckpoints(int protocolVersion, char* src, int64_t& off,
                                  int64_t max,
-                                 std::vector<Checkpoint> &checkpoints) {
+                                 std::vector<Checkpoint>& checkpoints) {
   ByteRange br = makeByteRange(src, max, off);  // will check for off>0 max>0
   const ByteRange obr = br;
   uint64_t len;
@@ -265,7 +265,7 @@ bool Protocol::decodeCheckpoints(int protocolVersion, char *src, int64_t &off,
   return ok;
 }
 
-bool Protocol::encodeDone(int protocolVersion, char *dest, int64_t &off,
+bool Protocol::encodeDone(int protocolVersion, char* dest, int64_t& off,
                           int64_t max, int64_t numBlocks, int64_t bytesSent) {
   bool ok = encodeVarI64C(dest, max, off, numBlocks);
   if (ok && protocolVersion >= CHECKPOINT_OFFSET_VERSION) {
@@ -274,8 +274,8 @@ bool Protocol::encodeDone(int protocolVersion, char *dest, int64_t &off,
   return ok;
 }
 
-bool Protocol::decodeDone(int protocolVersion, char *src, int64_t &off,
-                          int64_t max, int64_t &numBlocks, int64_t &bytesSent) {
+bool Protocol::decodeDone(int protocolVersion, char* src, int64_t& off,
+                          int64_t max, int64_t& numBlocks, int64_t& bytesSent) {
   ByteRange br = makeByteRange(src, max, off);  // will check for off>0 max>0
   const ByteRange obr = br;
   bool ok = decodeInt64C(br, numBlocks);
@@ -286,13 +286,13 @@ bool Protocol::decodeDone(int protocolVersion, char *src, int64_t &off,
   return ok;
 }
 
-bool Protocol::encodeSize(char *dest, int64_t &off, int64_t max,
+bool Protocol::encodeSize(char* dest, int64_t& off, int64_t max,
                           int64_t totalNumBytes) {
   return encodeVarI64C(dest, max, off, totalNumBytes);
 }
 
-bool Protocol::decodeSize(char *src, int64_t &off, int64_t max,
-                          int64_t &totalNumBytes) {
+bool Protocol::decodeSize(char* src, int64_t& off, int64_t max,
+                          int64_t& totalNumBytes) {
   ByteRange br = makeByteRange(src, max, off);  // will check for off>0 max>0
   const ByteRange obr = br;
   bool ok = decodeInt64C(br, totalNumBytes);
@@ -300,7 +300,7 @@ bool Protocol::decodeSize(char *src, int64_t &off, int64_t max,
   return ok;
 }
 
-bool Protocol::encodeAbort(char *dest, int64_t &off, const int64_t max,
+bool Protocol::encodeAbort(char* dest, int64_t& off, const int64_t max,
                            int32_t protocolVersion, ErrorCode errCode,
                            int64_t checkpoint) {
   if (off + kAbortLength > max) {
@@ -316,9 +316,9 @@ bool Protocol::encodeAbort(char *dest, int64_t &off, const int64_t max,
   return encodeInt64FixedLength(dest, max, off, checkpoint);
 }
 
-bool Protocol::decodeAbort(char *src, int64_t &off, int64_t max,
-                           int32_t &protocolVersion, ErrorCode &errCode,
-                           int64_t &checkpoint) {
+bool Protocol::decodeAbort(char* src, int64_t& off, int64_t max,
+                           int32_t& protocolVersion, ErrorCode& errCode,
+                           int64_t& checkpoint) {
   if (off + kAbortLength > max) {
     WLOG(ERROR) << "Trying to decode abort, not enough to read sz " << max
                 << " at off " << off;
@@ -337,14 +337,14 @@ bool Protocol::decodeAbort(char *src, int64_t &off, int64_t max,
   return ok;
 }
 
-bool Protocol::encodeChunksCmd(char *dest, int64_t &off, int64_t max,
+bool Protocol::encodeChunksCmd(char* dest, int64_t& off, int64_t max,
                                int64_t bufSize, int64_t numFiles) {
   return encodeInt64FixedLength(dest, max, off, bufSize) &&
          encodeInt64FixedLength(dest, max, off, numFiles);
 }
 
-bool Protocol::decodeChunksCmd(char *src, int64_t &off, int64_t max,
-                               int64_t &bufSize, int64_t &numFiles) {
+bool Protocol::decodeChunksCmd(char* src, int64_t& off, int64_t max,
+                               int64_t& bufSize, int64_t& numFiles) {
   ByteRange br = makeByteRange(src, max, off);  // will check for off>0 max>0
   const ByteRange obr = br;
   bool ok = decodeInt64FixedLength(br, bufSize) &&
@@ -353,18 +353,18 @@ bool Protocol::decodeChunksCmd(char *src, int64_t &off, int64_t max,
   return ok;
 }
 
-bool Protocol::encodeChunkInfo(char *dest, int64_t &off, int64_t max,
-                               const Interval &chunk) {
+bool Protocol::encodeChunkInfo(char* dest, int64_t& off, int64_t max,
+                               const Interval& chunk) {
   return encodeVarI64C(dest, max, off, chunk.start_) &&
          encodeVarI64C(dest, max, off, chunk.end_);
 }
 
-bool Protocol::decodeChunkInfo(ByteRange &br, Interval &chunk) {
+bool Protocol::decodeChunkInfo(ByteRange& br, Interval& chunk) {
   return decodeInt64C(br, chunk.start_) && decodeInt64C(br, chunk.end_);
 }
 
-bool Protocol::encodeFileChunksInfo(char *dest, int64_t &off, int64_t max,
-                                    const FileChunksInfo &fileChunksInfo) {
+bool Protocol::encodeFileChunksInfo(char* dest, int64_t& off, int64_t max,
+                                    const FileChunksInfo& fileChunksInfo) {
   bool ok = encodeVarI64C(dest, max, off, fileChunksInfo.getSeqId()) &&
             encodeString(dest, max, off, fileChunksInfo.getFileName()) &&
             encodeVarI64C(dest, max, off, fileChunksInfo.getFileSize()) &&
@@ -372,7 +372,7 @@ bool Protocol::encodeFileChunksInfo(char *dest, int64_t &off, int64_t max,
   if (!ok) {
     return false;
   }
-  for (const auto &chunk : fileChunksInfo.getChunks()) {
+  for (const auto& chunk : fileChunksInfo.getChunks()) {
     if (!encodeChunkInfo(dest, off, max, chunk)) {
       return false;
     }
@@ -380,8 +380,8 @@ bool Protocol::encodeFileChunksInfo(char *dest, int64_t &off, int64_t max,
   return true;
 }
 
-bool Protocol::decodeFileChunksInfo(ByteRange &br,
-                                    FileChunksInfo &fileChunksInfo) {
+bool Protocol::decodeFileChunksInfo(ByteRange& br,
+                                    FileChunksInfo& fileChunksInfo) {
   int64_t seqId, fileSize, numChunks;
   string fileName;
   bool ok = decodeInt64C(br, seqId) && decodeString(br, fileName) &&
@@ -406,19 +406,19 @@ bool Protocol::decodeFileChunksInfo(ByteRange &br,
   return true;
 }
 
-int64_t Protocol::maxEncodeLen(const FileChunksInfo &fileChunkInfo) {
+int64_t Protocol::maxEncodeLen(const FileChunksInfo& fileChunkInfo) {
   return 10 + 2 + fileChunkInfo.getFileName().size() + 10 + 10 +
          fileChunkInfo.getChunks().size() * kMaxChunkEncodeLen;
 }
 
 int64_t Protocol::encodeFileChunksInfoList(
-    char *dest, int64_t &off, int64_t bufSize, int64_t startIndex,
-    const std::vector<FileChunksInfo> &fileChunksInfoList) {
+    char* dest, int64_t& off, int64_t bufSize, int64_t startIndex,
+    const std::vector<FileChunksInfo>& fileChunksInfoList) {
   int64_t oldOffset = off;
   int64_t numEncoded = 0;
   const int64_t numFileChunks = fileChunksInfoList.size();
   for (int64_t i = startIndex; i < numFileChunks; i++) {
-    const FileChunksInfo &fileChunksInfo = fileChunksInfoList[i];
+    const FileChunksInfo& fileChunksInfo = fileChunksInfoList[i];
     int64_t maxLength = maxEncodeLen(fileChunksInfo);
     if (maxLength + oldOffset > bufSize) {
       WLOG(WARNING) << "Chunk info for " << fileChunksInfo.getFileName()
@@ -436,8 +436,8 @@ int64_t Protocol::encodeFileChunksInfoList(
 }
 
 bool Protocol::decodeFileChunksInfoList(
-    char *src, int64_t &off, int64_t dataSize,
-    std::vector<FileChunksInfo> &fileChunksInfoList) {
+    char* src, int64_t& off, int64_t dataSize,
+    std::vector<FileChunksInfo>& fileChunksInfoList) {
   ByteRange br = makeByteRange(src, dataSize, off);
   const ByteRange obr = br;
   while (!br.empty()) {
@@ -451,9 +451,9 @@ bool Protocol::decodeFileChunksInfoList(
   return true;
 }
 
-bool Protocol::encodeSettings(int senderProtocolVersion, char *dest,
-                              int64_t &off, int64_t max,
-                              const Settings &settings) {
+bool Protocol::encodeSettings(int senderProtocolVersion, char* dest,
+                              int64_t& off, int64_t max,
+                              const Settings& settings) {
   bool ok = encodeVarI64C(dest, max, off, senderProtocolVersion) &&
             encodeVarI64C(dest, max, off, settings.readTimeoutMillis) &&
             encodeVarI64C(dest, max, off, settings.writeTimeoutMillis) &&
@@ -480,8 +480,8 @@ bool Protocol::encodeSettings(int senderProtocolVersion, char *dest,
   return ok;
 }
 
-bool Protocol::decodeVersion(char *src, int64_t &off, int64_t max,
-                             int &senderProtocolVersion) {
+bool Protocol::decodeVersion(char* src, int64_t& off, int64_t max,
+                             int& senderProtocolVersion) {
   ByteRange br = makeByteRange(src, max, off);
   const ByteRange obr = br;
   bool ok = decodeInt32C(br, senderProtocolVersion);
@@ -489,8 +489,8 @@ bool Protocol::decodeVersion(char *src, int64_t &off, int64_t max,
   return ok;
 }
 
-bool Protocol::decodeSettings(int protocolVersion, char *src, int64_t &off,
-                              int64_t max, Settings &settings) {
+bool Protocol::decodeSettings(int protocolVersion, char* src, int64_t& off,
+                              int64_t max, Settings& settings) {
   settings.enableChecksum = settings.sendFileChunks = false;
   if (off < 0) {
     WLOG(ERROR) << "Invalid negative start offset for decodeSettings " << off;
@@ -521,9 +521,9 @@ bool Protocol::decodeSettings(int protocolVersion, char *src, int64_t &off,
 }
 
 /* static */
-bool Protocol::encodeEncryptionSettings(char *dest, int64_t &off, int64_t max,
+bool Protocol::encodeEncryptionSettings(char* dest, int64_t& off, int64_t max,
                                         const EncryptionType encryptionType,
-                                        const string &iv,
+                                        const string& iv,
                                         const int32_t tagInterval) {
   return encodeVarI64C(dest, max, off, encryptionType) &&
          encodeString(dest, max, off, iv) &&
@@ -531,9 +531,9 @@ bool Protocol::encodeEncryptionSettings(char *dest, int64_t &off, int64_t max,
 }
 
 /* static */
-bool Protocol::decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
-                                        EncryptionType &encryptionType,
-                                        string &iv, int32_t &tagInterval) {
+bool Protocol::decodeEncryptionSettings(char* src, int64_t& off, int64_t max,
+                                        EncryptionType& encryptionType,
+                                        string& iv, int32_t& tagInterval) {
   ByteRange br = makeByteRange(src, max, off);
   const ByteRange obr = br;
   int64_t v;
@@ -546,13 +546,13 @@ bool Protocol::decodeEncryptionSettings(char *src, int64_t &off, int64_t max,
   return ok;
 }
 
-bool Protocol::encodeFooter(char *dest, int64_t &off, int64_t max,
+bool Protocol::encodeFooter(char* dest, int64_t& off, int64_t max,
                             int32_t checksum) {
   return encodeVarI64(dest, max, off, checksum);
 }
 
-bool Protocol::decodeFooter(char *src, int64_t &off, int64_t max,
-                            int32_t &checksum) {
+bool Protocol::decodeFooter(char* src, int64_t& off, int64_t max,
+                            int32_t& checksum) {
   ByteRange br = makeByteRange(src, max, off);
   const ByteRange obr = br;
   bool ok = decodeInt32(br, checksum);

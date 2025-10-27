@@ -48,18 +48,18 @@ class Wdt {
    * @param:
    *   applicationName is used at fb for scuba reporting to differentiate apps
    */
-  static Wdt &initializeWdt(const std::string &appName);
+  static Wdt& initializeWdt(const std::string& appName);
   /**
    * Mutable reference to WdtOptions
    */
-  WdtOptions &getWdtOptions();
+  WdtOptions& getWdtOptions();
   /**
    * Return Wdt lib handle which has been previously initialized by calling
    * @see initializeWdt()
    * This is only needed if the caller code doesn't want to pass the Wdt
    * instance around.
    */
-  static Wdt &getWdt(const std::string &appName);
+  static Wdt& getWdt(const std::string& appName);
   /**
    * TLS is unsupported for now
    */
@@ -75,46 +75,46 @@ class Wdt {
    * Optionally passes an abort checker.
    */
   virtual ErrorCode wdtSend(
-      const WdtTransferRequest &wdtRequest,
+      const WdtTransferRequest& wdtRequest,
       std::shared_ptr<IAbortChecker> abortChecker = nullptr,
       bool terminateExistingOne = false);
 
-  virtual ErrorCode createWdtSender(const WdtTransferRequest &wdtRequest,
+  virtual ErrorCode createWdtSender(const WdtTransferRequest& wdtRequest,
                                     std::shared_ptr<IAbortChecker> abortChecker,
                                     bool terminateExistingOne,
-                                    SenderPtr &senderPtr);
+                                    SenderPtr& senderPtr);
 
-  virtual ErrorCode releaseWdtSender(const WdtTransferRequest &wdtRequest);
+  virtual ErrorCode releaseWdtSender(const WdtTransferRequest& wdtRequest);
 
   /**
    * Receive data. It creates a receiver on specified namespace/identifier and
    * initialize it.
    */
   virtual ErrorCode wdtReceiveStart(
-      const std::string &wdtNamespace, WdtTransferRequest &wdtRequest,
-      const std::string &identifier = "default",
+      const std::string& wdtNamespace, WdtTransferRequest& wdtRequest,
+      const std::string& identifier = "default",
       std::shared_ptr<IAbortChecker> abortChecker = nullptr);
 
   /**
    * Finish receiving data. It finishes the receiver on specified
    * namespace/identifier.
    */
-  virtual ErrorCode wdtReceiveFinish(const std::string &wdtNamespace,
-                                     const std::string &identifier = "default");
+  virtual ErrorCode wdtReceiveFinish(const std::string& wdtNamespace,
+                                     const std::string& identifier = "default");
 
-  virtual ErrorCode printWdtOptions(std::ostream &out);
+  virtual ErrorCode printWdtOptions(std::ostream& out);
 
-  WdtResourceController *getWdtResourceController() {
+  WdtResourceController* getWdtResourceController() {
     return resourceController_.get();
   }
 
   /// destroys WDT object for an app
-  static void releaseWdt(const std::string &appName);
+  static void releaseWdt(const std::string& appName);
 
   /// @return  sender identifier for a transfer request
-  static std::string getSenderIdentifier(const WdtTransferRequest &req);
+  static std::string getSenderIdentifier(const WdtTransferRequest& req);
 
-  virtual void wdtSetReceiverSocketCreator(Receiver & /* unused */) {
+  virtual void wdtSetReceiverSocketCreator(Receiver& /* unused */) {
   }
 
   /// Virtual Destructor (for class hierarchy)
@@ -138,24 +138,24 @@ class Wdt {
   std::unique_ptr<WdtResourceController> resourceController_;
 
   // Internal initialization so sub classes can share the code
-  virtual ErrorCode initializeWdtInternal(const std::string &appName);
+  virtual ErrorCode initializeWdtInternal(const std::string& appName);
 
   // Optionally set socket creator and progress reporter (used for fb)
   virtual ErrorCode wdtSetAbortSocketCreatorAndReporter(
-      WdtBase *target, const WdtTransferRequest &req,
+      WdtBase* target, const WdtTransferRequest& req,
       std::shared_ptr<IAbortChecker> abortChecker);
 
   // Internal wdt object creator/holder
-  static Wdt &getWdtInternal(const std::string &appName,
-                             std::function<Wdt *()> factory);
+  static Wdt& getWdtInternal(const std::string& appName,
+                             std::function<Wdt*()> factory);
 
   /// Private constructor
   explicit Wdt();
   explicit Wdt(std::shared_ptr<Throttler> throttler);
 
   /// Not copyable
-  Wdt(const Wdt &) = delete;
-  Wdt &operator=(const Wdt &) = delete;
+  Wdt(const Wdt&) = delete;
+  Wdt& operator=(const Wdt&) = delete;
 };
 }  // namespace wdt
 }  // namespace facebook

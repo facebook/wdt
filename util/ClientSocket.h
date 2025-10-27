@@ -18,22 +18,22 @@ namespace facebook {
 namespace wdt {
 class ClientSocket : public IClientSocket {
  public:
-  ClientSocket(ThreadCtx &threadCtx, const std::string &dest, int port,
-               const EncryptionParams &encryptionParams,
+  ClientSocket(ThreadCtx& threadCtx, const std::string& dest, int port,
+               const EncryptionParams& encryptionParams,
                int64_t ivChangeInterval);
   virtual ErrorCode connect() override;
   /// @return   peer-ip of the connected socket
-  const std::string &getPeerIp() const override;
+  const std::string& getPeerIp() const override;
   /// shutdown() is now on WdtSocket as shutdownWrites()
   virtual ~ClientSocket() override;
 
   /// tries to read nbyte data and periodically checks for abort
-  int read(char *buf, int nbyte, bool tryFull = true) override {
+  int read(char* buf, int nbyte, bool tryFull = true) override {
     return socket_->read(buf, nbyte, tryFull);
   }
 
   /// tries to read nbyte data with a specific and periodically checks for abort
-  int readWithTimeout(char *buf, int nbyte, int timeoutMs,
+  int readWithTimeout(char* buf, int nbyte, int timeoutMs,
                       bool tryFull = true) override {
     return socket_->readWithTimeout(buf, nbyte, timeoutMs, tryFull);
   }
@@ -41,7 +41,7 @@ class ClientSocket : public IClientSocket {
   /// tries to write nbyte data and periodically checks for abort, if retry is
   /// true, socket tries to write as long as it makes some progress within a
   /// write timeout
-  int write(char *buf, int nbyte, bool retry = false) override {
+  int write(char* buf, int nbyte, bool retry = false) override {
     return socket_->write(buf, nbyte, retry);
   }
 
@@ -120,7 +120,7 @@ class ClientSocket : public IClientSocket {
   std::string peerIp_;
   struct addrinfo sa_;
   std::unique_ptr<WdtSocket> socket_{nullptr};
-  ThreadCtx &threadCtx_;
+  ThreadCtx& threadCtx_;
 };
 }  // namespace wdt
 }  // namespace facebook

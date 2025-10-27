@@ -19,9 +19,9 @@ namespace wdt {
 
 using std::string;
 
-ClientSocket::ClientSocket(ThreadCtx &threadCtx, const string &dest,
+ClientSocket::ClientSocket(ThreadCtx& threadCtx, const string& dest,
                            const int port,
-                           const EncryptionParams &encryptionParams,
+                           const EncryptionParams& encryptionParams,
                            int64_t ivChangeInterval)
     : dest_(dest), threadCtx_(threadCtx) {
   memset(&sa_, 0, sizeof(sa_));
@@ -41,7 +41,7 @@ ErrorCode ClientSocket::connect() {
   auto port = socket_->getPort();
   WDT_CHECK(fd < 0) << "Previous connection not closed " << fd << " " << port;
   // Lookup
-  struct addrinfo *infoList = nullptr;
+  struct addrinfo* infoList = nullptr;
   auto guard = folly::makeGuard([&] {
     if (infoList) {
       freeaddrinfo(infoList);
@@ -56,7 +56,7 @@ ErrorCode ClientSocket::connect() {
     return CONN_ERROR;
   }
   int count = 0;
-  for (struct addrinfo *info = infoList; info != nullptr;
+  for (struct addrinfo* info = infoList; info != nullptr;
        info = info->ai_next) {
     ++count;
     std::string host, port_2;
@@ -175,7 +175,7 @@ ErrorCode ClientSocket::connect() {
   return OK;
 }
 
-const std::string &ClientSocket::getPeerIp() const {
+const std::string& ClientSocket::getPeerIp() const {
   return peerIp_;
 }
 

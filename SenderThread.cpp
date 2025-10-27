@@ -17,7 +17,7 @@
 namespace facebook {
 namespace wdt {
 
-std::ostream &operator<<(std::ostream &os, const SenderThread &senderThread) {
+std::ostream& operator<<(std::ostream& os, const SenderThread& senderThread) {
   os << "Thread[" << senderThread.threadIndex_
      << ", port: " << senderThread.port_ << "] ";
   return os;
@@ -33,12 +33,11 @@ const SenderThread::StateFunction SenderThread::stateMap_[] = {
     &SenderThread::processAbortCmd, &SenderThread::processVersionMismatch};
 
 std::unique_ptr<IClientSocket> SenderThread::connectToReceiver(
-    const int port, IAbortChecker const * /*abortChecker*/,
-    ErrorCode &errCode) {
+    const int port, IAbortChecker const* /*abortChecker*/, ErrorCode& errCode) {
   auto startTime = Clock::now();
   int connectAttempts = 0;
   std::unique_ptr<IClientSocket> socket;
-  const EncryptionParams &encryptionData =
+  const EncryptionParams& encryptionData =
       wdtParent_->transferRequest_.encryptionData;
   int64_t ivChangeInterval = wdtParent_->transferRequest_.ivChangeInterval;
   if (threadProtocolVersion_ <
@@ -151,7 +150,7 @@ SenderState SenderThread::connect() {
 
 SenderState SenderThread::readLocalCheckPoint() {
   WTLOG(INFO) << "entered READ_LOCAL_CHECKPOINT state";
-  ThreadTransferHistory &transferHistory = getTransferHistory();
+  ThreadTransferHistory& transferHistory = getTransferHistory();
   std::vector<Checkpoint> checkpoints;
   int64_t decodeOffset = 0;
   int checkpointLen =
@@ -184,7 +183,7 @@ SenderState SenderThread::readLocalCheckPoint() {
     threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  const Checkpoint &checkpoint = checkpoints[0];
+  const Checkpoint& checkpoint = checkpoints[0];
   auto numBlocks = checkpoint.numBlocks;
   WTVLOG(1) << "received local checkpoint " << checkpoint;
 
@@ -282,7 +281,7 @@ ErrorCode SenderThread::readHeartBeats() {
 
 SenderState SenderThread::sendBlocks() {
   WTVLOG(1) << "entered SEND_BLOCKS state";
-  ThreadTransferHistory &transferHistory = getTransferHistory();
+  ThreadTransferHistory& transferHistory = getTransferHistory();
   if (threadProtocolVersion_ >= Protocol::RECEIVER_PROGRESS_REPORT_VERSION &&
       !totalSizeSent_ && dirQueue_->fileDiscoveryFinished()) {
     return SEND_SIZE_CMD;
@@ -315,17 +314,17 @@ SenderState SenderThread::sendBlocks() {
 }
 
 TransferStats SenderThread::sendOneByteSource(
-    const std::unique_ptr<ByteSource> &source, ErrorCode transferStatus) {
+    const std::unique_ptr<ByteSource>& source, ErrorCode transferStatus) {
   TransferStats stats;
   char headerBuf[Protocol::kMaxHeader];
   int64_t off = 0;
   headerBuf[off++] = Protocol::FILE_CMD;
   headerBuf[off++] = transferStatus;
-  char *headerLenPtr = headerBuf + off;
+  char* headerLenPtr = headerBuf + off;
   off += sizeof(int16_t);
   const int64_t expectedSize = source->getSize();
   int64_t actualSize = 0;
-  const SourceMetaData &metadata = source->getMetaData();
+  const SourceMetaData& metadata = source->getMetaData();
   BlockDetails blockDetails;
   blockDetails.fileName = metadata.relPath;
   blockDetails.seqId = metadata.seqId;
@@ -361,7 +360,7 @@ TransferStats SenderThread::sendOneByteSource(
     readHeartBeats();
 
     int64_t size;
-    char *buffer = source->read(size);
+    char* buffer = source->read(size);
     if (source->hasError()) {
       WTLOG(ERROR) << "Failed reading file " << source->getIdentifier()
                    << " for fd " << socket_->getFd();
@@ -369,7 +368,7 @@ TransferStats SenderThread::sendOneByteSource(
     }
     WDT_CHECK(buffer && size > 0);
     if (footerType_ == CHECKSUM_FOOTER) {
-      checksum = folly::crc32c((const uint8_t *)buffer, size, checksum);
+      checksum = folly::crc32c((const uint8_t*)buffer, size, checksum);
     }
     if (wdtParent_->getThrottler()) {
       /**
@@ -760,7 +759,7 @@ ErrorCode SenderThread::readAndVerifySpuriousCheckpoint() {
 SenderState SenderThread::processDoneCmd() {
   WTVLOG(1) << "entered PROCESS_DONE_CMD state";
   // DONE cmd implies that all the blocks sent till now is acked
-  ThreadTransferHistory &transferHistory = getTransferHistory();
+  ThreadTransferHistory& transferHistory = getTransferHistory();
   transferHistory.markAllAcknowledged();
 
   // send ack for DONE
@@ -782,7 +781,7 @@ SenderState SenderThread::processDoneCmd() {
 SenderState SenderThread::processWaitCmd() {
   WTLOG(INFO) << "entered PROCESS_WAIT_CMD state ";
   // similar to DONE, WAIT also verifies all the blocks
-  ThreadTransferHistory &transferHistory = getTransferHistory();
+  ThreadTransferHistory& transferHistory = getTransferHistory();
   transferHistory.markAllAcknowledged();
   WTVLOG(1) << "received WAIT_CMD, port " << port_;
   return READ_RECEIVER_CMD;
@@ -791,7 +790,7 @@ SenderState SenderThread::processWaitCmd() {
 SenderState SenderThread::processErrCmd() {
   WTLOG(INFO) << "entered PROCESS_ERR_CMD state";
   // similar to DONE, global checkpoint cmd also verifies all the blocks
-  ThreadTransferHistory &transferHistory = getTransferHistory();
+  ThreadTransferHistory& transferHistory = getTransferHistory();
   transferHistory.markAllAcknowledged();
   int64_t toRead = sizeof(int16_t);
   int64_t numRead = socket_->read(buf_, toRead);
@@ -820,7 +819,7 @@ SenderState SenderThread::processErrCmd() {
     threadStats_.setLocalErrorCode(PROTOCOL_ERROR);
     return END;
   }
-  for (auto &checkpoint : checkpoints) {
+  for (auto& checkpoint : checkpoints) {
     WTLOG(INFO) << "Received global checkpoint " << checkpoint;
     transferHistoryController_->handleGlobalCheckpoint(checkpoint);
   }
@@ -829,7 +828,7 @@ SenderState SenderThread::processErrCmd() {
 
 SenderState SenderThread::processAbortCmd() {
   WTLOG(INFO) << "entered PROCESS_ABORT_CMD state ";
-  ThreadTransferHistory &transferHistory = getTransferHistory();
+  ThreadTransferHistory& transferHistory = getTransferHistory();
   threadStats_.setLocalErrorCode(ABORT);
   int toRead = Protocol::kAbortLength;
   auto numRead = socket_->read(buf_, toRead);
@@ -990,7 +989,7 @@ void SenderThread::start() {
               << threadStats_.getEffectiveTotalBytes() / totalTime / kMbToB
               << " Mbytes/sec";
 
-  ThreadTransferHistory &transferHistory = getTransferHistory();
+  ThreadTransferHistory& transferHistory = getTransferHistory();
   transferHistory.markNotInUse();
   controller_->deRegisterThread(threadIndex_);
   controller_->executeAtEnd([&]() { wdtParent_->endCurTransfer(); });

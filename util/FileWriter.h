@@ -17,8 +17,8 @@ namespace wdt {
 
 class FileWriter : public Writer {
  public:
-  FileWriter(ThreadCtx &threadCtx, BlockDetails const *blockDetails,
-             FileCreator *fileCreator)
+  FileWriter(ThreadCtx& threadCtx, BlockDetails const* blockDetails,
+             FileCreator* fileCreator)
       : threadCtx_(threadCtx),
         blockDetails_(blockDetails),
 #ifdef HAS_SYNC_FILE_RANGE
@@ -33,7 +33,7 @@ class FileWriter : public Writer {
   ErrorCode open() override;
 
   /// @see Writer.h
-  ErrorCode write(char *buf, int64_t size) override;
+  ErrorCode write(char* buf, int64_t size) override;
 
   /// @see Writer.h
   int64_t getTotalWritten() override {
@@ -62,13 +62,13 @@ class FileWriter : public Writer {
    */
   bool isClosed();
 
-  ThreadCtx &threadCtx_;
+  ThreadCtx& threadCtx_;
 
   /// file handler
   int fd_{-1};
 
   /// details of the block
-  BlockDetails const *blockDetails_;
+  BlockDetails const* blockDetails_;
 
   /// number of bytes written
   int64_t totalWritten_{0};
@@ -80,7 +80,7 @@ class FileWriter : public Writer {
   int64_t writtenSinceLastSync_{0};
 #endif
   /// reference to file creator
-  FileCreator *fileCreator_;
+  FileCreator* fileCreator_;
 };
 }  // namespace wdt
 }  // namespace facebook

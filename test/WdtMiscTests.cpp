@@ -17,8 +17,8 @@ namespace facebook {
 namespace wdt {
 
 TEST(BasicTest, ReceiverAcceptTimeout) {
-  Wdt &wdt = Wdt::initializeWdt("unit test ReceiverAcceptTimeout");
-  WdtOptions &opts = wdt.getWdtOptions();
+  Wdt& wdt = Wdt::initializeWdt("unit test ReceiverAcceptTimeout");
+  WdtOptions& opts = wdt.getWdtOptions();
   opts.accept_timeout_millis = 1;
   opts.max_accept_retries = 1;
   opts.max_retries = 1;
@@ -42,8 +42,8 @@ TEST(BasicTest, MultiWdtSender) {
   string targetDir = baseDir + "/dst";
   string srcFileFullPath = srcDir + "/" + srcFile;
 
-  Wdt &wdt = Wdt::initializeWdt("unit test MultiWdtSender");
-  WdtOptions &options = wdt.getWdtOptions();
+  Wdt& wdt = Wdt::initializeWdt("unit test MultiWdtSender");
+  WdtOptions& options = wdt.getWdtOptions();
   options.avg_mbytes_per_sec = 100;
   WdtTransferRequest req(/* start port */ 0,
                          /* num ports */ 1, targetDir);
@@ -53,7 +53,7 @@ TEST(BasicTest, MultiWdtSender) {
     // Create 400mb srcFile
     const int32_t size = 1024 * 1024;
     uint a[size];
-    FILE *pFile;
+    FILE* pFile;
     pFile = fopen(srcFileFullPath.c_str(), "wb");
     for (int i = 0; i < 100; ++i) {
       fwrite(a, 1, sizeof(a), pFile);
@@ -98,7 +98,7 @@ TEST(BasicTest, ThrottlerWithoutReporting) {
 }  // namespace wdt
 }  // namespace facebook
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);

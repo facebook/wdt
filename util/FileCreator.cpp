@@ -14,7 +14,7 @@
 namespace facebook {
 namespace wdt {
 
-bool FileCreator::setFileSize(ThreadCtx &threadCtx, int fd, int64_t fileSize) {
+bool FileCreator::setFileSize(ThreadCtx& threadCtx, int fd, int64_t fileSize) {
   struct stat fileStat;
   if (fstat(fd, &fileStat) != 0) {
     WPLOG(ERROR) << "fstat() failed for " << fd;
@@ -48,8 +48,8 @@ bool FileCreator::setFileSize(ThreadCtx &threadCtx, int fd, int64_t fileSize) {
 #endif
 }
 
-int FileCreator::openAndSetSize(ThreadCtx &threadCtx,
-                                BlockDetails const *blockDetails) {
+int FileCreator::openAndSetSize(ThreadCtx& threadCtx,
+                                BlockDetails const* blockDetails) {
   int fd;
   const bool doCreate = (blockDetails->allocationStatus == NOT_EXISTS);
   const bool isTooLarge = (blockDetails->allocationStatus == EXISTS_TOO_LARGE);
@@ -87,8 +87,8 @@ int FileCreator::openAndSetSize(ThreadCtx &threadCtx,
   return fd;
 }
 
-int FileCreator::openForFirstBlock(ThreadCtx &threadCtx,
-                                   BlockDetails const *blockDetails) {
+int FileCreator::openForFirstBlock(ThreadCtx& threadCtx,
+                                   BlockDetails const* blockDetails) {
   int fd = openAndSetSize(threadCtx, blockDetails);
   {
     std::unique_lock guard(lock_);
@@ -120,8 +120,8 @@ bool FileCreator::waitForAllocationFinish(int allocatingThreadIndex,
   }
 }
 
-int FileCreator::openForBlocks(ThreadCtx &threadCtx,
-                               BlockDetails const *blockDetails) {
+int FileCreator::openForBlocks(ThreadCtx& threadCtx,
+                               BlockDetails const* blockDetails) {
   if (blockDetails->allocationStatus == TO_BE_DELETED) {
     const std::string path = getFullPath(blockDetails->fileName);
     int status;
@@ -169,8 +169,8 @@ int FileCreator::openForBlocks(ThreadCtx &threadCtx,
 
 using std::string;
 
-int FileCreator::openExistingFile(ThreadCtx &threadCtx,
-                                  const string &relPathStr) {
+int FileCreator::openExistingFile(ThreadCtx& threadCtx,
+                                  const string& relPathStr) {
   // This should have been validated earlier and errored out
   // instead of crashing here
   WDT_CHECK(!relPathStr.empty());
@@ -198,7 +198,7 @@ int FileCreator::openExistingFile(ThreadCtx &threadCtx,
   return res;
 }
 
-int FileCreator::createFile(ThreadCtx &threadCtx, const string &relPathStr) {
+int FileCreator::createFile(ThreadCtx& threadCtx, const string& relPathStr) {
   CHECK(!relPathStr.empty());
   CHECK(relPathStr[0] != '/');
   CHECK(relPathStr.back() != '/');
@@ -334,12 +334,12 @@ bool FileCreator::createDirRecursively(const std::string dir, bool force) {
   return true;
 }
 
-std::string FileCreator::getFullPath(const std::string &relPath) {
+std::string FileCreator::getFullPath(const std::string& relPath) {
   return (rootDir_ + relPath);
 }
 
 /* static */
-void FileCreator::addTrailingSlash(string &path) {
+void FileCreator::addTrailingSlash(string& path) {
   if (path.back() != '/') {
     path.push_back('/');
     WVLOG(1) << "Added missing trailing / to " << path;

@@ -34,7 +34,7 @@ class Writer {
    *
    * @return      status of the write
    */
-  virtual ErrorCode write(char *buf, int64_t size) = 0;
+  virtual ErrorCode write(char* buf, int64_t size) = 0;
 
   /// @return   total number of bytes written
   virtual int64_t getTotalWritten() = 0;

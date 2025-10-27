@@ -18,13 +18,13 @@
 namespace facebook {
 namespace wdt {
 
-typedef struct addrinfo *addrInfoList;
+typedef struct addrinfo* addrInfoList;
 
 class ServerSocket : public IServerSocket {
  public:
-  ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
-               const EncryptionParams &encryptionParams,
-               int64_t ivChangeInterval, Func &&tagVerificationSuccessCallback);
+  ServerSocket(ThreadCtx& threadCtx, int port, int backlog,
+               const EncryptionParams& encryptionParams,
+               int64_t ivChangeInterval, Func&& tagVerificationSuccessCallback);
   ~ServerSocket() override;
   /// Sets up listening socket (first wildcard type (ipv4 or ipv6 depending
   /// on flag)).
@@ -48,13 +48,13 @@ class ServerSocket : public IServerSocket {
   void closeAllNoCheck() override;
 
   /// tries to read nbyte data and periodically checks for abort
-  int read(char *buf, int nbyte, bool tryFull = true) override {
+  int read(char* buf, int nbyte, bool tryFull = true) override {
     return socket_->read(buf, nbyte, tryFull);
   }
 
   /// tries to read nbyte data with a specific timeout and periodically checks
   /// for abort
-  int readWithTimeout(char *buf, int nbyte, int timeoutMs,
+  int readWithTimeout(char* buf, int nbyte, int timeoutMs,
                       bool tryFull = true) override {
     return socket_->readWithTimeout(buf, nbyte, timeoutMs, tryFull);
   }
@@ -62,7 +62,7 @@ class ServerSocket : public IServerSocket {
   /// tries to write nbyte data and periodically checks for abort, if retry is
   /// true, socket tries to write as long as it makes some progress within a
   /// write timeout
-  int write(char *buf, int nbyte, bool retry = false) override {
+  int write(char* buf, int nbyte, bool retry = false) override {
     return socket_->write(buf, nbyte, retry);
   }
 
@@ -129,7 +129,7 @@ class ServerSocket : public IServerSocket {
 
  private:
   std::unique_ptr<WdtSocket> socket_{nullptr};
-  ThreadCtx &threadCtx_;
+  ThreadCtx& threadCtx_;
 
   /// sets the receive buffer size for this socket
   void setReceiveBufferSize(int fd);
@@ -151,7 +151,7 @@ class ServerSocket : public IServerSocket {
    *
    * @return        socket fd, -1 in case of error
    */
-  int listenInternal(struct addrinfo *info, const std::string &host);
+  int listenInternal(struct addrinfo* info, const std::string& host);
 
   /**
    * Returns the selected port and new address list to use
@@ -163,9 +163,9 @@ class ServerSocket : public IServerSocket {
    *
    * @return                selected port if successful, -1 otherwise
    */
-  int getSelectedPortAndNewAddress(int listeningFd, struct addrinfo &sa,
-                                   const std::string &host,
-                                   addrInfoList &infoList);
+  int getSelectedPortAndNewAddress(int listeningFd, struct addrinfo& sa,
+                                   const std::string& host,
+                                   addrInfoList& infoList);
 };
 }  // namespace wdt
 }  // namespace facebook

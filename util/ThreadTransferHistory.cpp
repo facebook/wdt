@@ -11,8 +11,8 @@
 namespace facebook {
 namespace wdt {
 
-ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue &queue,
-                                             TransferStats &threadStats,
+ThreadTransferHistory::ThreadTransferHistory(DirectorySourceQueue& queue,
+                                             TransferStats& threadStats,
                                              int32_t port)
     : queue_(queue), threadStats_(threadStats), port_(port) {
   WVLOG(1) << "Making thread history for port " << port_;
@@ -31,7 +31,7 @@ std::string ThreadTransferHistory::getSourceId(int64_t index) {
   return sourceId;
 }
 
-bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
+bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource>& source) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (globalCheckpoint_) {
     // already received an error for this thread
@@ -47,13 +47,13 @@ bool ThreadTransferHistory::addSource(std::unique_ptr<ByteSource> &source) {
 }
 
 ErrorCode ThreadTransferHistory::setLocalCheckpoint(
-    const Checkpoint &checkpoint) {
+    const Checkpoint& checkpoint) {
   std::lock_guard<std::mutex> lock(mutex_);
   return setCheckpointAndReturnToQueue(checkpoint, false);
 }
 
 ErrorCode ThreadTransferHistory::setGlobalCheckpoint(
-    const Checkpoint &checkpoint) {
+    const Checkpoint& checkpoint) {
   std::unique_lock<std::mutex> lock(mutex_);
   ErrorCode status = setCheckpointAndReturnToQueue(checkpoint, true);
   while (inUse_) {
@@ -65,7 +65,7 @@ ErrorCode ThreadTransferHistory::setGlobalCheckpoint(
   return status;
 }
 ErrorCode ThreadTransferHistory::setCheckpointAndReturnToQueue(
-    const Checkpoint &checkpoint, bool globalCheckpoint) {
+    const Checkpoint& checkpoint, bool globalCheckpoint) {
   const int64_t historySize = history_.size();
   int64_t numReceivedSources = checkpoint.numBlocks;
   int64_t lastBlockReceivedBytes = checkpoint.lastBlockReceivedBytes;
@@ -96,7 +96,7 @@ ErrorCode ThreadTransferHistory::setCheckpointAndReturnToQueue(
   for (int64_t i = 0; i < numFailedSources; i++) {
     std::unique_ptr<ByteSource> source = std::move(history_.back());
     history_.pop_back();
-    const Checkpoint *checkpointPtr =
+    const Checkpoint* checkpointPtr =
         (i == numFailedSources - 1 ? &checkpoint : nullptr);
     markSourceAsFailed(source, checkpointPtr);
     sourcesToReturn.emplace_back(std::move(source));
@@ -134,7 +134,7 @@ void ThreadTransferHistory::returnUnackedSourcesToQueue() {
 }
 
 ErrorCode ThreadTransferHistory::validateCheckpoint(
-    const Checkpoint &checkpoint, bool globalCheckpoint) {
+    const Checkpoint& checkpoint, bool globalCheckpoint) {
   if (lastCheckpoint_ == nullptr) {
     return OK;
   }
@@ -179,8 +179,8 @@ ErrorCode ThreadTransferHistory::validateCheckpoint(
 }
 
 void ThreadTransferHistory::markSourceAsFailed(
-    std::unique_ptr<ByteSource> &source, const Checkpoint *checkpoint) {
-  auto &metadata = source->getMetaData();
+    std::unique_ptr<ByteSource>& source, const Checkpoint* checkpoint) {
+  auto& metadata = source->getMetaData();
   bool validCheckpoint = false;
   if (checkpoint != nullptr) {
     if (checkpoint->hasSeqId) {
@@ -204,7 +204,7 @@ void ThreadTransferHistory::markSourceAsFailed(
   }
   int64_t receivedBytes =
       (validCheckpoint ? checkpoint->lastBlockReceivedBytes : 0);
-  TransferStats &sourceStats = source->getTransferStats();
+  TransferStats& sourceStats = source->getTransferStats();
   if (sourceStats.getLocalErrorCode() != OK) {
     // already marked as failed
     sourceStats.addEffectiveBytes(0, receivedBytes);
@@ -237,11 +237,11 @@ void ThreadTransferHistory::markNotInUse() {
 }
 
 TransferHistoryController::TransferHistoryController(
-    DirectorySourceQueue &dirQueue)
+    DirectorySourceQueue& dirQueue)
     : dirQueue_(dirQueue) {
 }
 
-ThreadTransferHistory &TransferHistoryController::getTransferHistory(
+ThreadTransferHistory& TransferHistoryController::getTransferHistory(
     int32_t port) {
   auto it = threadHistoriesMap_.find(port);
   WDT_CHECK(it != threadHistoriesMap_.end()) << "port not found" << port;
@@ -249,15 +249,15 @@ ThreadTransferHistory &TransferHistoryController::getTransferHistory(
 }
 
 void TransferHistoryController::addThreadHistory(int32_t port,
-                                                 TransferStats &threadStats) {
+                                                 TransferStats& threadStats) {
   WVLOG(1) << "Adding the history for " << port;
   threadHistoriesMap_.emplace(port, std::make_unique<ThreadTransferHistory>(
                                         dirQueue_, threadStats, port));
 }
 
 ErrorCode TransferHistoryController::handleVersionMismatch() {
-  for (auto &historyPair : threadHistoriesMap_) {
-    auto &history = historyPair.second;
+  for (auto& historyPair : threadHistoriesMap_) {
+    auto& history = historyPair.second;
     if (history->getNumAcked() > 0) {
       WLOG(ERROR)
           << "Even though the transfer aborted due to VERSION_MISMATCH, "
@@ -271,7 +271,7 @@ ErrorCode TransferHistoryController::handleVersionMismatch() {
 }
 
 void TransferHistoryController::handleGlobalCheckpoint(
-    const Checkpoint &checkpoint) {
+    const Checkpoint& checkpoint) {
   auto errPort = checkpoint.port;
   auto it = threadHistoriesMap_.find(errPort);
   if (it == threadHistoriesMap_.end()) {

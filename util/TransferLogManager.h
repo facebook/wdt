@@ -48,56 +48,56 @@ constexpr char kWdtBuggyLogName[] = ".wdt.log.bug";
 class LogEncoderDecoder {
  public:
   /// encodes header entry
-  int64_t encodeLogHeader(char *dest, int64_t max,
-                          const std::string &recoveryId,
-                          const std::string &senderIp, int64_t config);
+  int64_t encodeLogHeader(char* dest, int64_t max,
+                          const std::string& recoveryId,
+                          const std::string& senderIp, int64_t config);
 
   /// decodes header entry
-  bool decodeLogHeader(char *buf, int16_t size, int64_t &timestamp,
-                       int &version, std::string &recoveryId,
-                       std::string &senderIp, int64_t &config);
+  bool decodeLogHeader(char* buf, int16_t size, int64_t& timestamp,
+                       int& version, std::string& recoveryId,
+                       std::string& senderIp, int64_t& config);
 
   /// encodes file creation entry
-  int64_t encodeFileCreationEntry(char *dest, int64_t max,
-                                  const std::string &fileName,
+  int64_t encodeFileCreationEntry(char* dest, int64_t max,
+                                  const std::string& fileName,
                                   const int64_t seqId, const int64_t fileSize);
 
   /// decodes file creation entry
-  bool decodeFileCreationEntry(char *buf, int16_t size, int64_t &timestamp,
-                               std::string &fileName, int64_t &seqId,
-                               int64_t &fileSize);
+  bool decodeFileCreationEntry(char* buf, int16_t size, int64_t& timestamp,
+                               std::string& fileName, int64_t& seqId,
+                               int64_t& fileSize);
 
   /// encodes block write entry
-  int64_t encodeBlockWriteEntry(char *dest, int64_t max, const int64_t seqId,
+  int64_t encodeBlockWriteEntry(char* dest, int64_t max, const int64_t seqId,
                                 const int64_t offset, const int64_t blockSize);
 
   /// decodes block write entry
-  bool decodeBlockWriteEntry(char *buf, int16_t size, int64_t &timestamp,
-                             int64_t &seqId, int64_t &offset,
-                             int64_t &blockSize);
+  bool decodeBlockWriteEntry(char* buf, int16_t size, int64_t& timestamp,
+                             int64_t& seqId, int64_t& offset,
+                             int64_t& blockSize);
 
   /// encodes file resize entry
-  int64_t encodeFileResizeEntry(char *dest, int64_t max, const int64_t seqId,
+  int64_t encodeFileResizeEntry(char* dest, int64_t max, const int64_t seqId,
                                 const int64_t fileSize);
 
   /// decodes file resize entry
-  bool decodeFileResizeEntry(char *buf, int16_t size, int64_t &timestamp,
-                             int64_t &seqId, int64_t &fileSize);
+  bool decodeFileResizeEntry(char* buf, int16_t size, int64_t& timestamp,
+                             int64_t& seqId, int64_t& fileSize);
 
   /// encodes file invalidation entry
-  int64_t encodeFileInvalidationEntry(char *dest, int64_t max,
-                                      const int64_t &seqId);
+  int64_t encodeFileInvalidationEntry(char* dest, int64_t max,
+                                      const int64_t& seqId);
 
   /// decodes file invalidation entry
-  bool decodeFileInvalidationEntry(char *buf, int16_t size, int64_t &timestamp,
-                                   int64_t &seqId);
+  bool decodeFileInvalidationEntry(char* buf, int16_t size, int64_t& timestamp,
+                                   int64_t& seqId);
 
   /// encodes directory invalidation entry
-  int64_t encodeDirectoryInvalidationEntry(char *buf, int64_t max);
+  int64_t encodeDirectoryInvalidationEntry(char* buf, int64_t max);
 
   /// decodes directory invalidation entry
-  bool decodeDirectoryInvalidationEntry(char *buf, int16_t size,
-                                        int64_t &timestamp);
+  bool decodeDirectoryInvalidationEntry(char* buf, int16_t size,
+                                        int64_t& timestamp);
 
  private:
   /// @return     timestamp in microseconds
@@ -127,7 +127,7 @@ class TransferLogManager {
   /// bytes for seq-id, 10 bytes for file-size, 10 bytes for timestamp
   static const int64_t kMaxEntryLength = 2 + 1 + 10 + PATH_MAX + 2 * 10;
 
-  TransferLogManager(const WdtOptions &options, const std::string &rootDir)
+  TransferLogManager(const WdtOptions& options, const std::string& rootDir)
       : options_(options) {
     rootDir_ = rootDir;
     if (rootDir_.back() != '/') {
@@ -158,7 +158,7 @@ class TransferLogManager {
    *
    * @return         whether sender-ip matched log ip
    */
-  bool verifySenderIp(const std::string &curSenderIp);
+  bool verifySenderIp(const std::string& curSenderIp);
 
   /**
    * If resumption is based on directory tree, writes log header to the
@@ -173,7 +173,7 @@ class TransferLogManager {
    * @param seqId     seq-id of the file
    * @param fileSize  size of the file
    */
-  void addFileCreationEntry(const std::string &fileName, int64_t seqId,
+  void addFileCreationEntry(const std::string& fileName, int64_t seqId,
                             int64_t fileSize);
 
   /**
@@ -227,8 +227,8 @@ class TransferLogManager {
    *
    * @return      status of the parsing
    */
-  ErrorCode parseAndMatch(const std::string &recoveryId, int64_t config,
-                          std::vector<FileChunksInfo> &fileChunksInfo);
+  ErrorCode parseAndMatch(const std::string& recoveryId, int64_t config,
+                          std::vector<FileChunksInfo>& fileChunksInfo);
 
   /// @return     returns current resumption status
   ErrorCode getResumptionStatus();
@@ -245,7 +245,7 @@ class TransferLogManager {
   /// Shutdown the log writer thread
   void shutdownThread();
 
-  std::string getFullPath(const std::string &relPath);
+  std::string getFullPath(const std::string& relPath);
 
   /**
    * entry point for the writer thread. This thread periodically writes buffer
@@ -255,7 +255,7 @@ class TransferLogManager {
 
   /// Write 'entries' to disk synchronously
   /// return true if entries are written successfully, otherwise false.
-  bool writeEntriesToDiskNoLock(const std::vector<std::string> &entries);
+  bool writeEntriesToDiskNoLock(const std::vector<std::string>& entries);
 
   /// fsync transfer log
   void fsyncLog();
@@ -282,13 +282,13 @@ class TransferLogManager {
    *
    * @return                  Log parsing status
    */
-  ErrorCode parseVerifyAndFix(const std::string &recoveryId, int64_t config,
+  ErrorCode parseVerifyAndFix(const std::string& recoveryId, int64_t config,
                               bool parseOnly,
-                              std::vector<FileChunksInfo> &parsedInfo);
+                              std::vector<FileChunksInfo>& parsedInfo);
 
   LogEncoderDecoder encoderDecoder_;
 
-  const WdtOptions &options_;
+  const WdtOptions& options_;
 
   /// File handler for writing
   int fd_{-1};
@@ -320,12 +320,12 @@ class TransferLogManager {
 /// class responsible for parsing and fixing transfer log
 class LogParser {
  public:
-  LogParser(const WdtOptions &options, LogEncoderDecoder &encoderDecoder,
-            const std::string &rootDir, const std::string &recoveryId,
+  LogParser(const WdtOptions& options, LogEncoderDecoder& encoderDecoder,
+            const std::string& rootDir, const std::string& recoveryId,
             int64_t config, bool parseOnly);
 
-  ErrorCode parseLog(int fd, std::string &senderIp,
-                     std::vector<FileChunksInfo> &fileChunksInfo);
+  ErrorCode parseLog(int fd, std::string& senderIp,
+                     std::vector<FileChunksInfo>& fileChunksInfo);
 
  private:
   std::string getFormattedTimestamp(int64_t timestamp);
@@ -347,24 +347,24 @@ class LogParser {
    *
    * @param seqIds    Invalid seq-ids
    */
-  bool writeFileInvalidationEntries(int fd, const std::set<int64_t> &seqIds);
+  bool writeFileInvalidationEntries(int fd, const std::set<int64_t>& seqIds);
 
-  ErrorCode processHeaderEntry(char *buf, int64_t max, int64_t size,
-                               std::string &senderIp);
+  ErrorCode processHeaderEntry(char* buf, int64_t max, int64_t size,
+                               std::string& senderIp);
 
   // TODO: switch to ByteRange
-  ErrorCode processFileCreationEntry(char *buf, int64_t size);
+  ErrorCode processFileCreationEntry(char* buf, int64_t size);
 
-  ErrorCode processBlockWriteEntry(char *buf, int64_t size);
+  ErrorCode processBlockWriteEntry(char* buf, int64_t size);
 
-  ErrorCode processFileResizeEntry(char *buf, int64_t size);
+  ErrorCode processFileResizeEntry(char* buf, int64_t size);
 
-  ErrorCode processFileInvalidationEntry(char *buf, int64_t size);
+  ErrorCode processFileInvalidationEntry(char* buf, int64_t size);
 
-  ErrorCode processDirectoryInvalidationEntry(char *buf, int64_t size);
+  ErrorCode processDirectoryInvalidationEntry(char* buf, int64_t size);
 
-  const WdtOptions &options_;
-  LogEncoderDecoder &encoderDecoder_;
+  const WdtOptions& options_;
+  LogEncoderDecoder& encoderDecoder_;
   std::string rootDir_;
   std::string recoveryId_;
   int64_t config_;

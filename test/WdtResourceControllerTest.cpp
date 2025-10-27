@@ -34,11 +34,11 @@ class WdtResourceControllerTest : public WdtResourceController {
   void ReleaseStaleTest();
 
  private:
-  string getTransferId(const string &wdtNamespace, int index) {
+  string getTransferId(const string& wdtNamespace, int index) {
     return wdtNamespace + to_string(index);
   }
 
-  WdtTransferRequest makeTransferRequest(const string &transferId) {
+  WdtTransferRequest makeTransferRequest(const string& transferId) {
     WdtTransferRequest request(startPort, numPorts, directory);
     request.hostName = hostName;
     request.transferId = transferId;
@@ -280,21 +280,21 @@ void WdtResourceControllerTest::ReleaseStaleTest() {
 }
 
 TEST(WdtResourceController, AddObjectsWithNoLimits) {
-  auto &options = WdtOptions::getMutable();
+  auto& options = WdtOptions::getMutable();
   options.namespace_receiver_limit = 0;
   WdtResourceControllerTest t;
   t.AddObjectsWithNoLimitsTest();
 }
 
 TEST(WdtResourceController, MultipleNamespacesTest) {
-  auto &options = WdtOptions::getMutable();
+  auto& options = WdtOptions::getMutable();
   options.namespace_receiver_limit = 0;
   WdtResourceControllerTest t;
   t.MultipleNamespacesTest();
 }
 
 TEST(WdtResourceController, AddObjectsWithLimitsTest) {
-  auto &options = WdtOptions::getMutable();
+  auto& options = WdtOptions::getMutable();
   options.global_sender_limit = 2;
   options.global_receiver_limit = 2;
   options.namespace_receiver_limit = 1;
@@ -308,7 +308,7 @@ TEST(WdtResourceController, InvalidNamespaceTest) {
 }
 
 TEST(WdtResourceControllerTest, ReleaseStaleTest) {
-  auto &options = WdtOptions::getMutable();
+  auto& options = WdtOptions::getMutable();
   options.global_sender_limit = 2;
   options.global_receiver_limit = 2;
   WdtResourceControllerTest t;
@@ -317,7 +317,7 @@ TEST(WdtResourceControllerTest, ReleaseStaleTest) {
 }  // namespace wdt
 }  // namespace facebook
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);

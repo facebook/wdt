@@ -17,48 +17,48 @@ namespace wdt {
 
 /// make a byterange from ptr size and offset (byte range starts at
 /// dest + offset and ends at dest + size)
-folly::ByteRange makeByteRange(char *dest, int64_t sz, int64_t off = 0);
+folly::ByteRange makeByteRange(char* dest, int64_t sz, int64_t off = 0);
 /// make a byterange from a string
 folly::ByteRange makeByteRange(std::string);
 /// Delta between 2 byteranges (assumes newRange was advanced and we want to
 /// know the offset change)
-int64_t offset(const folly::ByteRange &newR, const folly::ByteRange &oldR);
+int64_t offset(const folly::ByteRange& newR, const folly::ByteRange& oldR);
 
 /// decodes from br and consumes (advances the byte range)
 /// returns value in the result param and returns true
 /// if the varint is malformed (would read past the end of br), returns false
-bool decodeInt64(folly::ByteRange &br, int64_t &result);
+bool decodeInt64(folly::ByteRange& br, int64_t& result);
 /// will also return false if the number decoded doesn't fit in an int32_t
-bool decodeInt32(folly::ByteRange &br, int32_t &result);
+bool decodeInt32(folly::ByteRange& br, int32_t& result);
 /// Unsigned (not zigzaged encoded version)
-bool decodeUInt64(folly::ByteRange &br, uint64_t &res);
+bool decodeUInt64(folly::ByteRange& br, uint64_t& res);
 /// Unsigned but result in a signed - @see encodeVarI64C
-bool decodeInt64C(folly::ByteRange &br, int64_t &res);
+bool decodeInt64C(folly::ByteRange& br, int64_t& res);
 /// Encoded with encodeVarI64C (aka as unsigned) and fits in 32 bits
-bool decodeInt32C(folly::ByteRange &br, int32_t &result);
+bool decodeInt32C(folly::ByteRange& br, int32_t& result);
 /// Decodes fixed length int16
-bool decodeInt16FixedLength(folly::ByteRange &br, int16_t &res);
+bool decodeInt16FixedLength(folly::ByteRange& br, int16_t& res);
 /// Decodes fixed length int32
-bool decodeInt32FixedLength(folly::ByteRange &br, int32_t &res);
+bool decodeInt32FixedLength(folly::ByteRange& br, int32_t& res);
 /// Decodes fixed length int64
-bool decodeInt64FixedLength(folly::ByteRange &br, int64_t &res);
+bool decodeInt64FixedLength(folly::ByteRange& br, int64_t& res);
 /// Encodes fixed length int16
-bool encodeInt16FixedLength(char *dest, int64_t sz, int64_t &off, int16_t val);
+bool encodeInt16FixedLength(char* dest, int64_t sz, int64_t& off, int16_t val);
 /// Encodes fixed length int32
-bool encodeInt32FixedLength(char *dest, int64_t sz, int64_t &off, int32_t val);
+bool encodeInt32FixedLength(char* dest, int64_t sz, int64_t& off, int32_t val);
 /// Encodes fixed length int64
-bool encodeInt64FixedLength(char *dest, int64_t sz, int64_t &off, int64_t val);
+bool encodeInt64FixedLength(char* dest, int64_t sz, int64_t& off, int64_t val);
 
 /// encodes str into dest + off; not writing past dest + sz
 /// moves the off into the dest pointer, returns true if successful, false if
 /// off would need to be moved past sz
-bool encodeString(char *dest, int64_t sz, int64_t &off, const std::string &str);
+bool encodeString(char* dest, int64_t sz, int64_t& off, const std::string& str);
 
 /// decodes from br and consumes/moves off
 /// sets str
 /// @return false if there isn't enough data in br to decode the length or
 ///         the string
-bool decodeString(folly::ByteRange &br, std::string &str);
+bool decodeString(folly::ByteRange& br, std::string& str);
 
 /// ------- Encoding (varint) building blocks:  ---------
 
@@ -86,7 +86,7 @@ inline int64_t decodeZigZag(uint64_t val) {
  * are unsigned, use this version and save 1 bit. The ranges beccome
  * [0 - 128] -> 1 byte, [128 - 16384] -> 2 bytes, etc...
  */
-inline size_t encodeVarU64(std::string &buffer, uint64_t v) {
+inline size_t encodeVarU64(std::string& buffer, uint64_t v) {
   size_t count = 0;
   while ((++count < 9) && (v >= 128)) {
     buffer.push_back(static_cast<char>(0x80 | (v & 0x7f)));
@@ -106,21 +106,21 @@ inline size_t encodeVarU64(std::string &buffer, uint64_t v) {
  *
  * std::string version - see next one for pointer version
  */
-inline size_t encodeVarI64(std::string &buffer, int64_t i64) {
+inline size_t encodeVarI64(std::string& buffer, int64_t i64) {
   return encodeVarU64(buffer, encodeZigZag(i64));
 }
 
 /**
  * Unsigned buffer based version of @see encodeVarI64
  */
-inline bool encodeVarU64(char *data, size_t datasz, int64_t &pos, uint64_t v) {
+inline bool encodeVarU64(char* data, size_t datasz, int64_t& pos, uint64_t v) {
 #if WDT_EDI64_DO_CHECKS
   if (pos < 0) {
     return false;
   }
 #endif
-  char *p = data + pos;
-  char *const end = data + datasz;
+  char* p = data + pos;
+  char* const end = data + datasz;
   int count = 0;
   while ((++count < 9) && (v >= 128)) {
 #if WDT_EDI64_DO_CHECKS
@@ -155,7 +155,7 @@ inline bool encodeVarU64(char *data, size_t datasz, int64_t &pos, uint64_t v) {
  * @param datalen  to be sure all value fit, must be at least pos+9 (but at
  *                 minimum pos+n, n>=1 if data fits in pos+n)
  */
-inline bool encodeVarI64(char *data, size_t datalen, int64_t &pos, int64_t sv) {
+inline bool encodeVarI64(char* data, size_t datalen, int64_t& pos, int64_t sv) {
   return encodeVarU64(data, datalen, pos, encodeZigZag(sv));
 }
 
@@ -172,16 +172,16 @@ inline bool encodeVarI64(char *data, size_t datalen, int64_t &pos, int64_t sv) {
  * uint64_t result;
  * decodeVar64(buffer.data(), buffer.length(), offset, result);
  */
-inline bool decodeVarU64(const char *data, size_t datalen, int64_t &pos,
-                         uint64_t &res) {
+inline bool decodeVarU64(const char* data, size_t datalen, int64_t& pos,
+                         uint64_t& res) {
 #if WDT_EDI64_DO_CHECKS
   if (pos < 0) {
     WLOG(WARNING) << "negative writing offset " << pos;
     return false;
   }
 #endif
-  const char *p = data + pos;
-  const char *const end = data + datalen;
+  const char* p = data + pos;
+  const char* const end = data + datalen;
   uint64_t val = 0;
   int shift = 0;
   int count = 0;
@@ -211,7 +211,7 @@ inline bool decodeVarU64(const char *data, size_t datalen, int64_t &pos,
 /// This is necessary because wdt 1.x encodes signed value without zigzag
 /// (ie potentially 10 bytes for small negative values) - to preserve backward
 /// compatibility:
-inline bool encodeVarI64C(char *data, size_t datasz, int64_t &pos, int64_t v) {
+inline bool encodeVarI64C(char* data, size_t datasz, int64_t& pos, int64_t v) {
 #if WDT_EDI64_DO_CHECKS
   WDT_CHECK_GE(v, 0);  // to crash/find bugs/cases where we use negative values
 #endif
@@ -231,8 +231,8 @@ inline bool encodeVarI64C(char *data, size_t datasz, int64_t &pos, int64_t v) {
  * int64_t result;
  * decodeVarI64(buffer.data(), buffer.length(), offset, result);
  */
-inline bool decodeVarI64(const char *data, size_t datalen, int64_t &pos,
-                         int64_t &res) {
+inline bool decodeVarI64(const char* data, size_t datalen, int64_t& pos,
+                         int64_t& res) {
   uint64_t v;
   bool ok = decodeVarU64(data, datalen, pos, v);
   if (ok) {

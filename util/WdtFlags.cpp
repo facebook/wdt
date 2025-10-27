@@ -28,7 +28,7 @@ const std::string FLAGS_PREFIX = WDT_TOSTR(WDT_LONG_PREFIX);
 
 // Internal utilities
 
-std::string getOptionNameFromFlagName(const std::string &flagName) {
+std::string getOptionNameFromFlagName(const std::string& flagName) {
 #ifndef STANDALONE_APP
   // extra wdt_ prefix is added in this case
   if (flagName.compare(0, FLAGS_PREFIX.size(), FLAGS_PREFIX) == 0) {
@@ -45,7 +45,7 @@ std::set<std::string> WdtFlags::getUserSpecifiedOptions() {
   std::set<std::string> userSpecifiedFlags;
   std::vector<GFLAGS_NAMESPACE::CommandLineFlagInfo> allFlags;
   GFLAGS_NAMESPACE::GetAllFlags(&allFlags);
-  for (const auto &flag : allFlags) {
+  for (const auto& flag : allFlags) {
     if (!flag.is_default) {
       // is_default is false if the flag has been specified in the cmd line.
       // Even if the value specified is same as the default value, this boolean
@@ -58,7 +58,7 @@ std::set<std::string> WdtFlags::getUserSpecifiedOptions() {
   return userSpecifiedFlags;
 }
 
-void WdtFlags::initializeFromFlags(WdtOptions &options) {
+void WdtFlags::initializeFromFlags(WdtOptions& options) {
   WVLOG(1) << "Running WDT " << Protocol::getFullVersion();
 #define ASSIGN_OPT
 #include "WdtFlags.cpp.inc"  //nolint
@@ -67,7 +67,7 @@ void WdtFlags::initializeFromFlags(WdtOptions &options) {
   options.modifyOptions(WDT_FLAG_VAR(option_type), userSpecifiedFlags);
 }
 
-void WdtFlags::printOptions(std::ostream &out, const WdtOptions &options) {
+void WdtFlags::printOptions(std::ostream& out, const WdtOptions& options) {
   out << "Options current value:" << std::endl;
 #define PRINT_OPT
 #include "WdtFlags.cpp.inc"  //nolint

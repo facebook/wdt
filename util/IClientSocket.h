@@ -21,16 +21,16 @@ class IClientSocket {
   /// tries to establish a connection with the server port
   virtual ErrorCode connect() = 0;
   /// @return   peer-ip of the connected socket
-  virtual const std::string &getPeerIp() const = 0;
+  virtual const std::string& getPeerIp() const = 0;
   /// tries to read nbyte data and periodically checks for abort
-  virtual int read(char *buf, int nbyte, bool tryFull = true) = 0;
+  virtual int read(char* buf, int nbyte, bool tryFull = true) = 0;
   /// tries to read nbyte data with a specific timeout and periodically checks
   /// for abort
-  virtual int readWithTimeout(char *buf, int nbyte, int timeoutMs,
+  virtual int readWithTimeout(char* buf, int nbyte, int timeoutMs,
                               bool tryFull = true) = 0;
   /// tries to write nbyte data, if retry is true, socket tries to
   /// write as long as it makes some progress within a write timeout
-  virtual int write(char *buf, int nbyte, bool retry = false) = 0;
+  virtual int write(char* buf, int nbyte, bool retry = false) = 0;
 
   virtual ErrorCode shutdownWrites() = 0;
 

@@ -44,14 +44,14 @@ class ExecuteOnceFunc {
   }
 
   /// Deleted copy constructor
-  ExecuteOnceFunc(const ExecuteOnceFunc &that) = delete;
+  ExecuteOnceFunc(const ExecuteOnceFunc& that) = delete;
 
   /// Deleted assignment operator
-  ExecuteOnceFunc &operator=(const ExecuteOnceFunc &that) = delete;
+  ExecuteOnceFunc& operator=(const ExecuteOnceFunc& that) = delete;
 
   /// Implements the main functionality of the executor
   template <typename Func>
-  void execute(Func &&execFunc) {
+  void execute(Func&& execFunc) {
     std::unique_lock<std::mutex> lock(mutex_);
     ++numHits_;
     WDT_CHECK(numHits_ <= numThreads_);
@@ -87,19 +87,19 @@ class ConditionGuardImpl {
  public:
   /// Release the lock and wait for the timeout
   /// After the wait is over, lock is reacquired
-  void wait(int timeoutMillis, const ThreadCtx &threadCtx);
+  void wait(int timeoutMillis, const ThreadCtx& threadCtx);
   /// Notify all the threads waiting on the lock
   void notifyAll();
   /// Notify one thread waiting on the lock
   void notifyOne();
   /// Delete the copy constructor
-  ConditionGuardImpl(const ConditionGuardImpl &that) = delete;
+  ConditionGuardImpl(const ConditionGuardImpl& that) = delete;
   /// Delete the copy assignment operator
-  ConditionGuardImpl &operator=(const ConditionGuardImpl &that) = delete;
+  ConditionGuardImpl& operator=(const ConditionGuardImpl& that) = delete;
   /// Move constructor for the guard
-  ConditionGuardImpl(ConditionGuardImpl &&that) noexcept;
+  ConditionGuardImpl(ConditionGuardImpl&& that) noexcept;
   /// Move assignment operator deleted
-  ConditionGuardImpl &operator=(ConditionGuardImpl &&that) = delete;
+  ConditionGuardImpl& operator=(ConditionGuardImpl&& that) = delete;
   /// Destructor that releases the lock, you would explicitly
   /// need to notify any other threads waiting in the wait()
   ~ConditionGuardImpl();
@@ -109,11 +109,11 @@ class ConditionGuardImpl {
   friend class Funnel;
   /// Constructor that takes the shared mutex and condition
   /// variable
-  ConditionGuardImpl(std::mutex &mutex, std::condition_variable &cv);
+  ConditionGuardImpl(std::mutex& mutex, std::condition_variable& cv);
   /// Instance of lock is made on construction with the specified mutex
-  std::unique_lock<std::mutex> *lock_{nullptr};
+  std::unique_lock<std::mutex>* lock_{nullptr};
   /// Shared condition variable
-  std::condition_variable &cv_;
+  std::condition_variable& cv_;
 };
 
 /**
@@ -135,10 +135,10 @@ class ConditionGuard {
   }
 
   /// Deleted copy constructor
-  ConditionGuard(const ConditionGuard &that) = delete;
+  ConditionGuard(const ConditionGuard& that) = delete;
 
   /// Deleted assignment operator
-  ConditionGuard &operator=(const ConditionGuard &that) = delete;
+  ConditionGuard& operator=(const ConditionGuard& that) = delete;
 
  private:
   /// Mutex for the condition variable
@@ -155,10 +155,10 @@ class ConditionGuard {
 class Barrier {
  public:
   /// Deleted copy constructor
-  Barrier(const Barrier &that) = delete;
+  Barrier(const Barrier& that) = delete;
 
   /// Deleted assignment operator
-  Barrier &operator=(const Barrier &that) = delete;
+  Barrier& operator=(const Barrier& that) = delete;
 
   /// Constructor which takes total number of threads
   /// to be hit in order for the barrier to clear
@@ -214,7 +214,7 @@ enum FunnelStatus { FUNNEL_START, FUNNEL_PROGRESS, FUNNEL_END };
 class Funnel {
  public:
   /// Deleted copy constructor
-  Funnel(const Funnel &that) = delete;
+  Funnel(const Funnel& that) = delete;
 
   /// Default constructor for funnel
   Funnel() {
@@ -222,7 +222,7 @@ class Funnel {
   }
 
   /// Deleted assignment operator
-  Funnel &operator=(const Funnel &that) = delete;
+  Funnel& operator=(const Funnel& that) = delete;
 
   /**
    * Get the current status of funnel.
@@ -235,7 +235,7 @@ class Funnel {
   void wait();
 
   /// Threads that get status as progress execute this function
-  void wait(int32_t waitingTime, const ThreadCtx &threadCtx);
+  void wait(int32_t waitingTime, const ThreadCtx& threadCtx);
 
   /**
    * The first thread that was able to start the funnel
@@ -270,8 +270,8 @@ class ThreadsController {
   /// Make threads of a type Sender/Receiver
   template <typename WdtBaseType, typename WdtThreadType>
   std::vector<std::unique_ptr<WdtThread>> makeThreads(
-      WdtBaseType *wdtParent, int numThreads,
-      const std::vector<int32_t> &ports) {
+      WdtBaseType* wdtParent, int numThreads,
+      const std::vector<int32_t>& ports) {
     std::vector<std::unique_ptr<WdtThread>> threads;
     for (int threadIndex = 0; threadIndex < numThreads; ++threadIndex) {
       threads.emplace_back(std::make_unique<WdtThreadType>(
@@ -287,13 +287,13 @@ class ThreadsController {
 
   /// Execute a function func once, by the first thread
   template <typename FunctionType>
-  void executeAtStart(FunctionType &&fn) const {
+  void executeAtStart(FunctionType&& fn) const {
     execAtStart_->execute(fn);
   }
 
   /// Execute a function once by the last thread
   template <typename FunctionType>
-  void executeAtEnd(FunctionType &&fn) const {
+  void executeAtEnd(FunctionType&& fn) const {
     execAtEnd_->execute(fn);
   }
 

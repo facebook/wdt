@@ -35,12 +35,12 @@ int64_t LogEncoderDecoder::timestampInMicroseconds() const {
       .count();
 }
 
-int64_t LogEncoderDecoder::encodeLogHeader(char *dest, int64_t max,
-                                           const string &recoveryId,
-                                           const string &senderIp,
+int64_t LogEncoderDecoder::encodeLogHeader(char* dest, int64_t max,
+                                           const string& recoveryId,
+                                           const string& senderIp,
                                            int64_t config) {
   // increment by 2 bytes to later store the total length
-  char *ptr = dest + sizeof(int16_t);
+  char* ptr = dest + sizeof(int16_t);
   max -= sizeof(int16_t);
   int64_t size = 0;
   WDT_CHECK_GE(max, 1);
@@ -59,10 +59,10 @@ int64_t LogEncoderDecoder::encodeLogHeader(char *dest, int64_t max,
   return (size + sizeof(int16_t));
 }
 
-bool LogEncoderDecoder::decodeLogHeader(char *buf, int16_t size,
-                                        int64_t &timestamp, int &version,
-                                        string &recoveryId, string &senderIp,
-                                        int64_t &config) {
+bool LogEncoderDecoder::decodeLogHeader(char* buf, int16_t size,
+                                        int64_t& timestamp, int& version,
+                                        string& recoveryId, string& senderIp,
+                                        int64_t& config) {
   ByteRange br = makeByteRange(buf, size);
   bool ok = decodeInt64C(br, timestamp) && decodeInt32C(br, version) &&
             decodeString(br, recoveryId) && decodeString(br, senderIp) &&
@@ -75,8 +75,8 @@ bool LogEncoderDecoder::decodeLogHeader(char *buf, int16_t size,
   return ok;
 }
 
-int64_t LogEncoderDecoder::encodeFileCreationEntry(char *dest, int64_t max,
-                                                   const string &fileName,
+int64_t LogEncoderDecoder::encodeFileCreationEntry(char* dest, int64_t max,
+                                                   const string& fileName,
                                                    const int64_t seqId,
                                                    const int64_t fileSize) {
   // increment by 2 bytes to later store the total length
@@ -96,11 +96,11 @@ int64_t LogEncoderDecoder::encodeFileCreationEntry(char *dest, int64_t max,
   return size;
 }
 
-bool LogEncoderDecoder::decodeFileCreationEntry(char *buf, int16_t size,
-                                                int64_t &timestamp,
-                                                string &fileName,
-                                                int64_t &seqId,
-                                                int64_t &fileSize) {
+bool LogEncoderDecoder::decodeFileCreationEntry(char* buf, int16_t size,
+                                                int64_t& timestamp,
+                                                string& fileName,
+                                                int64_t& seqId,
+                                                int64_t& fileSize) {
   ByteRange br = makeByteRange(buf, size);
   bool ok = decodeInt64C(br, timestamp) && decodeString(br, fileName) &&
             decodeInt64C(br, seqId) && decodeInt64C(br, fileSize);
@@ -112,7 +112,7 @@ bool LogEncoderDecoder::decodeFileCreationEntry(char *buf, int16_t size,
   return true;
 }
 
-int64_t LogEncoderDecoder::encodeBlockWriteEntry(char *dest, int64_t max,
+int64_t LogEncoderDecoder::encodeBlockWriteEntry(char* dest, int64_t max,
                                                  const int64_t seqId,
                                                  const int64_t offset,
                                                  const int64_t blockSize) {
@@ -131,10 +131,10 @@ int64_t LogEncoderDecoder::encodeBlockWriteEntry(char *dest, int64_t max,
   return size;
 }
 
-bool LogEncoderDecoder::decodeBlockWriteEntry(char *buf, int16_t size,
-                                              int64_t &timestamp,
-                                              int64_t &seqId, int64_t &offset,
-                                              int64_t &blockSize) {
+bool LogEncoderDecoder::decodeBlockWriteEntry(char* buf, int16_t size,
+                                              int64_t& timestamp,
+                                              int64_t& seqId, int64_t& offset,
+                                              int64_t& blockSize) {
   ByteRange br = makeByteRange(buf, size);
   bool ok = decodeInt64C(br, timestamp) && decodeInt64C(br, seqId) &&
             decodeInt64C(br, offset) && decodeInt64C(br, blockSize);
@@ -146,7 +146,7 @@ bool LogEncoderDecoder::decodeBlockWriteEntry(char *buf, int16_t size,
   return true;
 }
 
-int64_t LogEncoderDecoder::encodeFileResizeEntry(char *dest, int64_t max,
+int64_t LogEncoderDecoder::encodeFileResizeEntry(char* dest, int64_t max,
                                                  const int64_t seqId,
                                                  const int64_t fileSize) {
   int64_t size = sizeof(int16_t);
@@ -162,10 +162,10 @@ int64_t LogEncoderDecoder::encodeFileResizeEntry(char *dest, int64_t max,
   return size;
 }
 
-bool LogEncoderDecoder::decodeFileResizeEntry(char *buf, int16_t size,
-                                              int64_t &timestamp,
-                                              int64_t &seqId,
-                                              int64_t &fileSize) {
+bool LogEncoderDecoder::decodeFileResizeEntry(char* buf, int16_t size,
+                                              int64_t& timestamp,
+                                              int64_t& seqId,
+                                              int64_t& fileSize) {
   ByteRange br = makeByteRange(buf, size);
   bool ok = decodeInt64C(br, timestamp) && decodeInt64C(br, seqId) &&
             decodeInt64C(br, fileSize);
@@ -177,8 +177,8 @@ bool LogEncoderDecoder::decodeFileResizeEntry(char *buf, int16_t size,
   return true;
 }
 
-int64_t LogEncoderDecoder::encodeFileInvalidationEntry(char *dest, int64_t max,
-                                                       const int64_t &seqId) {
+int64_t LogEncoderDecoder::encodeFileInvalidationEntry(char* dest, int64_t max,
+                                                       const int64_t& seqId) {
   int64_t size = sizeof(int16_t);
   WDT_CHECK_GE(max, size + 1);
   dest[size++] = TransferLogManager::FILE_INVALIDATION;
@@ -192,9 +192,9 @@ int64_t LogEncoderDecoder::encodeFileInvalidationEntry(char *dest, int64_t max,
   return size;
 }
 
-bool LogEncoderDecoder::decodeFileInvalidationEntry(char *buf, int16_t size,
-                                                    int64_t &timestamp,
-                                                    int64_t &seqId) {
+bool LogEncoderDecoder::decodeFileInvalidationEntry(char* buf, int16_t size,
+                                                    int64_t& timestamp,
+                                                    int64_t& seqId) {
   ByteRange br = makeByteRange(buf, size);
   bool ok = decodeInt64C(br, timestamp) && decodeInt64C(br, seqId);
   if (!ok || (br.size() != 0)) {
@@ -205,7 +205,7 @@ bool LogEncoderDecoder::decodeFileInvalidationEntry(char *buf, int16_t size,
   return true;
 }
 
-int64_t LogEncoderDecoder::encodeDirectoryInvalidationEntry(char *dest,
+int64_t LogEncoderDecoder::encodeDirectoryInvalidationEntry(char* dest,
                                                             int64_t max) {
   int64_t size = sizeof(int16_t);
   WDT_CHECK_GE(max, size + 1);
@@ -219,9 +219,9 @@ int64_t LogEncoderDecoder::encodeDirectoryInvalidationEntry(char *dest,
 }
 
 // TODO make the caller make and pass the byterange
-bool LogEncoderDecoder::decodeDirectoryInvalidationEntry(char *buf,
+bool LogEncoderDecoder::decodeDirectoryInvalidationEntry(char* buf,
                                                          int16_t size,
-                                                         int64_t &timestamp) {
+                                                         int64_t& timestamp) {
   ByteRange br = makeByteRange(buf, size);
   bool ok = decodeInt64C(br, timestamp);
   if (!ok || (br.size() != 0)) {
@@ -232,7 +232,7 @@ bool LogEncoderDecoder::decodeDirectoryInvalidationEntry(char *buf,
   return true;
 }
 
-string TransferLogManager::getFullPath(const string &relPath) {
+string TransferLogManager::getFullPath(const string& relPath) {
   WDT_CHECK(!rootDir_.empty()) << "Root directory not set";
   string fullPath = rootDir_;
   fullPath.append(relPath);
@@ -360,10 +360,10 @@ TransferLogManager::~TransferLogManager() {
 }
 
 bool TransferLogManager::writeEntriesToDiskNoLock(
-    const std::vector<std::string> &entries) {
+    const std::vector<std::string>& entries) {
   string buffer;
   // write entries to disk
-  for (const auto &entry : entries) {
+  for (const auto& entry : entries) {
     buffer.append(entry);
   }
   if (buffer.empty()) {
@@ -412,7 +412,7 @@ void TransferLogManager::threadProcWriteEntriesToDisk() {
   WLOG(INFO) << "Transfer log writer thread finished";
 }
 
-bool TransferLogManager::verifySenderIp(const string &curSenderIp) {
+bool TransferLogManager::verifySenderIp(const string& curSenderIp) {
   if (fd_ < 0) {
     return false;
   }
@@ -487,7 +487,7 @@ void TransferLogManager::writeLogHeader() {
   headerWritten_ = true;
 }
 
-void TransferLogManager::addFileCreationEntry(const string &fileName,
+void TransferLogManager::addFileCreationEntry(const string& fileName,
                                               int64_t seqId, int64_t fileSize) {
   if (fd_ < 0 || !headerWritten_) {
     return;
@@ -572,16 +572,16 @@ bool TransferLogManager::parseAndPrint() {
 }
 
 ErrorCode TransferLogManager::parseAndMatch(
-    const string &recoveryId, int64_t config,
-    std::vector<FileChunksInfo> &fileChunksInfo) {
+    const string& recoveryId, int64_t config,
+    std::vector<FileChunksInfo>& fileChunksInfo) {
   recoveryId_ = recoveryId;
   config_ = config;
   return parseVerifyAndFix(recoveryId_, config, false, fileChunksInfo);
 }
 
 ErrorCode TransferLogManager::parseVerifyAndFix(
-    const string &recoveryId, int64_t config, bool parseOnly,
-    std::vector<FileChunksInfo> &parsedInfo) {
+    const string& recoveryId, int64_t config, bool parseOnly,
+    std::vector<FileChunksInfo>& parsedInfo) {
   if (fd_ < 0) {
     return INVALID_LOG;
   }
@@ -634,7 +634,7 @@ void TransferLogManager::compactLog() {
     return;
   }
 
-  for (const auto &fileChunksInfo : fileChunksInfoVec) {
+  for (const auto& fileChunksInfo : fileChunksInfoVec) {
     // Found multiple chunks for a file.
     if (fileChunksInfo.getChunks().size() != 1) {
       WLOG(ERROR) << "File " << fileChunksInfo.getFileName()
@@ -663,7 +663,7 @@ void TransferLogManager::compactLog() {
 
   writeLogHeader();
 
-  for (const auto &fileChunksInfo : fileChunksInfoVec) {
+  for (const auto& fileChunksInfo : fileChunksInfoVec) {
     addFileCreationEntry(fileChunksInfo.getFileName(),
                          fileChunksInfo.getSeqId(),
                          fileChunksInfo.getFileSize());
@@ -687,9 +687,9 @@ void TransferLogManager::compactLog() {
   }
 }
 
-LogParser::LogParser(const WdtOptions &options,
-                     LogEncoderDecoder &encoderDecoder, const string &rootDir,
-                     const string &recoveryId, int64_t config, bool parseOnly)
+LogParser::LogParser(const WdtOptions& options,
+                     LogEncoderDecoder& encoderDecoder, const string& rootDir,
+                     const string& recoveryId, int64_t config, bool parseOnly)
     : options_(options),
       encoderDecoder_(encoderDecoder),
       rootDir_(rootDir),
@@ -699,7 +699,7 @@ LogParser::LogParser(const WdtOptions &options,
 }
 
 bool LogParser::writeFileInvalidationEntries(int fd,
-                                             const std::set<int64_t> &seqIds) {
+                                             const std::set<int64_t>& seqIds) {
   char buf[TransferLogManager::kMaxEntryLength];
   for (auto seqId : seqIds) {
     int64_t size =
@@ -759,8 +759,8 @@ string LogParser::getFormattedTimestamp(int64_t timestampMicros) {
   return buf;
 }
 
-ErrorCode LogParser::processHeaderEntry(char *buf, int64_t max, int64_t size,
-                                        string &senderIp) {
+ErrorCode LogParser::processHeaderEntry(char* buf, int64_t max, int64_t size,
+                                        string& senderIp) {
   if (size > max) {
     WLOG(ERROR) << "Bad size " << size << " vs max " << max;
     return INVALID_LOG;
@@ -806,7 +806,7 @@ ErrorCode LogParser::processHeaderEntry(char *buf, int64_t max, int64_t size,
   return OK;
 }
 
-ErrorCode LogParser::processFileCreationEntry(char *buf, int64_t size) {
+ErrorCode LogParser::processFileCreationEntry(char* buf, int64_t size) {
   if (!headerParsed_) {
     WLOG(ERROR)
         << "Invalid log: File creation entry found before transfer log header";
@@ -863,7 +863,7 @@ ErrorCode LogParser::processFileCreationEntry(char *buf, int64_t size) {
   return OK;
 }
 
-ErrorCode LogParser::processFileResizeEntry(char *buf, int64_t size) {
+ErrorCode LogParser::processFileResizeEntry(char* buf, int64_t size) {
   if (!headerParsed_) {
     WLOG(ERROR)
         << "Invalid log: File resize entry found before transfer log header";
@@ -892,8 +892,8 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int64_t size) {
                 << fileSize;
     return INVALID_LOG;
   }
-  FileChunksInfo &chunksInfo = it->second;
-  const string &fileName = chunksInfo.getFileName();
+  FileChunksInfo& chunksInfo = it->second;
+  const string& fileName = chunksInfo.getFileName();
   auto sizeIt = seqIdToSizeMap_.find(seqId);
   WDT_CHECK(sizeIt != seqIdToSizeMap_.end());
   if (fileSize < sizeIt->second) {
@@ -913,7 +913,7 @@ ErrorCode LogParser::processFileResizeEntry(char *buf, int64_t size) {
   return OK;
 }
 
-ErrorCode LogParser::processBlockWriteEntry(char *buf, int64_t size) {
+ErrorCode LogParser::processBlockWriteEntry(char* buf, int64_t size) {
   if (!headerParsed_) {
     WLOG(ERROR)
         << "Invalid log: Block write entry found before transfer log header";
@@ -947,7 +947,7 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int64_t size) {
                 << offset << " " << blockSize;
     return INVALID_LOG;
   }
-  FileChunksInfo &chunksInfo = it->second;
+  FileChunksInfo& chunksInfo = it->second;
   // check whether the block is within disk size
   if (offset + blockSize > chunksInfo.getFileSize()) {
     WLOG(ERROR) << "Block end point is greater than file size in disk "
@@ -960,7 +960,7 @@ ErrorCode LogParser::processBlockWriteEntry(char *buf, int64_t size) {
   return OK;
 }
 
-ErrorCode LogParser::processFileInvalidationEntry(char *buf, int64_t size) {
+ErrorCode LogParser::processFileInvalidationEntry(char* buf, int64_t size) {
   if (!headerParsed_) {
     WLOG(ERROR) << "Invalid log: File invalidation entry found before transfer "
                    "log header";
@@ -992,7 +992,7 @@ ErrorCode LogParser::processFileInvalidationEntry(char *buf, int64_t size) {
   return OK;
 }
 
-ErrorCode LogParser::processDirectoryInvalidationEntry(char *buf,
+ErrorCode LogParser::processDirectoryInvalidationEntry(char* buf,
                                                        int64_t size) {
   int64_t timestamp;
   if (!encoderDecoder_.decodeDirectoryInvalidationEntry(buf, size, timestamp)) {
@@ -1007,8 +1007,8 @@ ErrorCode LogParser::processDirectoryInvalidationEntry(char *buf,
   return INCONSISTENT_DIRECTORY;
 }
 
-ErrorCode LogParser::parseLog(int fd, string &senderIp,
-                              std::vector<FileChunksInfo> &fileChunksInfo) {
+ErrorCode LogParser::parseLog(int fd, string& senderIp,
+                              std::vector<FileChunksInfo>& fileChunksInfo) {
   char entry[TransferLogManager::kMaxEntryLength];
   // empty log is valid
   ErrorCode status = OK;
@@ -1064,7 +1064,7 @@ ErrorCode LogParser::parseLog(int fd, string &senderIp,
       // header, because only a header can validate a directory
       continue;
     }
-    char *buf = entry + 1;
+    char* buf = entry + 1;
     const int64_t bufSize = sizeof(entry) - 1;
     const int64_t entryLen = entrySize - 1;
     switch (type) {
@@ -1099,8 +1099,8 @@ ErrorCode LogParser::parseLog(int fd, string &senderIp,
     }
   }
   if (status == OK) {
-    for (auto &pair : fileInfoMap_) {
-      FileChunksInfo &fileInfo = pair.second;
+    for (auto& pair : fileInfoMap_) {
+      FileChunksInfo& fileInfo = pair.second;
       fileInfo.mergeChunks();
       fileChunksInfo.emplace_back(std::move(fileInfo));
     }

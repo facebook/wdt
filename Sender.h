@@ -36,10 +36,10 @@ enum ProtoNegotiationStatus {
 class Sender : public WdtBase {
  public:
   /// Creates a counter part sender for the receiver according to the details
-  explicit Sender(const WdtTransferRequest &transferRequest);
+  explicit Sender(const WdtTransferRequest& transferRequest);
 
   /// Setup before start (@see WdtBase.h)
-  const WdtTransferRequest &init() override;
+  const WdtTransferRequest& init() override;
 
   /**
    * If the transfer has not finished, then it is aborted. finish() is called to
@@ -76,7 +76,7 @@ class Sender : public WdtBase {
 
   /// Get the destination sender is sending to
   /// @return     destination host-name
-  const std::string &getDestination() const;
+  const std::string& getDestination() const;
 
   /// @return    minimal transfer report using transfer stats of the thread
   std::unique_ptr<TransferReport> getTransferReport();
@@ -85,8 +85,8 @@ class Sender : public WdtBase {
   class ISocketCreator {
    public:
     virtual std::unique_ptr<IClientSocket> makeClientSocket(
-        ThreadCtx &threadCtx, const std::string &dest, const int port,
-        const EncryptionParams &encryptionParams, int64_t ivChangeInterval,
+        ThreadCtx& threadCtx, const std::string& dest, const int port,
+        const EncryptionParams& encryptionParams, int64_t ivChangeInterval,
         bool tls) = 0;
 
     virtual ~ISocketCreator() = default;
@@ -97,7 +97,7 @@ class Sender : public WdtBase {
    *
    * @param socketCreator   socket-creator to be used
    */
-  void setSocketCreator(ISocketCreator *socketCreator);
+  void setSocketCreator(ISocketCreator* socketCreator);
 
  private:
   friend class SenderThread;
@@ -118,13 +118,13 @@ class Sender : public WdtBase {
 
   /// Sender thread calls this method to set the file chunks info received
   /// from the receiver
-  void setFileChunksInfo(std::vector<FileChunksInfo> &fileChunksInfoList);
+  void setFileChunksInfo(std::vector<FileChunksInfo>& fileChunksInfoList);
 
   /// Abort checker passed to DirectoryQueue. If all the network threads finish,
   /// directory discovery thread is also aborted
   class QueueAbortChecker : public IAbortChecker {
    public:
-    explicit QueueAbortChecker(Sender *sender) : sender_(sender) {
+    explicit QueueAbortChecker(Sender* sender) : sender_(sender) {
     }
 
     bool shouldAbort() const override {
@@ -132,7 +132,7 @@ class Sender : public WdtBase {
     }
 
    private:
-    Sender *sender_;
+    Sender* sender_;
   };
 
   /// Abort checker shared with the directory queue
@@ -151,8 +151,8 @@ class Sender : public WdtBase {
    * @param failedSourceStats           Stats for the failed sources
    */
   void validateTransferStats(
-      const std::vector<TransferStats> &transferredSourceStats,
-      const std::vector<TransferStats> &failedSourceStats);
+      const std::vector<TransferStats>& transferredSourceStats,
+      const std::vector<TransferStats>& failedSourceStats);
 
   /**
    * Responsible for doing a periodic check.
@@ -177,7 +177,7 @@ class Sender : public WdtBase {
   /// The interval at which the progress reporter should check for progress
   int progressReportIntervalMillis_{0};
   /// Socket creator used to optionally create different kinds of client socket
-  ISocketCreator *socketCreator_{nullptr};
+  ISocketCreator* socketCreator_{nullptr};
   /// Whether download resumption is enabled or not
   bool downloadResumptionEnabled_{false};
   /// Flags representing whether file chunks have been received or not

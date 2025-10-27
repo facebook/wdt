@@ -21,8 +21,8 @@ struct SourceMetaData {
   }
 
   /// Delete copy constructor and assignment operator
-  SourceMetaData(const SourceMetaData &that) = delete;
-  SourceMetaData &operator=(const SourceMetaData &that) = delete;
+  SourceMetaData(const SourceMetaData& that) = delete;
+  SourceMetaData& operator=(const SourceMetaData& that) = delete;
 
   /// full filepath
   std::string fullPath;
@@ -57,7 +57,7 @@ class ByteSource {
   }
 
   /// @return identifier for the source
-  virtual const std::string &getIdentifier() const = 0;
+  virtual const std::string& getIdentifier() const = 0;
 
   /// @return number of bytes in this source
   virtual int64_t getSize() const = 0;
@@ -66,7 +66,7 @@ class ByteSource {
   virtual int64_t getOffset() const = 0;
 
   /// @return metadata for the source
-  virtual const SourceMetaData &getMetaData() const = 0;
+  virtual const SourceMetaData& getMetaData() const = 0;
 
   /// @return true iff all data read successfully
   virtual bool finished() const = 0;
@@ -88,7 +88,7 @@ class ByteSource {
    *                  use finished() and hasError() members to distinguish
    *                  the two cases
    */
-  virtual char *read(int64_t &size) = 0;
+  virtual char* read(int64_t& size) = 0;
 
   /// Advances ByteSource offset by numBytes
   virtual void advanceOffset(int64_t numBytes) = 0;
@@ -100,7 +100,7 @@ class ByteSource {
    *
    * @return      error code
    */
-  virtual ErrorCode open(ThreadCtx *threadCtx) = 0;
+  virtual ErrorCode open(ThreadCtx* threadCtx) = 0;
 
   /// close the source for reading
   virtual void close() = 0;
@@ -109,10 +109,10 @@ class ByteSource {
    * @return transfer stats for the source. If the stats is moved by the
    *         caller, then this function can not be called again
    */
-  virtual TransferStats &getTransferStats() = 0;
+  virtual TransferStats& getTransferStats() = 0;
 
   /// @param stats    Stats to be added
-  virtual void addTransferStats(const TransferStats &stats) = 0;
+  virtual void addTransferStats(const TransferStats& stats) = 0;
 };
 
 }  // namespace wdt

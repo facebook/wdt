@@ -60,7 +60,7 @@ class SenderThread : public WdtThread {
   /// abort and whether global checkpoint has been received or not
   class SocketAbortChecker : public IAbortChecker {
    public:
-    explicit SocketAbortChecker(SenderThread *threadPtr)
+    explicit SocketAbortChecker(SenderThread* threadPtr)
         : threadPtr_(threadPtr) {
     }
 
@@ -69,12 +69,12 @@ class SenderThread : public WdtThread {
     }
 
    private:
-    SenderThread *threadPtr_{nullptr};
+    SenderThread* threadPtr_{nullptr};
   };
 
   /// Constructor for the sender thread
-  SenderThread(Sender *sender, int threadIndex, int32_t port,
-               ThreadsController *threadsController)
+  SenderThread(Sender* sender, int threadIndex, int32_t port,
+               ThreadsController* threadsController)
       : WdtThread(sender->options_, threadIndex, port,
                   sender->getProtocolVersion(), threadsController),
         wdtParent_(sender),
@@ -112,11 +112,11 @@ class SenderThread : public WdtThread {
 
  private:
   /// Overloaded operator for printing thread info
-  friend std::ostream &operator<<(std::ostream &os,
-                                  const SenderThread &senderThread);
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const SenderThread& senderThread);
 
   /// Parent shared among all the threads for meta information
-  Sender *wdtParent_;
+  Sender* wdtParent_;
 
   /// sets the correct footer type depending on the checksum and encryption type
   void setFooterType();
@@ -125,7 +125,7 @@ class SenderThread : public WdtThread {
   void start() override;
 
   /// Get the local transfer history
-  ThreadTransferHistory &getTransferHistory() {
+  ThreadTransferHistory& getTransferHistory() {
     return transferHistoryController_->getTransferHistory(port_);
   }
 
@@ -272,10 +272,10 @@ class SenderThread : public WdtThread {
 
   /// General utility used by sender threads to connect to receiver
   std::unique_ptr<IClientSocket> connectToReceiver(
-      int port, IAbortChecker const *abortChecker, ErrorCode &errCode);
+      int port, IAbortChecker const* abortChecker, ErrorCode& errCode);
 
   /// Method responsible for sending one source to the destination
-  TransferStats sendOneByteSource(const std::unique_ptr<ByteSource> &source,
+  TransferStats sendOneByteSource(const std::unique_ptr<ByteSource>& source,
                                   ErrorCode transferStatus);
 
   /// checks to see if heart-beat is enabled, and if it is time to read
@@ -303,13 +303,13 @@ class SenderThread : public WdtThread {
   int numReconnectWithoutProgress_{0};
 
   /// Point to the directory queue of parent sender
-  DirectorySourceQueue *dirQueue_;
+  DirectorySourceQueue* dirQueue_;
 
   /// abort checker to use for this thread
   std::unique_ptr<IAbortChecker> threadAbortChecker_{nullptr};
 
   /// Thread history controller shared across all threads
-  TransferHistoryController *transferHistoryController_;
+  TransferHistoryController* transferHistoryController_;
 };
 }  // namespace wdt
 }  // namespace facebook

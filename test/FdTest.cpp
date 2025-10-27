@@ -21,10 +21,10 @@ namespace facebook {
 namespace wdt {
 
 void basicTest(bool resumption, bool nosize) {
-  auto &opts = WdtOptions::getMutable();
+  auto& opts = WdtOptions::getMutable();
   opts.enable_download_resumption = false;
   // Tmpfile (deleted)
-  FILE *tmp = tmpfile();
+  FILE* tmp = tmpfile();
   ASSERT_NE(tmp, nullptr);
   SCOPE_EXIT {
     fclose(tmp);
@@ -85,11 +85,11 @@ TEST(FdTest, FdTestNosize) {
 }
 
 TEST(DupSend, DuplicateSend) {
-  auto &opts = WdtOptions::getMutable();
+  auto& opts = WdtOptions::getMutable();
   opts.skip_writes = true;
   opts.enable_download_resumption = false;
   // Tmpfile (deleted)
-  FILE *tmp = tmpfile();
+  FILE* tmp = tmpfile();
   EXPECT_NE(tmp, nullptr);
   // We keep the fd around
   int fd = fileno(tmp);
@@ -115,7 +115,7 @@ TEST(DupSend, DuplicateSend) {
 }  // namespace wdt
 }  // namespace facebook
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);

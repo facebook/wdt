@@ -15,10 +15,10 @@
 namespace facebook {
 namespace wdt {
 
-ServerSocket::ServerSocket(ThreadCtx &threadCtx, int port, int backlog,
-                           const EncryptionParams &encryptionParams,
+ServerSocket::ServerSocket(ThreadCtx& threadCtx, int port, int backlog,
+                           const EncryptionParams& encryptionParams,
                            int64_t ivChangeInterval,
-                           Func &&tagVerificationSuccessCallback)
+                           Func&& tagVerificationSuccessCallback)
     : threadCtx_(threadCtx), backlog_(backlog) {
   socket_ = std::make_unique<WdtSocket>(
       threadCtx, port, encryptionParams, ivChangeInterval,
@@ -52,8 +52,8 @@ ServerSocket::~ServerSocket() {
   closeAllNoCheck();
 }
 
-int ServerSocket::listenInternal(struct addrinfo *info,
-                                 const std::string &host) {
+int ServerSocket::listenInternal(struct addrinfo* info,
+                                 const std::string& host) {
   int port = socket_->getPort();
 
   WVLOG(1) << "Will listen on " << host << " " << port << " "
@@ -91,13 +91,13 @@ int ServerSocket::listenInternal(struct addrinfo *info,
 }
 
 int ServerSocket::getSelectedPortAndNewAddress(int listeningFd,
-                                               struct addrinfo &sa,
-                                               const std::string &host,
-                                               addrInfoList &infoList) {
+                                               struct addrinfo& sa,
+                                               const std::string& host,
+                                               addrInfoList& infoList) {
   int port;
   struct sockaddr_in sin;
   socklen_t len = sizeof(sin);
-  if (getsockname(listeningFd, (struct sockaddr *)&sin, &len) == -1) {
+  if (getsockname(listeningFd, (struct sockaddr*)&sin, &len) == -1) {
     WPLOG(ERROR) << "getsockname failed " << host;
     return -1;
   }
@@ -126,7 +126,7 @@ ErrorCode ServerSocket::listen() {
   int port = socket_->getPort();
 
   memset(&sa, 0, sizeof(sa));
-  const WdtOptions &options = threadCtx_.getOptions();
+  const WdtOptions& options = threadCtx_.getOptions();
   if (options.ipv6) {
     sa.ai_family = AF_INET6;
   }
@@ -156,7 +156,7 @@ ErrorCode ServerSocket::listen() {
   // list is created using the new port. This variable is used to ensure that we
   // do not try to bind again to the previous type.
   int addressTypeAlreadyBound = AF_UNSPEC;
-  for (struct addrinfo *info = infoList; info != nullptr;) {
+  for (struct addrinfo* info = infoList; info != nullptr;) {
     if (info->ai_family == addressTypeAlreadyBound) {
       // we are already listening for this address type
       WVLOG(2) << "Ignoring address family " << info->ai_family
@@ -221,7 +221,7 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
 
   auto port = socket_->getPort();
   auto fd = socket_->getFd();
-  const WdtOptions &options = threadCtx_.getOptions();
+  const WdtOptions& options = threadCtx_.getOptions();
   const bool checkAbort = (options.abort_check_interval_millis > 0);
 
   const int numFds = listeningFds_.size();
@@ -276,16 +276,16 @@ ErrorCode ServerSocket::acceptNextConnection(int timeoutMillis,
   }
 
   for (int count = 0; count < numFds; count++) {
-    auto &pollFd = pollFds[lastCheckedPollIndex_];
+    auto& pollFd = pollFds[lastCheckedPollIndex_];
     if (pollFd.revents & POLLIN) {
       struct sockaddr_storage addr;
       socklen_t addrLen = sizeof(addr);
-      fd = accept(pollFd.fd, (struct sockaddr *)&addr, &addrLen);
+      fd = accept(pollFd.fd, (struct sockaddr*)&addr, &addrLen);
       if (fd < 0) {
         WPLOG(ERROR) << "accept error";
         return CONN_ERROR;
       }
-      WdtSocket::getNameInfo((struct sockaddr *)&addr, addrLen, peerIp_,
+      WdtSocket::getNameInfo((struct sockaddr*)&addr, addrLen, peerIp_,
                              peerPort_);
       WVLOG(1) << "New connection, fd : " << fd << " from " << peerIp_ << " "
                << peerPort_;

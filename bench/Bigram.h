@@ -38,17 +38,17 @@ class Bigram {
     return b_[idx];
   }
 
-  bool operator==(const Bigram &o) const;
-  bool operator!=(const Bigram &o) const {
+  bool operator==(const Bigram& o) const;
+  bool operator!=(const Bigram& o) const {
     return !(operator==(o));
   }
-  bool operator<(const Bigram &o) const;
-  void toPrintableString(std::string &result) const;
-  void toBinary(std::string &result) const;
-  void binarySerialize(std::ostream &os) const;
+  bool operator<(const Bigram& o) const;
+  void toPrintableString(std::string& result) const;
+  void toBinary(std::string& result) const;
+  void binarySerialize(std::ostream& os) const;
   /// Reads from the stream the 2 bytes for this bigram - returns true if
   /// no error/eof triggered when reading
-  bool binaryDeserialize(std::istream &is);
+  bool binaryDeserialize(std::istream& is);
   std::string toPrintableString() const;
   /// Utility only to be used for logging to escape 1 character
   static std::string toPrintableString(char c);
@@ -58,13 +58,13 @@ class Bigram {
 };
 
 /// Dumps a bigram in human readable format
-std::ostream &operator<<(std::ostream &os, const Bigram &b);
+std::ostream& operator<<(std::ostream& os, const Bigram& b);
 
 namespace std {
 /// Hash function for Bigrams
 template <>
 struct hash<Bigram> {
-  std::size_t operator()(const Bigram &k) const {
+  std::size_t operator()(const Bigram& k) const {
     return ((k[0] << 1) | k[1]);
   }
 };

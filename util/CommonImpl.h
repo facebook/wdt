@@ -23,7 +23,7 @@ class Buffer {
   explicit Buffer(const int64_t size);
 
   /// @return   buffer ptr
-  char *getData() const;
+  char* getData() const;
 
   /// @return   whether the allocated buffer is aligned
   bool isAligned() const;
@@ -34,13 +34,13 @@ class Buffer {
   ~Buffer();
 
   // making the object non-copyable and non-moveable
-  Buffer(const Buffer &stats) = delete;
-  Buffer &operator=(const Buffer &stats) = delete;
-  Buffer(Buffer &&stats) = delete;
-  Buffer &operator=(Buffer &&stats) = delete;
+  Buffer(const Buffer& stats) = delete;
+  Buffer& operator=(const Buffer& stats) = delete;
+  Buffer(Buffer&& stats) = delete;
+  Buffer& operator=(Buffer&& stats) = delete;
 
  private:
-  char *data_{nullptr};
+  char* data_{nullptr};
   int64_t size_{0};
   bool isAligned_{false};
 };
@@ -50,49 +50,49 @@ class ThreadCtx {
  public:
   /// @param  options        options to use
   /// @param  allocateBuffer whether to allocate buffer
-  ThreadCtx(const WdtOptions &options, bool allocateBuffer);
+  ThreadCtx(const WdtOptions& options, bool allocateBuffer);
 
   /// @param  options        options to use
   /// @param  allocateBuffer whether to allocate buffer
   /// @param  threadIndex    index of the thread
-  ThreadCtx(const WdtOptions &options, bool allocateBuffer, int threadIndex);
+  ThreadCtx(const WdtOptions& options, bool allocateBuffer, int threadIndex);
 
   /// @return   options to use
-  const WdtOptions &getOptions() const;
+  const WdtOptions& getOptions() const;
 
   /// @param    thread index
   int getThreadIndex() const;
 
   /// @return   buffer to use
-  const Buffer *getBuffer() const;
+  const Buffer* getBuffer() const;
 
   /// @return   perf stat reporter
-  PerfStatReport &getPerfReport();
+  PerfStatReport& getPerfReport();
 
   /// @param    abort checker to use
-  void setAbortChecker(IAbortChecker const *abortChecker);
+  void setAbortChecker(IAbortChecker const* abortChecker);
 
   /// @return   abort checker to use
-  const IAbortChecker *getAbortChecker() const;
+  const IAbortChecker* getAbortChecker() const;
 
   // making the object non-copyable and non-moveable
-  ThreadCtx(const ThreadCtx &stats) = delete;
-  ThreadCtx &operator=(const ThreadCtx &stats) = delete;
-  ThreadCtx(ThreadCtx &&stats) = delete;
-  ThreadCtx &operator=(ThreadCtx &&stats) = delete;
+  ThreadCtx(const ThreadCtx& stats) = delete;
+  ThreadCtx& operator=(const ThreadCtx& stats) = delete;
+  ThreadCtx(ThreadCtx&& stats) = delete;
+  ThreadCtx& operator=(ThreadCtx&& stats) = delete;
 
  private:
-  const WdtOptions &options_;
+  const WdtOptions& options_;
   int threadIndex_{-1};
   std::unique_ptr<Buffer> buffer_{nullptr};
   PerfStatReport perfReport_;
-  IAbortChecker const *abortChecker_{nullptr};
+  IAbortChecker const* abortChecker_{nullptr};
 };
 
 /// util class to collect perf stat
 class PerfStatCollector {
  public:
-  PerfStatCollector(ThreadCtx &threadCtx,
+  PerfStatCollector(ThreadCtx& threadCtx,
                     const PerfStatReport::StatType statType)
       : threadCtx_(threadCtx), statType_(statType) {
     if (threadCtx_.getOptions().enable_perf_stat_collection) {
@@ -111,7 +111,7 @@ class PerfStatCollector {
   }
 
  private:
-  ThreadCtx &threadCtx_;
+  ThreadCtx& threadCtx_;
   const PerfStatReport::StatType statType_;
   Clock::time_point startTime_;
 };

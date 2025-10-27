@@ -15,23 +15,23 @@ namespace facebook {
 namespace wdt {
 
 ByteRange makeByteRange(string str) {
-  return ByteRange((uint8_t *)str.data(), str.size());
+  return ByteRange((uint8_t*)str.data(), str.size());
 }
 
-ByteRange makeByteRange(char *dest, int64_t sz, int64_t off) {
+ByteRange makeByteRange(char* dest, int64_t sz, int64_t off) {
   WDT_CHECK_GE(off, 0);
   WDT_CHECK_GE(sz, 0);
   WDT_CHECK(dest != nullptr);
-  return ByteRange((uint8_t *)(dest + off), sz - off);
+  return ByteRange((uint8_t*)(dest + off), sz - off);
 }
 
-int64_t offset(const folly::ByteRange &newRange,
-               const folly::ByteRange &oldRange) {
+int64_t offset(const folly::ByteRange& newRange,
+               const folly::ByteRange& oldRange) {
   WDT_CHECK_EQ(newRange.end(), oldRange.end());
   return newRange.start() - oldRange.start();
 }
 
-bool decodeInt32(ByteRange &br, int32_t &res32) {
+bool decodeInt32(ByteRange& br, int32_t& res32) {
   int64_t res64;
   ByteRange obr = br;
   bool ok = decodeInt64(br, res64);
@@ -48,9 +48,9 @@ bool decodeInt32(ByteRange &br, int32_t &res32) {
   return true;
 }
 
-bool decodeInt64(ByteRange &br, int64_t &res) {
+bool decodeInt64(ByteRange& br, int64_t& res) {
   int64_t pos = 0;
-  bool ret = decodeVarI64((const char *)(br.start()), br.size(), pos, res);
+  bool ret = decodeVarI64((const char*)(br.start()), br.size(), pos, res);
   if (!ret) {
     return false;
   }
@@ -59,9 +59,9 @@ bool decodeInt64(ByteRange &br, int64_t &res) {
   return true;
 }
 
-bool decodeUInt64(ByteRange &br, uint64_t &res) {
+bool decodeUInt64(ByteRange& br, uint64_t& res) {
   int64_t pos = 0;
-  bool ret = decodeVarU64((const char *)(br.start()), br.size(), pos, res);
+  bool ret = decodeVarU64((const char*)(br.start()), br.size(), pos, res);
   if (!ret) {
     return false;
   }
@@ -70,7 +70,7 @@ bool decodeUInt64(ByteRange &br, uint64_t &res) {
   return true;
 }
 
-bool decodeInt64C(ByteRange &br, int64_t &sres) {
+bool decodeInt64C(ByteRange& br, int64_t& sres) {
   uint64_t ures;
   bool ret = decodeUInt64(br, ures);
   if (!ret) {
@@ -84,7 +84,7 @@ bool decodeInt64C(ByteRange &br, int64_t &sres) {
   return true;
 }
 
-bool decodeInt32C(ByteRange &br, int32_t &res32) {
+bool decodeInt32C(ByteRange& br, int32_t& res32) {
   int64_t res64;
   ByteRange obr = br;
   bool ok = decodeInt64C(br, res64);
@@ -102,7 +102,7 @@ bool decodeInt32C(ByteRange &br, int32_t &res32) {
 }
 
 template <typename T>
-bool decodeIntFixedLength(folly::ByteRange &br, T &res) {
+bool decodeIntFixedLength(folly::ByteRange& br, T& res) {
   if (br.size() < sizeof(T)) {
     WLOG(ERROR) << "Not enough to read to decode fixed length encoded int";
     return false;
@@ -117,21 +117,21 @@ bool decodeIntFixedLength(folly::ByteRange &br, T &res) {
   return true;
 }
 
-bool decodeInt16FixedLength(folly::ByteRange &br, int16_t &res) {
+bool decodeInt16FixedLength(folly::ByteRange& br, int16_t& res) {
   bool success = decodeIntFixedLength<int16_t>(br, res);
   return success;
 }
 
-bool decodeInt32FixedLength(folly::ByteRange &br, int32_t &res) {
+bool decodeInt32FixedLength(folly::ByteRange& br, int32_t& res) {
   return decodeIntFixedLength<int32_t>(br, res);
 }
 
-bool decodeInt64FixedLength(folly::ByteRange &br, int64_t &res) {
+bool decodeInt64FixedLength(folly::ByteRange& br, int64_t& res) {
   return decodeIntFixedLength<int64_t>(br, res);
 }
 
 template <typename T>
-bool encodeIntFixedLength(char *dest, int64_t sz, int64_t &off, const T val) {
+bool encodeIntFixedLength(char* dest, int64_t sz, int64_t& off, const T val) {
   constexpr int intLen = sizeof(T);
   if (off + intLen > sz) {
     WLOG(ERROR) << "Not enough room to encode fixed length int " << val
@@ -143,19 +143,19 @@ bool encodeIntFixedLength(char *dest, int64_t sz, int64_t &off, const T val) {
   return true;
 }
 
-bool encodeInt16FixedLength(char *dest, int64_t sz, int64_t &off, int16_t val) {
+bool encodeInt16FixedLength(char* dest, int64_t sz, int64_t& off, int16_t val) {
   return encodeIntFixedLength<int16_t>(dest, sz, off, val);
 }
 
-bool encodeInt32FixedLength(char *dest, int64_t sz, int64_t &off, int32_t val) {
+bool encodeInt32FixedLength(char* dest, int64_t sz, int64_t& off, int32_t val) {
   return encodeIntFixedLength<int32_t>(dest, sz, off, val);
 }
 
-bool encodeInt64FixedLength(char *dest, int64_t sz, int64_t &off, int64_t val) {
+bool encodeInt64FixedLength(char* dest, int64_t sz, int64_t& off, int64_t val) {
   return encodeIntFixedLength<int64_t>(dest, sz, off, val);
 }
 
-bool encodeString(char *dest, int64_t sz, int64_t &off, const string &str) {
+bool encodeString(char* dest, int64_t sz, int64_t& off, const string& str) {
   if (!encodeVarU64(dest, sz, off, str.length())) {
     return false;
   }
@@ -170,7 +170,7 @@ bool encodeString(char *dest, int64_t sz, int64_t &off, const string &str) {
   return true;
 }
 
-bool decodeString(ByteRange &br, string &str) {
+bool decodeString(ByteRange& br, string& str) {
   uint64_t strLen;
   if (!decodeUInt64(br, strLen)) {
     return false;
@@ -180,7 +180,7 @@ bool decodeString(ByteRange &br, string &str) {
                 << strLen;
     return false;
   }
-  str.assign((const char *)(br.start()), strLen);
+  str.assign((const char*)(br.start()), strLen);
   br.advance(strLen);
   return true;
 }

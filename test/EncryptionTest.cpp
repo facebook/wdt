@@ -11,7 +11,7 @@ namespace wdt {
 // make a copy to help ensure we don't accidentally
 // mutate the original data
 void testEncryption(const EncryptionType encryptionType,
-                    const std::string &plaintext) {
+                    const std::string& plaintext) {
   AESEncryptor encryptor;
   AESDecryptor decryptor;
 
@@ -120,7 +120,7 @@ TEST(Encryption, SuperBasic) {
 }  // namespace wdt
 }  // namespace facebook
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);

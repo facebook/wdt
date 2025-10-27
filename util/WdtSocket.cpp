@@ -12,10 +12,10 @@
 namespace facebook {
 namespace wdt {
 
-WdtSocket::WdtSocket(ThreadCtx &threadCtx, const int port,
-                     const EncryptionParams &encryptionParams,
+WdtSocket::WdtSocket(ThreadCtx& threadCtx, const int port,
+                     const EncryptionParams& encryptionParams,
                      const int64_t ivChangeInterval,
-                     Func &&tagVerificationSuccessCallback)
+                     Func&& tagVerificationSuccessCallback)
     : port_(port),
       threadCtx_(threadCtx),
       encryptionParams_(encryptionParams),
@@ -122,7 +122,7 @@ void WdtSocket::writeEncryptionSettingsOnce() {
   encryptionSettingsWritten_ = true;
 }
 
-int WdtSocket::readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull) {
+int WdtSocket::readInternal(char* buf, int nbyte, int timeoutMs, bool tryFull) {
   int numRead = readWithAbortCheck(buf, nbyte, timeoutMs, tryFull);
   if (numRead == 0) {
     readErrorCode_ = SOCKET_READ_ERROR;
@@ -141,7 +141,7 @@ int WdtSocket::readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull) {
   return numRead;
 }
 
-int WdtSocket::writeInternal(const char *buf, int nbyte, int timeoutMs,
+int WdtSocket::writeInternal(const char* buf, int nbyte, int timeoutMs,
                              bool retry) {
   int count = 0;
   int written = 0;
@@ -167,7 +167,7 @@ int WdtSocket::writeInternal(const char *buf, int nbyte, int timeoutMs,
   return written;
 }
 
-bool WdtSocket::checkAndChangeDecryptionIv(const std::string &tag) {
+bool WdtSocket::checkAndChangeDecryptionIv(const std::string& tag) {
   if (ivChangeInterval_ == 0) {
     return true;
   }
@@ -232,7 +232,7 @@ int WdtSocket::computeNextTagOffset(int64_t totalProcessed,
   return nextTagOffset;
 }
 
-int WdtSocket::readAndDecrypt(char *buf, int nbyte, int timeoutMs,
+int WdtSocket::readAndDecrypt(char* buf, int nbyte, int timeoutMs,
                               bool tryFull) {
   WDT_CHECK_GT(nbyte, 0);
   const bool encrypt = encryptionParams_.isSet();
@@ -250,7 +250,7 @@ int WdtSocket::readAndDecrypt(char *buf, int nbyte, int timeoutMs,
   return numRead;
 }
 
-int WdtSocket::readAndDecryptWithTag(char *buf, int nbyte, int timeoutMs,
+int WdtSocket::readAndDecryptWithTag(char* buf, int nbyte, int timeoutMs,
                                      bool tryFull) {
   WDT_CHECK_GT(readTagInterval_, 0);
   WDT_CHECK_LE(nbyte, readTagInterval_);
@@ -307,7 +307,7 @@ int WdtSocket::readAndDecryptWithTag(char *buf, int nbyte, int timeoutMs,
   return numRead + ret;
 }
 
-int WdtSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
+int WdtSocket::readWithTimeout(char* buf, int nbyte, int timeoutMs,
                                bool tryFull) {
   WDT_CHECK_GT(nbyte, 0);
   if (readErrorCode_ != OK && readErrorCode_ != WDT_TIMEOUT) {
@@ -370,12 +370,12 @@ int WdtSocket::readWithTimeout(char *buf, int nbyte, int timeoutMs,
   return numRead;
 }
 
-int WdtSocket::read(char *buf, int nbyte, bool tryFull) {
+int WdtSocket::read(char* buf, int nbyte, bool tryFull) {
   return readWithTimeout(buf, nbyte,
                          threadCtx_.getOptions().read_timeout_millis, tryFull);
 }
 
-int WdtSocket::encryptAndWrite(char *buf, int nbyte, int timeoutMs,
+int WdtSocket::encryptAndWrite(char* buf, int nbyte, int timeoutMs,
                                bool retry) {
   WDT_CHECK_GT(nbyte, 0);
   const bool encrypt = encryptionParams_.isSet();
@@ -440,7 +440,7 @@ bool WdtSocket::writeEncryptionTag() {
   return true;
 }
 
-int WdtSocket::encryptAndWriteWithTag(char *buf, int nbyte, int timeoutMs,
+int WdtSocket::encryptAndWriteWithTag(char* buf, int nbyte, int timeoutMs,
                                       bool retry) {
   WDT_CHECK_GT(writeTagInterval_, 0);
   WDT_CHECK_LE(nbyte, writeTagInterval_);
@@ -481,7 +481,7 @@ int WdtSocket::encryptAndWriteWithTag(char *buf, int nbyte, int timeoutMs,
   return nbyte;
 }
 
-int WdtSocket::write(char *buf, int nbyte, bool retry) {
+int WdtSocket::write(char* buf, int nbyte, bool retry) {
   WDT_CHECK_GT(nbyte, 0);
   if (writeErrorCode_ != OK) {
     WLOG(ERROR) << "Socket write failed before, not trying to write again "
@@ -521,13 +521,13 @@ int WdtSocket::write(char *buf, int nbyte, bool retry) {
   return written;
 }
 
-int64_t WdtSocket::readWithAbortCheck(char *buf, int64_t nbyte, int timeoutMs,
+int64_t WdtSocket::readWithAbortCheck(char* buf, int64_t nbyte, int timeoutMs,
                                       bool tryFull) {
   PerfStatCollector statCollector(threadCtx_, PerfStatReport::SOCKET_READ);
   return ioWithAbortCheck(::read, buf, nbyte, timeoutMs, tryFull);
 }
 
-int64_t WdtSocket::writeWithAbortCheck(const char *buf, int64_t nbyte,
+int64_t WdtSocket::writeWithAbortCheck(const char* buf, int64_t nbyte,
                                        int timeoutMs, bool tryFull) {
   PerfStatCollector statCollector(threadCtx_, PerfStatReport::SOCKET_WRITE);
   return ioWithAbortCheck(::write, buf, nbyte, timeoutMs, tryFull);
@@ -742,7 +742,7 @@ void WdtSocket::setSocketTimeouts() {
     struct timeval tv;
     tv.tv_sec = readTimeout / 1000;            // milli to sec
     tv.tv_usec = (readTimeout % 1000) * 1000;  // milli to micro
-    if (setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,
+    if (setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv,
                    sizeof(struct timeval)) != 0) {
       WPLOG(ERROR) << "Unable to set read timeout for " << port_ << " " << fd_;
     }
@@ -753,7 +753,7 @@ void WdtSocket::setSocketTimeouts() {
     struct timeval tv;
     tv.tv_sec = writeTimeout / 1000;            // milli to sec
     tv.tv_usec = (writeTimeout % 1000) * 1000;  // milli to micro
-    if (setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv,
+    if (setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv,
                    sizeof(struct timeval)) != 0) {
       WPLOG(ERROR) << "Unable to set write timeout for " << port_ << " " << fd_;
     }
@@ -764,15 +764,15 @@ void WdtSocket::setDscp(int dscp) {
   if (dscp > 0) {
     if (threadCtx_.getOptions().ipv6) {
       int classval = dscp << 2;
-      if (setsockopt(fd_, IPPROTO_IPV6, IPV6_TCLASS, (char *)&classval,
+      if (setsockopt(fd_, IPPROTO_IPV6, IPV6_TCLASS, (char*)&classval,
                      sizeof(classval)) != 0) {
         WPLOG(ERROR) << "Unable to set DSCP flag for " << port_ << " " << fd_;
       }
     }
     if (threadCtx_.getOptions().ipv4) {
       int ip_tos = dscp << 2;
-      if (setsockopt(fd_, IPPROTO_IP, IP_TOS, (char *)&ip_tos,
-                     sizeof(ip_tos)) != 0) {
+      if (setsockopt(fd_, IPPROTO_IP, IP_TOS, (char*)&ip_tos, sizeof(ip_tos)) !=
+          0) {
         WPLOG(ERROR) << "Unable to set DSCP flag for " << port_ << " " << fd_;
       }
     }
@@ -780,8 +780,8 @@ void WdtSocket::setDscp(int dscp) {
 }
 
 /* static */
-bool WdtSocket::getNameInfo(const struct sockaddr *sa, socklen_t salen,
-                            std::string &host, std::string &port) {
+bool WdtSocket::getNameInfo(const struct sockaddr* sa, socklen_t salen,
+                            std::string& host, std::string& port) {
   char hostBuf[NI_MAXHOST], portBuf[NI_MAXSERV];
   int res = getnameinfo(sa, salen, hostBuf, sizeof(hostBuf), portBuf,
                         sizeof(portBuf), NI_NUMERICHOST | NI_NUMERICSERV);
@@ -797,14 +797,14 @@ bool WdtSocket::getNameInfo(const struct sockaddr *sa, socklen_t salen,
 int WdtSocket::getReceiveBufferSize() const {
   int size;
   socklen_t sizeSize = sizeof(size);
-  getsockopt(fd_, SOL_SOCKET, SO_RCVBUF, (void *)&size, &sizeSize);
+  getsockopt(fd_, SOL_SOCKET, SO_RCVBUF, (void*)&size, &sizeSize);
   return size;
 }
 
 int WdtSocket::getSendBufferSize() const {
   int size;
   socklen_t sizeSize = sizeof(size);
-  getsockopt(fd_, SOL_SOCKET, SO_SNDBUF, (void *)&size, &sizeSize);
+  getsockopt(fd_, SOL_SOCKET, SO_SNDBUF, (void*)&size, &sizeSize);
   return size;
 }
 

@@ -26,7 +26,7 @@ class FileUtil {
    *
    * @return    If successful, fd is returned, else -1 is returned
    */
-  static int openForRead(ThreadCtx &threadCtx, const std::string &filename,
+  static int openForRead(ThreadCtx& threadCtx, const std::string& filename,
                          bool isDirectReads);
   // TODO: create a separate file for this class and move other file related
   // code here
@@ -45,7 +45,7 @@ class FileByteSource : public ByteSource {
    *                          truncate, if it's smaller we'll fail
    * @param offset            block offset
    */
-  FileByteSource(SourceMetaData *metadata, int64_t size, int64_t offset);
+  FileByteSource(SourceMetaData* metadata, int64_t size, int64_t offset);
 
   /// close file descriptor if still open
   ~FileByteSource() override {
@@ -53,7 +53,7 @@ class FileByteSource : public ByteSource {
   }
 
   /// @return filepath
-  const std::string &getIdentifier() const override {
+  const std::string& getIdentifier() const override {
     return metadata_->relPath;
   }
 
@@ -68,7 +68,7 @@ class FileByteSource : public ByteSource {
   }
 
   /// @see ByteSource.h
-  const SourceMetaData &getMetaData() const override {
+  const SourceMetaData& getMetaData() const override {
     return *metadata_;
   }
 
@@ -83,13 +83,13 @@ class FileByteSource : public ByteSource {
   }
 
   /// @see ByteSource.h
-  char *read(int64_t &size) override;
+  char* read(int64_t& size) override;
 
   /// @see ByteSource.h
   void advanceOffset(int64_t numBytes) override;
 
   /// @see ByteSource.h
-  ErrorCode open(ThreadCtx *threadCtx) override;
+  ErrorCode open(ThreadCtx* threadCtx) override;
 
   /// close the source for reading
   void close() override;
@@ -98,12 +98,12 @@ class FileByteSource : public ByteSource {
    * @return transfer stats for the source. If the stats is moved by the
    *         caller, then this function can not be called again
    */
-  TransferStats &getTransferStats() override {
+  TransferStats& getTransferStats() override {
     return transferStats_;
   }
 
   /// @param stats    Stats to be added
-  void addTransferStats(const TransferStats &stats) override {
+  void addTransferStats(const TransferStats& stats) override {
     transferStats_ += stats;
   }
 
@@ -111,10 +111,10 @@ class FileByteSource : public ByteSource {
   /// clears page cache
   void clearPageCache();
 
-  ThreadCtx *threadCtx_{nullptr};
+  ThreadCtx* threadCtx_{nullptr};
 
   /// shared file information
-  SourceMetaData *metadata_;
+  SourceMetaData* metadata_;
 
   /// filesize
   int64_t size_;

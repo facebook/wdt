@@ -35,7 +35,7 @@ void Sender::startNewTransfer() {
              << transferRequest_.hostName;
 }
 
-Sender::Sender(const WdtTransferRequest &transferRequest)
+Sender::Sender(const WdtTransferRequest& transferRequest)
     : queueAbortChecker_(this) {
   WLOG(INFO) << "WDT Sender " << Protocol::getFullVersion();
   transferRequest_ = transferRequest;
@@ -58,7 +58,7 @@ ErrorCode Sender::validateTransferRequest() {
   return code;
 }
 
-const WdtTransferRequest &Sender::init() {
+const WdtTransferRequest& Sender::init() {
   WVLOG(1) << "Sender Init() with encryption set = "
            << transferRequest_.encryptionData.isSet();
   negotiateProtocol();
@@ -91,7 +91,7 @@ ProtoNegotiationStatus Sender::getNegotiationStatus() {
 
 std::vector<int> Sender::getNegotiatedProtocols() const {
   std::vector<int> ret;
-  for (const auto &senderThread : senderThreads_) {
+  for (const auto& senderThread : senderThreads_) {
     ret.push_back(senderThread->getNegotiatedProtocol());
   }
   return ret;
@@ -112,7 +112,7 @@ bool Sender::isFileChunksReceived() {
 }
 
 void Sender::setFileChunksInfo(
-    std::vector<FileChunksInfo> &fileChunksInfoList) {
+    std::vector<FileChunksInfo>& fileChunksInfoList) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (fileChunksReceived_) {
     WLOG(WARNING) << "File chunks list received multiple times";
@@ -122,7 +122,7 @@ void Sender::setFileChunksInfo(
   fileChunksReceived_ = true;
 }
 
-const std::string &Sender::getDestination() const {
+const std::string& Sender::getDestination() const {
   return transferRequest_.hostName;
 }
 
@@ -156,7 +156,7 @@ Clock::time_point Sender::getEndTime() {
 
 TransferStats Sender::getGlobalTransferStats() const {
   TransferStats globalStats;
-  for (const auto &thread : senderThreads_) {
+  for (const auto& thread : senderThreads_) {
     globalStats += thread->getTransferStats();
   }
   return globalStats;
@@ -179,7 +179,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
   const bool twoPhases = options_.two_phases;
   bool progressReportEnabled =
       progressReporter_ && progressReportIntervalMillis_ > 0;
-  for (auto &senderThread : senderThreads_) {
+  for (auto& senderThread : senderThreads_) {
     senderThread->finish();
   }
   if (!twoPhases) {
@@ -191,13 +191,13 @@ std::unique_ptr<TransferReport> Sender::finish() {
     progressReporterThread_.join();
   }
   std::vector<TransferStats> threadStats;
-  for (auto &senderThread : senderThreads_) {
+  for (auto& senderThread : senderThreads_) {
     threadStats.push_back(senderThread->moveStats());
   }
 
   bool allSourcesAcked = false;
-  for (auto &senderThread : senderThreads_) {
-    auto &stats = senderThread->getTransferStats();
+  for (auto& senderThread : senderThreads_) {
+    auto& stats = senderThread->getTransferStats();
     if (stats.getErrorCode() == OK) {
       // at least one thread finished correctly
       // that means all transferred sources are acked
@@ -208,7 +208,7 @@ std::unique_ptr<TransferReport> Sender::finish() {
 
   std::vector<TransferStats> transferredSourceStats;
   for (auto port : transferRequest_.ports) {
-    auto &transferHistory =
+    auto& transferHistory =
         transferHistoryController_->getTransferHistory(port);
     if (allSourcesAcked) {
       transferHistory.markAllAcknowledged();
@@ -357,7 +357,7 @@ ErrorCode Sender::start() {
   if (twoPhases) {
     dirThread_.join();
   }
-  for (auto &senderThread : senderThreads_) {
+  for (auto& senderThread : senderThreads_) {
     senderThread->startThread();
   }
   if (progressReportEnabled) {
@@ -369,8 +369,8 @@ ErrorCode Sender::start() {
 }
 
 void Sender::validateTransferStats(
-    const std::vector<TransferStats> &transferredSourceStats,
-    const std::vector<TransferStats> &failedSourceStats) {
+    const std::vector<TransferStats>& transferredSourceStats,
+    const std::vector<TransferStats>& failedSourceStats) {
   int64_t sourceFailedAttempts = 0;
   int64_t sourceDataBytes = 0;
   int64_t sourceEffectiveDataBytes = 0;
@@ -381,20 +381,20 @@ void Sender::validateTransferStats(
   int64_t threadEffectiveDataBytes = 0;
   int64_t threadNumBlocks = 0;
 
-  for (const auto &stat : transferredSourceStats) {
+  for (const auto& stat : transferredSourceStats) {
     sourceFailedAttempts += stat.getFailedAttempts();
     sourceDataBytes += stat.getDataBytes();
     sourceEffectiveDataBytes += stat.getEffectiveDataBytes();
     sourceNumBlocks += stat.getNumBlocks();
   }
-  for (const auto &stat : failedSourceStats) {
+  for (const auto& stat : failedSourceStats) {
     sourceFailedAttempts += stat.getFailedAttempts();
     sourceDataBytes += stat.getDataBytes();
     sourceEffectiveDataBytes += stat.getEffectiveDataBytes();
     sourceNumBlocks += stat.getNumBlocks();
   }
-  for (const auto &senderThread : senderThreads_) {
-    const auto &stat = senderThread->getTransferStats();
+  for (const auto& senderThread : senderThreads_) {
+    const auto& stat = senderThread->getTransferStats();
     threadFailedAttempts += stat.getFailedAttempts();
     threadDataBytes += stat.getDataBytes();
     threadEffectiveDataBytes += stat.getEffectiveDataBytes();
@@ -407,7 +407,7 @@ void Sender::validateTransferStats(
   WDT_CHECK(sourceNumBlocks == threadNumBlocks);
 }
 
-void Sender::setSocketCreator(Sender::ISocketCreator *socketCreator) {
+void Sender::setSocketCreator(Sender::ISocketCreator* socketCreator) {
   socketCreator_ = socketCreator;
 }
 
@@ -463,7 +463,7 @@ void Sender::logPerfStats() const {
   }
 
   PerfStatReport report(options_);
-  for (auto &senderThread : senderThreads_) {
+  for (auto& senderThread : senderThreads_) {
     report += senderThread->getPerfReport();
   }
   report += dirQueue_->getPerfReport();

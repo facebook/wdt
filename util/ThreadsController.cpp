@@ -13,8 +13,8 @@ using namespace std;
 namespace facebook {
 namespace wdt {
 
-void ConditionGuardImpl::wait(int timeoutMillis, const ThreadCtx &threadCtx) {
-  const WdtOptions &options = threadCtx.getOptions();
+void ConditionGuardImpl::wait(int timeoutMillis, const ThreadCtx& threadCtx) {
+  const WdtOptions& options = threadCtx.getOptions();
   const bool checkAbort = (options.abort_check_interval_millis > 0);
   int remainingTime = timeoutMillis;
 
@@ -52,13 +52,13 @@ ConditionGuardImpl::~ConditionGuardImpl() {
   }
 }
 
-ConditionGuardImpl::ConditionGuardImpl(mutex &guardMutex,
-                                       condition_variable &cv)
+ConditionGuardImpl::ConditionGuardImpl(mutex& guardMutex,
+                                       condition_variable& cv)
     : cv_(cv) {
   lock_ = new unique_lock<mutex>(guardMutex);
 }
 
-ConditionGuardImpl::ConditionGuardImpl(ConditionGuardImpl &&that) noexcept
+ConditionGuardImpl::ConditionGuardImpl(ConditionGuardImpl&& that) noexcept
     : cv_(that.cv_) {
   swap(lock_, that.lock_);
 }
@@ -84,7 +84,7 @@ void Funnel::wait() {
   cv_.wait(lock);
 }
 
-void Funnel::wait(int32_t waitingTime, const ThreadCtx &threadCtx) {
+void Funnel::wait(int32_t waitingTime, const ThreadCtx& threadCtx) {
   ConditionGuardImpl guard(mutex_, cv_);
   if (status_ != FUNNEL_PROGRESS) {
     return;
@@ -191,7 +191,7 @@ bool ThreadsController::hasThreads(ThreadStatus threadState) {
 
 bool ThreadsController::hasThreads(int threadIndex, ThreadStatus threadState) {
   GuardLock lock(controllerMutex_);
-  for (auto &threadPair : threadStateMap_) {
+  for (auto& threadPair : threadStateMap_) {
     if (threadPair.first == threadIndex) {
       continue;
     }
@@ -240,7 +240,7 @@ void ThreadsController::reset() {
   execAtEnd_->reset();
   GuardLock lock(controllerMutex_);
   // Restore threads back to initial state
-  for (auto &threadPair : threadStateMap_) {
+  for (auto& threadPair : threadStateMap_) {
     threadPair.second = RUNNING;
   }
 }
@@ -270,7 +270,7 @@ void ThreadsController::setNumFunnels(int numFunnels) {
 int ThreadsController::numRunningThreads() {
   GuardLock lock(controllerMutex_);
   int ret = 0;
-  for (auto &p : threadStateMap_) {
+  for (auto& p : threadStateMap_) {
     if (p.second == RUNNING) {
       ret++;
     }

@@ -30,16 +30,16 @@ namespace wdt {
 class Receiver : public WdtBase {
  public:
   /// Constructor using wdt transfer request (@see in WdtBase.h)
-  explicit Receiver(const WdtTransferRequest &transferRequest);
+  explicit Receiver(const WdtTransferRequest& transferRequest);
 
   /**
    * Constructor with start port, number of ports and directory to write to.
    * If the start port is specified as zero, it auto configures the ports
    */
-  Receiver(int port, int numSockets, const std::string &destDir);
+  Receiver(int port, int numSockets, const std::string& destDir);
 
   /// Setup before starting (@see WdtBase.h)
-  const WdtTransferRequest &init() override;
+  const WdtTransferRequest& init() override;
 
   /**
    * Joins on the threads spawned by start. This method
@@ -63,7 +63,7 @@ class Receiver : public WdtBase {
   ErrorCode transferAsync() override;
 
   /// @param recoveryId   unique-id used to verify transfer log
-  void setRecoveryId(const std::string &recoveryId);
+  void setRecoveryId(const std::string& recoveryId);
 
   /// Returns true if at least one thread has accepted connection
   bool hasNewTransferStarted() const;
@@ -82,9 +82,9 @@ class Receiver : public WdtBase {
   class ISocketCreator {
    public:
     virtual std::unique_ptr<IServerSocket> makeServerSocket(
-        ThreadCtx &threadCtx, int port, int backlog,
-        const EncryptionParams &encryptionParams, int64_t ivChangeInterval,
-        Func &&tagVerificationSuccessCallback, bool tls) = 0;
+        ThreadCtx& threadCtx, int port, int backlog,
+        const EncryptionParams& encryptionParams, int64_t ivChangeInterval,
+        Func&& tagVerificationSuccessCallback, bool tls) = 0;
 
     virtual ~ISocketCreator() = default;
   };
@@ -94,7 +94,7 @@ class Receiver : public WdtBase {
    *
    * @param socketCreator   socket-creator to be used
    */
-  void setSocketCreator(ISocketCreator *socketCreator);
+  void setSocketCreator(ISocketCreator* socketCreator);
 
   /**
    * Destructor for the receiver. The destructor automatically cancels
@@ -113,19 +113,19 @@ class Receiver : public WdtBase {
    *
    * @param fileChunksInfo     discovered file info
    */
-  void traverseDestinationDir(std::vector<FileChunksInfo> &fileChunksInfo);
+  void traverseDestinationDir(std::vector<FileChunksInfo>& fileChunksInfo);
 
   /// Get the transferred file chunks info
-  const std::vector<FileChunksInfo> &getFileChunksInfo() const;
+  const std::vector<FileChunksInfo>& getFileChunksInfo() const;
 
   /// Get file creator, used by receiver threads
-  std::unique_ptr<FileCreator> &getFileCreator();
+  std::unique_ptr<FileCreator>& getFileCreator();
 
   /// Socket creator used to optionally create different kind of server socket
-  ISocketCreator *socketCreator_{nullptr};
+  ISocketCreator* socketCreator_{nullptr};
 
   /// Get the ref to transfer log manager
-  TransferLogManager &getTransferLogManager();
+  TransferLogManager& getTransferLogManager();
 
   /// Responsible for basic setup and starting threads
   ErrorCode start();
@@ -150,7 +150,7 @@ class Receiver : public WdtBase {
   std::vector<Checkpoint> getNewCheckpoints(int startIndex);
 
   /// Does the steps needed before a new transfer is started
-  void startNewGlobalSession(const std::string &peerIp);
+  void startNewGlobalSession(const std::string& peerIp);
 
   /// Has steps to do when the current transfer is ended
   void endCurGlobalSession();

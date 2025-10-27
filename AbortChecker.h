@@ -22,7 +22,7 @@ class IAbortChecker {
 /// A sample abort checker using std::atomic for abort
 class WdtAbortChecker : public IAbortChecker {
  public:
-  explicit WdtAbortChecker(const std::atomic<bool> &abortTrigger)
+  explicit WdtAbortChecker(const std::atomic<bool>& abortTrigger)
       : abortTriggerPtr_(&abortTrigger) {
   }
   bool shouldAbort() const override {
@@ -30,7 +30,7 @@ class WdtAbortChecker : public IAbortChecker {
   }
 
  private:
-  std::atomic<bool> const *abortTriggerPtr_;
+  std::atomic<bool> const* abortTriggerPtr_;
 };
 
 }  // namespace wdt

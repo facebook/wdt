@@ -19,26 +19,26 @@ using Func = std::function<void()>;
 /// Mbytes anyway.
 class WdtSocket {
  public:
-  WdtSocket(ThreadCtx &threadCtx, int port,
-            const EncryptionParams &encryptionParams, int64_t ivChangeInterval,
-            Func &&tagVerificationSuccessCallback);
+  WdtSocket(ThreadCtx& threadCtx, int port,
+            const EncryptionParams& encryptionParams, int64_t ivChangeInterval,
+            Func&& tagVerificationSuccessCallback);
 
   // making the object non-copyable and non-movable
-  WdtSocket(const WdtSocket &stats) = delete;
-  WdtSocket &operator=(const WdtSocket &stats) = delete;
-  WdtSocket(WdtSocket &&stats) = delete;
-  WdtSocket &operator=(WdtSocket &&stats) = delete;
+  WdtSocket(const WdtSocket& stats) = delete;
+  WdtSocket& operator=(const WdtSocket& stats) = delete;
+  WdtSocket(WdtSocket&& stats) = delete;
+  WdtSocket& operator=(WdtSocket&& stats) = delete;
 
   /// tries to read nbyte data and periodically checks for abort
-  int read(char *buf, int nbyte, bool tryFull = true);
+  int read(char* buf, int nbyte, bool tryFull = true);
 
   /// tries to read nbyte data with a specific and periodically checks for abort
-  int readWithTimeout(char *buf, int nbyte, int timeoutMs, bool tryFull = true);
+  int readWithTimeout(char* buf, int nbyte, int timeoutMs, bool tryFull = true);
 
   /// tries to write nbyte data and periodically checks for abort, if retry is
   /// true, socket tries to write as long as it makes some progress within a
   /// write timeout
-  int write(char *buf, int nbyte, bool retry = false);
+  int write(char* buf, int nbyte, bool retry = false);
 
   /// writes the tag/mac (for gcm) and shuts down the write half of the
   /// underlying socket
@@ -110,7 +110,7 @@ class WdtSocket {
   // manipulates DSCP Bits
   void setDscp(int dscp);
 
-  ThreadCtx &getThreadCtx() {
+  ThreadCtx& getThreadCtx() {
     return threadCtx_;
   }
 
@@ -127,8 +127,8 @@ class WdtSocket {
    *
    * @return        whether getnameinfo was successful or not
    */
-  static bool getNameInfo(const struct sockaddr *sa, socklen_t salen,
-                          std::string &host, std::string &port);
+  static bool getNameInfo(const struct sockaddr* sa, socklen_t salen,
+                          std::string& host, std::string& port);
 
   virtual ~WdtSocket();
 
@@ -142,10 +142,10 @@ class WdtSocket {
   int getEffectiveTimeout(int networkTimeout);
 
   /// @see ioWithAbortCheck
-  int64_t readWithAbortCheck(char *buf, int64_t nbyte, int timeoutMs,
+  int64_t readWithAbortCheck(char* buf, int64_t nbyte, int timeoutMs,
                              bool tryFull);
   /// @see ioWithAbortCheck
-  int64_t writeWithAbortCheck(const char *buf, int64_t nbyte, int timeoutMs,
+  int64_t writeWithAbortCheck(const char* buf, int64_t nbyte, int timeoutMs,
                               bool tryFull);
 
   /**
@@ -175,32 +175,32 @@ class WdtSocket {
   int computeNextTagOffset(int64_t totalProcessed, int64_t tagInterval);
 
   // reads from socket and decrypts. Does not understand tag verification
-  int readAndDecrypt(char *buf, int nbyte, int timeoutMs, bool tryFull);
+  int readAndDecrypt(char* buf, int nbyte, int timeoutMs, bool tryFull);
 
   // reads from socket, decrypts and verifies tag. If the read contains a tag,
   // first, we read till the tag and decrypt. Then, the tag(plain-text) is read
   // and verified. After that remaining bytes are read.
   // This method expects one tag contained in the read. So, nbyte must be
   // less than readTagInterval_
-  int readAndDecryptWithTag(char *buf, int nbyte, int timeoutMs, bool tryFull);
+  int readAndDecryptWithTag(char* buf, int nbyte, int timeoutMs, bool tryFull);
 
   // reads encryption tag. Returns empty string in case of failure.
   std::string readEncryptionTag();
 
   // checks whether decryption iv has changed or not. If yes, it reads the new
   // iv
-  bool checkAndChangeDecryptionIv(const std::string &tag);
+  bool checkAndChangeDecryptionIv(const std::string& tag);
 
   // reads from socket. Does not understand encryption
-  int readInternal(char *buf, int nbyte, int timeoutMs, bool tryFull);
+  int readInternal(char* buf, int nbyte, int timeoutMs, bool tryFull);
 
   // encrypts and writes. Does not understand encryption tag
-  int encryptAndWrite(char *buf, int nbyte, int timeoutMs, bool retry);
+  int encryptAndWrite(char* buf, int nbyte, int timeoutMs, bool retry);
 
   // encrypts, writes and also adds tag if necessary.
   // This method expects one tag contained in the write. So, nbyte must be less
   // than writeTagInterval_
-  int encryptAndWriteWithTag(char *buf, int nbyte, int timeoutMs, bool retry);
+  int encryptAndWriteWithTag(char* buf, int nbyte, int timeoutMs, bool retry);
 
   // writes encryption tag. Returns status
   bool writeEncryptionTag();
@@ -210,7 +210,7 @@ class WdtSocket {
   bool checkAndChangeEncryptionIv();
 
   // writes to socket. Does not understand encryption
-  int writeInternal(const char *buf, int nbyte, int timeoutMs, bool retry);
+  int writeInternal(const char* buf, int nbyte, int timeoutMs, bool retry);
 
   void readEncryptionSettingsOnce(int timeoutMs);
 
@@ -226,7 +226,7 @@ class WdtSocket {
   int port_{-1};
   int fd_{-1};
 
-  ThreadCtx &threadCtx_;
+  ThreadCtx& threadCtx_;
 
   EncryptionParams encryptionParams_;
   int64_t ivChangeInterval_{0};

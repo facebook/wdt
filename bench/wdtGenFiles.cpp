@@ -49,7 +49,7 @@ class ProbabilityTable;  // forward for operator below
 
 // needs to be before the friend below
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const ProbabilityTable<T> &t) {
+std::ostream& operator<<(std::ostream& os, const ProbabilityTable<T>& t) {
   uint32_t sz = t.size();
   os << "probT " << sz << ": ";
   if (!sz) {
@@ -110,8 +110,8 @@ class ProbabilityTable {
 
   void init(std::vector<std::pair<T, uint32_t>> input) {
     uint32_t sum = 0;
-    for (auto const &p : input) {
-      auto const &b = p.first;
+    for (auto const& p : input) {
+      auto const& b = p.first;
       VLOG(1) << "PT " << b << " weight " << p.second;
       sum += p.second;
     }
@@ -121,9 +121,9 @@ class ProbabilityTable {
     // TODO: auto scale (divide by min/3 for instance?)
     dist_.reset(new std::uniform_int_distribution<int>(0, sum - 1));
     size_ = sum;
-    for (auto const &p : input) {
-      auto const &b = p.first;
-      auto const &v = p.second;
+    for (auto const& p : input) {
+      auto const& b = p.first;
+      auto const& v = p.second;
       VLOG(1) << "PT " << b << " scaled weight " << v;
       for (uint32_t n = v; n--;) {
         data_.push_back(b);
@@ -134,12 +134,12 @@ class ProbabilityTable {
   // Incremental version
   ProbabilityTable() : size_(0) {
   }
-  void append(const T &value, uint32_t count) {
+  void append(const T& value, uint32_t count) {
     for (; count--;) {
       data_.push_back(value);
     }
   }
-  void seal(const ProbabilityTable & /*parent*/) {
+  void seal(const ProbabilityTable& /*parent*/) {
     size_ = data_.size();
     if (size_ > 0) {
       dist_.reset(new std::uniform_int_distribution<int>(0, size_ - 1));
@@ -148,10 +148,10 @@ class ProbabilityTable {
   uint32_t size() const {
     return size_;
   }
-  const T &operator[](uint32_t idx) const {
+  const T& operator[](uint32_t idx) const {
     return data_[idx];
   }
-  const T &random(RndEngine &gen) {
+  const T& random(RndEngine& gen) {
     if (!size_) {
       static const T EMPTY;
       LOG(ERROR) << "Called random on 0 sized PT " << this;
@@ -167,8 +167,8 @@ class ProbabilityTable {
   std::vector<T> data_;
   std::unique_ptr<std::uniform_int_distribution<int>> dist_;
   template <typename A>
-  friend std::ostream &operator<<(std::ostream &os,
-                                  const ProbabilityTable<A> &t);
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const ProbabilityTable<A>& t);
 };
 
 using PTB = ProbabilityTable<Bigram>;
@@ -186,8 +186,8 @@ class SentenceGen {
     if (!FLAGS_reset_char.empty()) {
       reset_char_ = FLAGS_reset_char[0];
     }
-    for (auto const &p : input) {
-      const Bigram &b = p.first;
+    for (auto const& p : input) {
+      const Bigram& b = p.first;
       const char first = b[0];
       const int idx = char2index(first);
       ptb1_[idx].append(b, p.second);
@@ -206,11 +206,11 @@ class SentenceGen {
       }
     }
   }
-  const Bigram &initial(RndEngine &gen) {
+  const Bigram& initial(RndEngine& gen) {
     return ptb0_.random(gen);
   }
   // Sets result a random Bigram starting with c - or returns false
-  bool next(RndEngine &gen, Bigram &result, char c) {
+  bool next(RndEngine& gen, Bigram& result, char c) {
     const int idx = char2index(c);
     VLOG(3) << "looking up for '" << Bigram::toPrintableString(c)
             << "' (at position " << idx << ") :" << ptb1_[idx] << std::endl;
@@ -226,12 +226,12 @@ class SentenceGen {
     return true;
   }
   // Implace next() logic, chain the bigrams if possible, return false otherwise
-  bool next(RndEngine &gen, Bigram &previous) {
+  bool next(RndEngine& gen, Bigram& previous) {
     return next(gen, previous, previous[1]);
   }
 
   // will generate exactly len bytes unless len is < FLAGS_start.size()
-  Bigram generateInitial(RndEngine &gen, std::string &result, int32_t len) {
+  Bigram generateInitial(RndEngine& gen, std::string& result, int32_t len) {
     Bigram previous;
     // Start with given string or start randomly:
     size_t startLen = FLAGS_start.size();
@@ -255,8 +255,8 @@ class SentenceGen {
     return previous;
   }
 
-  void generate(RndEngine &gen, std::string &result, int32_t len,
-                Bigram &previous) {
+  void generate(RndEngine& gen, std::string& result, int32_t len,
+                Bigram& previous) {
     VLOG(1) << "generate " << len << " " << previous;
     // main loop:
     while (len > 0) {
@@ -279,7 +279,7 @@ class SentenceGen {
     }
   }
 
-  static SentenceGen &getTestInstance() {
+  static SentenceGen& getTestInstance() {
     static SentenceGen s_wg{
         {{"la"}, 3},    {{"ah"}, 2}, {{" B"}, 1}, {{" b"}, 1}, {{" f"}, 1},
         {{" l"}, 1},    {{". "}, 1}, {{"Bl"}, 1}, {{"Th"}, 1}, {{"az"}, 1},
@@ -306,24 +306,24 @@ class SentenceGen {
   char reset_char_{0};
 };
 
-void deserialize(std::vector<PairBigramCount> &statsData, std::istream &sin) {
+void deserialize(std::vector<PairBigramCount>& statsData, std::istream& sin) {
   while (!sin.fail()) {
     Bigram b;
     if (!b.binaryDeserialize(sin)) {
       break;
     }
     uint32_t count = 0;
-    sin.read(reinterpret_cast<char *>(&count), sizeof(count));
+    sin.read(reinterpret_cast<char*>(&count), sizeof(count));
     statsData.emplace_back(b, count);
   }
 }
 
 using std::string;
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   FLAGS_logtostderr = true;
   // gflags api is nicely inconsistent here
-  GFLAGS_NAMESPACE::SetArgv(argc, const_cast<const char **>(argv));
+  GFLAGS_NAMESPACE::SetArgv(argc, const_cast<const char**>(argv));
   GFLAGS_NAMESPACE::SetVersionString(WDT_VERSION_STR);
   string usage("Generates test files for wdt transfer benchmark. v");
   usage.append(GFLAGS_NAMESPACE::VersionString());

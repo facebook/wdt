@@ -13,7 +13,7 @@
 namespace facebook {
 namespace wdt {
 
-int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
+int FileUtil::openForRead(ThreadCtx& threadCtx, const std::string& filename,
                           const bool isDirectReads) {
   int openFlags = O_RDONLY;
   if (isDirectReads) {
@@ -55,7 +55,7 @@ int FileUtil::openForRead(ThreadCtx &threadCtx, const std::string &filename,
   return fd;
 }
 
-FileByteSource::FileByteSource(SourceMetaData *metadata, int64_t size,
+FileByteSource::FileByteSource(SourceMetaData* metadata, int64_t size,
                                int64_t offset)
     : metadata_(metadata),
       size_(size),
@@ -65,7 +65,7 @@ FileByteSource::FileByteSource(SourceMetaData *metadata, int64_t size,
   transferStats_.setId(getIdentifier());
 }
 
-ErrorCode FileByteSource::open(ThreadCtx *threadCtx) {
+ErrorCode FileByteSource::open(ThreadCtx* threadCtx) {
   if (metadata_->allocationStatus == TO_BE_DELETED) {
     return OK;
   }
@@ -101,12 +101,12 @@ void FileByteSource::advanceOffset(int64_t numBytes) {
   size_ -= numBytes;
 }
 
-char *FileByteSource::read(int64_t &size) {
+char* FileByteSource::read(int64_t& size) {
   size = 0;
   if (hasError() || finished()) {
     return nullptr;
   }
-  const Buffer *buffer = threadCtx_->getBuffer();
+  const Buffer* buffer = threadCtx_->getBuffer();
   int64_t offsetRemainder = 0;
   if (alignedReadNeeded_) {
     offsetRemainder = (offset_ + bytesRead_) % kDiskBlockSize;
@@ -171,7 +171,7 @@ void FileByteSource::clearPageCache() {
   if (threadCtx_ == nullptr) {
     return;
   }
-  auto &options = threadCtx_->getOptions();
+  auto& options = threadCtx_->getOptions();
   if (bytesRead_ > 0 && !options.skip_fadvise) {
     PerfStatCollector statCollector(*threadCtx_, PerfStatReport::FADVISE);
     if (posix_fadvise(fd_, offset_, bytesRead_, POSIX_FADV_DONTNEED) != 0) {

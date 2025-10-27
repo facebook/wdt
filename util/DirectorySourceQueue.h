@@ -45,8 +45,8 @@ class DirectorySourceQueue : public SourceQueue {
    * @param rootDir               root directory to recurse on
    * @param abortChecker          abort checker
    */
-  DirectorySourceQueue(const WdtOptions &options, const std::string &rootDir,
-                       IAbortChecker const *abortChecker);
+  DirectorySourceQueue(const WdtOptions& options, const std::string& rootDir,
+                       IAbortChecker const* abortChecker);
 
   /**
    * Recurse over given root directory, gather data about regular files and
@@ -84,8 +84,8 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @return next FileByteSource to consume or nullptr when finished
    */
-  std::unique_ptr<ByteSource> getNextSource(ThreadCtx *callerThreadCtx,
-                                            ErrorCode &status) override;
+  std::unique_ptr<ByteSource> getNextSource(ThreadCtx* callerThreadCtx,
+                                            ErrorCode& status) override;
 
   /// @return         total number of files processed/enqueued
   int64_t getCount() const override;
@@ -97,28 +97,28 @@ class DirectorySourceQueue : public SourceQueue {
   std::pair<int64_t, ErrorCode> getNumBlocksAndStatus() const;
 
   /// @return         perf report
-  const PerfStatReport &getPerfReport() const;
+  const PerfStatReport& getPerfReport() const;
 
   /**
    * Sets regex representing files to include for transfer
    *
    * @param includePattern          file inclusion regex
    */
-  void setIncludePattern(const std::string &includePattern);
+  void setIncludePattern(const std::string& includePattern);
 
   /**
    * Sets regex representing files to exclude for transfer
    *
    * @param excludePattern          file exclusion regex
    */
-  void setExcludePattern(const std::string &excludePattern);
+  void setExcludePattern(const std::string& excludePattern);
 
   /**
    * Sets regex representing directories to exclude for transfer
    *
    * @param pruneDirPattern         directory exclusion regex
    */
-  void setPruneDirPattern(const std::string &pruneDirPattern);
+  void setPruneDirPattern(const std::string& pruneDirPattern);
 
   /**
    * Sets the number of consumer threads for this queue. used as threshold
@@ -155,7 +155,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param fileInfo              files to transferred
    */
-  void setFileInfo(const std::vector<WdtFileInfo> &fileInfo);
+  void setFileInfo(const std::vector<WdtFileInfo>& fileInfo);
 
   void setFileInfoGenerator(WdtTransferRequest::FileInfoGenerator gen);
 
@@ -178,7 +178,7 @@ class DirectorySourceQueue : public SourceQueue {
    * @param previouslyTransferredChunks   previously sent chunk info
    */
   void setPreviouslyReceivedChunks(
-      std::vector<FileChunksInfo> &previouslyTransferredChunks);
+      std::vector<FileChunksInfo>& previouslyTransferredChunks);
 
   /**
    * returns sources to the queue, checks for fail/retries, doesn't increment
@@ -186,7 +186,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param sources               sources to be returned to the queue
    */
-  void returnToQueue(std::vector<std::unique_ptr<ByteSource>> &sources);
+  void returnToQueue(std::vector<std::unique_ptr<ByteSource>>& sources);
 
   /**
    * returns a source to the queue, checks for fail/retries, doesn't increment
@@ -194,7 +194,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param source                source to be returned to the queue
    */
-  void returnToQueue(std::unique_ptr<ByteSource> &source);
+  void returnToQueue(std::unique_ptr<ByteSource>& source);
 
   /**
    * Returns list of files which were not transferred. It empties the queue and
@@ -203,10 +203,10 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @return                      stats for failed sources
    */
-  std::vector<TransferStats> &getFailedSourceStats();
+  std::vector<TransferStats>& getFailedSourceStats();
 
   /// @return   returns list of directories which could not be opened
-  std::vector<std::string> &getFailedDirectories();
+  std::vector<std::string>& getFailedDirectories();
 
   /// @return   number of bytes previously sent
   int64_t getPreviouslySentBytes() const;
@@ -214,7 +214,7 @@ class DirectorySourceQueue : public SourceQueue {
   ~DirectorySourceQueue() override;
 
   /// @return   discovered files metadata
-  std::vector<SourceMetaData *> &getDiscoveredFilesMetaData();
+  std::vector<SourceMetaData*>& getDiscoveredFilesMetaData();
 
   /// Returns the time it took to traverse the directory tree
   double getDirectoryTime() const {
@@ -228,7 +228,7 @@ class DirectorySourceQueue : public SourceQueue {
    * path.
    * @return    true if successful, false on error (logged)
    */
-  bool setRootDir(const std::string &newRootDir);
+  bool setRootDir(const std::string& newRootDir);
 
   /**
    * Allows the caller to block until all the previous transfers have
@@ -250,7 +250,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @return                realpath or empty string on error (logged)
    */
-  std::string resolvePath(const std::string &path);
+  std::string resolvePath(const std::string& path);
 
   /**
    * Traverse rootDir_ to gather files and sizes to enqueue
@@ -263,7 +263,7 @@ class DirectorySourceQueue : public SourceQueue {
    * Stat the input files and populate queue
    * @return                true on success, false on error
    */
-  bool enqueueFiles(std::vector<WdtFileInfo> &fileInfo);
+  bool enqueueFiles(std::vector<WdtFileInfo>& fileInfo);
 
   /**
    * initial creation from either explore or enqueue files, uses
@@ -272,7 +272,7 @@ class DirectorySourceQueue : public SourceQueue {
    * @param fullPath             full path of the file to be added
    * @param fileInfo             Information about file
    */
-  void createIntoQueue(const std::string &fullPath, WdtFileInfo &fileInfo);
+  void createIntoQueue(const std::string& fullPath, WdtFileInfo& fileInfo);
 
   /**
    * initial creation from either explore or enqueue files - always increment
@@ -280,7 +280,7 @@ class DirectorySourceQueue : public SourceQueue {
    *
    * @param metadata             file meta-data
    */
-  void createIntoQueueInternal(SourceMetaData *metadata);
+  void createIntoQueueInternal(SourceMetaData* metadata);
 
   /**
    * when adding multiple files, we have the option of using notify_one multiple
@@ -339,8 +339,8 @@ class DirectorySourceQueue : public SourceQueue {
   bool initFinished_{false};
 
   struct SourceComparator {
-    bool operator()(const std::unique_ptr<ByteSource> &source1,
-                    const std::unique_ptr<ByteSource> &source2) {
+    bool operator()(const std::unique_ptr<ByteSource>& source1,
+                    const std::unique_ptr<ByteSource>& source2) {
       bool toBeDeleted1 =
           (source1->getMetaData().allocationStatus == TO_BE_DELETED);
       bool toBeDeleted2 =
@@ -411,7 +411,7 @@ class DirectorySourceQueue : public SourceQueue {
 
   /// shared file data. This are used during transfer to add blocks
   /// contribution
-  std::vector<SourceMetaData *> sharedFileData_;
+  std::vector<SourceMetaData*> sharedFileData_;
 
   /// A map from relative file name to previously received chunks
   std::unordered_map<std::string, FileChunksInfo> previouslyTransferredChunks_;

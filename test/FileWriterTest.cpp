@@ -33,9 +33,9 @@ bool canSupportODirect() {
   return false;
 }
 
-void basicTest(WdtOptions &opts) {
-  auto &thread_ctx = ThreadCtx(opts, false);
-  auto &xfer_log_manager = TransferLogManager(opts, kRootDir);
+void basicTest(WdtOptions& opts) {
+  auto& thread_ctx = ThreadCtx(opts, false);
+  auto& xfer_log_manager = TransferLogManager(opts, kRootDir);
 
   // Existing File
   BlockDetails block_details = {
@@ -72,7 +72,7 @@ void basicTest(WdtOptions &opts) {
 }
 
 TEST(FileWriterTest, SimpleWriteTest) {
-  auto &opts = WdtOptions::getMutable();
+  auto& opts = WdtOptions::getMutable();
   basicTest(opts);
 }
 
@@ -81,14 +81,14 @@ TEST(FileWriterTest, ODirectWriteTest) {
     WLOG(WARNING) << "Wdt can't support O_DIRECT skipping this test";
     return;
   }
-  auto &opts = WdtOptions::getMutable();
+  auto& opts = WdtOptions::getMutable();
   opts.odirect_reads = true;
   basicTest(opts);
 }
 }  // namespace wdt
 }  // namespace facebook
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   FLAGS_logtostderr = true;
   test::InitGoogleTest(&argc, argv);
   GLFAGS_NAMESPACE::ParseCommandLineFlags(&argc, &rgv, true);

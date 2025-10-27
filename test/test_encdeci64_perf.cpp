@@ -67,7 +67,7 @@ void BM_encodeDecodeI64_vi_str(int iters, int vin) {
     buf.clear();
     facebook::Varint::encodeToByteSink(facebook::ZigZag::encode(v), &bs);
     int64_t x = 12345;
-    const char *pos2 = buf.data();
+    const char* pos2 = buf.data();
     x = facebook::ZigZag::decode(facebook::Varint::decode(&pos2, buf.length()));
     CHECK_EQ(x, v);
   }
@@ -79,10 +79,10 @@ void BM_encodeDecodeI64_vi(int iters, int vin) {
   // use 0 to test max int64_t (9 bytes encoding)
   int64_t v = vin ? vin : 9223372036854775807LL;
   for (int i = 0; i < iters; ++i) {
-    char *pos = tmp;
+    char* pos = tmp;
     facebook::Varint::encode(facebook::ZigZag::encode(v), &pos);
     int64_t x = 12345;
-    const char *pos2 = tmp;
+    const char* pos2 = tmp;
     x = facebook::ZigZag::decode(facebook::Varint::decode(&pos2, sizeof(tmp)));
     CHECK_EQ(x, v);
   }
@@ -143,7 +143,7 @@ BENCHMARK_PARAM(BM_encodeDecodeI64_vi_str, 10);
 
 // -- main
 
-int main(int /* unused */, char ** /* unused */) {
+int main(int /* unused */, char** /* unused */) {
   folly::runBenchmarks();
   return 0;
 }

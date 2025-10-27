@@ -5,20 +5,20 @@ namespace facebook {
 namespace wdt {
 
 // this must be called first and exactly once:
-Wdt &Wdt::initializeWdt(const std::string &appName) {
+Wdt& Wdt::initializeWdt(const std::string& appName) {
   static bool doGlobalFlagsInit = true;
   if (doGlobalFlagsInit) {
     WdtFlags::initializeFromFlags(WdtOptions::getMutable());
     doGlobalFlagsInit = false;
   }
-  Wdt &res = getWdtInternal(appName, []() -> Wdt * { return new Wdt(); });
+  Wdt& res = getWdtInternal(appName, []() -> Wdt* { return new Wdt(); });
   res.initializeWdtInternal(appName);
   // At fb we do this for services - that's floody for cmd line though
   // res.printWdtOptions(WLOG(INFO));
   return res;
 }
 
-ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
+ErrorCode Wdt::initializeWdtInternal(const std::string& appName) {
   WLOG(INFO) << "One time initialization of WDT for " << appName;
   if (initDone_) {
     WLOG(ERROR) << "Called initializeWdt() more than once";
@@ -32,8 +32,8 @@ ErrorCode Wdt::initializeWdtInternal(const std::string &appName) {
 }
 
 // this can be called many times after initializeWdt()
-Wdt &Wdt::getWdt(const std::string &appName) {
-  Wdt &res = getWdtInternal(appName, nullptr);
+Wdt& Wdt::getWdt(const std::string& appName) {
+  Wdt& res = getWdtInternal(appName, nullptr);
   if (!res.initDone_) {
     WLOG(ERROR) << "Called getWdt() before/without initializeWdt()";
     WDT_CHECK(false) << "Must call initializeWdt() once before getWdt()";
@@ -41,7 +41,7 @@ Wdt &Wdt::getWdt(const std::string &appName) {
   return res;
 }
 
-ErrorCode Wdt::printWdtOptions(std::ostream &out) {
+ErrorCode Wdt::printWdtOptions(std::ostream& out) {
   WdtFlags::printOptions(out, options_);
   return OK;
 }
@@ -57,17 +57,17 @@ Wdt::Wdt(std::shared_ptr<Throttler> throttler) {
       std::make_unique<WdtResourceController>(options_, throttler);
 }
 
-std::string Wdt::getSenderIdentifier(const WdtTransferRequest &req) {
+std::string Wdt::getSenderIdentifier(const WdtTransferRequest& req) {
   if (req.destIdentifier.empty()) {
     return req.hostName;
   }
   return req.destIdentifier;
 }
 
-ErrorCode Wdt::createWdtSender(const WdtTransferRequest &req,
+ErrorCode Wdt::createWdtSender(const WdtTransferRequest& req,
                                std::shared_ptr<IAbortChecker> abortChecker,
                                bool terminateExistingOne,
-                               SenderPtr &senderPtr) {
+                               SenderPtr& senderPtr) {
   if (req.errorCode != OK) {
     WLOG(ERROR) << "Transfer request error " << errorCodeToStr(req.errorCode);
     return req.errorCode;
@@ -75,7 +75,7 @@ ErrorCode Wdt::createWdtSender(const WdtTransferRequest &req,
   // Protocol issues will/should be flagged as error when we call createSender
 
   // try to create sender
-  const std::string &wdtNamespace = req.wdtNamespace;
+  const std::string& wdtNamespace = req.wdtNamespace;
   const std::string secondKey = getSenderIdentifier(req);
   ErrorCode errCode = resourceController_->createSender(wdtNamespace, secondKey,
                                                         req, senderPtr);
@@ -104,12 +104,12 @@ ErrorCode Wdt::createWdtSender(const WdtTransferRequest &req,
   return OK;
 }
 
-ErrorCode Wdt::releaseWdtSender(const WdtTransferRequest &wdtRequest) {
+ErrorCode Wdt::releaseWdtSender(const WdtTransferRequest& wdtRequest) {
   return resourceController_->releaseSender(wdtRequest.wdtNamespace,
                                             getSenderIdentifier(wdtRequest));
 }
 
-ErrorCode Wdt::wdtSend(const WdtTransferRequest &req,
+ErrorCode Wdt::wdtSend(const WdtTransferRequest& req,
                        std::shared_ptr<IAbortChecker> abortChecker,
                        bool terminateExistingOne) {
   SenderPtr sender;
@@ -118,7 +118,7 @@ ErrorCode Wdt::wdtSend(const WdtTransferRequest &req,
   if (errCode != OK) {
     return errCode;
   }
-  const std::string &wdtNamespace = req.wdtNamespace;
+  const std::string& wdtNamespace = req.wdtNamespace;
   auto validatedReq = sender->init();
   if (validatedReq.errorCode != OK) {
     WLOG(ERROR) << "Couldn't init sender with request for " << wdtNamespace;
@@ -132,9 +132,9 @@ ErrorCode Wdt::wdtSend(const WdtTransferRequest &req,
   return errCode;
 }
 
-ErrorCode Wdt::wdtReceiveStart(const std::string &wdtNamespace,
-                               WdtTransferRequest &req,
-                               const std::string &identifier,
+ErrorCode Wdt::wdtReceiveStart(const std::string& wdtNamespace,
+                               WdtTransferRequest& req,
+                               const std::string& identifier,
                                std::shared_ptr<IAbortChecker> abortChecker) {
   if (req.errorCode != OK) {
     WLOG(ERROR) << "Transfer request namespace:" << wdtNamespace
@@ -168,8 +168,8 @@ ErrorCode Wdt::wdtReceiveStart(const std::string &wdtNamespace,
   return errCode;
 }
 
-ErrorCode Wdt::wdtReceiveFinish(const std::string &wdtNamespace,
-                                const std::string &identifier) {
+ErrorCode Wdt::wdtReceiveFinish(const std::string& wdtNamespace,
+                                const std::string& identifier) {
   ReceiverPtr receiver =
       resourceController_->getReceiver(wdtNamespace, identifier);
   if (receiver == nullptr) {
@@ -186,7 +186,7 @@ ErrorCode Wdt::wdtReceiveFinish(const std::string &wdtNamespace,
 }
 
 ErrorCode Wdt::wdtSetAbortSocketCreatorAndReporter(
-    WdtBase *target, const WdtTransferRequest &,
+    WdtBase* target, const WdtTransferRequest&,
     std::shared_ptr<IAbortChecker> abortChecker) {
   if (abortChecker.get() != nullptr) {
     target->setAbortChecker(abortChecker);
@@ -194,7 +194,7 @@ ErrorCode Wdt::wdtSetAbortSocketCreatorAndReporter(
   return OK;
 }
 
-WdtOptions &Wdt::getWdtOptions() {
+WdtOptions& Wdt::getWdtOptions() {
   return options_;
 }
 
@@ -202,8 +202,8 @@ static std::unordered_map<std::string, std::unique_ptr<Wdt>> s_wdtMap;
 static std::mutex s_mutex;
 
 // private version
-Wdt &Wdt::getWdtInternal(const std::string &appName,
-                         std::function<Wdt *()> factory) {
+Wdt& Wdt::getWdtInternal(const std::string& appName,
+                         std::function<Wdt*()> factory) {
   std::lock_guard<std::mutex> lock(s_mutex);
   auto it = s_wdtMap.find(appName);
   if (it != s_wdtMap.end()) {
@@ -211,13 +211,13 @@ Wdt &Wdt::getWdtInternal(const std::string &appName,
   }
   WDT_CHECK(factory) << "Must call initializeWdt() once before getWdt() "
                      << appName;
-  Wdt *wdtPtr = factory();
+  Wdt* wdtPtr = factory();
   std::unique_ptr<Wdt> wdt(wdtPtr);
   s_wdtMap.emplace(appName, std::move(wdt));
   return *wdtPtr;
 }
 
-void Wdt::releaseWdt(const std::string &appName) {
+void Wdt::releaseWdt(const std::string& appName) {
   LOG(INFO) << "Releasing WDT for " << appName;
   std::lock_guard<std::mutex> lock(s_mutex);
   auto it = s_wdtMap.find(appName);

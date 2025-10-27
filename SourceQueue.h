@@ -42,8 +42,8 @@ class SourceQueue {
    * @return          New ByteSource to consume or nullptr if there are
    *                  no more sources to read from (equivalent to finished()).
    */
-  virtual std::unique_ptr<ByteSource> getNextSource(ThreadCtx *threadCtx,
-                                                    ErrorCode &status) = 0;
+  virtual std::unique_ptr<ByteSource> getNextSource(ThreadCtx* threadCtx,
+                                                    ErrorCode& status) = 0;
 
   /// @return         total number of files processed/enqueued
   virtual int64_t getCount() const = 0;

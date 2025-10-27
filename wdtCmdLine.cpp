@@ -93,7 +93,7 @@ DECLARE_bool(help);
 
 // TODO: move this to some util and/or delete
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const std::set<T> &v) {
+std::ostream& operator<<(std::ostream& os, const std::set<T>& v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
   return os;
 }
@@ -127,7 +127,7 @@ std::shared_ptr<facebook::wdt::WdtAbortChecker> setupAbortChecker() {
   return res;
 }
 
-void setAbortChecker(facebook::wdt::WdtBase &senderOrReceiver) {
+void setAbortChecker(facebook::wdt::WdtBase& senderOrReceiver) {
   senderOrReceiver.setAbortChecker(setupAbortChecker());
 }
 
@@ -140,7 +140,7 @@ void cancelAbort() {
   std::this_thread::yield();
 }
 
-void readManifest(std::istream &fin, facebook::wdt::WdtTransferRequest &req,
+void readManifest(std::istream& fin, facebook::wdt::WdtTransferRequest& req,
                   bool dfltDirect) {
   std::string line;
   while (std::getline(fin, line)) {
@@ -171,14 +171,14 @@ void sigUSR1Handler(int) {
   facebook::wdt::ReportPerfSignalSubscriber::notify();
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
 #ifdef WDTFBINIT
   WDTFBINIT
 #endif
 
   FLAGS_logtostderr = true;
   // Ugliness in gflags' api; to be able to use program name
-  GFLAGS_NAMESPACE::SetArgv(argc, const_cast<const char **>(argv));
+  GFLAGS_NAMESPACE::SetArgv(argc, const_cast<const char**>(argv));
   GFLAGS_NAMESPACE::SetVersionString(facebook::wdt::Protocol::getFullVersion());
   usage.assign("WDT Warp-speed Data Transfer. v ");
   usage.append(GFLAGS_NAMESPACE::VersionString());
@@ -240,13 +240,13 @@ int main(int argc, char *argv[]) {
   }
 
   // Might be a sub class (fbonly wdtCmdLine.cpp)
-  facebook::wdt::Wdt &wdt =
+  facebook::wdt::Wdt& wdt =
       facebook::wdt::WDTCLASS::initializeWdt(FLAGS_app_name);
   if (FLAGS_print_options) {
     wdt.printWdtOptions(std::cout);
     return 0;
   }
-  facebook::wdt::WdtOptions &options = wdt.getWdtOptions();
+  facebook::wdt::WdtOptions& options = wdt.getWdtOptions();
 
   facebook::wdt::ErrorCode retCode = facebook::wdt::OK;
 
@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
     reqPtr->directory = FLAGS_directory;
     WLOG(INFO) << "Parsed url as " << reqPtr->getLogSafeString();
   }
-  facebook::wdt::WdtTransferRequest &req = *reqPtr;
+  facebook::wdt::WdtTransferRequest& req = *reqPtr;
   req.wdtNamespace = FLAGS_namespace;
   if (!FLAGS_dest_id.empty()) {
     req.destIdentifier = FLAGS_dest_id;
@@ -301,7 +301,7 @@ int main(int argc, char *argv[]) {
   }
   if (FLAGS_destination.empty() && connectUrl.empty()) {
     facebook::wdt::Receiver receiver(req);
-    facebook::wdt::WdtOptions &recOptions = receiver.getWdtOptions();
+    facebook::wdt::WdtOptions& recOptions = receiver.getWdtOptions();
     if (FLAGS_run_as_daemon) {
       // Backward compatible with static ports, you can still get dynamic
       // daemon ports using -start_port 0 like before

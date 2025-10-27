@@ -25,15 +25,15 @@ class ThreadsController;
 class WdtThread {
  public:
   /// Constructor for wdt thread
-  WdtThread(const WdtOptions &options, int threadIndex, int port,
-            int protocolVersion, ThreadsController *controller)
+  WdtThread(const WdtOptions& options, int threadIndex, int port,
+            int protocolVersion, ThreadsController* controller)
       : options_(options),
         port_(port),
         threadProtocolVersion_(protocolVersion) {
     controller_ = controller;
     threadCtx_ = std::make_unique<ThreadCtx>(
         options, /* allocate buffer */ true, threadIndex);
-    const Buffer *buffer = threadCtx_->getBuffer();
+    const Buffer* buffer = threadCtx_->getBuffer();
     WDT_CHECK(buffer);
     buf_ = buffer->getData();
     bufSize_ = buffer->getSize();
@@ -44,7 +44,7 @@ class WdtThread {
   void startThread();
 
   /// Get the perf stats of the transfer for this thread
-  const PerfStatReport &getPerfReport() const;
+  const PerfStatReport& getPerfReport() const;
 
   /// Initializes the wdt thread before starting
   virtual ErrorCode init() = 0;
@@ -56,7 +56,7 @@ class WdtThread {
   TransferStats moveStats();
 
   /// Get the transfer stats recorded by this thread
-  const TransferStats &getTransferStats() const;
+  const TransferStats& getTransferStats() const;
 
   /// Reset the wdt thread
   virtual void reset() = 0;
@@ -78,13 +78,13 @@ class WdtThread {
   std::unique_ptr<ThreadCtx> threadCtx_{nullptr};
 
   /// buffer pointer. this points to the buffer in threadCtx_
-  char *buf_{nullptr};
+  char* buf_{nullptr};
 
   /// buffer size. this is the size of buffer in threadCtx_
   int64_t bufSize_{0};
 
   /// reference to parent options
-  const WdtOptions &options_;
+  const WdtOptions& options_;
 
   /// Index of this thread with respect to other threads
   int threadIndex_;
@@ -112,7 +112,7 @@ class WdtThread {
   TransferStats threadStats_{true};
 
   /// Thread controller for all the sender threads
-  ThreadsController *controller_{nullptr};
+  ThreadsController* controller_{nullptr};
 
   /// Pointer to the std::thread executing the transfer
   std::unique_ptr<std::thread> threadPtr_{nullptr};

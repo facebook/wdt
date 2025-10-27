@@ -74,7 +74,7 @@ TEST(ThrottlerTest, FAIRNESS) {
     std::thread t(transfer, i, getBuffer(i));
     threads.emplace_back(std::move(t));
   }
-  for (auto &t : threads) {
+  for (auto& t : threads) {
     t.join();
   }
   for (int i = 0; i < numThread; i++) {

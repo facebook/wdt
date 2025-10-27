@@ -66,8 +66,8 @@ class ReceiverThread : public WdtThread {
    *                        receiver threads. All the receiver thread objects
    *                        need to share the same instance of the controller
    */
-  ReceiverThread(Receiver *wdtParent, int threadIndex, int port,
-                 ThreadsController *controller);
+  ReceiverThread(Receiver* wdtParent, int threadIndex, int port,
+                 ThreadsController* controller);
 
   /// Initializes the receiver thread before starting
   ErrorCode init() override;
@@ -86,12 +86,12 @@ class ReceiverThread : public WdtThread {
 
  private:
   /// Overloaded operator for printing thread info
-  friend std::ostream &operator<<(std::ostream &os,
-                                  const ReceiverThread &receiverThread);
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const ReceiverThread& receiverThread);
   typedef ReceiverState (ReceiverThread::*StateFunction)();
 
   /// Parent shared among all the threads for meta information
-  Receiver *wdtParent_;
+  Receiver* wdtParent_;
 
   /**
    * Tries to listen/bind to port. If this fails, thread is considered failed.
@@ -269,7 +269,7 @@ class ReceiverThread : public WdtThread {
   ReceiverState finishWithError();
 
   /// marks a block a verified
-  void markBlockVerified(const BlockDetails &blockDetails);
+  void markBlockVerified(const BlockDetails& blockDetails);
 
   /// verifies received blocks which are not already verified
   void markReceivedBlocksVerified();

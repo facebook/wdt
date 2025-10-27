@@ -33,26 +33,26 @@ std::vector<Checkpoint> Receiver::getNewCheckpoints(int startIndex) {
   return checkpoints;
 }
 
-Receiver::Receiver(const WdtTransferRequest &transferRequest) {
+Receiver::Receiver(const WdtTransferRequest& transferRequest) {
   WLOG(INFO) << "WDT Receiver " << Protocol::getFullVersion();
   transferRequest_ = transferRequest;
 }
 
-Receiver::Receiver(int port, int numSockets, const std::string &destDir)
+Receiver::Receiver(int port, int numSockets, const std::string& destDir)
     : Receiver(WdtTransferRequest(port, numSockets, destDir)) {
 }
 
-void Receiver::setSocketCreator(Receiver::ISocketCreator *socketCreator) {
+void Receiver::setSocketCreator(Receiver::ISocketCreator* socketCreator) {
   socketCreator_ = socketCreator;
 }
 
 void Receiver::traverseDestinationDir(
-    std::vector<FileChunksInfo> &fileChunksInfo) {
+    std::vector<FileChunksInfo>& fileChunksInfo) {
   DirectorySourceQueue dirQueue(options_, getDirectory(),
                                 &abortCheckerCallback_);
   dirQueue.buildQueueSynchronously();
-  auto &discoveredFilesInfo = dirQueue.getDiscoveredFilesMetaData();
-  for (auto &fileInfo : discoveredFilesInfo) {
+  auto& discoveredFilesInfo = dirQueue.getDiscoveredFilesMetaData();
+  for (auto& fileInfo : discoveredFilesInfo) {
     if (fileInfo->relPath == kWdtLogName ||
         fileInfo->relPath == kWdtBuggyLogName) {
       // do not include wdt log files
@@ -68,7 +68,7 @@ void Receiver::traverseDestinationDir(
   return;
 }
 
-void Receiver::startNewGlobalSession(const std::string &peerIp) {
+void Receiver::startNewGlobalSession(const std::string& peerIp) {
   if (throttler_) {
     // If throttler is configured/set then register this session
     // in the throttler. This is guranteed to work in either of the
@@ -111,7 +111,7 @@ void Receiver::endCurGlobalSession() {
   hasNewTransferStarted_.store(false);
 }
 
-const WdtTransferRequest &Receiver::init() {
+const WdtTransferRequest& Receiver::init() {
   if (validateTransferRequest() != OK) {
     WLOG(ERROR) << "Couldn't validate the transfer request "
                 << transferRequest_.getLogSafeString();
@@ -199,7 +199,7 @@ const WdtTransferRequest &Receiver::init() {
   receiverThreads_ = threadsController_->makeThreads<Receiver, ReceiverThread>(
       this, transferRequest_.ports.size(), transferRequest_.ports);
   size_t numSuccessfulInitThreads = 0;
-  for (auto &receiverThread : receiverThreads_) {
+  for (auto& receiverThread : receiverThreads_) {
     ErrorCode code = receiverThread->init();
     if (code == OK) {
       ++numSuccessfulInitThreads;
@@ -218,7 +218,7 @@ const WdtTransferRequest &Receiver::init() {
   }
 
   transferRequest_.ports.clear();
-  for (const auto &receiverThread : receiverThreads_) {
+  for (const auto& receiverThread : receiverThreads_) {
     transferRequest_.ports.push_back(receiverThread->getPort());
   }
 
@@ -236,15 +236,15 @@ const WdtTransferRequest &Receiver::init() {
   return transferRequest_;
 }
 
-TransferLogManager &Receiver::getTransferLogManager() {
+TransferLogManager& Receiver::getTransferLogManager() {
   return *transferLogManager_;
 }
 
-std::unique_ptr<FileCreator> &Receiver::getFileCreator() {
+std::unique_ptr<FileCreator>& Receiver::getFileCreator() {
   return fileCreator_;
 }
 
-void Receiver::setRecoveryId(const std::string &recoveryId) {
+void Receiver::setRecoveryId(const std::string& recoveryId) {
   recoveryId_ = recoveryId;
   WLOG(INFO) << "recovery id " << recoveryId_;
 }
@@ -269,7 +269,7 @@ Receiver::~Receiver() {
   finish();
 }
 
-const std::vector<FileChunksInfo> &Receiver::getFileChunksInfo() const {
+const std::vector<FileChunksInfo>& Receiver::getFileChunksInfo() const {
   return fileChunksInfo_;
 }
 
@@ -302,7 +302,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     WLOG(WARNING) << "The receiver is not joinable. The threads will never"
                   << " finish and this method will never return";
   }
-  for (auto &receiverThread : receiverThreads_) {
+  for (auto& receiverThread : receiverThreads_) {
     receiverThread->finish();
   }
 
@@ -313,7 +313,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
     progressTrackerThread_.join();
   }
   std::unique_ptr<TransferReport> report = getTransferReport();
-  auto &summary = report->getSummary();
+  auto& summary = report->getSummary();
   bool transferSuccess = (report->getSummary().getErrorCode() == OK);
   fixAndCloseTransferLog(transferSuccess);
   auto totalSenderBytes = summary.getTotalSenderBytes();
@@ -331,7 +331,7 @@ std::unique_ptr<TransferReport> Receiver::finish() {
 
 std::unique_ptr<TransferReport> Receiver::getTransferReport() {
   TransferStats globalStats;
-  for (const auto &receiverThread : receiverThreads_) {
+  for (const auto& receiverThread : receiverThreads_) {
     globalStats += receiverThread->getTransferStats();
   }
   std::unique_ptr<TransferReport> transferReport =
@@ -403,7 +403,7 @@ void Receiver::progressTracker() {
     }
     double totalTime = durationSeconds(Clock::now() - startTime_.load());
     TransferStats globalStats;
-    for (const auto &receiverThread : receiverThreads_) {
+    for (const auto& receiverThread : receiverThreads_) {
       globalStats += receiverThread->getTransferStats();
     }
     totalSenderBytes = globalStats.getTotalSenderBytes();
@@ -438,7 +438,7 @@ void Receiver::logPerfStats() const {
   }
 
   PerfStatReport globalPerfReport(options_);
-  for (auto &receiverThread : receiverThreads_) {
+  for (auto& receiverThread : receiverThreads_) {
     globalPerfReport += receiverThread->getPerfReport();
   }
   WLOG(INFO) << globalPerfReport;
@@ -458,7 +458,7 @@ ErrorCode Receiver::start() {
   }
   setTransferStatus(TransferStatus::ONGOING);
   while (true) {
-    for (auto &receiverThread : receiverThreads_) {
+    for (auto& receiverThread : receiverThreads_) {
       receiverThread->startThread();
     }
     if (isJoinable_) {
@@ -467,7 +467,7 @@ ErrorCode Receiver::start() {
     // If it is long running mode, finish the threads
     // processing the current transfer and re spawn them again
     // with the same sockets
-    for (auto &receiverThread : receiverThreads_) {
+    for (auto& receiverThread : receiverThreads_) {
       receiverThread->finish();
       receiverThread->reset();
     }

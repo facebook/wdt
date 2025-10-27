@@ -27,11 +27,11 @@ namespace wdt {
 
 using std::string;
 
-WdtFileInfo::WdtFileInfo(const string &name, int64_t size, bool doDirectReads)
+WdtFileInfo::WdtFileInfo(const string& name, int64_t size, bool doDirectReads)
     : fileName(name), fileSize(size), directReads(doDirectReads) {
 }
 
-WdtFileInfo::WdtFileInfo(int fd, int64_t size, const string &name)
+WdtFileInfo::WdtFileInfo(int fd, int64_t size, const string& name)
     : WdtFileInfo(name, size, false) {
   this->fd = fd;
 }
@@ -54,24 +54,24 @@ void WdtFileInfo::verifyAndFixFlags() {
   }
 }
 
-DirectorySourceQueue::DirectorySourceQueue(const WdtOptions &options,
-                                           const string &rootDir,
-                                           IAbortChecker const *abortChecker) {
+DirectorySourceQueue::DirectorySourceQueue(const WdtOptions& options,
+                                           const string& rootDir,
+                                           IAbortChecker const* abortChecker) {
   threadCtx_ =
       std::make_unique<ThreadCtx>(options, /* do not allocate buffer */ false);
   threadCtx_->setAbortChecker(abortChecker);
   setRootDir(rootDir);
 }
 
-void DirectorySourceQueue::setIncludePattern(const string &includePattern) {
+void DirectorySourceQueue::setIncludePattern(const string& includePattern) {
   includePattern_ = includePattern;
 }
 
-void DirectorySourceQueue::setExcludePattern(const string &excludePattern) {
+void DirectorySourceQueue::setExcludePattern(const string& excludePattern) {
   excludePattern_ = excludePattern;
 }
 
-void DirectorySourceQueue::setPruneDirPattern(const string &pruneDirPattern) {
+void DirectorySourceQueue::setPruneDirPattern(const string& pruneDirPattern) {
   pruneDirPattern_ = pruneDirPattern;
 }
 
@@ -80,7 +80,7 @@ void DirectorySourceQueue::setBlockSizeMbytes(int64_t blockSizeMbytes) {
 }
 
 void DirectorySourceQueue::setFileInfo(
-    const std::vector<WdtFileInfo> &fileInfo) {
+    const std::vector<WdtFileInfo>& fileInfo) {
   fileInfo_ = fileInfo;
   exploreDirectory_ = false;
 }
@@ -103,14 +103,14 @@ void DirectorySourceQueue::setFollowSymlinks(const bool followSymlinks) {
   }
 }
 
-std::vector<SourceMetaData *> &
+std::vector<SourceMetaData*>&
 DirectorySourceQueue::getDiscoveredFilesMetaData() {
   return sharedFileData_;
 }
 
 // const ref string param but first thing we do is make a copy because
 // of logging original input vs resolved one
-bool DirectorySourceQueue::setRootDir(const string &newRootDir) {
+bool DirectorySourceQueue::setRootDir(const string& newRootDir) {
   if (newRootDir.empty()) {
     WLOG(ERROR) << "Invalid empty root dir!";
     return false;
@@ -143,7 +143,7 @@ void DirectorySourceQueue::clearSourceQueue() {
 }
 
 void DirectorySourceQueue::setPreviouslyReceivedChunks(
-    std::vector<FileChunksInfo> &previouslyTransferredChunks) {
+    std::vector<FileChunksInfo>& previouslyTransferredChunks) {
   std::unique_lock<std::mutex> lock(mutex_);
   WDT_CHECK_EQ(0, numBlocksDequeued_);
   // reset all the queue variables
@@ -151,7 +151,7 @@ void DirectorySourceQueue::setPreviouslyReceivedChunks(
   totalFileSize_ = 0;
   numEntries_ = 0;
   numBlocks_ = 0;
-  for (auto &chunkInfo : previouslyTransferredChunks) {
+  for (auto& chunkInfo : previouslyTransferredChunks) {
     nextSeqId_ = std::max(nextSeqId_, chunkInfo.getSeqId() + 1);
     auto fileName = chunkInfo.getFileName();
     previouslyTransferredChunks_.insert(
@@ -171,7 +171,7 @@ DirectorySourceQueue::~DirectorySourceQueue() {
   // need to remove all the sources because they access metadata at the
   // destructor.
   clearSourceQueue();
-  for (SourceMetaData *fileData : sharedFileData_) {
+  for (SourceMetaData* fileData : sharedFileData_) {
     if (fileData->needToClose && fileData->fd >= 0) {
       int ret = ::close(fileData->fd);
       if (ret) {
@@ -235,14 +235,14 @@ bool DirectorySourceQueue::buildQueueSynchronously() {
 }
 
 // TODO: move this and a bunch of stuff into FileUtil and/or System class
-string DirectorySourceQueue::resolvePath(const string &path) {
+string DirectorySourceQueue::resolvePath(const string& path) {
   // Use realpath() as it resolves to a nice canonicalized
   // full path we can used for the stat() call later,
   // readlink could still give us a relative path
   // and making sure the output buffer is sized appropriately
   // can be ugly
   string result;
-  char *resolvedPath = realpath(path.c_str(), nullptr);
+  char* resolvedPath = realpath(path.c_str(), nullptr);
   if (!resolvedPath) {
     WPLOG(ERROR) << "Couldn't resolve " << path;
     return result;  // empty string == error
@@ -277,7 +277,7 @@ bool DirectorySourceQueue::explore() {
     todoList.pop_front();
     const string fullPath = rootDir_ + relativePath;
     WVLOG(1) << "Processing directory " << fullPath;
-    DIR *dirPtr = opendir(fullPath.c_str());
+    DIR* dirPtr = opendir(fullPath.c_str());
     if (!dirPtr) {
       WPLOG(ERROR) << "Error opening dir " << fullPath;
       failedDirectories_.emplace_back(fullPath);
@@ -287,7 +287,7 @@ bool DirectorySourceQueue::explore() {
     // http://elliotth.blogspot.com/2012/10/how-not-to-use-readdirr3.html
     // tl;dr readdir is actually better than readdir_r ! (because of the
     // nastiness of calculating correctly buffer size and race conditions there)
-    struct dirent *dirEntryRes = nullptr;
+    struct dirent* dirEntryRes = nullptr;
     while (true) {
       if (threadCtx_->getAbortChecker()->shouldAbort()) {
         break;
@@ -420,10 +420,10 @@ void DirectorySourceQueue::smartNotify(int32_t addedSource) {
 }
 
 void DirectorySourceQueue::returnToQueue(
-    std::vector<std::unique_ptr<ByteSource>> &sources) {
+    std::vector<std::unique_ptr<ByteSource>>& sources) {
   int returnedCount = 0;
   std::unique_lock<std::mutex> lock(mutex_);
-  for (auto &source : sources) {
+  for (auto& source : sources) {
     sourceQueue_.push(std::move(source));
     returnedCount++;
     WDT_CHECK_GT(numBlocksDequeued_, 0);
@@ -433,14 +433,14 @@ void DirectorySourceQueue::returnToQueue(
   smartNotify(returnedCount);
 }
 
-void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource> &source) {
+void DirectorySourceQueue::returnToQueue(std::unique_ptr<ByteSource>& source) {
   std::vector<std::unique_ptr<ByteSource>> sources;
   sources.emplace_back(std::move(source));
   returnToQueue(sources);
 }
 
-void DirectorySourceQueue::createIntoQueue(const string &fullPath,
-                                           WdtFileInfo &fileInfo) {
+void DirectorySourceQueue::createIntoQueue(const string& fullPath,
+                                           WdtFileInfo& fileInfo) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
   // large file. This can be optimized as follows -
@@ -451,7 +451,7 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   // block and use a shorter header for subsequent blocks. Also, we can remove
   // block size once negotiated, since blocksize is sort of fixed.
   fileInfo.verifyAndFixFlags();
-  SourceMetaData *metadata = new SourceMetaData();
+  SourceMetaData* metadata = new SourceMetaData();
   metadata->fullPath = fullPath;
   metadata->relPath = fileInfo.fileName;
   metadata->fd = fileInfo.fd;
@@ -476,7 +476,7 @@ void DirectorySourceQueue::createIntoQueue(const string &fullPath,
   createIntoQueueInternal(metadata);
 }
 
-void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
+void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData* metadata) {
   // TODO: currently we are treating small files(size less than blocksize) as
   // blocks. Also, we transfer file name in the header for all the blocks for a
   // large file. This can be optimized as follows -
@@ -486,8 +486,8 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
   // b) if filesize > blocksize, we can use send filename only in the first
   // block and use a shorter header for subsequent blocks. Also, we can remove
   // block size once negotiated, since blocksize is sort of fixed.
-  auto &fileSize = metadata->size;
-  auto &relPath = metadata->relPath;
+  auto& fileSize = metadata->size;
+  auto& relPath = metadata->relPath;
   int64_t blockSizeBytes = blockSizeMbytes_ * 1024 * 1024;
   bool enableBlockTransfer = blockSizeBytes > 0;
   if (!enableBlockTransfer) {
@@ -516,7 +516,7 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
     allocationStatus = EXISTS_TOO_LARGE;
     prevSeqId = it->second.getSeqId();
   } else {
-    auto &fileChunksInfo = it->second;
+    auto& fileChunksInfo = it->second;
     // Some portion of the file was sent in previous transfers. Receiver sends
     // the list of chunks to the sender. Adding all the bytes of those chunks
     // should give us the number of bytes saved due to incremental download
@@ -535,7 +535,7 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
   metadata->prevSeqId = prevSeqId;
   metadata->allocationStatus = allocationStatus;
 
-  for (const auto &chunk : remainingChunks) {
+  for (const auto& chunk : remainingChunks) {
     int64_t offset = chunk.start_;
     int64_t remainingBytes = chunk.size();
     do {
@@ -554,7 +554,7 @@ void DirectorySourceQueue::createIntoQueueInternal(SourceMetaData *metadata) {
   smartNotify(blockCount);
 }
 
-std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
+std::vector<TransferStats>& DirectorySourceQueue::getFailedSourceStats() {
   while (!sourceQueue_.empty()) {
     failedSourceStats_.emplace_back(
         std::move(sourceQueue_.top()->getTransferStats()));
@@ -563,12 +563,12 @@ std::vector<TransferStats> &DirectorySourceQueue::getFailedSourceStats() {
   return failedSourceStats_;
 }
 
-std::vector<string> &DirectorySourceQueue::getFailedDirectories() {
+std::vector<string>& DirectorySourceQueue::getFailedDirectories() {
   return failedDirectories_;
 }
 
-bool DirectorySourceQueue::enqueueFiles(std::vector<WdtFileInfo> &fileInfo) {
-  for (auto &info : fileInfo) {
+bool DirectorySourceQueue::enqueueFiles(std::vector<WdtFileInfo>& fileInfo) {
+  for (auto& info : fileInfo) {
     if (threadCtx_->getAbortChecker()->shouldAbort()) {
       WLOG(ERROR) << "Directory transfer thread aborted";
       return false;
@@ -605,7 +605,7 @@ int64_t DirectorySourceQueue::getCount() const {
   return numEntries_;
 }
 
-const PerfStatReport &DirectorySourceQueue::getPerfReport() const {
+const PerfStatReport& DirectorySourceQueue::getPerfReport() const {
   return threadCtx_->getPerfReport();
 }
 
@@ -645,12 +645,12 @@ void DirectorySourceQueue::enqueueFilesToBeDeleted() {
     return;
   }
   std::set<std::string> discoveredFiles;
-  for (const SourceMetaData *metadata : sharedFileData_) {
+  for (const SourceMetaData* metadata : sharedFileData_) {
     discoveredFiles.insert(metadata->relPath);
   }
   int64_t numFilesToBeDeleted = 0;
-  for (auto &it : previouslyTransferredChunks_) {
-    const std::string &fileName = it.first;
+  for (auto& it : previouslyTransferredChunks_) {
+    const std::string& fileName = it.first;
     if (discoveredFiles.find(fileName) != discoveredFiles.end()) {
       continue;
     }
@@ -658,7 +658,7 @@ void DirectorySourceQueue::enqueueFilesToBeDeleted() {
     // extra file on the receiver side
     WLOG(INFO) << "Extra file " << fileName << " seq-id " << seqId
                << " on the receiver side, will be deleted";
-    SourceMetaData *metadata = new SourceMetaData();
+    SourceMetaData* metadata = new SourceMetaData();
     metadata->relPath = fileName;
     metadata->size = 0;
     // we can reuse the previous seq-id
@@ -677,7 +677,7 @@ void DirectorySourceQueue::enqueueFilesToBeDeleted() {
 }
 
 std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
-    ThreadCtx *callerThreadCtx, ErrorCode &status) {
+    ThreadCtx* callerThreadCtx, ErrorCode& status) {
   std::unique_ptr<ByteSource> source;
   while (true) {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -697,8 +697,8 @@ std::unique_ptr<ByteSource> DirectorySourceQueue::getNextSource(
       return nullptr;
     }
     // using const_cast since priority_queue returns a const reference
-    source = std::move(
-        const_cast<std::unique_ptr<ByteSource> &>(sourceQueue_.top()));
+    source =
+        std::move(const_cast<std::unique_ptr<ByteSource>&>(sourceQueue_.top()));
     sourceQueue_.pop();
     if (sourceQueue_.empty() && initFinished_) {
       conditionNotEmpty_.notify_all();

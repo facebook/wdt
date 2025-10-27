@@ -35,8 +35,8 @@ namespace wdt {
  */
 class FileCreator {
  public:
-  FileCreator(const std::string &rootDir, int numThreads,
-              TransferLogManager &transferLogManager, bool skipWrites)
+  FileCreator(const std::string& rootDir, int numThreads,
+              TransferLogManager& transferLogManager, bool skipWrites)
       : transferLogManager_(transferLogManager), skipWrites_(skipWrites) {
     CHECK(!rootDir.empty());
 
@@ -67,7 +67,7 @@ class FileCreator {
    *
    * @return              file descriptor in case of success, -1 otherwise
    */
-  int openForBlocks(ThreadCtx &threadCtx, BlockDetails const *blockDetails);
+  int openForBlocks(ThreadCtx& threadCtx, BlockDetails const* blockDetails);
 
   /// reset internal directory cache
   void resetDirCache() {
@@ -92,7 +92,7 @@ class FileCreator {
    *
    * @return          file descriptor in case of success, -1 otherwise
    */
-  int openAndSetSize(ThreadCtx &threadCtx, BlockDetails const *blockDetails);
+  int openAndSetSize(ThreadCtx& threadCtx, BlockDetails const* blockDetails);
 
   /**
    * Create a file and open for writing, recursively create subdirs.
@@ -107,11 +107,11 @@ class FileCreator {
    *
    * @return          file descriptor or -1 on error
    */
-  int createFile(ThreadCtx &threadCtx, const std::string &relPath);
+  int createFile(ThreadCtx& threadCtx, const std::string& relPath);
   /**
    * Open existing file
    */
-  int openExistingFile(ThreadCtx &threadCtx, const std::string &relPath);
+  int openExistingFile(ThreadCtx& threadCtx, const std::string& relPath);
 
   /**
    * sets the size of the file. If the size is greater then the
@@ -123,7 +123,7 @@ class FileCreator {
    *
    * @return          true for success, false otherwise
    */
-  bool setFileSize(ThreadCtx &threadCtx, int fd, int64_t fileSize);
+  bool setFileSize(ThreadCtx& threadCtx, int fd, int64_t fileSize);
 
   /**
    * opens the file and sets it size. Called only for the first block to request
@@ -135,13 +135,13 @@ class FileCreator {
    *
    * @return          file descriptor or -1 on error
    */
-  int openForFirstBlock(ThreadCtx &threadCtx, BlockDetails const *blockDetails);
+  int openForFirstBlock(ThreadCtx& threadCtx, BlockDetails const* blockDetails);
 
   /// waits for allocation of a file to finish
   bool waitForAllocationFinish(int allocatingThreadIndex, int64_t seqId);
 
   /// appends a trailing / if not already there to path
-  static void addTrailingSlash(std::string &path);
+  static void addTrailingSlash(std::string& path);
 
   /**
    * Create directory recursively, populating cache. Cache is only
@@ -157,13 +157,13 @@ class FileCreator {
   bool createDirRecursively(const std::string dir, bool force = false);
 
   /// Check whether directory has been created/is in cache
-  bool dirCreated(const std::string &dir) {
+  bool dirCreated(const std::string& dir) {
     std::lock_guard<std::mutex> lock(mutex_);
     return createdDirs_.find(dir) != createdDirs_.end();
   }
 
   /// returns full path of a file
-  std::string getFullPath(const std::string &relPath);
+  std::string getFullPath(const std::string& relPath);
 
   /// root directory
   std::string rootDir_;
@@ -183,11 +183,11 @@ class FileCreator {
   /// thread)
   std::map<int64_t, int> fileStatusMap_;
   /// transfer log manger used by receiver
-  TransferLogManager &transferLogManager_;
+  TransferLogManager& transferLogManager_;
   /// mutex to coordinate waiting among threads
   std::mutex allocationMutex_;
   /// array of condition_variables for different threads
-  std::condition_variable *threadConditionVariables_;
+  std::condition_variable* threadConditionVariables_;
   /// lock protecting fileStatusMap_
   folly::SpinLock lock_;
 

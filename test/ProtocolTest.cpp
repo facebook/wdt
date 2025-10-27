@@ -105,19 +105,19 @@ void testFileChunksInfo() {
   int64_t off = 0;
   Protocol::encodeFileChunksInfo(buf, off, sizeof(buf), fileChunksInfo);
   FileChunksInfo nFileChunksInfo;
-  folly::ByteRange br((uint8_t *)buf, sizeof(buf));
+  folly::ByteRange br((uint8_t*)buf, sizeof(buf));
   bool success = Protocol::decodeFileChunksInfo(br, nFileChunksInfo);
   EXPECT_TRUE(success);
-  int64_t noff = br.start() - (uint8_t *)buf;
+  int64_t noff = br.start() - (uint8_t*)buf;
   EXPECT_EQ(noff, off);
   EXPECT_EQ(nFileChunksInfo, fileChunksInfo);
 
   // test with smaller buffer; exact size:
-  br.reset((uint8_t *)buf, off);
+  br.reset((uint8_t*)buf, off);
   success = Protocol::decodeFileChunksInfo(br, nFileChunksInfo);
   EXPECT_TRUE(success);
   // 1 byte missing :
-  br.reset((uint8_t *)buf, off - 1);
+  br.reset((uint8_t*)buf, off - 1);
   success = Protocol::decodeFileChunksInfo(br, nFileChunksInfo);
   EXPECT_FALSE(success);
 }
@@ -159,7 +159,7 @@ void testSettings() {
 TEST(Protocol, EncodeString) {
   string inp1("abc");
   char buf[10];
-  folly::ByteRange br((const u_int8_t *)buf, sizeof(buf));
+  folly::ByteRange br((const u_int8_t*)buf, sizeof(buf));
   int64_t off = 0;
   EXPECT_TRUE(encodeString(buf, sizeof(buf), off, inp1));
   EXPECT_EQ(off, inp1.size() + 1);
@@ -181,7 +181,7 @@ TEST(Protocol, DecodeInt32) {
   EXPECT_TRUE(encodeVarI64(buf, 1L << 32));
   EXPECT_TRUE(encodeVarI64(buf, -7));
   EXPECT_EQ(buf.size(), 2 + 2 + 5 + 1);
-  folly::ByteRange br((uint8_t *)buf.data(), buf.size());
+  folly::ByteRange br((uint8_t*)buf.data(), buf.size());
   int32_t v = -1;
   EXPECT_TRUE(decodeInt32(br, v));
   EXPECT_EQ(501, v);
@@ -217,7 +217,7 @@ TEST(Protocol, FileChunksInfo) {
 }  // namespace wdt
 }  // namespace facebook
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);

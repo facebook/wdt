@@ -48,7 +48,7 @@ double durationSeconds(T d) {
 }
 
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& v) {
   std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
   return os;
 }
@@ -112,10 +112,10 @@ class TransferStats {
 
  public:
   // making the object noncopyable
-  TransferStats(const TransferStats &stats) = delete;
-  TransferStats &operator=(const TransferStats &stats) = delete;
-  TransferStats(TransferStats &&stats) = default;
-  TransferStats &operator=(TransferStats &&stats) = default;
+  TransferStats(const TransferStats& stats) = delete;
+  TransferStats& operator=(const TransferStats& stats) = delete;
+  TransferStats(TransferStats&& stats) = default;
+  TransferStats& operator=(TransferStats&& stats) = default;
 
   explicit TransferStats(bool isLocked = false) {
     if (isLocked) {
@@ -123,7 +123,7 @@ class TransferStats {
     }
   }
 
-  explicit TransferStats(const std::string &id, bool isLocked = false)
+  explicit TransferStats(const std::string& id, bool isLocked = false)
       : TransferStats(isLocked) {
     id_ = id;
   }
@@ -240,7 +240,7 @@ class TransferStats {
     return remoteErrCode_;
   }
 
-  const std::string &getId() const {
+  const std::string& getId() const {
     std::shared_lock lock(getSharedLock());
     return id_;
   }
@@ -288,7 +288,7 @@ class TransferStats {
   }
 
   /// @param id of the corresponding entity
-  void setId(const std::string &id) {
+  void setId(const std::string& id) {
     std::unique_lock lock(getUniqueLock());
     id_ = id;
   }
@@ -348,9 +348,9 @@ class TransferStats {
     return tls_;
   }
 
-  TransferStats &operator+=(const TransferStats &stats);
+  TransferStats& operator+=(const TransferStats& stats);
 
-  friend std::ostream &operator<<(std::ostream &os, const TransferStats &stats);
+  friend std::ostream& operator<<(std::ostream& os, const TransferStats& stats);
 };
 
 /**
@@ -365,10 +365,10 @@ class TransferReport {
    * This constructor moves all the stat objects to member variables. This is
    * only called at the end of transfer by the sender
    */
-  TransferReport(std::vector<TransferStats> &transferredSourceStats,
-                 std::vector<TransferStats> &failedSourceStats,
-                 std::vector<TransferStats> &threadStats,
-                 std::vector<std::string> &failedDirectories, double totalTime,
+  TransferReport(std::vector<TransferStats>& transferredSourceStats,
+                 std::vector<TransferStats>& failedSourceStats,
+                 std::vector<TransferStats>& threadStats,
+                 std::vector<std::string>& failedDirectories, double totalTime,
                  int64_t totalFileSize, int64_t numDiscoveredFiles,
                  int64_t previouslySentBytes, bool fileDiscoveryFinished);
 
@@ -376,16 +376,16 @@ class TransferReport {
    * This function does not move the thread stats passed to it. This is called
    * by the progress reporter thread.
    */
-  TransferReport(const std::vector<TransferStats> &threadStats,
+  TransferReport(const std::vector<TransferStats>& threadStats,
                  double totalTime, int64_t totalFileSize,
                  int64_t numDiscoveredFiles, bool fileDiscoveryFinished);
 
-  TransferReport(TransferStats &&stats, double totalTime, int64_t totalFileSize,
+  TransferReport(TransferStats&& stats, double totalTime, int64_t totalFileSize,
                  int64_t numDiscoveredFiles, bool fileDiscoveryFinished);
   /// constructor used by receiver, does move the stats
-  explicit TransferReport(TransferStats &&globalStats);
+  explicit TransferReport(TransferStats&& globalStats);
   /// @return   summary of the report
-  const TransferStats &getSummary() const {
+  const TransferStats& getSummary() const {
     return summary_;
   }
   /// @return   transfer throughput in Mbytes/sec
@@ -397,18 +397,18 @@ class TransferReport {
     return totalTime_;
   }
   /// @return   stats for successfully transferred sources
-  const std::vector<TransferStats> &getTransferredSourceStats() const {
+  const std::vector<TransferStats>& getTransferredSourceStats() const {
     return transferredSourceStats_;
   }
   /// @return   stats for failed sources
-  const std::vector<TransferStats> &getFailedSourceStats() const {
+  const std::vector<TransferStats>& getFailedSourceStats() const {
     return failedSourceStats_;
   }
   /// @return   stats for threads
-  const std::vector<TransferStats> &getThreadStats() const {
+  const std::vector<TransferStats>& getThreadStats() const {
     return threadStats_;
   }
-  const std::vector<std::string> &getFailedDirectories() const {
+  const std::vector<std::string>& getFailedDirectories() const {
     return failedDirectories_;
   }
   int64_t getTotalFileSize() const {
@@ -419,7 +419,7 @@ class TransferReport {
     return currentThroughput_ / kMbToB;
   }
   /// @param stats  stats to added
-  void addTransferStats(const TransferStats &stats) {
+  void addTransferStats(const TransferStats& stats) {
     summary_ += stats;
   }
   /// @param currentThroughput  current throughput
@@ -445,8 +445,8 @@ class TransferReport {
   int64_t getPreviouslySentBytes() const {
     return previouslySentBytes_;
   }
-  friend std::ostream &operator<<(std::ostream &os,
-                                  const TransferReport &report);
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const TransferReport& report);
 
  private:
   TransferStats summary_;
@@ -478,7 +478,7 @@ class TransferReport {
  */
 class ProgressReporter {
  public:
-  explicit ProgressReporter(const WdtTransferRequest &transferRequest)
+  explicit ProgressReporter(const WdtTransferRequest& transferRequest)
       : transferRequest_(transferRequest) {
     isTty_ = isatty(STDOUT_FILENO);
   }
@@ -495,14 +495,14 @@ class ProgressReporter {
    *
    * @param report                current transfer report
    */
-  virtual void progress(const std::unique_ptr<TransferReport> &report);
+  virtual void progress(const std::unique_ptr<TransferReport>& report);
 
   /**
    * This method gets called after the transfer ends
    *
    * @param report                final transfer report
    */
-  virtual void end(const std::unique_ptr<TransferReport> &report);
+  virtual void end(const std::unique_ptr<TransferReport>& report);
 
   virtual ~ProgressReporter() {
   }
@@ -510,7 +510,7 @@ class ProgressReporter {
  protected:
   /// Reference to the wdt transfer request for the wdt base
   /// object using the progress reporter
-  const WdtTransferRequest &transferRequest_;
+  const WdtTransferRequest& transferRequest_;
 
  private:
   /**
@@ -568,7 +568,7 @@ class PerfStatReport {
     END
   };
 
-  explicit PerfStatReport(const WdtOptions &options);
+  explicit PerfStatReport(const WdtOptions& options);
 
   /**
    * @param statType      stat-type
@@ -576,9 +576,9 @@ class PerfStatReport {
    */
   void addPerfStat(StatType statType, int64_t timeInMicros);
 
-  friend std::ostream &operator<<(std::ostream &os,
-                                  const PerfStatReport &statReport);
-  PerfStatReport &operator+=(const PerfStatReport &statReport);
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const PerfStatReport& statReport);
+  PerfStatReport& operator+=(const PerfStatReport& statReport);
 
  private:
   const static int kNumTypes_ = PerfStatReport::END;

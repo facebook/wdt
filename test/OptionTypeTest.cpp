@@ -29,7 +29,7 @@ const std::string NUM_PORTS_FLAG = WDT_FLAG_STR(num_ports);
 const std::string BLOCK_SIZE_FLAG = WDT_FLAG_STR(block_size_mbytes);
 const std::string OPTION_TYPE_FLAG = WDT_FLAG_STR(option_type);
 
-void overrideTest1(const std::string &optionType) {
+void overrideTest1(const std::string& optionType) {
   WdtOptions options;
   GFLAGS_NAMESPACE::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(),
                                          optionType.c_str());
@@ -40,7 +40,7 @@ void overrideTest1(const std::string &optionType) {
   EXPECT_EQ(8, options.block_size_mbytes);
 }
 
-void overrideTest2(const std::string &optionType) {
+void overrideTest2(const std::string& optionType) {
   WdtOptions options;
   GFLAGS_NAMESPACE::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(),
                                          optionType.c_str());
@@ -68,7 +68,7 @@ TEST(OptionType, FlashOptionTypeTest3) {
 }
 
 TEST(OptionType, DiskOptionTypeTest1) {
-  auto &options = WdtOptions::getMutable();
+  auto& options = WdtOptions::getMutable();
   GFLAGS_NAMESPACE::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
   WdtFlags::initializeFromFlags(options);
   EXPECT_EQ(3, options.num_ports);
@@ -76,7 +76,7 @@ TEST(OptionType, DiskOptionTypeTest1) {
 }
 
 TEST(OptionType, DiskOptionTypeTest2) {
-  auto &options = WdtOptions::getMutable();
+  auto& options = WdtOptions::getMutable();
   GFLAGS_NAMESPACE::SetCommandLineOption(OPTION_TYPE_FLAG.c_str(), "disk");
   Wdt::initializeWdt("wdt");
   EXPECT_EQ(3, options.num_ports);
@@ -93,7 +93,7 @@ TEST(OptionType, DiskOptionTypeTest4) {
 }  // namespace wdt
 }  // namespace facebook
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);

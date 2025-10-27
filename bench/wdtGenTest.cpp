@@ -61,7 +61,7 @@ TEST(Bigram, ToString) {
   EXPECT_EQ(res, "abc{\"de\"}");
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   testing::InitGoogleTest(&argc, argv);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);

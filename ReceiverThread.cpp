@@ -20,14 +20,14 @@ namespace wdt {
 const static int kTimeoutBufferMillis = 1000;
 const static int kWaitTimeoutFactor = 5;
 
-std::ostream &operator<<(std::ostream &os,
-                         const ReceiverThread &receiverThread) {
+std::ostream& operator<<(std::ostream& os,
+                         const ReceiverThread& receiverThread) {
   os << "Thread[" << receiverThread.threadIndex_
      << ", port: " << receiverThread.socket_->getPort() << "] ";
   return os;
 }
 
-int64_t readAtLeast(IServerSocket &s, char *buf, int64_t max, int64_t atLeast,
+int64_t readAtLeast(IServerSocket& s, char* buf, int64_t max, int64_t atLeast,
                     int64_t len) {
   WVLOG(4) << "readAtLeast len " << len << " max " << max << " atLeast "
            << atLeast << " from " << s.getFd();
@@ -60,7 +60,7 @@ int64_t readAtLeast(IServerSocket &s, char *buf, int64_t max, int64_t atLeast,
   return len;
 }
 
-int64_t readAtMost(IServerSocket &s, char *buf, int64_t max, int64_t atMost) {
+int64_t readAtMost(IServerSocket& s, char* buf, int64_t max, int64_t atMost) {
   const int64_t target = atMost < max ? atMost : max;
   WVLOG(3) << "readAtMost target " << target;
   // because we want to process data as soon as it arrives, tryFull option for
@@ -95,8 +95,8 @@ const ReceiverThread::StateFunction ReceiverThread::stateMap_[] = {
     &ReceiverThread::waitForFinishOrNewCheckpoint,
     &ReceiverThread::finishWithError};
 
-ReceiverThread::ReceiverThread(Receiver *wdtParent, int threadIndex,
-                               int32_t port, ThreadsController *controller)
+ReceiverThread::ReceiverThread(Receiver* wdtParent, int threadIndex,
+                               int32_t port, ThreadsController* controller)
     : WdtThread(wdtParent->options_, threadIndex, port,
                 wdtParent->getProtocolVersion(), controller),
       wdtParent_(wdtParent) {
@@ -476,7 +476,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   WTVLOG(1) << "Read id:" << blockDetails.fileName
             << " size:" << blockDetails.dataSize << " ooff:" << oldOffset_
             << " off_: " << off_ << " numRead_: " << numRead_;
-  auto &fileCreator = wdtParent_->getFileCreator();
+  auto& fileCreator = wdtParent_->getFileCreator();
   FileWriter writer(*threadCtx_, &blockDetails, fileCreator.get());
   const auto encryptionType = socket_->getEncryptionType();
   auto writtenGuard = folly::makeGuard([&] {
@@ -512,7 +512,7 @@ ReceiverState ReceiverThread::processFileCmd() {
   }
   threadStats_.addDataBytes(toWrite);
   if (footerType_ == CHECKSUM_FOOTER) {
-    checksum = folly::crc32c((const uint8_t *)(buf_ + off_), toWrite, checksum);
+    checksum = folly::crc32c((const uint8_t*)(buf_ + off_), toWrite, checksum);
   }
   auto throttler = wdtParent_->getThrottler();
   if (throttler) {
@@ -558,7 +558,7 @@ ReceiverState ReceiverThread::processFileCmd() {
     }
     threadStats_.addDataBytes(nres);
     if (footerType_ == CHECKSUM_FOOTER) {
-      checksum = folly::crc32c((const uint8_t *)buf_, nres, checksum);
+      checksum = folly::crc32c((const uint8_t*)buf_, nres, checksum);
     }
 
     sendHeartBeat();
@@ -665,14 +665,14 @@ ReceiverState ReceiverThread::processFileCmd() {
   return READ_NEXT_CMD;
 }
 
-void ReceiverThread::markBlockVerified(const BlockDetails &blockDetails) {
+void ReceiverThread::markBlockVerified(const BlockDetails& blockDetails) {
   threadStats_.addEffectiveBytes(0, blockDetails.dataSize);
   threadStats_.incrNumBlocks();
   checkpoint_.incrNumBlocks();
   if (!options_.isLogBasedResumption()) {
     return;
   }
-  TransferLogManager &transferLogManager = wdtParent_->getTransferLogManager();
+  TransferLogManager& transferLogManager = wdtParent_->getTransferLogManager();
   if (blockDetails.allocationStatus == TO_BE_DELETED) {
     transferLogManager.addFileInvalidationEntry(blockDetails.seqId);
     return;
@@ -682,7 +682,7 @@ void ReceiverThread::markBlockVerified(const BlockDetails &blockDetails) {
 }
 
 void ReceiverThread::markReceivedBlocksVerified() {
-  for (const BlockDetails &blockDetails : blocksWaitingVerification_) {
+  for (const BlockDetails& blockDetails : blocksWaitingVerification_) {
     markBlockVerified(blockDetails);
   }
   blocksWaitingVerification_.clear();
@@ -770,7 +770,7 @@ ReceiverState ReceiverThread::sendFileChunks() {
       case FUNNEL_START: {
         int64_t off = 0;
         buf_[off++] = Protocol::CHUNKS_CMD;
-        const auto &fileChunksInfo = wdtParent_->getFileChunksInfo();
+        const auto& fileChunksInfo = wdtParent_->getFileChunksInfo();
         const int64_t numParsedChunksInfo = fileChunksInfo.size();
         Protocol::encodeChunksCmd(buf_, off, /* size of buf_ */ bufSize_,
                                   /* param to send */ bufSize_,
@@ -1012,7 +1012,7 @@ int32_t ReceiverThread::getPort() const {
 }
 
 ErrorCode ReceiverThread::init() {
-  const EncryptionParams &encryptionData =
+  const EncryptionParams& encryptionData =
       wdtParent_->transferRequest_.encryptionData;
   Func tagVerificationSuccessCallback = [this] {
     this->markReceivedBlocksVerified();
