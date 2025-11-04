@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
 
-from common_utils import *
 import os
+
+from common_utils import (
+    check_transfer_status,
+    create_test_directory,
+    error,
+    generate_random_files,
+    get_dest_dir,
+    get_wdt_binary,
+    run_command,
+    run_sender,
+    start_receiver,
+    start_test,
+    verify_transfer_success,
+)
 
 
 def verify_log_parse_ok(log_dir):
