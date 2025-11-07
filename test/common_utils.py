@@ -314,7 +314,7 @@ def get_md5_for_file(file_path):
 
 def create_md5_for_directory(src_dir, md5_file_name):
     lines = []
-    for root, dirs, files in os.walk(src_dir):
+    for root, _, files in os.walk(src_dir):
         for file in files:
             if file == ".wdt.log":
                 continue
