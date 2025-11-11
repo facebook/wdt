@@ -253,7 +253,7 @@ ErrorCode TransferLogManager::openLog() {
     } else {
       // creation of the log path (which can still be a race)
       WLOG(INFO) << logPath << " doesn't exist... creating...";
-      fd_ = ::open(logPath.c_str(), O_CREAT | O_EXCL, 0644);
+      fd_ = ::open(logPath.c_str(), O_CREAT | O_EXCL, 0666);
       if (fd_ < 0) {
         WPLOG(WARNING) << "Could not create wdt log (maybe ok if race): "
                        << logPath;
