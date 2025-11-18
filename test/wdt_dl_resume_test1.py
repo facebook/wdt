@@ -9,7 +9,17 @@
 # -enable_download_resumption on the sender
 
 from time import time
-from common_utils import *
+
+from common_utils import (
+    check_transfer_status,
+    create_test_directory,
+    generate_random_files,
+    get_test_count,
+    run_sender,
+    start_receiver,
+    start_test,
+    verify_transfer_success,
+)
 
 root_dir = create_test_directory("/tmp")
 generate_random_files(100 * 1024 * 1024)
