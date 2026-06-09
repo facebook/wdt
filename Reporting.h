@@ -30,7 +30,7 @@ const double kMicroToMilli = 1000;
 const double kMicroToSec = 1000 * 1000;
 const double kMilliToSec = 1000;
 
-typedef std::chrono::high_resolution_clock Clock;
+using Clock = std::chrono::high_resolution_clock;
 
 template <typename T>
 int64_t durationMicros(T d) {

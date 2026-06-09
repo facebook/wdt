@@ -88,7 +88,7 @@ class SenderThread : public WdtThread {
     isTty_ = isatty(STDERR_FILENO);
   }
 
-  typedef SenderState (SenderThread::*StateFunction)();
+  using StateFunction = SenderState (SenderThread::*)();
 
   /// Returns the neogtiated protocol
   int getNegotiatedProtocol() const override;

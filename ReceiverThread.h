@@ -88,7 +88,7 @@ class ReceiverThread : public WdtThread {
   /// Overloaded operator for printing thread info
   friend std::ostream& operator<<(std::ostream& os,
                                   const ReceiverThread& receiverThread);
-  typedef ReceiverState (ReceiverThread::*StateFunction)();
+  using StateFunction = ReceiverState (ReceiverThread::*)();
 
   /// Parent shared among all the threads for meta information
   Receiver* wdtParent_;

@@ -16,8 +16,8 @@
 namespace facebook {
 namespace wdt {
 
-typedef std::shared_ptr<Receiver> ReceiverPtr;
-typedef std::shared_ptr<Sender> SenderPtr;
+using ReceiverPtr = std::shared_ptr<Receiver>;
+using SenderPtr = std::shared_ptr<Sender>;
 
 /**
  * Base class for both wdt global and namespace controller
@@ -270,7 +270,7 @@ class WdtResourceController : public WdtControllerBase {
   const WdtOptions& getOptions() const;
 
  protected:
-  typedef std::shared_ptr<WdtNamespaceController> NamespaceControllerPtr;
+  using NamespaceControllerPtr = std::shared_ptr<WdtNamespaceController>;
   /// Get the namespace controller
   NamespaceControllerPtr getNamespaceController(
       const std::string& wdtNamespace) const;
