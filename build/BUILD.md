@@ -171,6 +171,136 @@ cmake ../wdt -G "Eclipse CDT4 - Unix Makefiles" -DBUILD_TESTING=on
 
 # Troubleshooting
 
+## MAC OSX Build Problems -- Catalina
+
+## TLDR
+
+1) Turn testing off in the cmake call
+2) You need to manually change a version number in 2 wdt repo files from a fresh pull of a repo
+3) You need to use system installed folly.  brew install it, and pass the flag to cmake informing it to skip the local build.
+4) cmake ... make ... make install ... succcess!
+
+* Following the manual instructions, not travis. I had the command line tools installed, but no Xcode Dev App. I followed the `cmake ../wdt -G "Unix Makefiles" -DBUILD_TESTING=on -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl` path. Cmake ran fine, but make crashed in several ways I had to find workarounds for.
+
+### Tests Causing Errors
+
+<pre>
+make -j 8
+...
+ld: library not found for -lgtest
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+make[2]: *** [CMakeFiles/wdtbenchtestslib.dir/build.make:100: libwdtbenchtestslib.dylib] Error 1
+make[1]: *** [CMakeFiles/Makefile2:466: CMakeFiles/wdtbenchtestslib.dir/all] Error 2
+make[1]: *** Waiting for unfinished jobs....
+[ 18%] Linking CXX executable _bin/wdt/wdt_gen_stats
+[ 18%] Built target wdt_gen_stats
+[ 19%] Linking CXX executable _bin/wdt/bench/wdt_gen_files
+[ 19%] Built target wdt_gen_files
+[ 20%] Linking CXX shared library libfolly4wdt.dylib
+[ 20%] Built target folly4wdt
+make: *** [Makefile:146: all] Error 2
+</pre>
+
+*solutions*
+1) start with a fresh cmake call and turn testing off ` -DBUILD_TESTING=off`
+2) Or, just re-run `make -j`  and it will proceed to the next bug
+`
+
+### ld: malformed 64-bit a.b.c.d.e version number: 1.32.1910230
+
+Not being savvy w/make/cmake/clang/... this took a while to figure out. OSX appears to have slightly different rules around versioning numbering schemes than the rest of ULINUX land.  I'd do a poor job rehashing it and didn't save the reference links.... so here is the fix:
+1) First, do not change the 1.32 prefix.  The '32' minor version needs to match some other library minor version or all hell breaks loose.  The third integer needs to change (1910230)
+2) delete the wdt repo and re-pull a fresh copy.  delete your build directory too.
+3) edit the wdt/WdtConfig.h file. This section
+
+<pre>
+#define WDT_VERSION_MAJOR 1
+#define WDT_VERSION_MINOR 32
+#define WDT_VERSION_BUILD 1910230
+// Add -fbcode to version str
+#define WDT_VERSION_STR "1.32.1910230-fbcode"
+</pre>
+
+Should be edited to look like this:
+
+<pre>
+#define WDT_VERSION_MAJOR 1
+#define WDT_VERSION_MINOR 32
+#define WDT_VERSION_BUILD 64
+// Add -fbcode to version str
+#define WDT_VERSION_STR "1.32.64-fbcode"
+</pre>
+* I chose the number 64 and it worked, I know there are rules and size limits for this part of the version, so stick with 64
+
+4) And this file: wdt/CMakeLists.txt needs to be edited. From
+
+<pre># There is no C per se in WDT but if you use CXX only here many checks fail
+# Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
+# Minor currently is also the protocol version - has to match with Protocol.cpp
+project("WDT" LANGUAGES C CXX VERSION 1.32.1910230)```
+</pre>
+To:
+<pre>
+# There is no C per se in WDT but if you use CXX only here many checks fail
+# Version is Major.Minor.YYMMDDX for up to 10 releases per day (X from 0 to 9)
+# Minor currently is also the protocol version - has to match with Protocol.cpp
+project("WDT" LANGUAGES C CXX VERSION 1.32.64)
+</pre>
+
+5) Ok, save the files. move back to your fresh build dir start with cmake with testing offf:
+
+<pre>
+cmake ../wdt -G "Unix Makefiles" -DBUILD_TESTING=off -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
+make -j 8
+...
+...
+[ 82%] Building CXX object CMakeFiles/wdt_min.dir/util/CommonImpl.cpp.o
+[ 84%] Linking CXX shared library libwdt_min.dylib
+Undefined symbols for architecture x86_64:
+  "folly::detail::to_ascii_table<10ull, folly::to_ascii_alphabet<false> >::data", referenced from:
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in ClientSocket.cpp.o
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in EncryptionUtils.cpp.o
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in ErrorCodes.cpp.o
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in WdtTransferRequest.cpp.o
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in Sender.cpp.o
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in ServerSocket.cpp.o
+  "folly::detail::to_ascii_powers<10ull, unsigned long long>::data", referenced from:
+      unsigned long folly::to_ascii_size<10ull>(unsigned long long) in ClientSocket.cpp.o
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in ClientSocket.cpp.o
+      unsigned long folly::to_ascii_size<10ull>(unsigned long long) in EncryptionUtils.cpp.o
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in EncryptionUtils.cpp.o
+      unsigned long folly::to_ascii_size<10ull>(unsigned long long) in ErrorCodes.cpp.o
+      unsigned long folly::to_ascii_with<10ull, folly::to_ascii_alphabet<false>, 20ul>(char (&) [20ul], unsigned long long) in ErrorCodes.cpp.o
+      unsigned long folly::to_ascii_size<10ull>(unsigned long long) in WdtTransferRequest.cpp.o
+      ...
+ld: symbol(s) not found for architecture x86_64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+make[2]: *** [CMakeFiles/wdt_min.dir/build.make:520: libwdt_min.1.32.64.dylib] Error 1
+make[1]: *** [CMakeFiles/Makefile2:169: CMakeFiles/wdt_min.dir/all] Error 2
+make: *** [Makefile:136: all] Error 2
+</pre>
+
+* New Error with the same lib, but this time involving folly.  This also took me forever to figure out, but CMKAE has the fix for this in place already, use the system install of folly.....
+
+### Linking CXX shared library libwdt_min.dylib Undefined symbols for architecture x86_64:
+
+The fix for this is to use the system folly and not the WDS minimal version.
+So:
+1) Delete build directory
+2) Delete wdt repo, repull it, edit the version numbers as described above.
+3) Install folly with brew `brew install folly`
+4) Brew exits with the path to where it has installed folly.  Copy that so you can pass that to cmake in a momenmt.
+5) mkdir wdt-mac (next to the wdt dir), and:
+
+<pre>
+cmake ../wdt -G "Unix Makefiles" -DBUILD_TESTING=off -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DWDT_USE_SYSTEM_FOLLY=/usr/local/Cellar/folly/2021.06.14.00/
+make -j 8
+sudo make install
+</pre>
+
+And there it is.
+
+
 ## IPv6 DNS entry missing
 If the host you are running the tests on does not have an IPv6 address (either
 missing a AAAA record or not having any IPv6 address) some tests will fail
