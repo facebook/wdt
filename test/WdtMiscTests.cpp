@@ -6,15 +6,41 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <wdt/Receiver.h>
 #include <wdt/Wdt.h>
 #include <wdt/test/TestCommon.h>
 
+#include <memory>
 #include <thread>
 
 using namespace std;
 
 namespace facebook {
 namespace wdt {
+
+TEST(BasicTest, ReceiverInitFailureAllowsRetry) {
+  class FailingSocketCreator final : public Receiver::ISocketCreator {
+   public:
+    std::unique_ptr<IServerSocket> makeServerSocket(ThreadCtx&, int, int,
+                                                    const EncryptionParams&,
+                                                    int64_t, Func&&,
+                                                    bool) override {
+      return nullptr;
+    }
+  } socketCreator;
+
+  TemporaryDirectory tmpDir;
+  WdtTransferRequest request(0, 1, tmpDir.dir());
+  // The second attempt must be able to acquire the log released by the first
+  // receiver, and both attempts must report the socket setup error.
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    Receiver receiver(request);
+    receiver.getWdtOptions().enable_download_resumption = true;
+    receiver.setRecoveryId("retry");
+    receiver.setSocketCreator(&socketCreator);
+    EXPECT_EQ(ERROR, receiver.init().errorCode);
+  }
+}
 
 TEST(BasicTest, ReceiverAcceptTimeout) {
   Wdt& wdt = Wdt::initializeWdt("unit test ReceiverAcceptTimeout");

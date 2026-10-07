@@ -1008,7 +1008,7 @@ void ReceiverThread::start() {
 }
 
 int32_t ReceiverThread::getPort() const {
-  return socket_->getPort();
+  return socket_ ? socket_->getPort() : 0;
 }
 
 ErrorCode ReceiverThread::init() {

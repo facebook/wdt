@@ -219,7 +219,13 @@ const WdtTransferRequest& Receiver::init() {
 
   transferRequest_.ports.clear();
   for (const auto& receiverThread : receiverThreads_) {
-    transferRequest_.ports.push_back(receiverThread->getPort());
+    const auto port = receiverThread->getPort();
+    transferRequest_.ports.push_back(port);
+    // A socket creator can fail without making a socket (e.g. missing TLS
+    // credentials). Such a thread cannot be started, even if others can.
+    if (port == 0) {
+      code = ERROR;
+    }
   }
 
   if (transferRequest_.hostName.empty()) {
@@ -289,6 +295,10 @@ std::unique_ptr<TransferReport> Receiver::finish() {
   TransferStatus status = getTransferStatus();
   if (status == TransferStatus::NOT_STARTED) {
     WLOG(WARNING) << "Even though transfer has not started, finish is called";
+    // init() can open a resumption log before failing to create a socket.
+    if (transferLogManager_) {
+      transferLogManager_->closeLog();
+    }
     // getTransferReport will set the error code to ERROR
     return getTransferReport();
   }
